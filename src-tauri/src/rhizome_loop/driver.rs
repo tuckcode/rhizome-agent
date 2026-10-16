@@ -10,7 +10,7 @@ use crate::model_events::ModelEvent;
 use super::model::Model;
 use super::policy::{self, Ruling};
 use super::tools;
-use super::types::{DurableEvent, HistoryItem, ModelView, ToolCall};
+use super::types::{DurableEvent, HistoryItem, ModelView, ToolCall, UNANSWERED_TOOL_OUTPUT};
 
 /// Reply from a human approval wait. `Cancelled` is timeout or no UI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -108,23 +108,29 @@ impl Default for AgentLoop {
 impl AgentLoop {
     /// Rebuild history from a durable log. Grants and pending approvals
     /// are not restored. An unfinished last turn is closed as
-    /// `Cancelled { cause: "restart" }`.
+    /// `Cancelled { cause: "restart" }`. Unpaired tool calls get a
+    /// synthetic result so OpenAI-style providers see a matching
+    /// `role: "tool"` message. Unpaired results and denials are dropped.
     pub fn from_log(events: Vec<DurableEvent>) -> Self {
         let agent = Self::new();
         let mut history = Vec::new();
         let mut log = Vec::new();
         let mut last_assistant: Option<usize> = None;
+        let mut open_calls: Vec<(String, String)> = Vec::new();
         let mut turn_closed = true;
 
         for event in events {
-            log.push(event.clone());
             match &event {
                 DurableEvent::User { text } => {
+                    close_open_tool_calls(&mut open_calls, &mut history, &mut log);
+                    log.push(event.clone());
                     history.push(HistoryItem::User { text: text.clone() });
                     last_assistant = None;
                     turn_closed = false;
                 }
                 DurableEvent::Assistant { text } => {
+                    close_open_tool_calls(&mut open_calls, &mut history, &mut log);
+                    log.push(event.clone());
                     history.push(HistoryItem::Assistant {
                         text: text.clone(),
                         tool_calls: Vec::new(),
@@ -133,6 +139,7 @@ impl AgentLoop {
                     turn_closed = false;
                 }
                 DurableEvent::ToolCall { id, name, args } => {
+                    log.push(event.clone());
                     let call = ToolCall {
                         id: id.clone(),
                         name: name.clone(),
@@ -149,9 +156,14 @@ impl AgentLoop {
                         });
                         last_assistant = Some(history.len() - 1);
                     }
+                    open_calls.push((id.clone(), name.clone()));
                     turn_closed = false;
                 }
                 DurableEvent::ToolResult { id, name, output } => {
+                    if !take_open_call(&mut open_calls, id) {
+                        continue;
+                    }
+                    log.push(event.clone());
                     history.push(HistoryItem::ToolResult {
                         id: id.clone(),
                         name: name.clone(),
@@ -160,6 +172,10 @@ impl AgentLoop {
                     turn_closed = false;
                 }
                 DurableEvent::ToolDenied { id, name, reason } => {
+                    if !take_open_call(&mut open_calls, id) {
+                        continue;
+                    }
+                    log.push(event.clone());
                     history.push(HistoryItem::ToolDenied {
                         id: id.clone(),
                         name: name.clone(),
@@ -168,15 +184,19 @@ impl AgentLoop {
                     turn_closed = false;
                 }
                 DurableEvent::ModelFailed { .. } => {
+                    log.push(event.clone());
                     turn_closed = false;
                 }
                 DurableEvent::TurnEnd | DurableEvent::Cancelled { .. } => {
+                    close_open_tool_calls(&mut open_calls, &mut history, &mut log);
+                    log.push(event.clone());
                     turn_closed = true;
                     last_assistant = None;
                 }
             }
         }
 
+        close_open_tool_calls(&mut open_calls, &mut history, &mut log);
         if !turn_closed {
             log.push(DurableEvent::Cancelled {
                 cause: "restart".into(),
@@ -709,6 +729,30 @@ impl AgentLoop {
 
     fn lock(&self) -> MutexGuard<'_, Shared> {
         self.shared.lock().expect("rhizome loop")
+    }
+}
+
+fn take_open_call(open_calls: &mut Vec<(String, String)>, id: &str) -> bool {
+    let Some(index) = open_calls.iter().position(|(open_id, _)| open_id == id) else {
+        return false;
+    };
+    open_calls.remove(index);
+    true
+}
+
+fn close_open_tool_calls(
+    open_calls: &mut Vec<(String, String)>,
+    history: &mut Vec<HistoryItem>,
+    log: &mut Vec<DurableEvent>,
+) {
+    for (id, name) in open_calls.drain(..) {
+        let output = UNANSWERED_TOOL_OUTPUT.to_string();
+        history.push(HistoryItem::ToolResult {
+            id: id.clone(),
+            name: name.clone(),
+            output: output.clone(),
+        });
+        log.push(DurableEvent::ToolResult { id, name, output });
     }
 }
 

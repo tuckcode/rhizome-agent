@@ -563,6 +563,19 @@ pub struct NativeChatStartRequest {
     pub permission_mode: AiAgentPermissionMode,
 }
 
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NativeChatForkRequest {
+    pub events: Vec<crate::rhizome_loop::DurableEvent>,
+    pub target: String,
+    pub system_prompt: Option<String>,
+    pub vault_path: Option<String>,
+    #[serde(default)]
+    pub vault_paths: Vec<String>,
+    #[serde(default)]
+    pub permission_mode: AiAgentPermissionMode,
+}
+
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NativeChatListItem {
@@ -570,6 +583,8 @@ pub struct NativeChatListItem {
     pub created_at: String,
     pub target: String,
     pub title: String,
+    #[serde(default)]
+    pub archived: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -585,15 +600,65 @@ pub struct NativeChatOpenResult {
 
 pub fn list_native_sessions() -> Result<Vec<NativeChatListItem>, String> {
     let headers = crate::engines::native_log::list_session_headers()?;
-    Ok(headers
+    let archived = settings::get_settings()
+        .ok()
+        .and_then(|settings| settings.archived_native_sessions)
+        .unwrap_or_default();
+    Ok(mark_native_archived(
+        headers
+            .into_iter()
+            .map(|header| NativeChatListItem {
+                session_id: header.session_id,
+                created_at: header.created_at,
+                target: header.target,
+                title: String::new(),
+                archived: false,
+            })
+            .collect(),
+        &archived,
+    ))
+}
+
+/// Flag filed native chats without dropping them from the list.
+pub fn mark_native_archived(
+    items: Vec<NativeChatListItem>,
+    archived_ids: &[String],
+) -> Vec<NativeChatListItem> {
+    if archived_ids.is_empty() {
+        return items;
+    }
+    let archived: std::collections::HashSet<&str> =
+        archived_ids.iter().map(String::as_str).collect();
+    items
         .into_iter()
-        .map(|header| NativeChatListItem {
-            session_id: header.session_id,
-            created_at: header.created_at,
-            target: header.target,
-            title: String::new(),
+        .map(|mut item| {
+            item.archived = archived.contains(item.session_id.as_str());
+            item
         })
-        .collect())
+        .collect()
+}
+
+/// File a native chat out of the main list, or put it back.
+///
+/// Rhizome's own state. Native logs stay on disk.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn set_native_session_archived(session_id: String, archived: bool) -> Result<(), String> {
+    let session_id = session_id.trim().to_string();
+    if session_id.is_empty() {
+        return Err("A session needs an id to archive".into());
+    }
+    let mut stored = settings::get_settings()?;
+    let mut ids = stored.archived_native_sessions.take().unwrap_or_default();
+    if archived {
+        if !ids.iter().any(|id| id == &session_id) {
+            ids.push(session_id);
+        }
+    } else {
+        ids.retain(|id| id != &session_id);
+    }
+    stored.archived_native_sessions = Some(ids);
+    settings::save_settings(stored)
 }
 
 pub fn open_native_session_record(session_id: &str) -> Result<NativeChatOpenResult, String> {
@@ -744,6 +809,30 @@ pub fn native_chat_end(chats: tauri::State<NativeChats>, session_id: String) -> 
 #[tauri::command]
 pub fn native_chat_list() -> Result<Vec<NativeChatListItem>, String> {
     list_native_sessions()
+}
+
+/// Persist kept turns as a new native session. A fork of an archived chat
+/// gets a new id, so it is not archived.
+pub fn fork_native_session(request: NativeChatForkRequest) -> Result<String, String> {
+    let id = uuid::Uuid::new_v4().to_string();
+    let header = crate::engines::native_log::SessionHeader {
+        version: crate::engines::native_log::NATIVE_LOG_VERSION,
+        session_id: id.clone(),
+        created_at: chrono::Utc::now().to_rfc3339(),
+        target: request.target,
+        permission_mode: crate::engines::native_log::permission_mode_label(request.permission_mode),
+        vault_path: request.vault_path,
+        vault_paths: request.vault_paths,
+        system_prompt: request.system_prompt,
+    };
+    crate::engines::native_log::write_session_events(&header, &request.events)?;
+    Ok(id)
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub fn native_chat_fork(request: NativeChatForkRequest) -> Result<String, String> {
+    fork_native_session(request)
 }
 
 #[cfg(desktop)]
@@ -1276,6 +1365,278 @@ mod tests {
                 .turns
                 .iter()
                 .any(|turn| { turn.role == "assistant" && turn.text == "ok" }));
+        });
+    }
+
+    #[test]
+    fn native_list_items_carry_the_archive_flag() {
+        let items = vec![
+            NativeChatListItem {
+                session_id: "keep".into(),
+                created_at: String::new(),
+                target: String::new(),
+                title: String::new(),
+                archived: false,
+            },
+            NativeChatListItem {
+                session_id: "file".into(),
+                created_at: String::new(),
+                target: String::new(),
+                title: String::new(),
+                archived: false,
+            },
+        ];
+        let marked = mark_native_archived(items, &["file".into()]);
+        assert!(!marked[0].archived);
+        assert!(marked[1].archived);
+    }
+
+    fn kept_turns() -> Vec<DurableEvent> {
+        vec![
+            DurableEvent::User {
+                text: "First".into(),
+            },
+            DurableEvent::Assistant { text: "One".into() },
+            DurableEvent::TurnEnd,
+            DurableEvent::User {
+                text: "Second".into(),
+            },
+            DurableEvent::Assistant { text: "Two".into() },
+            DurableEvent::TurnEnd,
+        ]
+    }
+
+    fn fork_request(events: Vec<DurableEvent>) -> NativeChatForkRequest {
+        NativeChatForkRequest {
+            events,
+            target: "openai/gpt-4o-mini".into(),
+            system_prompt: None,
+            vault_path: Some("/vault".into()),
+            vault_paths: Vec::new(),
+            permission_mode: AiAgentPermissionMode::Safe,
+        }
+    }
+
+    #[test]
+    fn fork_persists_kept_turns_lists_them_and_survives_reload() {
+        with_temp_home(|_| {
+            write_native_log(
+                "archived-source",
+                1,
+                "openai/gpt-4o-mini",
+                &two_turn_events(),
+            );
+            let source_id = log_id("archived-source");
+            let events = kept_turns();
+            let fork_id = fork_native_session(fork_request(events.clone())).expect("fork");
+            assert_ne!(fork_id, source_id);
+
+            let listed = list_native_sessions().expect("list");
+            assert!(
+                listed.iter().any(|item| item.session_id == fork_id),
+                "fork must appear in the session list: {listed:?}"
+            );
+            let marked = mark_native_archived(listed, std::slice::from_ref(&source_id));
+            let source = marked
+                .iter()
+                .find(|item| item.session_id == source_id)
+                .expect("source");
+            let forked = marked
+                .iter()
+                .find(|item| item.session_id == fork_id)
+                .expect("fork");
+            assert!(source.archived);
+            assert!(
+                !forked.archived,
+                "a fork of an archived chat must land unarchived"
+            );
+
+            let reopened = crate::engines::native_log::open_session_log(&fork_id).expect("reload");
+            assert_eq!(reopened.events, events);
+        });
+    }
+
+    #[test]
+    fn forked_session_sends_kept_history_on_the_next_turn() {
+        with_temp_home(|_| {
+            let fork_id = fork_native_session(fork_request(kept_turns())).expect("fork");
+            let opened = crate::engines::native_log::open_session_log(&fork_id).expect("open log");
+            let agent = AgentLoop::from_log(opened.events);
+            let seen = std::sync::Arc::new(Mutex::new(Vec::<ModelView>::new()));
+            let model = FakeModel::saying("third").share_seen(std::sync::Arc::clone(&seen));
+            let chats = NativeChats::new();
+            let (tx, rx) = mpsc::channel();
+            chats
+                .open_with_engine(
+                    fork_id.clone(),
+                    NativeEngine::from_parts(agent, model),
+                    move |event| {
+                        let _ = tx.send(event);
+                    },
+                )
+                .expect("open");
+            chats.send(&fork_id, "three").expect("send");
+            let events = wait_for_turn_end(&rx);
+            assert!(
+                events.iter().any(
+                    |event| matches!(event, EngineEvent::TextDelta { text } if text == "third")
+                ),
+                "next turn missing: {events:?}"
+            );
+            let views = seen.lock().expect("seen").clone();
+            let last = views.last().expect("model saw the resumed turn");
+            let users: Vec<&str> = last
+                .history
+                .iter()
+                .filter_map(|item| match item {
+                    crate::rhizome_loop::HistoryItem::User { text } => Some(text.as_str()),
+                    _ => None,
+                })
+                .collect();
+            assert!(
+                users.contains(&"First") && users.contains(&"Second"),
+                "forked model must see kept turns: {users:?}"
+            );
+        });
+    }
+
+    fn pending_and_errored_fork_events() -> Vec<DurableEvent> {
+        vec![
+            DurableEvent::User {
+                text: "Do both".into(),
+            },
+            DurableEvent::ToolCall {
+                id: "pending-1".into(),
+                name: "search".into(),
+                args: "{}".into(),
+            },
+            DurableEvent::ToolDenied {
+                id: "pending-1".into(),
+                name: "search".into(),
+                reason: "cancelled".into(),
+            },
+            DurableEvent::ToolCall {
+                id: "err-1".into(),
+                name: "write".into(),
+                args: "{}".into(),
+            },
+            DurableEvent::ToolDenied {
+                id: "err-1".into(),
+                name: "write".into(),
+                reason: "disk full".into(),
+            },
+            DurableEvent::Assistant {
+                text: "Tried both".into(),
+            },
+            DurableEvent::TurnEnd,
+        ]
+    }
+
+    fn openai_tool_calls_are_paired(messages: &[serde_json::Value]) {
+        let mut open: Vec<String> = Vec::new();
+        for message in messages {
+            let role = message
+                .get("role")
+                .and_then(|value| value.as_str())
+                .unwrap_or("");
+            match role {
+                "user" | "system" => {
+                    assert!(
+                        open.is_empty(),
+                        "unpaired tool_calls before {role}: {open:?} in {messages:?}"
+                    );
+                }
+                "assistant" => {
+                    if let Some(calls) =
+                        message.get("tool_calls").and_then(|value| value.as_array())
+                    {
+                        for call in calls {
+                            open.push(
+                                call.get("id")
+                                    .and_then(|value| value.as_str())
+                                    .expect("tool_call id")
+                                    .to_string(),
+                            );
+                        }
+                    }
+                }
+                "tool" => {
+                    let id = message
+                        .get("tool_call_id")
+                        .and_then(|value| value.as_str())
+                        .expect("tool_call_id");
+                    let index = open
+                        .iter()
+                        .position(|open_id| open_id == id)
+                        .unwrap_or_else(|| {
+                            panic!("tool result {id} has no matching call: {messages:?}")
+                        });
+                    open.remove(index);
+                }
+                _ => {}
+            }
+        }
+        assert!(
+            open.is_empty(),
+            "unpaired tool_calls at end: {open:?} in {messages:?}"
+        );
+    }
+
+    fn openai_roles(messages: &[serde_json::Value]) -> Vec<&str> {
+        messages
+            .iter()
+            .filter_map(|message| message.get("role").and_then(|value| value.as_str()))
+            .collect()
+    }
+
+    #[test]
+    fn forked_pending_and_errored_tools_reload_into_a_valid_provider_list() {
+        with_temp_home(|_| {
+            let events = pending_and_errored_fork_events();
+            let fork_id = fork_native_session(fork_request(events.clone())).expect("fork");
+            let opened = crate::engines::native_log::open_session_log(&fork_id).expect("reload");
+            assert_eq!(opened.events, events);
+
+            let agent = AgentLoop::from_log(opened.events);
+            let seen = std::sync::Arc::new(Mutex::new(Vec::<ModelView>::new()));
+            let model = FakeModel::saying("next").share_seen(std::sync::Arc::clone(&seen));
+            let chats = NativeChats::new();
+            let (tx, rx) = mpsc::channel();
+            chats
+                .open_with_engine(
+                    fork_id.clone(),
+                    NativeEngine::from_parts(agent, model),
+                    move |event| {
+                        let _ = tx.send(event);
+                    },
+                )
+                .expect("open");
+            chats.send(&fork_id, "what next").expect("send");
+            let turn = wait_for_turn_end(&rx);
+            assert!(
+                turn.iter().any(
+                    |event| matches!(event, EngineEvent::TextDelta { text } if text == "next")
+                ),
+                "next turn missing: {turn:?}"
+            );
+
+            let views = seen.lock().expect("seen").clone();
+            let last = views.last().expect("model saw the resumed turn");
+            let messages = crate::rhizome_provider_model::openai_messages(last, last.turn_start);
+            openai_tool_calls_are_paired(&messages);
+            assert_eq!(
+                openai_roles(&messages),
+                ["user", "assistant", "tool", "tool", "assistant", "user",]
+            );
+            assert_eq!(messages[0]["content"], "Do both");
+            assert_eq!(messages[1]["tool_calls"][0]["id"], "pending-1");
+            assert_eq!(messages[1]["tool_calls"][1]["id"], "err-1");
+            assert_eq!(messages[2]["tool_call_id"], "pending-1");
+            assert_eq!(messages[2]["content"], "Denied: cancelled");
+            assert_eq!(messages[3]["tool_call_id"], "err-1");
+            assert_eq!(messages[3]["content"], "Denied: disk full");
+            assert_eq!(messages[4]["content"], "Tried both");
+            assert_eq!(messages[5]["content"], "what next");
         });
     }
 

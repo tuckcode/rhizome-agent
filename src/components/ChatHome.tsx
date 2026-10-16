@@ -256,7 +256,7 @@ export default function ChatHome({
           sessionsRailSlot={sessionsRailSlot}
           onRailSessionPicked={onRailSessionPicked}
           onConversationReset={clearEngineLock}
-          forkTargetsPrimeEntry
+          forkTargetsPrimeEntry={effectiveEngine === 'prime'}
           newChatRef={newChatRef}
           onOpenMycelium={onOpenSessionFootprint}
           notePane={

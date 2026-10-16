@@ -2181,7 +2181,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   )
 
   return (
-    <AppPreferencesProvider dateDisplayFormat={dateDisplayFormat} displayTimeZone={displayTimeZone}>
+    <AppPreferencesProvider dateDisplayFormat={dateDisplayFormat} displayTimeZone={displayTimeZone} locale={appLocale}>
       <CelebrationProvider
         enabled={readCelebrationsEnabled(settings.celebrations_enabled)}
         locale={appLocale}

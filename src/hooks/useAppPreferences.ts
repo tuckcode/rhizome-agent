@@ -16,10 +16,12 @@ import {
   type ThemeMode,
 } from '../lib/themeMode'
 import {
+  DEFAULT_APP_LOCALE,
   SYSTEM_UI_LANGUAGE,
   getBrowserLanguagePreferences,
   resolveEffectiveLocale,
   serializeUiLanguagePreference,
+  type AppLocale,
   type UiLanguagePreference,
 } from '../lib/i18n'
 import {
@@ -48,11 +50,13 @@ interface AppPreferencesConfig {
 interface AppPreferenceValues {
   dateDisplayFormat: DateDisplayFormat
   displayTimeZone: string | null
+  locale: AppLocale
 }
 
 const DEFAULT_APP_PREFERENCES: AppPreferenceValues = {
   dateDisplayFormat: DEFAULT_DATE_DISPLAY_FORMAT,
   displayTimeZone: null,
+  locale: DEFAULT_APP_LOCALE,
 }
 
 const AppPreferencesContext = createContext<AppPreferenceValues>(DEFAULT_APP_PREFERENCES)
@@ -61,17 +65,19 @@ export function AppPreferencesProvider({
   children,
   dateDisplayFormat = DEFAULT_DATE_DISPLAY_FORMAT,
   displayTimeZone = null,
+  locale = DEFAULT_APP_LOCALE,
 }: {
   children: ReactNode
   dateDisplayFormat?: DateDisplayFormat
   displayTimeZone?: string | null
+  locale?: AppLocale
 }) {
   const zone = normalizeDisplayTimeZone(displayTimeZone)
   bindDisplayTimeZone(zone)
   useEffect(() => () => bindDisplayTimeZone(null), [])
   const value = useMemo(
-    () => ({ dateDisplayFormat, displayTimeZone: zone }),
-    [dateDisplayFormat, zone],
+    () => ({ dateDisplayFormat, displayTimeZone: zone, locale }),
+    [dateDisplayFormat, locale, zone],
   )
   return createElement(AppPreferencesContext.Provider, { value }, children)
 }
@@ -82,6 +88,10 @@ export function useDateDisplayFormat(): DateDisplayFormat {
 
 export function useDisplayTimeZone(): string | null {
   return useContext(AppPreferencesContext).displayTimeZone
+}
+
+export function useAppLocale(): AppLocale {
+  return useContext(AppPreferencesContext).locale
 }
 
 export function useAppPreferences({

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { translate } from '../lib/i18n'
 import {
   bindDisplayTimeZone,
   formatDatePartsForDisplay,
@@ -131,12 +132,23 @@ describe('formatInboxDateLabel', () => {
 
   it('uses translated Today and a short relative label for the last week', () => {
     expect(formatInboxDateLabel(now, 'friendly', now)).toEqual({
-      label: 'Today',
+      label: translate('en', 'inbox.date.today'),
       title: 'August 22, 2026',
     })
     expect(formatInboxDateLabel(now - 86400 * 3, 'friendly', now)).toEqual({
-      label: '3d',
+      label: translate('en', 'inbox.date.days', { count: 3 }),
       title: 'August 19, 2026',
+    })
+  })
+
+  it('uses the given locale for Today and relative days', () => {
+    expect(formatInboxDateLabel(now, 'friendly', now, null, 'en')).toEqual({
+      label: translate('en', 'inbox.date.today'),
+      title: 'August 22, 2026',
+    })
+    expect(formatInboxDateLabel(now - 86400 * 2, 'friendly', now, null, 'en')).toEqual({
+      label: translate('en', 'inbox.date.days', { count: 2 }),
+      title: 'August 20, 2026',
     })
   })
 

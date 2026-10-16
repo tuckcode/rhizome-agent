@@ -204,6 +204,8 @@ let mockSettings: Settings = {
 
 const DEFAULT_MOCK_VAULT_PATH = '/Users/mock/demo-vault-v2'
 const mockArchivedSessions = new Set<string>()
+const mockArchivedNativeSessions = new Set<string>()
+let mockForkedNative: { sessionId: string; events: unknown[] } | null = null
 let mockPrimeModelAllowList: string[] = ['mock/mock-model']
 const mockPrimePackages: string[] = []
 
@@ -676,16 +678,64 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   native_chat_cancel: () => null,
   native_chat_approval_reply: () => null,
   native_chat_end: () => null,
-  native_chat_list: () => [],
-  native_chat_open: () => ({
-    sessionId: 'mock-native-session',
-    events: [],
-    warning:
-      'Rhizome restarted. Permissions you gave earlier in this chat no longer apply, so Rhizome asks again.',
-    readOnly: false,
-    error: null,
-    successorId: null,
-  }),
+  native_chat_fork: (args?: Record<string, unknown>) => {
+    const request = args?.request as { events?: unknown[] } | undefined
+    mockForkedNative = {
+      sessionId: 'mock-native-fork',
+      events: Array.isArray(request?.events) ? request.events : [],
+    }
+    return mockForkedNative.sessionId
+  },
+  native_chat_list: () => {
+    const rows = [
+      {
+        sessionId: 'mock-native-1',
+        createdAt: new Date(Date.now() - 60_000).toISOString(),
+        target: 'free_tier_auto',
+        title: 'Native hello',
+        archived: mockArchivedNativeSessions.has('mock-native-1'),
+      },
+    ]
+    if (mockForkedNative) {
+      rows.push({
+        sessionId: mockForkedNative.sessionId,
+        createdAt: new Date().toISOString(),
+        target: 'free_tier_auto',
+        title: 'Forked native chat',
+        archived: mockArchivedNativeSessions.has(mockForkedNative.sessionId),
+      })
+    }
+    return rows
+  },
+  set_native_session_archived: (args: { sessionId?: string; archived?: boolean }) => {
+    const id = args?.sessionId
+    if (!id) return null
+    if (args?.archived) mockArchivedNativeSessions.add(id)
+    else mockArchivedNativeSessions.delete(id)
+    return null
+  },
+  native_chat_open: (args?: Record<string, unknown>) => {
+    const sessionId = typeof args?.sessionId === 'string' ? args.sessionId : 'mock-native-session'
+    if (mockForkedNative && sessionId === mockForkedNative.sessionId) {
+      return {
+        sessionId,
+        events: mockForkedNative.events,
+        warning: null,
+        readOnly: false,
+        error: null,
+        successorId: null,
+      }
+    }
+    return {
+      sessionId: 'mock-native-session',
+      events: [],
+      warning:
+        'Rhizome restarted. Permissions you gave earlier in this chat no longer apply, so Rhizome asks again.',
+      readOnly: false,
+      error: null,
+      successorId: null,
+    }
+  },
   native_chat_delete: () => null,
   get_free_tier_overview: () => mockFreeTierOverview(),
   save_free_tier_settings: (args: { settings?: typeof mockFreeTierSettings }) => {

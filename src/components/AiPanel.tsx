@@ -29,12 +29,18 @@ import {
   type AiAgentReadiness,
 } from '../lib/aiAgents'
 import { chatEngineAllowsSendWithoutPrime } from '../lib/chatEngine'
+import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
 import type { AiTarget } from '../lib/aiTargets'
 import type { AppLocale } from '../lib/i18n'
 import { type NoteListItem } from '../utils/ai-context'
 import type { VaultEntry } from '../types'
 import { useAiPanelController, type AiPanelController } from './useAiPanelController'
 import type { AiAgentMessage } from '../lib/aiAgentConversation'
+import {
+  forksPrimeEntry,
+  nativeSessionPath,
+  persistNativeFork,
+} from '../lib/nativeChatTranscript'
 import { useAiPanelPromptQueue } from './useAiPanelPromptQueue'
 import { useAiPanelFocus } from './useAiPanelFocus'
 import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
@@ -112,6 +118,7 @@ interface AiPanelViewProps {
   defaultAiAgentReadiness?: AiAgentReadiness
   defaultAiAgentReady?: boolean
   chatEngine?: 'prime' | 'native'
+  nativeTarget?: string
   locale?: AppLocale
   activeEntry?: VaultEntry | null
   entries?: VaultEntry[]
@@ -229,6 +236,7 @@ export function AiPanelView({
   defaultAiAgentReadiness: providedDefaultAiAgentReadiness,
   defaultAiAgentReady: providedDefaultAiAgentReady,
   chatEngine,
+  nativeTarget,
   locale = 'en',
   entries,
   interactive = true,
@@ -276,6 +284,9 @@ export function AiPanelView({
     handleNewChat,
   } = controller
   const isPrimeTarget = view.targetKind === 'agent' && view.defaultAiAgent === 'prime' && chatEngine !== 'native'
+  const showSessionList = isPrimeTarget || chatEngine === 'native'
+  const sessionListEngine = chatEngine === 'native' ? 'native' : 'prime'
+  const forkPrime = forksPrimeEntry(isPrimeTarget, forkTargetsPrimeEntry)
   const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath ?? undefined)
   const modelLabel = isPrimeTarget ? primeModelLabel(primeHost) : null
   // Refresh when a turn finishes rather than only on the interval, so context
@@ -384,6 +395,23 @@ export function AiPanelView({
     onConversationReset?.()
     return handleSelectSession(...args)
   }
+  const handleNativeFork = async (messageId: string) => {
+    try {
+      const sessionId = await persistNativeFork({
+        messages: agent.messages,
+        messageId,
+        target: resolveNativeChatTarget(nativeTarget),
+        vaultPath,
+        permissionMode,
+      })
+      await pickSession({
+        id: sessionId,
+        path: nativeSessionPath(sessionId),
+      })
+    } catch (error) {
+      reportSwitchError(error)
+    }
+  }
   usePrimeSessionRestore({
     enabled: isPrimeTarget,
     host: primeHost,
@@ -425,7 +453,7 @@ export function AiPanelView({
           onNewChat={beginNewChat}
         />
       )}
-      {isPrimeTarget && !usesRailSessions && (
+      {showSessionList && !usesRailSessions && (
         <div className="flex shrink-0 justify-end px-3 pt-1.5">
           <Button
             type="button"
@@ -472,6 +500,7 @@ export function AiPanelView({
             />
             <PrimeSessionList
               locale={locale}
+              engine={sessionListEngine}
               onSelectSession={(session) => void pickSession(session)}
               onNewChat={beginNewChat}
               onOpenMycelium={onOpenMycelium}
@@ -503,8 +532,8 @@ export function AiPanelView({
         locale={locale}
         messages={agent.messages}
         isActive={isActive}
-        onForkMessage={forkTargetsPrimeEntry ? (entryId) => void handleForkFromEntry(entryId) : onForkMessage}
-        forkTargetsPrimeEntry={forkTargetsPrimeEntry}
+        onForkMessage={forkPrime ? (entryId) => void handleForkFromEntry(entryId) : (onForkMessage ?? handleNativeFork)}
+        forkTargetsPrimeEntry={forkPrime}
         onOpenNote={onOpenNote}
         onNavigateWikilink={handleNavigateWikilink}
         onRegenerateMessage={agent.regenerateMessage}
@@ -591,7 +620,7 @@ export function AiPanelView({
         onCommandAction={isPrimeTarget ? (action, nextValue) => void handleCommandAction(action, nextValue) : undefined}
       />
       </AiPanelFrame>
-      {usesRailSessions && sessionsRailSlot && isPrimeTarget
+      {usesRailSessions && sessionsRailSlot && showSessionList
         ? createPortal(
             <div
               data-testid="command-rail-session-hits"
@@ -600,6 +629,7 @@ export function AiPanelView({
             >
               <PrimeSessionList
                 locale={locale}
+                engine={sessionListEngine}
                 onSelectSession={(session) => {
                   onRailSessionPicked?.()
                   void pickSession(session)
@@ -711,6 +741,7 @@ export function AiPanel({
       defaultAiAgentReadiness={defaultAiAgentReadiness}
       defaultAiAgentReady={providedDefaultAiAgentReady}
       chatEngine={chatEngine}
+      nativeTarget={nativeTarget}
       locale={locale}
       vaultPath={vaultPath}
       activeEntry={activeEntry}

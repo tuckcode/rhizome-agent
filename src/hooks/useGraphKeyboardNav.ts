@@ -87,6 +87,7 @@ export function useGraphKeyboardNav(options: UseGraphKeyboardNavOptions): void {
         onEscape,
       } = latest.current
       if (!enabled) return
+      if (event.defaultPrevented) return
       if (event.key === 'Escape') {
         if (isEditableTarget(event.target) || eventInDialog(event.target)) return
         event.preventDefault()

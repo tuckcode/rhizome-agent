@@ -16,9 +16,8 @@ import type {
   WikiGraphData,
   WikiGraphNode,
 } from './graphTypes'
-import { toGraphData } from './graphData'
+import { graphNodeScale, toGraphData } from './graphData'
 import { clampedCameraPosition, lookAtFromControls, panCameraToNode } from './cameraFraming'
-import { graphNodeScale } from './graphData'
 
 export interface ForceGraphHandle {
   /** Animate the camera to look at a node. */

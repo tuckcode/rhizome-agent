@@ -6,6 +6,12 @@ import { requestOpenSessionTranscriptHit } from '../lib/sessionTranscriptSearch'
 const invoked = vi.hoisted(() => ({
   calls: [] as Array<{ cmd: string; args?: Record<string, unknown> }>,
   switchImpl: null as null | (() => Promise<string>),
+  nativeOpen: {
+    sessionId: 'n1',
+    events: [] as unknown[],
+    error: null as string | null,
+    readOnly: false,
+  },
 }))
 
 vi.mock('../mock-tauri', () => ({
@@ -13,6 +19,7 @@ vi.mock('../mock-tauri', () => ({
   mockInvoke: (cmd: string, args?: Record<string, unknown>) => {
     invoked.calls.push({ cmd, args })
     if (cmd === 'read_prime_session_transcript') return Promise.resolve([])
+    if (cmd === 'native_chat_open') return Promise.resolve(invoked.nativeOpen)
     if (cmd === 'switch_prime_session') {
       return invoked.switchImpl ? invoked.switchImpl() : Promise.resolve('ok')
     }
@@ -21,13 +28,27 @@ vi.mock('../mock-tauri', () => ({
 }))
 
 describe('usePrimeSessionSwitcher', () => {
-  const agent = { replaceMessages: vi.fn(), messages: [] as unknown[] }
+  let liveNative = { sessionId: null as string | null, readOnly: false }
+  const agent = {
+    replaceMessages: vi.fn(),
+    messages: [] as unknown[],
+    getNativeSession: vi.fn(() => ({ ...liveNative })),
+    setNativeSession: vi.fn((sessionId: string | null, readOnly = false) => {
+      liveNative = sessionId
+        ? { sessionId, readOnly: readOnly === true }
+        : { sessionId: null, readOnly: false }
+    }),
+  }
   const refreshSessionTree = vi.fn()
 
   beforeEach(() => {
     invoked.calls = []
     invoked.switchImpl = null
+    invoked.nativeOpen = { sessionId: 'n1', events: [], error: null, readOnly: false }
+    liveNative = { sessionId: null, readOnly: false }
     agent.replaceMessages.mockReset()
+    agent.getNativeSession.mockClear()
+    agent.setNativeSession.mockClear()
     agent.messages = []
     refreshSessionTree.mockReset()
   })
@@ -219,6 +240,112 @@ describe('usePrimeSessionSwitcher', () => {
     })
     expect(result.current.activeSessionPath).toBeNull()
     expect(result.current.transcriptState).toBe('new')
+    expect(agent.setNativeSession).toHaveBeenCalledWith(null)
+  })
+
+  it('opens a native chat and loads its transcript instead of a Prime session', async () => {
+    invoked.nativeOpen = {
+      sessionId: 'n1',
+      events: [
+        { User: { text: 'Hello' } },
+        { Assistant: { text: 'Hi there' } },
+        'TurnEnd',
+      ],
+      error: null,
+      readOnly: false,
+    }
+    const { result } = renderHook(() => usePrimeSessionSwitcher({
+      agent: agent as never,
+      locale: 'en',
+      vaultPath: '/vault',
+      sessionsAutoCollapsed: false,
+      refreshSessionTree,
+      primeHostSessionPath: null,
+      hostRunning: false,
+    }))
+
+    await act(async () => {
+      await result.current.handleSelectSession({
+        id: 'n1',
+        path: 'rhizome-native:n1',
+      })
+    })
+
+    expect(invoked.calls.map((call) => call.cmd)).toEqual(['native_chat_open'])
+    expect(agent.replaceMessages).toHaveBeenLastCalledWith([
+      expect.objectContaining({ userMessage: 'Hello', response: 'Hi there' }),
+    ])
+    expect(result.current.activeSessionPath).toBe('rhizome-native:n1')
+    expect(result.current.transcriptState).toBe('ready')
+    expect(agent.setNativeSession).toHaveBeenCalledWith('n1', false)
+    expect(agent.getNativeSession()).toEqual({ sessionId: 'n1', readOnly: false })
+  })
+
+  it('surfaces a native open error and keeps the session read-only', async () => {
+    invoked.nativeOpen = {
+      sessionId: 'n1',
+      events: [
+        { User: { text: 'Hello' } },
+        { Assistant: { text: 'Hi there' } },
+        'TurnEnd',
+      ],
+      error: 'This model is read-only until you pick another.',
+      readOnly: true,
+    }
+    const { result } = renderHook(() => usePrimeSessionSwitcher({
+      agent: agent as never,
+      locale: 'en',
+      vaultPath: '/vault',
+      sessionsAutoCollapsed: false,
+      refreshSessionTree,
+      primeHostSessionPath: null,
+      hostRunning: false,
+    }))
+
+    await act(async () => {
+      await result.current.handleSelectSession({
+        id: 'n1',
+        path: 'rhizome-native:n1',
+      })
+    })
+
+    expect(result.current.switchError).toBe('This model is read-only until you pick another.')
+    expect(result.current.activeSessionPath).toBe('rhizome-native:n1')
+    expect(result.current.transcriptState).toBe('ready')
+    expect(agent.replaceMessages).toHaveBeenLastCalledWith([
+      expect.objectContaining({ userMessage: 'Hello', response: 'Hi there' }),
+    ])
+    expect(agent.setNativeSession).toHaveBeenCalledWith('n1', true)
+    expect(agent.getNativeSession()).toEqual({ sessionId: 'n1', readOnly: true })
+  })
+
+  it('marks a native restore read-only even without an error string', async () => {
+    invoked.nativeOpen = {
+      sessionId: 'n1',
+      events: [],
+      error: null,
+      readOnly: true,
+    }
+    const { result } = renderHook(() => usePrimeSessionSwitcher({
+      agent: agent as never,
+      locale: 'en',
+      vaultPath: '/vault',
+      sessionsAutoCollapsed: false,
+      refreshSessionTree,
+      primeHostSessionPath: null,
+      hostRunning: false,
+    }))
+
+    await act(async () => {
+      await result.current.handleSelectSession({
+        id: 'n1',
+        path: 'rhizome-native:n1',
+      })
+    })
+
+    expect(result.current.switchError).toBeNull()
+    expect(agent.setNativeSession).toHaveBeenCalledWith('n1', true)
+    expect(agent.getNativeSession()).toEqual({ sessionId: 'n1', readOnly: true })
   })
 
   it('switches a past session without starting Prime when Chat has no vault', async () => {

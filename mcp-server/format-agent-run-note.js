@@ -164,11 +164,15 @@ function renderRunNoteBody(formatted) {
   return parts.join('\n').trimEnd()
 }
 
+function toolCountLabel(n) {
+  return n === 1 ? 'tool' : 'tools'
+}
+
 function renderRunLog(formatted) {
   const n = formatted.tools.length
   const summary = formatted.duration
-    ? `Run log · ${n} tools · ${formatted.duration}`
-    : `Run log · ${n} tools`
+    ? `Run log · ${n} ${toolCountLabel(n)} · ${formatted.duration}`
+    : `Run log · ${n} ${toolCountLabel(n)}`
   const rows = formatted.tools.map((row) => (
     `${row.name} · ${row.target || '—'} · ${row.duration || '—'} · ${row.status}`
   ))
@@ -289,7 +293,7 @@ function keepFrontmatter(rawFrontmatter, agent, mode, title) {
 function hasYamlKey(rawFrontmatter, key) {
   return rawFrontmatter.split(/\r?\n/).some((line) => {
     const colon = line.indexOf(':')
-    return colon > 0 && line.slice(0, colon).trim() === key
+    return colon > 0 && line.slice(0, colon) === key
   })
 }
 

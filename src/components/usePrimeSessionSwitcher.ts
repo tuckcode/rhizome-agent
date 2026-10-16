@@ -11,6 +11,11 @@ import {
   transcriptAlongBranch,
   type PrimeTranscriptItem,
 } from '../lib/primeTranscriptToConversation'
+import {
+  isNativeSessionPath,
+  nativeEventsToConversation,
+  type NativeChatOpenResult,
+} from '../lib/nativeChatTranscript'
 import type { PrimeSessionTree } from '../lib/primeSessionTree'
 import type { PrimeSessionSummary } from '../lib/primeSessionMeta'
 import { useMenuBarSessionOpen } from '../hooks/useMenuBarSessionOpen'
@@ -162,6 +167,7 @@ export function usePrimeSessionSwitcher({
     setSwitchError(null)
     setFocusedTranscriptIndex(null)
     const previousPath = activeSessionPath
+    const previousLive = agent.getNativeSession()
     const previousMessages = [...agent.messages]
     const previousState = transcriptState
     // Highlight the row immediately. Clear the stale transcript in the same
@@ -171,6 +177,24 @@ export function usePrimeSessionSwitcher({
     setTranscriptState('loading')
     agent.replaceMessages([])
     try {
+      if (isNativeSessionPath(session.path)) {
+        const opened = await callHost<NativeChatOpenResult>('native_chat_open', {
+          sessionId: session.id,
+        })
+        const readOnly = opened.readOnly === true || Boolean(opened.error)
+        if (opened.error) {
+          reportSwitchError(opened.error)
+        }
+        agent.setNativeSession(opened.successorId || opened.sessionId || session.id, readOnly)
+        startTransition(() => {
+          agent.replaceMessages(nativeEventsToConversation(opened.events))
+          setTranscriptState('ready')
+          if (typeof options?.messageIndex === 'number') {
+            setFocusedTranscriptIndex(options.messageIndex)
+          }
+        })
+        return
+      }
       if (vaultPath && !hostRunning) {
         await callHost('ensure_prime_session_host', { vaultPath })
       }
@@ -192,6 +216,7 @@ export function usePrimeSessionSwitcher({
       // it on select throws away the standing context you opened it for, then
       // makes you reopen it to pick a second session.
     } catch (e) {
+      agent.setNativeSession(previousLive.sessionId, previousLive.readOnly)
       setActiveSessionPath(previousPath)
       setFocusedTranscriptIndex(null)
       setTranscriptState(previousPath ? previousState : 'error')
@@ -219,11 +244,12 @@ export function usePrimeSessionSwitcher({
   useMenuBarSessionOpen(handleOpenSessionFromMenuBar)
 
   const resetSessionSelection = useCallback(() => {
+    agent.setNativeSession(null)
     setActiveSessionPath(null)
     setFocusedTranscriptIndex(null)
     setTranscriptState('new')
     setSwitchError(null)
-  }, [])
+  }, [agent])
 
   /**
    * Only replayed turns carry a Prime entry id — the live stream has none — so

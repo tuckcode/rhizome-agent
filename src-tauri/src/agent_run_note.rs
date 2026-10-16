@@ -235,11 +235,20 @@ fn render_run_note_body(formatted: &FormattedNote) -> String {
     parts.join("\n").trim_end().to_string()
 }
 
+fn tool_count_label(n: usize) -> &'static str {
+    if n == 1 {
+        "tool"
+    } else {
+        "tools"
+    }
+}
+
 fn render_run_log(formatted: &FormattedNote) -> String {
     let n = formatted.tools.len();
+    let tools = tool_count_label(n);
     let summary = match &formatted.duration {
-        Some(duration) => format!("Run log · {n} tools · {duration}"),
-        None => format!("Run log · {n} tools"),
+        Some(duration) => format!("Run log · {n} {tools} · {duration}"),
+        None => format!("Run log · {n} {tools}"),
     };
     let rows: Vec<String> = formatted
         .tools
@@ -463,10 +472,8 @@ fn keep_frontmatter(
 }
 
 fn has_yaml_key(raw: &str, key: &str) -> bool {
-    raw.lines().any(|line| {
-        line.split_once(':')
-            .is_some_and(|(name, _)| name.trim() == key)
-    })
+    raw.lines()
+        .any(|line| line.split_once(':').is_some_and(|(name, _)| name == key))
 }
 
 fn yaml_double_quoted(value: &str) -> String {
@@ -647,7 +654,7 @@ duration: 1m 3s
         assert!(note.contains("[Docs](https://example.com/docs)"));
         assert!(note.contains("# Extra heading"));
         assert!(note.contains("[tool] Fake is running."));
-        assert!(note.contains("<summary>Run log · 1 tools"));
+        assert!(note.contains("<summary>Run log · 1 tool"));
         assert!(note.contains("type: Note\n"));
     }
 
@@ -660,6 +667,16 @@ duration: 1m 3s
         assert_eq!(note.matches("agent:").count(), 1);
         assert!(note.contains("agent: Grok CLI"));
         assert!(!note.contains("agent: \"Grok CLI\""));
+    }
+
+    #[test]
+    fn does_not_treat_an_indented_agent_field_as_top_level() {
+        let note = rewrite_agent_run_note_content(
+            "---\ntype: Note\nmeta:\n  agent: nested\n---\n\n# Vault analysis\n\n[preparing] start\n[tool] Grep\n[tool] Grep is running.\n\nThe answer.\n\nagent: Grok CLI\nmode: deep\n",
+            None,
+        );
+        assert!(note.contains("  agent: nested"));
+        assert!(note.contains("agent: \"Grok CLI\""));
     }
 
     #[test]

@@ -8,6 +8,7 @@ import {
   cloneAiWorkspaceSessionUntilMessage,
   resetAiWorkspaceSessionStoreForTests,
 } from '../lib/aiWorkspaceSessionStore'
+import { resetNativeLiveSessions } from '../lib/nativeChatTranscript'
 
 vi.mock('../utils/streamAiAgent', () => ({
   streamAiAgent: vi.fn(),
@@ -47,6 +48,7 @@ describe('useCliAiAgent', () => {
     vi.clearAllMocks()
     mockGetAgentDocsPath.mockResolvedValue('/app/agent-docs')
     resetAiWorkspaceSessionStoreForTests()
+    resetNativeLiveSessions()
     mockStreamAiAgent.mockImplementation(async ({ callbacks }) => {
       callbacks.onText('reply')
       callbacks.onDone()
@@ -219,5 +221,40 @@ describe('useCliAiAgent', () => {
       userMessage: 'Help',
       response: 'Codex is not available on this machine. Install it or switch the default AI agent in Settings.',
     })])
+  })
+
+  it('keeps native live sessions on the panel, not a window global', () => {
+    const first = renderAgent()
+    const second = renderAgent()
+
+    act(() => {
+      first.result.current.setNativeSession('n1')
+      second.result.current.setNativeSession('n2', true)
+    })
+
+    expect(first.result.current.getNativeSession()).toEqual({ sessionId: 'n1', readOnly: false })
+    expect(second.result.current.getNativeSession()).toEqual({ sessionId: 'n2', readOnly: true })
+  })
+
+  it('shares a native live session across remounts of the same workspace chat', () => {
+    const first = renderAgent(undefined, 'safe', 'chat-1')
+    act(() => {
+      first.result.current.setNativeSession('n1', true)
+    })
+    first.unmount()
+    const second = renderAgent(undefined, 'safe', 'chat-1')
+    expect(second.result.current.getNativeSession()).toEqual({ sessionId: 'n1', readOnly: true })
+  })
+
+  it('clears only this panel native session on a new chat', () => {
+    const first = renderAgent()
+    const second = renderAgent()
+    act(() => {
+      first.result.current.setNativeSession('n1')
+      second.result.current.setNativeSession('n2')
+      first.result.current.clearConversation()
+    })
+    expect(first.result.current.getNativeSession()).toEqual({ sessionId: null, readOnly: false })
+    expect(second.result.current.getNativeSession()).toEqual({ sessionId: 'n2', readOnly: false })
   })
 })

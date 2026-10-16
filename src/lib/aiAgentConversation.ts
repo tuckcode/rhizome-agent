@@ -79,6 +79,12 @@ export interface AgentExecutionContext {
   chatEngine?: 'prime' | 'native'
   /** Target string for `native_chat_start` when `chatEngine` is native. */
   nativeTarget?: string
+  /** Live native session to continue. Absent starts a new log. */
+  nativeSessionId?: string | null
+  /** Opened native logs that cannot accept another turn. */
+  nativeReadOnly?: boolean
+  /** Panel or workspace slot that owns `nativeSessionId`. */
+  nativeLiveSlot?: string
 }
 
 export interface PendingUserPrompt {

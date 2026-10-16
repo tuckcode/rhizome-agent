@@ -60,6 +60,10 @@ import { copyLocalPath } from '../utils/url'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import { invoke } from '@tauri-apps/api/core'
 import {
+  nativeChatListToSummaries,
+  type NativeChatListItem,
+} from '../lib/nativeChatTranscript'
+import {
   PrimeSessionListContextMenu,
   type PrimeSessionContextMenuState,
 } from './PrimeSessionListContextMenu'
@@ -71,6 +75,8 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> 
 
 interface PrimeSessionListProps {
   locale?: AppLocale
+  /** Prime lists `~/.prime` logs. Native lists Rhizome's own chat files. */
+  engine?: 'prime' | 'native'
   /** Chosen session. The caller switches and rehydrates — this list only picks. */
   onSelectSession?: (session: PrimeSessionSummary) => void
   onNewChat?: () => void
@@ -478,6 +484,7 @@ const ArchivedSessionRow = memo(function ArchivedSessionRow({
  */
 export default function PrimeSessionList({
   locale = 'en',
+  engine = 'prime',
   onSelectSession,
   onNewChat,
   onOpenMycelium,
@@ -564,13 +571,18 @@ export default function PrimeSessionList({
       let listed: PrimeSessionSummary[] = []
       let failure: string | null = null
       try {
-        const answer = await call<PrimeSessionSummary[]>('list_prime_session_summaries')
-        // Not every host answers with a list: a mock with no handler for this
-        // command, a Tauri build where it is absent, or a command that returns
-        // null all reach here. Trusting the type threw inside the effect,
-        // which surfaces as an unhandled rejection instead of an empty list
-        // the panel can render.
-        listed = Array.isArray(answer) ? answer : []
+        if (engine === 'native') {
+          const answer = await call<NativeChatListItem[]>('native_chat_list')
+          listed = nativeChatListToSummaries(answer)
+        } else {
+          const answer = await call<PrimeSessionSummary[]>('list_prime_session_summaries')
+          // Not every host answers with a list: a mock with no handler for this
+          // command, a Tauri build where it is absent, or a command that returns
+          // null all reach here. Trusting the type threw inside the effect,
+          // which surfaces as an unhandled rejection instead of an empty list
+          // the panel can render.
+          listed = Array.isArray(answer) ? answer : []
+        }
       } catch (e) {
         failure = e instanceof Error ? e.message : String(e)
       }
@@ -583,7 +595,7 @@ export default function PrimeSessionList({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [engine, activeSessionPath])
 
   const ordered = useMemo(
     () => sortPrimeSessions(sessions ?? [], sortKey),
@@ -687,7 +699,10 @@ export default function PrimeSessionList({
         ),
       )
       trackPrimeSessionArchived(next)
-      void call('set_prime_session_archived', { sessionId: session.id, archived: next }).catch(
+      const archiveCommand = engine === 'native'
+        ? 'set_native_session_archived'
+        : 'set_prime_session_archived'
+      void call(archiveCommand, { sessionId: session.id, archived: next }).catch(
         (e: unknown) => {
           setSessions((current) =>
             (current ?? []).map((entry) =>
@@ -701,7 +716,7 @@ export default function PrimeSessionList({
         },
       )
     },
-    [],
+    [engine],
   )
 
   const startRename = useCallback((session: PrimeSessionSummary) => {
