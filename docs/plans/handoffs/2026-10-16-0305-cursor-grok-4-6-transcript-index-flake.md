@@ -45,6 +45,8 @@ had already gone to the wrong path.
 - Vault cache and transcript-index tests share
   `app_config::TEST_CACHE_DIR_ENV` / `lock_test_cache_dir()`.
 - Dropped the leftover `IndexedTranscriptTurn` binding in the flaky test.
+- `test_reload_vault_invalidates_cache_and_rescans` now takes
+  `lock_test_cache_dir()` and restores `RHIZOME_CACHE_DIR`.
 
 Product chat behaviour is unchanged: production never changes
 `RHIZOME_CACHE_DIR` mid-process, so the captured path is the same
