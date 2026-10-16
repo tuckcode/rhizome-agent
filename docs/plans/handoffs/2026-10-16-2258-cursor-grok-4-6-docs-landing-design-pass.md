@@ -26,6 +26,11 @@ One PR off fresh `main` (not #185's branch). Landing and Starlight only.
 8. Nav: Docs is the solid primary; GitHub is a plain link.
 9–12. Home title `Docs | Rhizome`, H1 `Rhizome docs`, developer-preview is a Starlight `note` aside, Install list has no terminal periods on fragments.
 
-Did not remap Starlight `--sl-color-*` to Graphite/Earth. Did not edit app code or `docs/HANDOFF.md`.
+Did not remap Starlight `--sl-color-*` to Graphite/Earth. Did not edit app
+code or `docs/HANDOFF.md`. Did not run `pnpm agent-docs`.
+
+`.husky/pre-push` treats `website/` and `site/` as a Pages-only push: first
+PR push diffs against `origin/main`, and the skip path runs `website/build.sh`
+instead of `pnpm docs:build` (that script writes `src-tauri/resources/agent-docs`).
 
 Review shots: `docs/review-shots/docs-pass/`.

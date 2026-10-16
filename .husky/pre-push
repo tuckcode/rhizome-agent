@@ -137,7 +137,9 @@ echo "🚀 Pre-push checks (replaces CI — do not skip)"
 echo "================================================"
 
 # ── Detect what changed ─────────────────────────────────────────────────
-PUSH_TARGET=$(git rev-parse @{push} 2>/dev/null || echo "")
+# First push of a PR branch has no @{push}. Diff against origin/main so
+# a docs/Pages-only branch does not run the app suite.
+PUSH_TARGET=$(git rev-parse @{push} 2>/dev/null || git rev-parse origin/main 2>/dev/null || echo "")
 RUST_CHANGED=true
 APP_CHANGED=true
 SITE_CHANGED=false
@@ -150,7 +152,9 @@ if [ -n "$PUSH_TARGET" ]; then
   fi
   for FILE in $CHANGED; do
     case "$FILE" in
-      site/*)
+      website/*|site/*)
+        # Pages landing + Starlight. In-app agent-docs is `pnpm agent-docs`,
+        # a separate verb — do not write src-tauri/ from this skip path.
         SITE_CHANGED=true
         ;;
       .github/workflows/*|.husky/*|docs/*|*.md)
@@ -165,9 +169,9 @@ fi
 if [ "$APP_CHANGED" = false ]; then
   if [ "$SITE_CHANGED" = true ]; then
     echo ""
-    echo "📚 Docs-only push detected; running docs build..."
-    pnpm docs:build
-    echo "  ✅ Docs build OK"
+    echo "📚 Docs-only push detected; running Pages + Starlight build..."
+    bash website/build.sh /tmp/pages-prepush
+    echo "  ✅ Pages / Starlight build OK"
   else
     echo ""
     echo "⏭️  App checks skipped (docs/workflow/hooks only)"
