@@ -547,6 +547,42 @@ describe('NativeChatModelPicker', () => {
     })
     expect(onChange).toHaveBeenCalledWith('free_tier_auto')
   })
+
+  it('keeps the Settings menu at z-[12000] with the settings portal marker', async () => {
+    render(
+      <Dialog open>
+        <DialogContent>
+          <DialogTitle>Settings</DialogTitle>
+          <NativeChatModelPicker
+            value="open_ai/gpt-4o"
+            onChange={vi.fn()}
+            providers={configured}
+          />
+        </DialogContent>
+      </Dialog>,
+    )
+
+    openMenu()
+    const menu = await screen.findByTestId('native-chat-model-menu')
+    expect(menu).toHaveClass('z-[12000]')
+    expect(menu).toHaveAttribute('data-settings-panel-portal', 'true')
+  })
+
+  it('does not mark the composer chip menu as a settings portal', async () => {
+    render(
+      <NativeChatModelPicker
+        variant="chip"
+        value="open_ai/gpt-4o"
+        onChange={vi.fn()}
+        providers={configured}
+      />,
+    )
+
+    openMenu()
+    const menu = await screen.findByTestId('native-chat-model-menu')
+    expect(menu).not.toHaveAttribute('data-settings-panel-portal')
+    expect(menu).not.toHaveClass('z-[12000]')
+  })
 })
 
 

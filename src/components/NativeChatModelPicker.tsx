@@ -218,7 +218,7 @@ export function NativeChatModelPicker({
             event.preventDefault()
             triggerRef.current?.focus()
           }}
-          className={MENU_PANEL_CLASS}
+          className={cn(MENU_PANEL_CLASS, chip ? undefined : 'z-[12000]')}
           data-testid="native-chat-model-menu"
           data-settings-panel-portal={chip ? undefined : 'true'}
         >
