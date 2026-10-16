@@ -90,9 +90,11 @@ export function transcriptUntilMessage(
  *
  * Order matches a live native turn: assistant text that arrived before a
  * tool round stays in front of that ToolCall, each call is followed by its
- * ToolResult or ToolDenied, and the final assistant text comes after those
- * rounds. Pending and errored tools still get a paired result so
- * OpenAI-style providers do not see an unpaired tool_call id.
+ * ToolResult or ToolDenied, and leftover assistant text comes after those
+ * rounds. Live `response` may still hold the full accumulator, so prefixes
+ * already emitted as `beforeText` are stripped from that leftover. Pending
+ * and errored tools still get a paired result so OpenAI-style providers do
+ * not see an unpaired tool_call id.
  */
 export function conversationToNativeEvents(
   messages: readonly AiAgentMessage[],
@@ -122,12 +124,31 @@ export function conversationToNativeEvents(
         },
       })
     }
-    if (message.response) {
-      events.push({ Assistant: { text: message.response } })
+    const leftover = leftoverAssistantAfterBeforeText(message.response ?? '', message.actions)
+    if (leftover.trim()) {
+      events.push({ Assistant: { text: leftover } })
     }
     events.push('TurnEnd')
   }
   return events
+}
+
+/** Drop already-emitted round text from a live full-accumulator response. */
+function leftoverAssistantAfterBeforeText(
+  response: string,
+  actions: readonly AiAction[],
+): string {
+  let offset = 0
+  for (const action of actions) {
+    const before = action.beforeText
+    if (!before) continue
+    while (offset < response.length && /\s/u.test(response[offset] ?? '')) {
+      offset += 1
+    }
+    if (!response.startsWith(before, offset)) continue
+    offset += before.length
+  }
+  return response.slice(offset)
 }
 
 /**

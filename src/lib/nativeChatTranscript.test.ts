@@ -177,6 +177,33 @@ describe('conversationToNativeEvents', () => {
     ])
   })
 
+  it('does not repeat live response text that already sat in front of a tool', () => {
+    const events = conversationToNativeEvents([{
+      id: 'm1',
+      userMessage: 'Do both',
+      response: 'I will search firstHere is the answer',
+      actions: [
+        {
+          tool: 'search',
+          toolId: 't1',
+          label: 'search',
+          status: 'done',
+          input: '{}',
+          output: 'hits',
+          beforeText: 'I will search first',
+        },
+      ],
+    }])
+    expect(events).toEqual([
+      { User: { text: 'Do both' } },
+      { Assistant: { text: 'I will search first' } },
+      { ToolCall: { id: 't1', name: 'search', args: '{}' } },
+      { ToolResult: { id: 't1', name: 'search', output: 'hits' } },
+      { Assistant: { text: 'Here is the answer' } },
+      'TurnEnd',
+    ])
+  })
+
   it('keeps assistant text that came between tool rounds in front of the next call', () => {
     const events = conversationToNativeEvents([{
       id: 'm1',

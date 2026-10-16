@@ -182,21 +182,17 @@ export function createStreamCallbacks(context: StreamMutationContext) {
   // own bubble instead of merging into the first turn's reply.
   let activeMessageId = messageId
   let sealedByTurnBoundary = false
-  let parkedAssistantText = ''
-
-  function closeResponseText(): string {
-    const acc = responseAccRef.current
-    if (acc.trim()) return normalizeAssistantResponseText(acc)
-    if (parkedAssistantText) return ''
-    return finalResponseText(acc, agent)
-  }
+  // Index into responseAccRef: beforeText for a tool is the slice since the
+  // previous tool start. The accumulator itself is never cleared here — the
+  // panel renders message.response, not action.beforeText.
+  let responseMark = 0
 
   function sealActiveTurn(): void {
-    const sealedText = closeResponseText()
-    const analyticsText = responseAccRef.current || parkedAssistantText
+    const sealedText = finalResponseText(responseAccRef.current, agent)
+    const rawResponse = responseAccRef.current
     const toolCount = toolInputMapRef.current.size
     const toolNames = Array.from(toolInputMapRef.current.values()).map((t) => t.tool)
-    trackAiAgentResponseCompleted(agent, analyticsText, toolCount, failureTracked)
+    trackAiAgentResponseCompleted(agent, rawResponse, toolCount, failureTracked)
     const sealedId = activeMessageId
     const retarget: { id?: string; userMessage?: string } = {}
 
@@ -209,7 +205,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
               ...message,
               isStreaming: false,
               reasoningDone: true,
-              ...(sealedText ? { response: sealedText } : {}),
+              response: sealedText,
               actions: sealPendingActions(message),
             }
           : message
@@ -249,7 +245,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
     }
 
     responseAccRef.current = ''
-    parkedAssistantText = ''
+    responseMark = 0
     toolInputMapRef.current = new Map()
     failureTracked = false
     if (retarget.id) {
@@ -285,11 +281,9 @@ export function createStreamCallbacks(context: StreamMutationContext) {
       const previous = toolInputMapRef.current.get(toolId)
       toolInputMapRef.current.set(toolId, { tool: toolName, input: input ?? previous?.input })
 
-      const beforeText = responseAccRef.current
-      if (beforeText) {
-        parkedAssistantText = parkedAssistantText ? `${parkedAssistantText}${beforeText}` : beforeText
-        responseAccRef.current = ''
-      }
+      const acc = responseAccRef.current
+      const beforeText = acc.slice(responseMark)
+      responseMark = acc.length
 
       updateMessage(setMessages, activeMessageId, (message) => (
         updateToolAction(message, toolName, toolId, input, beforeText || undefined)
@@ -382,18 +376,13 @@ export function createStreamCallbacks(context: StreamMutationContext) {
         return
       }
 
-      const finalResponse = closeResponseText()
-      trackAiAgentResponseCompleted(
-        agent,
-        responseAccRef.current || parkedAssistantText,
-        toolInputMapRef.current.size,
-        failureTracked,
-      )
+      const finalResponse = finalResponseText(responseAccRef.current, agent)
+      trackAiAgentResponseCompleted(agent, responseAccRef.current, toolInputMapRef.current.size, failureTracked)
       updateMessage(setMessages, activeMessageId, (message) => ({
         ...message,
         isStreaming: false,
         reasoningDone: true,
-        ...(finalResponse ? { response: finalResponse } : {}),
+        response: finalResponse,
         queuedFollowUp: undefined,
         actions: sealPendingActions(message),
       }))
