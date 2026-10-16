@@ -13,7 +13,7 @@ describe('NotesPanelModeControl', () => {
 
     const trigger = screen.getByTestId('notes-panel-mode-trigger')
     expect(trigger).toHaveAttribute('data-mode', 'auto')
-    expect(trigger).toHaveAccessibleName('Panel: auto')
+    expect(trigger).toHaveAccessibleName('Panel: Auto')
     expect(trigger).toHaveClass('h-6')
     expect(trigger).toHaveStyle({ width: '24px', height: '24px', borderRadius: '8px' })
 

@@ -75,7 +75,7 @@ export function notesPanelModeLabel(mode: NotesPanelMode): string {
 }
 
 export function notesPanelModeTooltip(mode: NotesPanelMode): string {
-  return `Panel: ${mode}`
+  return `Panel: ${notesPanelModeLabel(mode)}`
 }
 
 export function notesPanelModeShortcutDisplay(): string {

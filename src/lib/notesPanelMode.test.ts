@@ -39,9 +39,9 @@ describe('notes panel mode values', () => {
     expect(notesPanelModeLabel('auto')).toBe('Auto')
     expect(notesPanelModeLabel('rail')).toBe('Rail')
     expect(notesPanelModeLabel('open')).toBe('Open')
-    expect(notesPanelModeTooltip('auto')).toBe('Panel: auto')
-    expect(notesPanelModeTooltip('rail')).toBe('Panel: rail')
-    expect(notesPanelModeTooltip('open')).toBe('Panel: open')
+    expect(notesPanelModeTooltip('auto')).toBe('Panel: Auto')
+    expect(notesPanelModeTooltip('rail')).toBe('Panel: Rail')
+    expect(notesPanelModeTooltip('open')).toBe('Panel: Open')
     expect(notesPanelModeShortcutAria()).toMatch(/Period/)
   })
 

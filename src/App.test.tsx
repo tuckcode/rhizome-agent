@@ -866,7 +866,7 @@ describe('App', () => {
     expect(screen.getByTestId('command-rail-history')).toBeInTheDocument()
     expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
     expect(screen.getByTestId('notes-panel-rail')).toBeVisible()
-    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: auto')
+    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Auto')
   })
 
   it('keeps Chat as the canvas while Notes is open, and Inbox only opens the list', async () => {
@@ -880,7 +880,7 @@ describe('App', () => {
       expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
     })
     expect(screen.getByTestId('chat-center')).not.toHaveStyle({ display: 'none' })
-    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: auto')
+    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Auto')
 
     await openNotesPanelFromRail()
     expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()

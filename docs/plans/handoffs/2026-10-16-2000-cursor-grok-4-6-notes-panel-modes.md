@@ -29,7 +29,7 @@ and Notes Auto refuses hover when the Sessions drawer is up.
 
 The 24px (`h-6`, 8px radius) ghost control sits at the top of the rail
 or the top right of the Notes header. The menu lists icon +
-sentence-case label + check. Tooltip is `Panel: auto` with `⌘.` /
+sentence-case label + check. Tooltip is `Panel: Auto` with `⌘.` /
 `Ctrl+.`. Unsaved rail dots use `--text-muted`, not mint.
 
 PostHog: `notes_panel_mode_changed` `{ mode }`.
