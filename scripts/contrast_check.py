@@ -13,6 +13,8 @@ Pass a design token file to keep the old design-file mode:
 
 Prints each text token's ratio on each surface (including hover and
 selected), status text on its tinted fill, input borders, and focus rings.
+App CSS also checks --text-faint and --text-muted on every dark skin
+against --surface-app and the banner tints (resolved cascade).
 A color the script cannot parse (hsl(), oklch(), color-mix(), an
 unresolved var(), …) is a FAIL that names the theme, token, and raw
 value — it is not skipped. Exits non-zero if any pair is below WCAG AA
@@ -582,6 +584,66 @@ def report(tokens: dict[str, str], theme: str, kind: str) -> tuple[list[str], li
     return rows, fails
 
 
+def report_dark_ink(tokens: dict[str, str], theme: str) -> tuple[list[str], list[str]]:
+    """Faint and muted on the app surface and banner tints for one dark skin."""
+    rows: list[str] = []
+    fails: list[str] = []
+    bg_name = pick_name(tokens, ('--surface-app', '--bg'))
+    if not bg_name:
+        fails.append(fail_line(theme, '(tokens)', '(scheme)', 0.0, TEXT_MIN, 'missing'))
+        return rows, fails
+    bg_resolved = resolve(tokens, bg_name)
+    bg_rgb = parse(bg_resolved)
+    if bg_rgb is None:
+        fails.append(unparseable_line(theme, bg_name, bg_resolved or '(empty)'))
+        return rows, fails
+
+    panel_name = pick_name(tokens, ('--surface-panel', '--surface'))
+    banner_bases = [name for name in (panel_name, bg_name) if name][:1] or [bg_name]
+
+    for text_name in BANNER_TEXT_ROLES:
+        if text_name not in tokens:
+            fails.append(fail_line(theme, text_name, bg_name, 0.0, TEXT_MIN, 'missing'))
+            continue
+        resolved = resolve(tokens, text_name)
+        fg_rgb = parse(resolved)
+        if fg_rgb is None:
+            fails.append(unparseable_line(theme, text_name, resolved or '(empty)'))
+            continue
+        on_app = cr(fg_rgb, bg_rgb)
+        rows.append(f'  {text_name} {resolved}  vs {bg_name} {on_app:.2f}')
+        if on_app < TEXT_MIN:
+            fails.append(fail_line(theme, text_name, bg_name, on_app, TEXT_MIN, 'text'))
+
+        for tint_label, tint_aliases in BANNER_TINT_ROLES:
+            tint_name = pick_name(tokens, tint_aliases)
+            if not tint_name:
+                continue
+            for surf_name in banner_bases:
+                base = parse(resolve(tokens, surf_name), bg_rgb)
+                if base is None:
+                    continue
+                tint = parse(resolve(tokens, tint_name), base)
+                if tint is None:
+                    continue
+                ratio = cr(fg_rgb, tint)
+                rows.append(
+                    f'  {text_name} on {tint_label}/{tint_name}/{surf_name}: {ratio:.2f}'
+                )
+                if ratio < TEXT_MIN:
+                    fails.append(
+                        fail_line(
+                            theme,
+                            text_name,
+                            f'{tint_label}/{tint_name}/{surf_name}',
+                            ratio,
+                            TEXT_MIN,
+                            'text',
+                        )
+                    )
+    return rows, fails
+
+
 def dump_resolved(text: str) -> dict[str, dict[str, str]]:
     rules = iter_style_rules(text)
     out: dict[str, dict[str, str]] = {}
@@ -622,6 +684,20 @@ def run(paths: list[Path]) -> int:
         theme_fails = [item for item in fails if item.startswith(f'FAIL {name}  ')]
         print('FAILS', [item.split('  ', 2)[2] if '  ' in item else item for item in theme_fails] or [])
         all_fails.extend(fails)
+
+    if kind == 'app':
+        print('== dark faint/muted')
+        product = {name for name, _ in APP_THEME_ELEMENTS}
+        for name, element in DARK_SKIN_DUMP:
+            tokens = resolve_cascade(text, element, rules)
+            rows, fails = report_dark_ink(tokens, name)
+            print('--', name)
+            for row in rows:
+                print(row)
+            theme_fails = [item for item in fails if item.startswith(f'FAIL {name}  ')]
+            print('FAILS', [item.split('  ', 2)[2] if '  ' in item else item for item in theme_fails] or [])
+            if name not in product:
+                all_fails.extend(fails)
 
     print()
     if all_fails:
