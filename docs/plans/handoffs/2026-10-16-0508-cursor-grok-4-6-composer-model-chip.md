@@ -19,7 +19,13 @@ whose menu opens upward.
 Current main already hosted `NativeChatModelPicker` inside
 `ChatComposerDeck`, but `AiPanel` only mounted that deck on a Prime
 target. Native chat therefore had no composer chip. The foot now
-renders when a deck is present or the target is Prime.
+renders only when the target is Prime or the engine is native, so
+Claude Code and Codex do not get Prime's chip.
+
+The chip still writes the global `native_chat_target`. A running
+native session keeps its start model, so the chip menu has a muted
+line: "Applies to new chats". Settings keeps the row label `Model`
+(`ai.composer.modelLabel`), not the unknown-model fallback.
 
 Critiquito constraints built in:
 
@@ -37,3 +43,24 @@ Critiquito constraints built in:
 
 Settings still uses the row variant. Dank.bot's provider-model
 command is not in this PR.
+
+## Collapsed composer height
+
+**Origin:** Grok 4.6 (Cursor) · 2026-10-16
+
+knispo's single-line composer was taller than the 30px send
+control, with extra empty space above the button and more padding
+on top than on the right or bottom.
+
+Root cause is not the deck and not a textarea `rows` value. The
+deck / `ChatComposerBar` sits under the box (`{foot}`). The editor
+is contenteditable. The leftover height is the shared wikilink
+field's `min-h-[34px] py-[8px]`. Compact overrides (`min-h-0`,
+`py-1`) used to apply only when Prime banners set `hasControls`,
+so native chat kept the taller field. The outer box also used
+`px-1.5 py-0.5` — 6px sides, 2px top/bottom.
+
+The box is now always `p-1 items-center` with
+`data-testid="chat-composer-box"`. The editor always uses
+`min-h-[30px] py-1 leading-5 border-0` and still grows to
+`max-h-[120px]`. Test: `AiPanelChrome.composerBox.test.tsx`.

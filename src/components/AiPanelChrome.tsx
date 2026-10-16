@@ -179,7 +179,6 @@ function composerStopButtonStyle(): CSSProperties {
 function ComposerInput({
   disabled,
   entries,
-  hasControls,
   input,
   inputRef,
   onChange,
@@ -200,7 +199,6 @@ function ComposerInput({
 }: {
   disabled: boolean
   entries: VaultEntry[]
-  hasControls: boolean
   input: string
   inputRef: React.RefObject<HTMLDivElement | null>
   onChange: (value: string) => void
@@ -239,16 +237,10 @@ function ComposerInput({
       unsupportedPasteMessage={unsupportedPasteMessage}
       disabled={disabled}
       placeholder={shownPlaceholder}
-      placeholderClassName={
-        completion
-          ? cn(
-              hasControls ? 'flex items-center px-1 text-[13px] leading-5' : 'flex items-center px-[10px] py-[8px] text-[13px]',
-              'italic',
-            )
-          : hasControls
-            ? 'flex items-center px-1 text-[13px] leading-5'
-            : undefined
-      }
+      placeholderClassName={cn(
+        'flex items-center px-1 text-[13px] leading-5',
+        completion && 'italic',
+      )}
       placeholderTestId={completion ? 'composer-reply-completion' : undefined}
       onAcceptCompletion={onAcceptCompletion}
       onDismissCompletion={onDismissCompletion}
@@ -259,10 +251,7 @@ function ComposerInput({
       commandInstantLabel={commandInstantLabel}
       onCommandAction={onCommandAction}
       onBrowsePromptHistory={onBrowsePromptHistory}
-      editorClassName={cn(
-        'max-h-[120px] overflow-y-auto overscroll-contain',
-        hasControls && 'min-h-0 border-0 px-1 py-1 leading-5',
-      )}
+      editorClassName="max-h-[120px] min-h-[30px] overflow-y-auto overscroll-contain border-0 px-1 py-1 leading-5"
       editorStyle={{ maxHeight: 120, overflowY: 'auto', overscrollBehavior: 'contain' }}
     />
   )
@@ -1198,10 +1187,11 @@ export function AiPanelComposer({
           ))}
         </ul>
       ) : null}
-      <div className={cn(
-        'flex items-center gap-1',
-        hasControls && 'rounded-xl border border-border bg-background px-1.5 py-0.5 shadow-xs',
-      )}>
+      <div
+        className="flex items-center gap-1 rounded-xl border border-border bg-background p-1 shadow-xs"
+        data-testid="chat-composer-box"
+        data-multiline={input.includes('\n') ? 'true' : 'false'}
+      >
         <ComposerPlusMenu
           locale={locale}
           onAttachImages={onAttachImages}
@@ -1215,7 +1205,6 @@ export function AiPanelComposer({
           <ComposerInput
             disabled={composerDisabled}
             entries={entries}
-            hasControls={hasControls}
             input={input}
             inputRef={inputRef}
             onChange={onChange}
