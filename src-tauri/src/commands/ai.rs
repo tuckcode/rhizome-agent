@@ -843,32 +843,26 @@ mod tests {
 
     #[cfg(desktop)]
     fn demo_list_provider(base_url: &str) -> crate::ai_models::AiModelProvider {
-        use crate::ai_models::{
-            AiModelApiKeyStorage, AiModelCapabilities, AiModelDefinition, AiModelProviderKind,
-        };
-
-        AiModelProvider {
-            id: "demo".into(),
-            name: "Demo".into(),
-            kind: AiModelProviderKind::LmStudio,
-            base_url: Some(base_url.into()),
-            api_key_storage: Some(AiModelApiKeyStorage::None),
-            api_key_env_var: None,
-            headers: None,
-            models: vec![AiModelDefinition {
-                id: "demo-model".into(),
-                display_name: None,
-                context_window: None,
-                max_output_tokens: None,
-                capabilities: AiModelCapabilities {
-                    streaming: false,
-                    tools: false,
-                    vision: false,
-                    json_mode: false,
-                    reasoning: false,
-                },
-            }],
-        }
+        serde_json::from_value(serde_json::json!({
+            "id": "demo",
+            "name": "Demo",
+            "kind": "lm_studio",
+            "base_url": base_url,
+            "api_key_storage": "none",
+            "api_key_env_var": null,
+            "headers": null,
+            "models": [{
+                "id": "demo-model",
+                "capabilities": {
+                    "streaming": false,
+                    "tools": false,
+                    "vision": false,
+                    "json_mode": false,
+                    "reasoning": false
+                }
+            }]
+        }))
+        .expect("demo list provider")
     }
 
     #[cfg(desktop)]
