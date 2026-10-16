@@ -162,6 +162,53 @@ describe('conversationToNativeEvents', () => {
     ])
   })
 
+  it('keeps assistant text that came between tool rounds in front of the next call', () => {
+    const events = conversationToNativeEvents([{
+      id: 'm1',
+      userMessage: 'Do both',
+      response: 'Here is the answer',
+      actions: [
+        {
+          tool: 'search',
+          toolId: 't1',
+          label: 'search',
+          status: 'done',
+          input: '{}',
+          output: 'hits',
+          beforeText: 'I will search first',
+        },
+        {
+          tool: 'write',
+          toolId: 't2',
+          label: 'write',
+          status: 'error',
+          input: '{}',
+          output: 'disk full',
+          beforeText: 'Now I will write',
+        },
+      ],
+    }])
+    expect(events).toEqual([
+      { User: { text: 'Do both' } },
+      { Assistant: { text: 'I will search first' } },
+      { ToolCall: { id: 't1', name: 'search', args: '{}' } },
+      { ToolResult: { id: 't1', name: 'search', output: 'hits' } },
+      { Assistant: { text: 'Now I will write' } },
+      { ToolCall: { id: 't2', name: 'write', args: '{}' } },
+      { ToolDenied: { id: 't2', name: 'write', reason: 'disk full' } },
+      { Assistant: { text: 'Here is the answer' } },
+      'TurnEnd',
+    ])
+    expect(nativeEventsToConversation(events)[0]).toEqual(expect.objectContaining({
+      userMessage: 'Do both',
+      response: 'Here is the answer',
+      actions: [
+        expect.objectContaining({ toolId: 't1', beforeText: 'I will search first', status: 'done' }),
+        expect.objectContaining({ toolId: 't2', beforeText: 'Now I will write', status: 'error' }),
+      ],
+    }))
+  })
+
   it('writes each tool call next to a result, then the final assistant text', () => {
     const events = conversationToNativeEvents([{
       id: 'm1',
