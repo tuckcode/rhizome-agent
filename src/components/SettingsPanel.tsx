@@ -1658,13 +1658,13 @@ function AiTargetManagementTabs({
         {loadModelCatalog ? <PrimeProviderStatusSection t={t} /> : null}
         {loadModelCatalog ? <PrimeDefaultModelSection vaultPath={vaultPath} /> : null}
         {loadModelCatalog ? <PrimeModelAllowListSection t={t} /> : null}
-        {onCopyMcpConfig ? <CopyMcpConfigButton t={t} onCopyMcpConfig={onCopyMcpConfig} /> : null}
         <AdvancedPrimeEngineSection
           t={t}
           aiAgentsStatus={aiAgentsStatus}
           loadExtensionCatalog={loadExtensionCatalog}
           openAdvancedPrime={openAdvancedPrime}
           onOpenAdvancedPrime={onOpenAdvancedPrime}
+          onCopyMcpConfig={onCopyMcpConfig}
           onClose={onClose}
         />
         <BridgeTokenRow t={t} />
@@ -1685,6 +1685,7 @@ function AdvancedPrimeEngineSection({
   loadExtensionCatalog = false,
   openAdvancedPrime = false,
   onOpenAdvancedPrime,
+  onCopyMcpConfig,
   onClose,
 }: {
   t: Translate
@@ -1692,12 +1693,19 @@ function AdvancedPrimeEngineSection({
   loadExtensionCatalog?: boolean
   openAdvancedPrime?: boolean
   onOpenAdvancedPrime?: () => void
+  onCopyMcpConfig?: () => void
   onClose?: () => void
 }) {
   const [userExpanded, setUserExpanded] = useState<boolean | null>(null)
   const expanded = userExpanded ?? openAdvancedPrime
   const primeStatus = getAiAgentAvailability(aiAgentsStatus, DEFAULT_AI_AGENT)
   const bodyId = 'settings-advanced-prime-engine-body'
+  const installed = primeStatus.status === 'installed'
+  const statusLabel = primeStatus.status === 'checking'
+    ? 'Checking Prime…'
+    : installed
+      ? 'Prime is installed'
+      : 'Prime is not installed'
 
   return (
     <div
@@ -1727,15 +1735,21 @@ function AdvancedPrimeEngineSection({
       </Button>
       {expanded ? (
         <div id={bodyId} className="space-y-3 border-t border-border px-3 py-3">
-          <div
-            className="text-xs leading-5 text-muted-foreground"
-            data-testid="settings-advanced-prime-install-status"
-          >
-            Prime Agent
-            {primeStatus.status === 'installed'
-              ? ` (${t('settings.aiAgents.installed')}${primeStatus.version ? ` ${primeStatus.version}` : ''})`
-              : ` (${t('settings.aiAgents.missing')})`}
-          </div>
+          <SettingsGroup>
+            <SettingsGroupItem testId="settings-advanced-prime-install-status">
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-foreground">{statusLabel}</div>
+                {primeStatus.version ? (
+                  <div className="mt-0.5 text-xs leading-5 text-muted-foreground">{primeStatus.version}</div>
+                ) : null}
+              </div>
+            </SettingsGroupItem>
+            {onCopyMcpConfig ? (
+              <SettingsGroupItem>
+                <CopyMcpConfigButton t={t} onCopyMcpConfig={onCopyMcpConfig} />
+              </SettingsGroupItem>
+            ) : null}
+          </SettingsGroup>
           <PrimeExtensionsSection active={loadExtensionCatalog} onClose={onClose} />
         </div>
       ) : null}

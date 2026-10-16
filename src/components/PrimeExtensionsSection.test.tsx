@@ -82,14 +82,35 @@ describe('PrimeExtensionsSection', () => {
     vi.mocked(requestOpenAiChat).mockClear()
   })
 
-  it('does not search until the section is active', async () => {
+  it('does not search until Browse packages is opened', async () => {
     render(<PrimeExtensionsSection active={false} />)
     expect(screen.getByTestId('prime-extensions-section')).toBeInTheDocument()
     expect(screen.queryByText('pi-mcp-adapter')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('prime-packages-browse')).not.toBeInTheDocument()
     await waitFor(() => {
       expect(state.searchCalls).toBe(0)
     })
     expect(trackPrimePackageCatalogOpened).not.toHaveBeenCalled()
+  })
+
+  it('keeps the catalog collapsed until Browse packages is clicked', async () => {
+    state.hits = [{
+      name: 'pi-mcp-adapter',
+      description: 'MCP adapter',
+      publisher: 'nicopreme',
+      downloadsMonthly: 900000,
+      npmUrl: 'https://www.npmjs.com/package/pi-mcp-adapter',
+      kinds: ['extension'],
+    }]
+    render(<PrimeExtensionsSection />)
+    expect(screen.getByRole('button', { name: 'Browse packages' })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('prime-extensions-search')).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(state.searchCalls).toBe(0)
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Browse packages' }))
+    expect(await screen.findByTestId('prime-extensions-search')).toBeInTheDocument()
+    expect(trackPrimePackageCatalogOpened).toHaveBeenCalled()
   })
 
   it('lists catalog hits and installs after a full-access warning', async () => {
@@ -103,9 +124,18 @@ describe('PrimeExtensionsSection', () => {
     }]
     state.total = 9724
     render(<PrimeExtensionsSection />)
+    fireEvent.click(screen.getByRole('button', { name: 'Browse packages' }))
     expect(await screen.findByText('pi-mcp-adapter')).toBeInTheDocument()
     expect(screen.getByText('Packages')).toBeInTheDocument()
+    expect(screen.getByText(
+      'Add-ons for the Prime engine: extensions, skills, prompts and themes.',
+    )).toBeInTheDocument()
+    expect(screen.getByTestId('prime-packages-access-warning')).toHaveTextContent(
+      'They run with full system access. Review the source before you install.',
+    )
     expect(screen.getByTestId('prime-packages-kind-tabs')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'All' })).toHaveClass('bg-foreground')
+    expect(screen.getByRole('tab', { name: 'Skills' })).toHaveClass('text-muted-foreground')
     expect(screen.getByText(/9,724 packages/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Install' }))
     expect(await screen.findByRole('dialog')).toHaveTextContent('full system access')
@@ -116,6 +146,23 @@ describe('PrimeExtensionsSection', () => {
     expect(screen.getByTestId('prime-extensions-installed-status')).toHaveTextContent(
       'Installed. Prime reloaded this chat.',
     )
+  })
+
+  it('clamps catalog descriptions and top-aligns Install', async () => {
+    state.hits = [{
+      name: 'pi-mcp-adapter',
+      description: 'A long description that should clamp to two lines in the catalog row.',
+      publisher: 'nicopreme',
+      downloadsMonthly: 1,
+      npmUrl: 'https://www.npmjs.com/package/pi-mcp-adapter',
+      kinds: ['extension'],
+    }]
+    state.total = 1
+    render(<PrimeExtensionsSection />)
+    fireEvent.click(screen.getByRole('button', { name: 'Browse packages' }))
+    expect(await screen.findByText(/A long description/)).toHaveClass('line-clamp-2')
+    expect(screen.getByRole('button', { name: 'Install' })).toHaveClass('self-start')
+    expect(screen.getByTestId('prime-packages-catalog-list')).toHaveClass('max-h-[31rem]')
   })
 
   it('asks Chat to install when Prime CLI is missing', async () => {
@@ -130,6 +177,7 @@ describe('PrimeExtensionsSection', () => {
     state.total = 1
     state.installError = 'Prime is not installed. Install it with `npm i -g prime-agent`.'
     render(<PrimeExtensionsSection onClose={vi.fn()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Browse packages' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Install' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Install package' }))
     expect(await screen.findByRole('button', { name: 'Ask Chat to install' })).toBeInTheDocument()
@@ -151,6 +199,7 @@ describe('PrimeExtensionsSection', () => {
 
   it('searches skills when that catalog tab is chosen', async () => {
     render(<PrimeExtensionsSection />)
+    fireEvent.click(screen.getByRole('button', { name: 'Browse packages' }))
     expect(await screen.findByTestId('prime-packages-kind-tabs')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('tab', { name: 'Skills' }))
     await waitFor(() => {

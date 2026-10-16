@@ -131,6 +131,53 @@ describe('parseNpmSearchResponse', () => {
     }])
     expect(JSON.stringify(parsed)).not.toContain('secret@example.com')
   })
+
+  it('hides GitHub Actions as the author and falls back to the repo owner', () => {
+    const parsed = parseNpmSearchResponse({
+      total: 1,
+      objects: [{
+        package: {
+          name: '@acme/prime-skill',
+          description: 'A skill',
+          keywords: ['pi-package', 'skill'],
+          publisher: { username: 'GitHub Actions' },
+          links: { repository: 'https://github.com/badlogic/pi-coding-agent' },
+        },
+      }],
+    })
+    expect(parsed.hits[0]?.publisher).toBe('badlogic')
+    expect(parsed.hits[0]?.publisher).not.toMatch(/github actions/i)
+  })
+
+  it('falls back to the npm scope when GitHub Actions has no repository', () => {
+    const parsed = parseNpmSearchResponse({
+      total: 1,
+      objects: [{
+        package: {
+          name: '@mariozechner/pi-web-access',
+          description: 'Web access',
+          keywords: ['pi-package'],
+          publisher: { username: 'github-actions[bot]' },
+        },
+      }],
+    })
+    expect(parsed.hits[0]?.publisher).toBe('mariozechner')
+  })
+
+  it('omits GitHub Actions when there is no repo owner or scope', () => {
+    const parsed = parseNpmSearchResponse({
+      total: 1,
+      objects: [{
+        package: {
+          name: 'pi-orphan-theme',
+          description: 'A theme',
+          keywords: ['pi-package', 'theme'],
+          publisher: { username: 'GitHub Actions' },
+        },
+      }],
+    })
+    expect(parsed.hits[0]?.publisher).toBeNull()
+  })
 })
 
 describe('catalogSearchUrl', () => {

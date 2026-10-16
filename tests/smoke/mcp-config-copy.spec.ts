@@ -15,6 +15,7 @@ test.describe('MCP config copy', () => {
 
     await sendShortcut(page, ',', ['Control'])
     await expect(page.getByTestId('settings-panel')).toBeVisible({ timeout: 3_000 })
+    await page.getByTestId('settings-advanced-prime-engine-toggle').click()
     await page.getByTestId('settings-copy-mcp-config').click()
 
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain('"mcpServers"')
