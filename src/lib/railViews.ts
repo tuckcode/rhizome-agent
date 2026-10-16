@@ -58,3 +58,28 @@ export function railViewById(id: RailViewId): RailViewDefinition {
   if (!view) throw new Error(`Unknown rail view: ${id}`)
   return view
 }
+
+export interface ActiveRailViewSelection {
+  kind: string
+  filter?: string
+}
+
+/**
+ * Which command-rail View is current. Research, Graph, and Mycelium win
+ * in that order when their destination flags are set; Pulse maps to
+ * History; anything else is no rail View.
+ */
+export function computeActiveRailView(
+  effectiveSelection: ActiveRailViewSelection,
+  isGraphDestination: boolean,
+  isMyceliumDestination: boolean,
+  isResearchDestination: boolean,
+): RailViewId | null {
+  if (isResearchDestination) return 'research'
+  if (isGraphDestination) return 'graph'
+  if (isMyceliumDestination) return 'mycelium'
+  if (effectiveSelection.kind === 'filter' && effectiveSelection.filter === 'pulse') {
+    return 'history'
+  }
+  return null
+}
