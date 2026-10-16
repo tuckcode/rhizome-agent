@@ -177,27 +177,58 @@ describe('SettingsPanel', () => {
     }
   })
 
-  it('does not search the Prime package catalog until Packages is opened', async () => {
+  it('keeps Packages out of the Settings nav and collapsed under Advanced Prime engine', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
       ok: true,
       json: async () => ({ objects: [], total: 0 }),
     } as Response)
     try {
       renderOpenSettings()
-      expect(screen.getByTestId('settings-nav-settings-section-extensions')).toHaveTextContent(
-        'Packages',
+      expect(screen.queryByTestId('settings-nav-settings-section-extensions')).not.toBeInTheDocument()
+      expect(screen.getByTestId('settings-advanced-prime-engine-toggle')).toHaveAttribute(
+        'aria-expanded',
+        'false',
       )
+      expect(screen.queryByTestId('prime-extensions-search')).not.toBeInTheDocument()
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 30))
       })
       expect(fetchSpy).not.toHaveBeenCalled()
 
-      fireEvent.click(screen.getByTestId(`settings-nav-${SETTINGS_SECTION_IDS.extensions}`))
+      fireEvent.click(screen.getByTestId('settings-advanced-prime-engine-toggle'))
       expect(await screen.findByTestId('prime-extensions-search')).toBeInTheDocument()
       await waitFor(() => {
         expect(fetchSpy).toHaveBeenCalled()
       })
       expect(String(fetchSpy.mock.calls[0]?.[0])).toContain('keywords%3Api-package')
+    } finally {
+      fetchSpy.mockRestore()
+    }
+  })
+
+  it('opens Advanced Prime engine for an old Packages section id', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: async () => ({ objects: [], total: 0 }),
+    } as Response)
+    try {
+      render(
+        <SettingsPanel
+          open={true}
+          settings={emptySettings}
+          initialSectionId="packages"
+          onSave={onSave}
+          onClose={onClose}
+        />,
+      )
+      expect(await screen.findByTestId('prime-extensions-search')).toBeInTheDocument()
+      expect(screen.getByTestId('settings-advanced-prime-engine-toggle')).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      )
+      await waitFor(() => {
+        expect(fetchSpy).toHaveBeenCalled()
+      })
     } finally {
       fetchSpy.mockRestore()
     }

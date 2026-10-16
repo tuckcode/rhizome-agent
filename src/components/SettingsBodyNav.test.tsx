@@ -5,7 +5,7 @@ import { SETTINGS_SECTION_IDS } from './settingsSectionIds'
 
 /**
  * Browser preview, 2026-09-26: picking About (the last section) stopped
- * short, because Packages loads its catalog lazily while the smooth scroll
+ * short, because Agents loads Prime catalogs lazily while the smooth scroll
  * passes it and the content above About grows. The nav keeps the picked
  * heading at the top while content settles, until the user scrolls.
  */
@@ -57,5 +57,11 @@ describe('SettingsBodyNav keeps the picked section at the top', () => {
 
     observers.forEach((fire) => fire())
     expect(scrollIntoView).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not list Packages as a top-level Settings item', () => {
+    render(<SettingsBodyNav t={(key) => key} />)
+    expect(screen.queryByTestId(`settings-nav-${SETTINGS_SECTION_IDS.extensions}`)).not.toBeInTheDocument()
+    expect(screen.queryByText('Packages')).not.toBeInTheDocument()
   })
 })
