@@ -1,14 +1,22 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AiModelProvider } from '../lib/aiTargets'
 import { NATIVE_CHAT_MODEL_CHIP_MAX_WIDTH_CLASS } from '../lib/composerMenuSide'
+import { resetListProviderModelsCache } from '../lib/listProviderModels'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { NativeChatModelPicker } from './NativeChatModelPicker'
 
+const host = vi.hoisted(() => ({
+  hold: null as Promise<void> | null,
+  release: null as (() => void) | null,
+}))
+
 vi.mock('../lib/callHost', () => ({
-  callHost: vi.fn(async (cmd: string, args?: { provider?: { kind?: string } }) => {
-    if (cmd !== 'discover_ai_models') return []
+  callHost: vi.fn(async (cmd: string, args?: { provider?: { kind?: string; id?: string } }) => {
+    if (host.hold) await host.hold
+    if (cmd !== 'list_ai_model_provider_models' && cmd !== 'discover_ai_models') return []
     if (args?.provider?.kind === 'ollama') return ['llama3.2', 'qwen2.5']
+    if (args?.provider?.id === 'work-openai') return ['gpt-4o', 'gpt-5']
     return []
   }),
 }))
@@ -22,6 +30,7 @@ const configured: AiModelProvider[] = [
     id: 'work-openai',
     name: 'Work OpenAI',
     kind: 'open_ai',
+    api_key_storage: 'local_file',
     models: [
       {
         id: 'gpt-4o',
@@ -46,6 +55,12 @@ function openMenu(testId = 'native-chat-model-trigger') {
     new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
   )
 }
+
+beforeEach(() => {
+  host.hold = null
+  host.release = null
+  resetListProviderModelsCache()
+})
 
 function mockTriggerBox(top: number, bottom: number, innerHeight = 640) {
   const trigger = screen.getByTestId('native-chat-model-trigger')
@@ -92,6 +107,30 @@ describe('NativeChatModelPicker', () => {
     await waitFor(() => {
       expect(screen.getByTestId('native-chat-model-ollama/qwen2.5')).toBeInTheDocument()
     })
+  })
+
+  it('lists live models for a keyed provider and shows a brief loading state', async () => {
+    host.hold = new Promise<void>((resolve) => {
+      host.release = resolve
+    })
+    render(
+      <NativeChatModelPicker
+        variant="chip"
+        value="work-openai/gpt-4o"
+        onChange={vi.fn()}
+        providers={configured}
+      />,
+    )
+    openMenu()
+    const loading = await screen.findAllByTestId('native-chat-model-loading')
+    expect(loading[0]).toHaveTextContent('Loading…')
+    await act(async () => {
+      host.release?.()
+    })
+    await waitFor(() => {
+      expect(screen.getByTestId('native-chat-model-work-openai/gpt-5')).toHaveTextContent('gpt-5')
+    })
+    expect(screen.queryByTestId('native-chat-model-loading')).not.toBeInTheDocument()
   })
 
   it('keeps a well-formed discovered target even before the menu opens', () => {

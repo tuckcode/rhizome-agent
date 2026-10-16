@@ -758,6 +758,13 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     if (kind === 'lm_studio') return ['llama3.2']
     return []
   },
+  list_ai_model_provider_models: (args: { provider?: { kind?: string; id?: string } }) => {
+    const kind = args?.provider?.kind
+    if (kind === 'ollama') return ['llama3.2', 'qwen2.5']
+    if (kind === 'lm_studio') return ['llama3.2']
+    if (args?.provider?.id === 'work-openai') return ['gpt-4o', 'gpt-5']
+    return []
+  },
   list_prime_sessions: () => [
     {
       name: [

@@ -22,12 +22,15 @@ import {
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { middleEllipsis, NATIVE_CHAT_MODEL_CHIP_LABEL_MAX_CHARS } from '../lib/middleEllipsis'
 import {
+  loadLiveRhizomeChatModels,
+  pendingLiveProviderNames,
+} from '../lib/listProviderModels'
+import {
   countKeylessRhizomeProviders,
   excludeKeylessRhizomeModels,
   filterRhizomeChatModels,
   groupRhizomeChatModels,
   includeRemovedProviderModel,
-  loadRhizomeChatModels,
   REMOVED_PROVIDER_ERROR,
   REMOVED_PROVIDER_LABEL,
   resolveRhizomeChatModel,
@@ -92,6 +95,7 @@ export function NativeChatModelPicker({
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [models, setModels] = useState<RhizomeChatModel[]>(() => seedRhizomeChatModels(providers))
+  const [loadingNames, setLoadingNames] = useState<string[]>([])
   const [menuSide, setMenuSide] = useState<ComposerMenuSide>(variant === 'chip' ? 'top' : 'bottom')
   const [sideOffset, setSideOffset] = useState(4)
   const selectedId = resolveNativeChatTarget(value, providers)
@@ -114,10 +118,16 @@ export function NativeChatModelPicker({
   }, [providers])
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      setLoadingNames([])
+      return
+    }
     let cancelled = false
-    void loadRhizomeChatModels(providers).then((next) => {
-      if (!cancelled) setModels(next)
+    setLoadingNames(pendingLiveProviderNames(providers))
+    void loadLiveRhizomeChatModels(providers).then((next) => {
+      if (cancelled) return
+      setModels(next)
+      setLoadingNames([])
     })
     return () => {
       cancelled = true
@@ -172,6 +182,7 @@ export function NativeChatModelPicker({
           if (next) {
             updateMenuPlacement()
             setQuery('')
+            setLoadingNames(pendingLiveProviderNames(providers))
           }
           setOpen(next)
         }}
@@ -261,7 +272,15 @@ export function NativeChatModelPicker({
                     className="px-2 pb-1 pt-2 text-[11px] font-medium text-muted-foreground normal-case tracking-normal"
                     data-testid="native-chat-model-provider"
                   >
-                    {group.provider}
+                    <span>{group.provider}</span>
+                    {loadingNames.includes(group.provider) ? (
+                      <span
+                        className="ml-1.5 font-normal"
+                        data-testid="native-chat-model-loading"
+                      >
+                        Loading…
+                      </span>
+                    ) : null}
                   </DropdownMenuLabel>
                   {group.models.map((model) => {
                     const label = rhizomeModelVisibleName(model)
