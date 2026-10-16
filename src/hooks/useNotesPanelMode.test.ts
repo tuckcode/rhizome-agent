@@ -48,7 +48,8 @@ describe('useNotesPanelMode', () => {
     const mac = typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform)
     act(() => {
       window.dispatchEvent(new KeyboardEvent('keydown', {
-        key: '.',
+        key: '>',
+        code: 'Period',
         metaKey: mac,
         ctrlKey: !mac,
         shiftKey: true,

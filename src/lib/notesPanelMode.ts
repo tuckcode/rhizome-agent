@@ -76,10 +76,12 @@ export function notesPanelModeLabel(mode: NotesPanelMode): string {
 
 export function notesPanelModeTooltip(
   mode: NotesPanelMode,
-  options: { windowTooNarrow?: boolean } = {},
+  options: { windowTooNarrow?: boolean; openForNow?: boolean } = {},
 ): string {
   const base = `Panel: ${notesPanelModeLabel(mode)}`
-  return options.windowTooNarrow ? `${base} (window too narrow)` : base
+  if (options.windowTooNarrow) return `${base} (window too narrow)`
+  if (options.openForNow) return `${base} (open for now)`
+  return base
 }
 
 export function notesPanelModeShortcutDisplay(): string {
@@ -91,8 +93,9 @@ export function notesPanelModeShortcutAria(): string {
   return isMac() ? 'Meta+Shift+Period' : 'Control+Shift+Period'
 }
 
-export function isNotesPanelModeShortcut(event: Pick<KeyboardEvent, 'key' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey'>): boolean {
-  if (event.key !== '.' && event.key !== 'Period') return false
+export function isNotesPanelModeShortcut(event: Pick<KeyboardEvent, 'code' | 'key' | 'metaKey' | 'ctrlKey' | 'altKey' | 'shiftKey'>): boolean {
+  // Shift+Period types '>' on a US keyboard. Match the physical key.
+  if (event.code !== 'Period') return false
   if (event.altKey || !event.shiftKey) return false
   return isMac() ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey
 }

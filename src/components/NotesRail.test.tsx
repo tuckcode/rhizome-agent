@@ -39,6 +39,22 @@ describe('NotesRail', () => {
     expect(screen.getByTestId('notes-rail-all')).toHaveStyle({ width: '32px', height: '32px' })
     expect(screen.getByTestId('notes-rail-all')).toHaveAccessibleName('All Notes')
     expect(screen.getByTestId('notes-rail-all').textContent).toBe('')
+    expect(screen.getByTestId('notes-rail-all')).toHaveStyle({ color: 'var(--text-secondary)' })
+  })
+
+  it('uses a neutral selected fill, not mint', () => {
+    renderRail({
+      items: [{
+        id: 'all',
+        label: 'All Notes',
+        icon: FileText,
+        active: true,
+        onSelect: vi.fn(),
+      }],
+    })
+    const selected = screen.getByTestId('notes-rail-all')
+    expect(selected).toHaveStyle({ backgroundColor: 'var(--state-hover)', color: 'var(--text-primary)' })
+    expect(selected).not.toHaveStyle({ backgroundColor: 'var(--state-selected)' })
   })
 
   it('overlays Chat without a backdrop when Auto expands', () => {
@@ -47,7 +63,15 @@ describe('NotesRail', () => {
     expect(rail).toHaveAttribute('data-overlay', 'true')
     expect(rail).toHaveClass('bg-background')
     expect(rail).toHaveClass('shadow-md')
-    expect(rail).toHaveStyle({ marginLeft: '-194px', width: '240px', zIndex: '40' })
+    expect(rail).toHaveStyle({
+      position: 'absolute',
+      right: '0px',
+      top: '0px',
+      bottom: '0px',
+      width: '240px',
+      zIndex: '40',
+    })
+    expect(screen.getByTestId('notes-panel-rail-slot')).toHaveStyle({ width: '46px' })
     expect(screen.getByTestId('notes-panel-rail-expanded')).toBeInTheDocument()
     expect(screen.queryByTestId('notes-rail-all')).not.toBeInTheDocument()
   })

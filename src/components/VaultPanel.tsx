@@ -31,6 +31,7 @@ interface VaultPanelProps {
   onModeMenuOpenChange?: (open: boolean) => void
   modeButtonRef?: Ref<HTMLButtonElement>
   windowTooNarrow?: boolean
+  openForNow?: boolean
 }
 
 export function VaultPanel({
@@ -48,6 +49,7 @@ export function VaultPanel({
   onModeMenuOpenChange,
   modeButtonRef,
   windowTooNarrow = false,
+  openForNow = false,
 }: VaultPanelProps) {
   const collapseLabel = translate(locale, 'sidebar.action.collapse')
   const browseLabel = translate(
@@ -133,6 +135,7 @@ export function VaultPanel({
             onMenuOpenChange={onModeMenuOpenChange}
             triggerRef={modeButtonRef}
             windowTooNarrow={windowTooNarrow}
+            openForNow={openForNow}
           />
         ) : (
           <Button

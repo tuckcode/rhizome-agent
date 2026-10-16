@@ -21,8 +21,7 @@ const state = (['rail', 'hover', 'open', 'narrow'].includes(params.get('state') 
 
 document.documentElement.classList.toggle('dark', theme === 'graphite')
 document.documentElement.dataset.theme = theme === 'graphite' ? 'dark' : 'light'
-if (theme === 'earth') document.documentElement.dataset.colorTheme = 'rhizome'
-else document.documentElement.removeAttribute('data-color-theme')
+document.documentElement.removeAttribute('data-color-theme')
 document.body.style.margin = '0'
 document.body.style.background = 'var(--surface-app)'
 document.body.style.color = 'var(--text-primary)'
@@ -43,7 +42,7 @@ const panel = (
     navigation={<div className="p-3 text-sm text-muted-foreground">Inbox</div>}
     noteList={(
       <div className="flex flex-col gap-1 p-2 text-sm">
-        <div className="rounded-md px-2 py-1.5" style={{ background: 'var(--state-selected)' }}>All notes</div>
+        <div className="rounded-md px-2 py-1.5" style={{ background: 'var(--state-hover)' }}>All notes</div>
         <div className="px-2 py-1.5 text-muted-foreground">Draft</div>
         <div className="px-2 py-1.5 text-muted-foreground">Weekly review</div>
       </div>

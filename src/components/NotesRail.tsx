@@ -39,6 +39,7 @@ interface NotesRailProps {
   children?: ReactNode
   controlMode?: NotesPanelMode
   windowTooNarrow?: boolean
+  openForNow?: boolean
 }
 
 export function NotesRail({
@@ -63,6 +64,7 @@ export function NotesRail({
   children,
   controlMode,
   windowTooNarrow = false,
+  openForNow = false,
 }: NotesRailProps) {
   const triggerMode = controlMode ?? mode
   const railItems = items ?? [
@@ -71,93 +73,104 @@ export function NotesRail({
       : []),
     ...notesRailRecentItems({ entries, getNoteStatus, onSelectNote }),
   ]
-  const layoutWidth = expanded && !overlaying ? width : RAIL_COLLAPSED_WIDTH_PX
-  const visualWidth = expanded ? width : RAIL_COLLAPSED_WIDTH_PX
+  const slotWidth = expanded && !overlaying ? width : RAIL_COLLAPSED_WIDTH_PX
+  const panelWidth = expanded ? width : RAIL_COLLAPSED_WIDTH_PX
 
   return (
     <div
-      ref={panelRef}
-      className={cn(
-        'relative flex shrink-0 flex-col items-center py-2',
-        overlaying ? 'bg-background shadow-md' : 'bg-[var(--surface-sidebar)]',
-        'motion-reduce:transition-none',
-      )}
-      data-testid="notes-panel-rail"
-      data-mode={mode}
-      data-expanded={expanded ? 'true' : 'false'}
-      data-overlay={overlaying ? 'true' : 'false'}
-      onMouseEnter={onMouseEnter}
-      onMouseLeave={onMouseLeave}
-      onFocusCapture={onFocusCapture}
+      className="relative h-full shrink-0 overflow-visible"
+      data-testid="notes-panel-rail-slot"
       style={{
-        width: visualWidth,
-        marginLeft: overlaying ? -(visualWidth - RAIL_COLLAPSED_WIDTH_PX) : undefined,
-        zIndex: overlaying ? NOTES_PANEL_OVERLAY_Z : undefined,
-        borderLeft: '1px solid var(--border-subtle)',
-        transition: `width ${RAIL_WIDTH_TRANSITION_MS}ms ease-out`,
-        flexBasis: layoutWidth,
-        minWidth: layoutWidth,
-        maxWidth: overlaying ? visualWidth : layoutWidth,
+        width: slotWidth,
+        flexBasis: slotWidth,
+        minWidth: slotWidth,
       }}
     >
       <div
-        className="flex w-full flex-col items-center"
-        style={{ gap: NOTES_RAIL_GAP_PX, paddingTop: 0 }}
-        data-testid="notes-panel-rail-icons"
-      >
-        {expanded ? null : (
-          <NotesPanelModeControl
-            mode={triggerMode}
-            onModeChange={onModeChange}
-            onMenuOpenChange={onMenuOpenChange}
-            triggerRef={modeButtonRef}
-            windowTooNarrow={windowTooNarrow}
-          />
+        ref={panelRef}
+        className={cn(
+          'flex h-full flex-col items-center py-2',
+          overlaying ? 'bg-background shadow-md' : 'relative bg-[var(--surface-sidebar)]',
+          'motion-reduce:transition-none',
         )}
-        {!expanded
-          ? railItems.map((item) => {
-              const Icon = item.icon
-              return (
-                <ActionTooltip key={item.id} copy={{ label: item.label }} side="left">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="relative shrink-0 p-0 hover:bg-[var(--state-hover,var(--accent))]"
-                    style={{
-                      width: NOTES_RAIL_HIT_PX,
-                      height: NOTES_RAIL_HIT_PX,
-                      color: item.active ? 'var(--foreground)' : 'var(--text-muted)',
-                      backgroundColor: item.active ? 'var(--state-selected)' : undefined,
-                    }}
-                    aria-label={item.label}
-                    aria-current={item.active ? 'page' : undefined}
-                    data-testid={`notes-rail-${item.id}`}
-                    onClick={item.onSelect}
-                  >
-                    <Icon size={NOTES_RAIL_ICON_PX} weight={item.active ? 'fill' : 'regular'} />
-                    {item.unsaved ? (
-                      <span
-                        aria-hidden="true"
-                        data-testid="notes-rail-unsaved"
-                        className="absolute right-1 top-1 rounded-full"
-                        style={{
-                          width: 6,
-                          height: 6,
-                          background: 'var(--text-muted)',
-                        }}
-                      />
-                    ) : null}
-                  </Button>
-                </ActionTooltip>
-              )
-            })
-          : null}
-      </div>
-      {expanded ? (
-        <div className="min-h-0 w-full flex-1 overflow-hidden" data-testid="notes-panel-rail-expanded">
-          {children}
+        data-testid="notes-panel-rail"
+        data-mode={mode}
+        data-expanded={expanded ? 'true' : 'false'}
+        data-overlay={overlaying ? 'true' : 'false'}
+        onMouseEnter={onMouseEnter}
+        onMouseLeave={onMouseLeave}
+        onFocusCapture={onFocusCapture}
+        style={{
+          position: overlaying ? 'absolute' : undefined,
+          top: overlaying ? 0 : undefined,
+          right: overlaying ? 0 : undefined,
+          bottom: overlaying ? 0 : undefined,
+          width: panelWidth,
+          zIndex: overlaying ? NOTES_PANEL_OVERLAY_Z : undefined,
+          borderLeft: '1px solid var(--border-subtle)',
+          transition: `width ${RAIL_WIDTH_TRANSITION_MS}ms ease-out`,
+        }}
+      >
+        <div
+          className="flex w-full flex-col items-center"
+          style={{ gap: NOTES_RAIL_GAP_PX, paddingTop: 0 }}
+          data-testid="notes-panel-rail-icons"
+        >
+          {expanded ? null : (
+            <NotesPanelModeControl
+              mode={triggerMode}
+              onModeChange={onModeChange}
+              onMenuOpenChange={onMenuOpenChange}
+              triggerRef={modeButtonRef}
+              windowTooNarrow={windowTooNarrow}
+              openForNow={openForNow}
+            />
+          )}
+          {!expanded
+            ? railItems.map((item) => {
+                const Icon = item.icon
+                return (
+                  <ActionTooltip key={item.id} copy={{ label: item.label }} side="left">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="relative shrink-0 p-0 hover:bg-[var(--state-hover)] hover:text-[var(--text-primary)] dark:hover:bg-[var(--state-hover)]"
+                      style={{
+                        width: NOTES_RAIL_HIT_PX,
+                        height: NOTES_RAIL_HIT_PX,
+                        color: item.active ? 'var(--text-primary)' : 'var(--text-secondary)',
+                        backgroundColor: item.active ? 'var(--state-hover)' : undefined,
+                      }}
+                      aria-label={item.label}
+                      aria-current={item.active ? 'page' : undefined}
+                      data-testid={`notes-rail-${item.id}`}
+                      onClick={item.onSelect}
+                    >
+                      <Icon size={NOTES_RAIL_ICON_PX} weight={item.active ? 'fill' : 'regular'} />
+                      {item.unsaved ? (
+                        <span
+                          aria-hidden="true"
+                          data-testid="notes-rail-unsaved"
+                          className="absolute right-1 top-1 rounded-full"
+                          style={{
+                            width: 6,
+                            height: 6,
+                            background: 'var(--text-muted)',
+                          }}
+                        />
+                      ) : null}
+                    </Button>
+                  </ActionTooltip>
+                )
+              })
+            : null}
         </div>
-      ) : null}
+        {expanded ? (
+          <div className="min-h-0 w-full flex-1 overflow-hidden" data-testid="notes-panel-rail-expanded">
+            {children}
+          </div>
+        ) : null}
+      </div>
     </div>
   )
 }

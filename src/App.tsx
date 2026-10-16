@@ -1719,6 +1719,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const fittedNotesMode = fittedNotesPanelMode(storedNotesMode, notesOpen && !hideNotesForCanvas)
   const layoutNotesMode = notesSessionOpen && notesOpen && !hideNotesForCanvas ? 'open' : fittedNotesMode
   const notesWindowTooNarrow = compactVaultPanel && storedNotesMode === 'open'
+  const notesOpenForNow = notesSessionOpen && storedNotesMode !== 'open' && layoutNotesMode === 'open'
   const notesHover = useHoverExpandPanel({
     enabled: chatCentered && layoutNotesMode === 'auto' && !hideNotesForCanvas,
     peerOverlaying: leftOverlaying,
@@ -2158,6 +2159,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         onModeMenuOpenChange={setNotesMenuOpen}
         modeButtonRef={notesHover.modeButtonRef}
         windowTooNarrow={notesWindowTooNarrow}
+        openForNow={notesOpenForNow}
       />
       {chatCentered ? (
         <ConnectionsPanel
@@ -2515,6 +2517,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               mode={layoutNotesMode}
               controlMode={storedNotesMode}
               windowTooNarrow={notesWindowTooNarrow}
+              openForNow={notesOpenForNow}
               onModeChange={handleNotesModeChange}
               expanded={notesHover.expanded}
               overlaying={notesHover.overlaying}
@@ -2549,6 +2552,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                 onModeMenuOpenChange={setNotesMenuOpen}
                 modeButtonRef={notesHover.modeButtonRef}
                 windowTooNarrow={notesWindowTooNarrow}
+                openForNow={notesOpenForNow}
               />
             </NotesRail>
           )}

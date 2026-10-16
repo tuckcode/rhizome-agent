@@ -36,4 +36,9 @@ describe('NotesPanelModeControl', () => {
     render(<NotesPanelModeControl mode="open" onModeChange={vi.fn()} windowTooNarrow />)
     expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Open (window too narrow)')
   })
+
+  it('marks a temporary view-switch open without changing the saved mode label', () => {
+    render(<NotesPanelModeControl mode="rail" onModeChange={vi.fn()} openForNow />)
+    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Rail (open for now)')
+  })
 })

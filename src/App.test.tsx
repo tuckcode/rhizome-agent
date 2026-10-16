@@ -879,7 +879,7 @@ describe('App', () => {
     pressViewShortcut('2')
     expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
     expect(localStorage.getItem(notesPanelModeStorageKey('main'))).toBe('rail')
-    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Rail')
+    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Rail (open for now)')
   })
 
   it('keeps Chat as the canvas while Notes is open, and Inbox only opens the list', async () => {

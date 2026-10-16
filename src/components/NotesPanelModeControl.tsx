@@ -25,6 +25,7 @@ interface NotesPanelModeControlProps {
   onMenuOpenChange?: (open: boolean) => void
   triggerRef?: Ref<HTMLButtonElement>
   windowTooNarrow?: boolean
+  openForNow?: boolean
 }
 
 export function NotesPanelModeControl({
@@ -33,9 +34,10 @@ export function NotesPanelModeControl({
   onMenuOpenChange,
   triggerRef,
   windowTooNarrow = false,
+  openForNow = false,
 }: NotesPanelModeControlProps) {
   const CurrentIcon = NOTES_PANEL_MODE_ICONS[mode]
-  const tooltip = notesPanelModeTooltip(mode, { windowTooNarrow })
+  const tooltip = notesPanelModeTooltip(mode, { windowTooNarrow, openForNow })
   const shortcut = notesPanelModeShortcutDisplay()
 
   return (
@@ -44,11 +46,12 @@ export function NotesPanelModeControl({
         <Button
           type="button"
           variant="ghost"
-          className="h-6 w-6 shrink-0 p-0 hover:bg-[var(--state-hover,var(--accent))]"
+          className="h-6 w-6 shrink-0 p-0 hover:bg-[var(--state-hover)] hover:text-[var(--text-primary)] dark:hover:bg-[var(--state-hover)]"
           style={{
             width: NOTES_MODE_BUTTON_PX,
             height: NOTES_MODE_BUTTON_PX,
             borderRadius: NOTES_MODE_BUTTON_RADIUS_PX,
+            color: 'var(--text-primary)',
           }}
           title={`${tooltip} ${shortcut}`}
           aria-label={tooltip}
@@ -56,6 +59,7 @@ export function NotesPanelModeControl({
           data-testid="notes-panel-mode-trigger"
           data-mode={mode}
           data-window-too-narrow={windowTooNarrow ? 'true' : 'false'}
+          data-open-for-now={openForNow ? 'true' : 'false'}
           ref={triggerRef}
         >
           <CurrentIcon size={16} weight={mode === 'open' ? 'fill' : 'regular'} />
@@ -64,7 +68,6 @@ export function NotesPanelModeControl({
       <DropdownMenuContent
         align="end"
         data-testid="notes-panel-mode-menu"
-        className="z-[60]"
         style={{ zIndex: NOTES_PANEL_MENU_Z }}
       >
         <DropdownMenuRadioGroup
