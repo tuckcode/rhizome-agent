@@ -1223,21 +1223,16 @@ mod tests {
                     {
                         return record.clone();
                     }
-                    let seen: Vec<&str> = document
-                        .sessions
-                        .iter()
-                        .map(|session| session.path.as_str())
-                        .collect();
                     assert!(
                         Instant::now() < deadline,
-                        "index never got the native session ({path}); index had {} session(s): {seen:?}",
-                        seen.len()
+                        "index never got the native session; index had {} session(s)",
+                        document.sessions.len()
                     );
                 }
-                Err(error) => {
+                Err(_) => {
                     assert!(
                         Instant::now() < deadline,
-                        "index never got the native session ({path}); {error}"
+                        "index never got the native session"
                     );
                 }
             }

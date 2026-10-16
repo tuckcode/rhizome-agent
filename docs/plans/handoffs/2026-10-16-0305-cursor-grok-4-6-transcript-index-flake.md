@@ -40,6 +40,8 @@ had already gone to the wrong path.
 - The flaky test waits for `TurnEnd` (the write is synchronous in
   that handler) and then still asserts the native session is in the
   index.
+- Panic text names only a session count. It must not interpolate the
+  native path (CodeQL `rust/cleartext-logging` on `session_id`).
 
 Product chat behaviour is unchanged: production never changes
 `RHIZOME_CACHE_DIR` mid-process, so the captured path is the same
