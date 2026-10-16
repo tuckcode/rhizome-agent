@@ -233,12 +233,23 @@ const hslToHex = (h, s, l) => {
 }
 
 // Dark community skins keep each role's hue and saturation and only change
-// HSL lightness. Faint and muted stay on the palette muted hue. Tertiary
-// sits between secondary and muted. Solarized dark body text is pinned.
+// HSL lightness. Faint and muted stay on the palette muted hue. Everforest
+// muted and faint get a small saturation boost so the moss reads after the
+// lightness lift. Tertiary sits between secondary and muted. Solarized dark
+// body stays #A5B2B3 when the ladder fits; it lifts only when banner tints
+// on sidebar/app leave no INK_GAP room. Dracula faint clears 4.6:1 so
+// warning tints stay above 4.5 with room.
 const TEXT_MIN = 4.5
+const DRACULA_FAINT_MIN = 4.6
+const EVERFOREST_SAT_BOOST = 0.1
 const SOLARIZED_DARK_PRIMARY = '#A5B2B3'
 const relativeY = (hex) => lum(hex2rgb(hex))
-const passesInk = (value, backgrounds) => backgrounds.every((bg) => contrast(value, bg) >= TEXT_MIN)
+const passesInk = (value, backgrounds, min = TEXT_MIN) =>
+  backgrounds.every((bg) => contrast(value, bg) >= min)
+const withSatBoost = (hex, extra) => {
+  const [h, s, l] = hexToHsl(hex)
+  return hslToHex(h, Math.min(1, s + extra), l)
+}
 const setY = (hex, targetY) => {
   const [h, s] = hexToHsl(hex)
   let lo = 0
@@ -261,8 +272,8 @@ const setY = (hex, targetY) => {
   }
   return best
 }
-const liftLightness = (hex, backgrounds) => {
-  if (passesInk(hex, backgrounds)) {
+const liftLightness = (hex, backgrounds, min = TEXT_MIN) => {
+  if (passesInk(hex, backgrounds, min)) {
     return hex
   }
   const [h, s, l0] = hexToHsl(hex)
@@ -272,7 +283,7 @@ const liftLightness = (hex, backgrounds) => {
   for (let i = 0; i < 24; i += 1) {
     const mid = (lo + hi) / 2
     const candidate = hslToHex(h, s, mid)
-    if (passesInk(candidate, backgrounds)) {
+    if (passesInk(candidate, backgrounds, min)) {
       best = candidate
       hi = mid
     } else {
@@ -281,50 +292,34 @@ const liftLightness = (hex, backgrounds) => {
   }
   let [, , l] = hexToHsl(best)
   let out = best
-  while (!passesInk(out, backgrounds) && l < 1) {
+  while (!passesInk(out, backgrounds, min) && l < 1) {
     l = Math.min(1, l + 1 / 255)
     out = hslToHex(h, s, l)
   }
   return out
 }
-const liftToY = (hex, targetY, backgrounds) => liftLightness(setY(hex, Math.max(relativeY(hex), targetY)), backgrounds)
-const setYUnder = (hex, maxY) => {
-  const [h, s] = hexToHsl(hex)
-  let lo = 0
-  let hi = 1
-  let best = hslToHex(h, s, 0)
-  for (let i = 0; i < 28; i += 1) {
-    const mid = (lo + hi) / 2
-    const candidate = hslToHex(h, s, mid)
-    if (relativeY(candidate) > maxY) {
-      hi = mid
-    } else {
-      best = candidate
-      lo = mid
-    }
-  }
-  let [, , l] = hexToHsl(best)
-  while (relativeY(best) > maxY && l > 0) {
-    l = Math.max(0, l - 1 / 255)
-    best = hslToHex(h, s, l)
-  }
-  return best
-}
-const fitUnderY = (hex, maxY, backgrounds) => liftLightness(setYUnder(hex, maxY), backgrounds)
+const liftToY = (hex, targetY, backgrounds, min = TEXT_MIN) =>
+  liftLightness(setY(hex, Math.max(relativeY(hex), targetY)), backgrounds, min)
 const fitInkLadder = (t, backgrounds) => {
-  const faint = liftLightness(t.muted, backgrounds)
-  const muted = liftToY(t.muted, relativeY(faint) + INK_GAP, backgrounds)
+  const mutedInk = t.slug === 'everforest' ? withSatBoost(t.muted, EVERFOREST_SAT_BOOST) : t.muted
+  const faintMin = t.slug === 'dracula' ? DRACULA_FAINT_MIN : TEXT_MIN
+  const faint = liftLightness(mutedInk, backgrounds, faintMin)
+  const muted = liftToY(mutedInk, relativeY(faint) + INK_GAP, backgrounds)
   if (t.slug === 'solarized-dark') {
-    const primary = SOLARIZED_DARK_PRIMARY
-    const secondary = fitUnderY(mix(t.fg, t.muted, 0.4), relativeY(primary) - INK_GAP, backgrounds)
     const tertiary = liftToY(t.muted, relativeY(muted) + INK_GAP, backgrounds)
+    const secondary = liftToY(mix(t.fg, t.muted, 0.4), relativeY(tertiary) + INK_GAP, backgrounds)
+    const primary = liftToY(
+      SOLARIZED_DARK_PRIMARY,
+      relativeY(secondary) + INK_GAP,
+      backgrounds,
+    )
     return {
-      primary,
+      primary:
+        relativeY(SOLARIZED_DARK_PRIMARY) >= relativeY(secondary) + INK_GAP
+          ? SOLARIZED_DARK_PRIMARY
+          : primary,
       secondary,
-      tertiary:
-        relativeY(tertiary) <= relativeY(secondary) - INK_GAP
-          ? tertiary
-          : fitUnderY(t.muted, relativeY(secondary) - INK_GAP, backgrounds),
+      tertiary,
       muted,
       faint,
     }
@@ -379,19 +374,25 @@ function themeBlock(t) {
   let muted = t.muted
   let faint = mix(t.muted, t.bg, 0.3)
   if (t.dark) {
-    const app = hex2rgb(t.bg)
-    const panel = hex2rgb(card)
+    const appRgb = hex2rgb(t.bg)
+    const sidebarRgb = hex2rgb(t.panel)
+    const cardRgb = hex2rgb(card)
+    const bannerTint = (base) => [
+      composite(t.accent, 0.12, base),
+      composite(t.green, 0.15, base),
+      composite(t.yellow, 0.16, base),
+      composite(t.red, 0.15, base),
+    ]
     const inkBackgrounds = [
-      app,
-      hex2rgb(t.panel),
-      panel,
+      appRgb,
+      sidebarRgb,
+      cardRgb,
       hex2rgb(hover),
       hex2rgb(selected),
       hex2rgb(selectedStrong),
-      composite(t.accent, 0.12, panel),
-      composite(t.green, 0.15, panel),
-      composite(t.yellow, 0.16, panel),
-      composite(t.red, 0.15, panel),
+      ...bannerTint(appRgb),
+      ...bannerTint(sidebarRgb),
+      ...bannerTint(cardRgb),
     ]
     const ladder = fitInkLadder(t, inkBackgrounds)
     primary = ladder.primary
