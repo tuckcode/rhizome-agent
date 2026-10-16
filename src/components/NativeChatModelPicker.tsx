@@ -99,8 +99,9 @@ export function NativeChatModelPicker({
         <DropdownMenuContent
           side={chip ? 'top' : 'bottom'}
           align="start"
-          className="max-h-[320px] w-72 overflow-y-auto"
+          className={cn('max-h-[320px] w-72 overflow-y-auto', chip ? undefined : 'z-[12000]')}
           data-testid="native-chat-model-menu"
+          data-settings-panel-portal={chip ? undefined : 'true'}
         >
           <div className="px-1.5 pb-1 pt-0.5">
             <Input

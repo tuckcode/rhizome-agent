@@ -942,6 +942,43 @@ describe('SettingsPanel', () => {
     expect(screen.queryByTestId('settings-default-ai-agent')).not.toBeInTheDocument()
   })
 
+  it('opens the model menu in a portal outside the settings overflow box and selects a model', async () => {
+    render(
+      <SettingsPanel
+        open={true}
+        settings={{ ...emptySettings, native_chat_target: 'gemini/gemini-2.5-flash' }}
+        onSave={onSave}
+        onClose={onClose}
+      />,
+    )
+
+    const trigger = screen.getByTestId('native-chat-model-trigger')
+    expect(trigger).toHaveTextContent('Gemini · gemini-2.5-flash')
+
+    fireEvent.pointerDown(
+      trigger,
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+
+    const menu = await screen.findByTestId('native-chat-model-menu')
+    expect(menu).toBeVisible()
+    expect(menu).toHaveAttribute('data-settings-panel-portal', 'true')
+    expect(menu.className).toMatch(/z-\[12000\]/)
+
+    const settings = screen.getByTestId('settings-panel')
+    const overflow = settings.querySelector('.overflow-auto')
+    const clipGroup = trigger.closest('.overflow-hidden')
+    expect(overflow).not.toBeNull()
+    expect(clipGroup).not.toBeNull()
+    expect(overflow?.contains(menu)).toBe(false)
+    expect(clipGroup?.contains(menu)).toBe(false)
+    expect(settings.contains(menu)).toBe(false)
+    expect(document.body.contains(menu)).toBe(true)
+
+    fireEvent.click(screen.getByTestId('native-chat-model-open_ai/gpt-4.1-mini'))
+    expect(trigger).toHaveTextContent('OpenAI · gpt-4.1-mini')
+  })
+
   it('persists the native Chat engine across a settings save and reload', () => {
     const { rerender } = render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
