@@ -1,4 +1,4 @@
-import { chromium } from 'playwright'
+import { chromium } from '@playwright/test'
 import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 
@@ -24,6 +24,7 @@ for (const [theme, state] of shots) {
   else await page.setViewportSize({ width: 1100, height: 720 })
   await page.goto(`${base}?theme=${theme}&state=${state}`, { waitUntil: 'networkidle' })
   await page.evaluate(() => document.fonts.ready)
+  await page.waitForTimeout(200)
   const file = path.join(outDir, `${theme}-${state}.png`)
   await page.screenshot({ path: file, fullPage: true })
   console.log(file)

@@ -7,6 +7,7 @@ import { VaultPanel } from '../src/components/VaultPanel'
 import { TooltipProvider } from '../src/components/ui/tooltip'
 import '../src/index.css'
 import '../src/themes.css'
+import '../src/App.css'
 
 type ShotState = 'rail' | 'hover' | 'open' | 'narrow'
 type ShotTheme = 'graphite' | 'earth'
@@ -24,6 +25,7 @@ else document.documentElement.removeAttribute('data-color-theme')
 document.body.style.margin = '0'
 document.body.style.background = 'var(--surface-app)'
 document.body.style.color = 'var(--text-primary)'
+document.body.style.fontFamily = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
 
 const railItems = [
   { id: 'inbox', label: 'Inbox', icon: Tray, onSelect: () => {} },
@@ -38,7 +40,13 @@ const panel = (
     locale="en"
     notesWidth={240}
     navigation={<div className="p-3 text-sm text-muted-foreground">Inbox</div>}
-    noteList={<div className="p-3 text-sm">Recent notes</div>}
+    noteList={(
+      <div className="flex flex-col gap-1 p-2 text-sm">
+        <div className="rounded-md px-2 py-1.5" style={{ background: 'var(--state-selected)' }}>All notes</div>
+        <div className="px-2 py-1.5 text-muted-foreground">Draft</div>
+        <div className="px-2 py-1.5 text-muted-foreground">Weekly review</div>
+      </div>
+    )}
     onBrowseToggle={() => {}}
     onCollapse={() => {}}
     mode={state === 'open' ? 'open' : state === 'rail' ? 'rail' : 'auto'}
@@ -47,7 +55,7 @@ const panel = (
 )
 
 const narrow = state === 'narrow'
-const expanded = state === 'hover' || state === 'open'
+const expanded = state === 'hover'
 const overlaying = state === 'hover' || state === 'narrow'
 
 function Shot() {
@@ -57,39 +65,65 @@ function Shot() {
         data-testid="notes-panel-modes-shot"
         data-theme={theme}
         data-state={state}
-        className="flex h-screen overflow-hidden"
+        className="flex h-screen flex-col overflow-hidden"
         style={{ width: narrow ? 640 : 1100, minHeight: 640 }}
       >
-        <CommandRail
-          locale="en"
-          pinned={state === 'open' || state === 'narrow'}
-          autoCollapsed={state === 'narrow'}
-          drawer={state === 'narrow'}
-          onOpenSettings={() => {}}
-          onSelectView={() => {}}
-        />
-        <div className="flex min-w-0 flex-1 flex-col bg-[var(--surface-app)]">
-          <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-            Chat stays at least 420px
-          </div>
+        <div
+          className="flex h-8 shrink-0 items-center px-3 text-xs font-medium"
+          style={{
+            background: 'var(--surface-panel)',
+            borderBottom: '1px solid var(--border-subtle)',
+            color: 'var(--text-secondary)',
+          }}
+        >
+          {theme === 'graphite' ? 'Graphite' : 'Earth light'}
+          {' · '}
+          {state === 'rail' ? 'Rail' : state === 'hover' ? 'Auto hover' : state === 'open' ? 'Open' : 'Narrow Auto'}
         </div>
-        {state === 'open' ? (
-          <div className="flex h-full" style={{ width: 240 }}>
-            {panel}
-          </div>
-        ) : (
-          <NotesRail
-            mode={state === 'rail' ? 'rail' : 'auto'}
-            onModeChange={() => {}}
-            expanded={expanded && state !== 'rail'}
-            overlaying={overlaying && state !== 'rail'}
-            width={240}
-            panelRef={createRef<HTMLDivElement>()}
-            items={railItems}
+        <div className="flex min-h-0 flex-1">
+          <CommandRail
+            locale="en"
+            pinned={state === 'open'}
+            autoCollapsed={state === 'narrow'}
+            drawer={false}
+            onOpenSettings={() => {}}
+            onSelectView={() => {}}
+          />
+          <div
+            className="flex min-w-0 flex-1 flex-col"
+            style={{ background: 'var(--surface-app)' }}
           >
-            {panel}
-          </NotesRail>
-        )}
+            <div className="flex flex-1 flex-col justify-end p-4">
+              <div
+                className="rounded-md px-3 py-2 text-sm"
+                style={{
+                  background: 'var(--surface-panel)',
+                  border: '1px solid var(--border-subtle)',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                Chat keeps at least 420px
+              </div>
+            </div>
+          </div>
+          {state === 'open' ? (
+            <div className="flex h-full" style={{ width: 240, background: 'var(--surface-sidebar)' }}>
+              {panel}
+            </div>
+          ) : (
+            <NotesRail
+              mode={state === 'rail' ? 'rail' : 'auto'}
+              onModeChange={() => {}}
+              expanded={expanded}
+              overlaying={overlaying && state !== 'rail'}
+              width={240}
+              panelRef={createRef<HTMLDivElement>()}
+              items={railItems}
+            >
+              {panel}
+            </NotesRail>
+          )}
+        </div>
       </div>
     </TooltipProvider>
   )
