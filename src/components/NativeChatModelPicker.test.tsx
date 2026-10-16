@@ -141,6 +141,31 @@ describe('NativeChatModelPicker', () => {
     expect(chip.className).not.toMatch(/text-primary|accent-green|bg-primary/)
   })
 
+  it('tells the chip menu that a pick applies to new chats, not this one', async () => {
+    render(
+      <NativeChatModelPicker
+        variant="chip"
+        value="open_ai/gpt-4o"
+        onChange={vi.fn()}
+        providers={configured}
+      />,
+    )
+
+    openMenu()
+    await waitFor(() => {
+      expect(screen.getByTestId('native-chat-model-new-chats')).toHaveTextContent('Applies to new chats')
+    })
+  })
+
+  it('keeps the Settings row label as Model, not the unknown-model fallback', () => {
+    render(
+      <NativeChatModelPicker value="open_ai/gpt-4o" onChange={vi.fn()} providers={configured} />,
+    )
+
+    expect(screen.getByTestId('native-chat-model-picker')).toHaveTextContent('Model')
+    expect(screen.queryByTestId('native-chat-model-new-chats')).not.toBeInTheDocument()
+  })
+
   it('cuts a long chip label with an ellipsis and keeps the full name on the tooltip and menu', async () => {
     const longProvider: AiModelProvider[] = [
       {

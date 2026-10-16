@@ -1257,6 +1257,8 @@
   "ai.composer.model": "Change model",
   "ai.composer.modelUnknown": "Model",
   "ai.composer.modelNamed": "Model: {name}",
+  "ai.composer.modelLabel": "Model",
+  "ai.composer.modelAppliesToNewChats": "Applies to new chats",
   "ai.composer.modelsLoading": "Loading models…",
   "ai.composer.modelsEmpty": "No models available",
   "ai.composer.modelsFilter": "Filter models…",

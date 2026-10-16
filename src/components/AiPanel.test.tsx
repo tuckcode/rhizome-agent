@@ -879,6 +879,24 @@ describe('the native composer deck', () => {
     expect(bar.contains(screen.getByTestId('native-chat-model-picker'))).toBe(true)
     expect(screen.queryByTestId('prime-session-subhead')).not.toBeInTheDocument()
   })
+
+  it('renders no model chip on a Claude Code chat even if a deck is passed', () => {
+    render(
+      <AiPanelView
+        controller={primeController()}
+        onClose={vi.fn()}
+        showHeader={false}
+        defaultAiAgent="claude_code"
+        defaultAiAgentReady
+        composerDeck={<div data-testid="native-chat-model-picker">chip</div>}
+      />,
+    )
+
+    expect(screen.queryByTestId('native-chat-model-picker')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('prime-model-chip')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('prime-thinking-toggle')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('chat-composer-bar')).not.toBeInTheDocument()
+  })
 })
 
 describe('the Goal button has one home', () => {

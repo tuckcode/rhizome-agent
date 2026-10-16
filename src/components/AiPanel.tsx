@@ -602,7 +602,7 @@ export function AiPanelView({
         } : undefined}
         onOpenGoal={isPrimeTarget ? goalDialog.openDialog : undefined}
         onOpenSchedule={isPrimeTarget ? () => scheduleDialog.onOpenChange(true) : undefined}
-        foot={(composerDeck || isPrimeTarget) ? (
+        foot={(isPrimeTarget || chatEngine === 'native') ? (
           <ChatComposerBar
             locale={locale}
             deck={composerDeck}

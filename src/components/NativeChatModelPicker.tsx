@@ -104,7 +104,7 @@ export function NativeChatModelPicker({
       }
       data-testid="native-chat-model-picker"
     >
-      {chip ? null : <span className="text-xs text-muted-foreground">{t('ai.composer.modelUnknown')}</span>}
+      {chip ? null : <span className="text-xs text-muted-foreground">{t('ai.composer.modelLabel')}</span>}
       <DropdownMenu
         open={open}
         onOpenChange={(next) => {
@@ -151,6 +151,14 @@ export function NativeChatModelPicker({
           data-testid="native-chat-model-menu"
           data-settings-panel-portal={chip ? undefined : 'true'}
         >
+          {chip ? (
+            <p
+              className="px-2 pb-1 pt-0.5 text-[11px] text-muted-foreground"
+              data-testid="native-chat-model-new-chats"
+            >
+              {t('ai.composer.modelAppliesToNewChats')}
+            </p>
+          ) : null}
           <div className="px-1.5 pb-1 pt-0.5">
             <Input
               value={query}
