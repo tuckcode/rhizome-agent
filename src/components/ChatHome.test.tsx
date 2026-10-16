@@ -384,6 +384,11 @@ describe('ChatHome composer wiring', () => {
     livePrimeHost()
   })
 
+  it('does not mount the native model picker as its own row above chat', () => {
+    expect(chatHomeSource).not.toContain('<NativeChatModelPicker')
+    expect(chatHomeSource).toContain('<ChatComposerDeck')
+  })
+
   it('puts the Agents idle/working pill on the composer next to thinking', () => {
     expect(chatHomeSource).toContain('activity={')
     expect(chatHomeSource).toContain('<AgentsPill')

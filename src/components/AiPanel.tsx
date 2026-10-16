@@ -84,7 +84,7 @@ interface AiPanelProps {
   newChatRef?: MutableRefObject<(() => void) | null>
   /** Rendered above the input: banners that explain why a turn may fail. */
   composerControls?: ReactNode
-  /** Live turn controls for the compact row under the input (Prime only). */
+  /** Live turn controls for the compact row under the input. */
   composerDeck?: ReactNode
   /** Skill label shown inside the compact row's Tools menu. */
   composerSkillsLabel?: string | null
@@ -602,12 +602,12 @@ export function AiPanelView({
         } : undefined}
         onOpenGoal={isPrimeTarget ? goalDialog.openDialog : undefined}
         onOpenSchedule={isPrimeTarget ? () => scheduleDialog.onOpenChange(true) : undefined}
-        foot={isPrimeTarget ? (
+        foot={(composerDeck || isPrimeTarget) ? (
           <ChatComposerBar
             locale={locale}
             deck={composerDeck}
             working={isActive}
-            failureReason={agent.status === 'error'
+            failureReason={isPrimeTarget && agent.status === 'error'
               ? workerStartFailureReason(getLastAgentMessage(agent.messages) ?? '')
               : null}
             stats={primeStats}

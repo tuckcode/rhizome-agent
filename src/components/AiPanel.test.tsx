@@ -861,6 +861,26 @@ describe('a pick in the rail Sessions list', () => {
  * small window. Goal and Schedule now live in the compact row's Tools menu,
  * and there is no separate meter row.
  */
+describe('the native composer deck', () => {
+  it('keeps the model chip on the composer row when the engine is native', () => {
+    render(
+      <AiPanelView
+        controller={primeController()}
+        onClose={vi.fn()}
+        showHeader={false}
+        defaultAiAgent="prime"
+        defaultAiAgentReady
+        chatEngine="native"
+        composerDeck={<div data-testid="native-chat-model-picker">chip</div>}
+      />,
+    )
+
+    const bar = screen.getByTestId('chat-composer-bar')
+    expect(bar.contains(screen.getByTestId('native-chat-model-picker'))).toBe(true)
+    expect(screen.queryByTestId('prime-session-subhead')).not.toBeInTheDocument()
+  })
+})
+
 describe('the Goal button has one home', () => {
   it('lives in the compact composer row, behind Tools', () => {
     render(

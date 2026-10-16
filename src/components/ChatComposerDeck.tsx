@@ -105,6 +105,7 @@ export function ChatComposerDeck({
       >
         {rhizome ? (
           <NativeChatModelPicker
+            locale={locale}
             value={nativeTarget}
             onChange={(target) => onNativeTargetChange?.(target)}
             providers={providers}
