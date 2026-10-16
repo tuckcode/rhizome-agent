@@ -4894,9 +4894,9 @@ mod tests {
             "Prime chat start must seed the vault skill"
         );
         assert!(
-            events
-                .iter()
-                .any(|event| matches!(event, AiAgentStreamEvent::TextDelta { text } if text == "hello")),
+            events.iter().any(
+                |event| matches!(event, AiAgentStreamEvent::TextDelta { text } if text == "hello")
+            ),
             "events={events:?}"
         );
         let _ = shutdown_host();
@@ -4928,9 +4928,9 @@ mod tests {
             "events={events:?}"
         );
         assert!(
-            events
-                .iter()
-                .any(|event| matches!(event, AiAgentStreamEvent::TextDelta { text } if text == "hello")),
+            events.iter().any(
+                |event| matches!(event, AiAgentStreamEvent::TextDelta { text } if text == "hello")
+            ),
             "events={events:?}"
         );
         assert!(

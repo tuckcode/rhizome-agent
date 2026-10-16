@@ -885,11 +885,10 @@ mod tests {
             is_prime_skill_write_failure(&error),
             "expected a .prime write failure, got {error}"
         );
-        assert!(
-            !dir.path()
-                .join(".prime/agent/skills/rhizome-vault/SKILL.md")
-                .exists()
-        );
+        assert!(!dir
+            .path()
+            .join(".prime/agent/skills/rhizome-vault/SKILL.md")
+            .exists());
     }
 
     #[test]
