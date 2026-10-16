@@ -914,7 +914,7 @@ mod tests {
     use crate::engines::{EngineEvent, NativeEngine, PrimeEngine};
     use crate::model_events::{ModelError, ModelErrorKind};
     use crate::rhizome_loop::{AgentLoop, DurableEvent, FakeModel, ModelView, ScriptPart};
-    use crate::session_transcript_index::{self, IndexedTranscriptTurn};
+    use crate::session_transcript_index;
     use std::panic::{catch_unwind, AssertUnwindSafe};
     use std::sync::mpsc;
     use std::time::Instant;
@@ -1276,11 +1276,6 @@ mod tests {
                 .turns
                 .iter()
                 .any(|turn| { turn.role == "assistant" && turn.text == "ok" }));
-            let _ = IndexedTranscriptTurn {
-                message_index: 0,
-                role: "user".into(),
-                text: String::new(),
-            };
         });
     }
 

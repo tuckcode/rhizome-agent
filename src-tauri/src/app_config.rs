@@ -2,6 +2,18 @@ use std::path::{Path, PathBuf};
 /// Serializes tests that change `HOME` / `XDG_CONFIG_HOME`.
 #[cfg(test)]
 pub static TEST_CONFIG_ENV: std::sync::Mutex<()> = std::sync::Mutex::new(());
+/// Serializes tests that change `RHIZOME_CACHE_DIR`.
+/// Vault cache and the session transcript index both read that env; one lock
+/// stops them from pointing each other at the wrong temp dir.
+#[cfg(test)]
+pub static TEST_CACHE_DIR_ENV: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+#[cfg(test)]
+pub fn lock_test_cache_dir() -> std::sync::MutexGuard<'static, ()> {
+    TEST_CACHE_DIR_ENV
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
 
 const APP_CONFIG_DIR: &str = "com.rhizome.app";
 // Order matters: most-recently-current name first, since that's most likely

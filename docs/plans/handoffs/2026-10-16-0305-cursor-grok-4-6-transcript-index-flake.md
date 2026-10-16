@@ -42,6 +42,9 @@ had already gone to the wrong path.
   index.
 - Panic text names only a session count. It must not interpolate the
   native path (CodeQL `rust/cleartext-logging` on `session_id`).
+- Vault cache and transcript-index tests share
+  `app_config::TEST_CACHE_DIR_ENV` / `lock_test_cache_dir()`.
+- Dropped the leftover `IndexedTranscriptTurn` binding in the flaky test.
 
 Product chat behaviour is unchanged: production never changes
 `RHIZOME_CACHE_DIR` mid-process, so the captured path is the same

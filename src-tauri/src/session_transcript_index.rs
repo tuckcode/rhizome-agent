@@ -202,19 +202,14 @@ pub fn with_temp_cache<T>(body: impl FnOnce() -> T) -> T {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Mutex;
     use tempfile::TempDir;
-
-    static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     pub fn with_temp_cache<T>(body: impl FnOnce() -> T) -> T {
         with_cache_dir(|_| body())
     }
 
     fn with_cache_dir<T>(body: impl FnOnce(&TempDir) -> T) -> T {
-        let _guard = ENV_LOCK
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let _guard = crate::app_config::lock_test_cache_dir();
         let dir = TempDir::new().expect("temp cache dir");
         TEST_CACHE_DIR.with(|slot| *slot.borrow_mut() = Some(dir.path().to_path_buf()));
         std::env::set_var("RHIZOME_CACHE_DIR", dir.path());
