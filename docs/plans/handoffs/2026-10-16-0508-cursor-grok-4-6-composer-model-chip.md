@@ -72,7 +72,8 @@ Review follow-up: the chip menu "Applies to new chats" line is
 floor), so a wrapped line without `\n` counts. The always-on
 composer border stays.
 
-The chip menu regression asserts a portal escape, not jsdom
-visibility: the menu (and the chosen row) sit on document.body,
-outside the overflow-hidden composer trap and outside a dialog
-content box. Clicking a row still selects that model.
+The chip menu regression does not use toBeVisible. It walks
+ancestors and requires no overflow-hidden parent, plus a body
+portal. Inside a dialog the menu is also outside
+`[data-slot=dialog-content]`. Clicking a row still selects that
+model.

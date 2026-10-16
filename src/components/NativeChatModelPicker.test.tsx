@@ -287,14 +287,22 @@ describe('NativeChatModelPicker', () => {
   })
 
   /**
-   * jsdom has no layout, so toBeVisible cannot prove a menu escaped a clip.
-   * The regression is structural: Radix must portal the menu to document.body,
-   * outside the overflow-hidden composer (and outside a dialog content box).
+   * jsdom has no layout, so visibility cannot prove a menu escaped a clip.
+   * Walk parents (not the menu itself — it uses overflow-y-auto) and require
+   * no overflow-hidden ancestor. The menu must sit on document.body.
    */
-  function expectMenuOutsideTrap(menu: HTMLElement, trap: HTMLElement) {
+  function overflowHiddenAncestor(node: HTMLElement): HTMLElement | null {
+    let current = node.parentElement
+    while (current && current !== document.body && current !== document.documentElement) {
+      if (current.classList.contains('overflow-hidden')) return current
+      current = current.parentElement
+    }
+    return null
+  }
+
+  function expectMenuInPortal(menu: HTMLElement) {
     expect(document.body.contains(menu)).toBe(true)
-    expect(menu).toBeVisible()
-    expect(trap.contains(menu)).toBe(false)
+    expect(overflowHiddenAncestor(menu)).toBeNull()
   }
 
   it('opens the composer chip menu in a portal and selects a model', async () => {
@@ -312,10 +320,13 @@ describe('NativeChatModelPicker', () => {
 
     openMenu()
     const menu = await screen.findByTestId('native-chat-model-menu')
-    expectMenuOutsideTrap(menu, screen.getByTestId('composer-clip-trap'))
+    const trap = screen.getByTestId('composer-clip-trap')
+    expectMenuInPortal(menu)
+    expect(trap.contains(menu)).toBe(false)
 
     const option = await screen.findByTestId('native-chat-model-free_tier_auto')
-    expect(screen.getByTestId('composer-clip-trap').contains(option)).toBe(false)
+    expect(overflowHiddenAncestor(option)).toBeNull()
+    expect(trap.contains(option)).toBe(false)
     await act(async () => {
       fireEvent.click(option)
     })
@@ -344,15 +355,19 @@ describe('NativeChatModelPicker', () => {
     const menu = await screen.findByTestId('native-chat-model-menu')
     const dialog = document.querySelector('[data-slot="dialog-content"]')
     expect(dialog).toBeInstanceOf(HTMLElement)
-    expectMenuOutsideTrap(menu, dialog as HTMLElement)
-    expectMenuOutsideTrap(menu, screen.getByTestId('dialog-clip-trap'))
+    expectMenuInPortal(menu)
+    expect((dialog as HTMLElement).contains(menu)).toBe(false)
+    expect(screen.getByTestId('dialog-clip-trap').contains(menu)).toBe(false)
 
     const option = await screen.findByTestId('native-chat-model-free_tier_auto')
+    expect(overflowHiddenAncestor(option)).toBeNull()
     expect((dialog as HTMLElement).contains(option)).toBe(false)
+    expect(screen.getByTestId('dialog-clip-trap').contains(option)).toBe(false)
     await act(async () => {
       fireEvent.click(option)
     })
     expect(onChange).toHaveBeenCalledWith('free_tier_auto')
   })
 })
+
 
