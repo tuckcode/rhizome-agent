@@ -336,9 +336,12 @@ describe('NativeChatModelPicker', () => {
       expect(screen.getByTestId('native-chat-model-open-providers')).toHaveTextContent(
         'providers need a key · Open settings',
       )
+      expect(screen.getByTestId('native-chat-model-keyless-note')).toHaveClass('text-muted-foreground')
+      expect(screen.getByTestId('native-chat-model-open-settings')).toHaveClass('text-primary')
+      expect(screen.getByTestId('native-chat-model-open-settings')).toHaveTextContent('Open settings')
     })
     await act(async () => {
-      fireEvent.click(screen.getByTestId('native-chat-model-open-providers'))
+      fireEvent.click(screen.getByTestId('native-chat-model-open-settings'))
     })
     expect(onOpenProviders).toHaveBeenCalledOnce()
 
@@ -435,7 +438,7 @@ describe('NativeChatModelPicker', () => {
     })
   })
 
-  it('styles Open settings as an accent link', async () => {
+  it('styles only Open settings as an accent link', async () => {
     render(
       <NativeChatModelPicker
         variant="chip"
@@ -446,36 +449,67 @@ describe('NativeChatModelPicker', () => {
       />,
     )
     openMenu()
-    const opener = await screen.findByTestId('native-chat-model-open-providers')
-    expect(opener).toHaveClass('text-primary')
-    expect(opener.className).toMatch(/underline/)
+    const note = await screen.findByTestId('native-chat-model-keyless-note')
+    const link = screen.getByTestId('native-chat-model-open-settings')
+    expect(note).toHaveClass('text-muted-foreground')
+    expect(note).not.toHaveClass('text-primary')
+    expect(link).toHaveClass('text-primary')
+    expect(link.className).toMatch(/underline/)
   })
 
-  it('keeps a heading for a live provider with no seed models', async () => {
-    host.hold = new Promise<void>((resolve) => {
-      host.release = resolve
-    })
-    const emptyKeyed: AiModelProvider[] = [
-      {
-        ...configured[0],
-        models: [],
-      },
-    ]
+  it('does not mark catalog locals offline when the user never set them up', async () => {
+    host.fail = true
     render(
       <NativeChatModelPicker
         variant="chip"
         value={null}
         onChange={vi.fn()}
-        providers={emptyKeyed}
+        providers={[]}
       />,
     )
     openMenu()
-    const headings = await screen.findAllByTestId('native-chat-model-provider')
-    expect(headings.some((node) => node.textContent?.includes('Work OpenAI'))).toBe(true)
-    expect(screen.getAllByTestId('native-chat-model-loading').length).toBeGreaterThan(0)
-    await act(async () => {
-      host.release?.()
+    await waitFor(() => {
+      expect(screen.queryByTestId('native-chat-model-loading')).not.toBeInTheDocument()
     })
+    expect(screen.queryByTestId('native-chat-model-offline')).not.toBeInTheDocument()
+  })
+
+  it('prefixes a colliding display name with the provider', async () => {
+    const openai: AiModelProvider = {
+      id: 'openai',
+      name: 'OpenAI',
+      kind: 'open_ai',
+      api_key_storage: 'local_file',
+      models: [{
+        id: 'gpt-4o',
+        display_name: 'GPT-4o',
+        capabilities: configured[0].models[0].capabilities,
+      }],
+    }
+    const azure: AiModelProvider = {
+      id: 'azure',
+      name: 'Azure',
+      kind: 'open_ai_compatible',
+      api_key_storage: 'local_file',
+      models: [{
+        id: 'gpt-4o',
+        display_name: 'GPT-4o',
+        capabilities: configured[0].models[0].capabilities,
+      }],
+    }
+    render(
+      <NativeChatModelPicker
+        variant="chip"
+        value="openai/gpt-4o"
+        onChange={vi.fn()}
+        providers={[openai, azure]}
+      />,
+    )
+    openMenu()
+    await waitFor(() => {
+      expect(screen.getByTestId('native-chat-model-openai/gpt-4o')).toHaveTextContent('OpenAI · GPT-4o')
+    })
+    expect(screen.getByTestId('native-chat-model-azure/gpt-4o')).toHaveTextContent('Azure · GPT-4o')
   })
 
   it('paints group dividers with the input-border token', async () => {

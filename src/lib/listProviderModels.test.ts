@@ -4,9 +4,11 @@ import { callHost } from './callHost'
 import {
   listAiModelProviderModels,
   liveModelDisplayName,
+  liveProviderHeadingNames,
   loadLiveRhizomeChatModels,
   offlineLiveProviderNames,
   providerModelsCacheKey,
+  providersToListLive,
   resetListProviderModelsCache,
 } from './listProviderModels'
 
@@ -141,6 +143,24 @@ describe('loadLiveRhizomeChatModels', () => {
     expect(listed.find((model) => model.id === 'work-openai/gpt-4o')?.displayName).toBe('GPT-4o')
   })
 
+  it('normalizes a mixed-case provider id so live rows match the seed', async () => {
+    const provider = { ...keyedOpenAi(), id: 'Work-OpenAI' }
+    vi.mocked(callHost).mockImplementation(async (_cmd, args) => {
+      const listed = args?.provider as { id?: string; kind?: string } | undefined
+      if (listed?.id === 'work-openai') return ['gpt-4o', 'gpt-5']
+      return []
+    })
+
+    const listed = await loadLiveRhizomeChatModels([provider])
+    const ids = listed.map((model) => model.id)
+    expect(ids).toContain('work-openai/gpt-4o')
+    expect(ids).toContain('work-openai/gpt-5')
+    expect(ids).not.toContain('Work-OpenAI/gpt-4o')
+    expect(ids).not.toContain('Work-OpenAI/gpt-5')
+    expect(listed.filter((model) => model.modelId === 'gpt-4o')).toHaveLength(1)
+    expect(providersToListLive([provider]).map((item) => item.id)).toContain('work-openai')
+  })
+
   it('uses an API display name on live-only rows', async () => {
     vi.mocked(callHost).mockImplementation(async (_cmd, args) => {
       const provider = args?.provider as { kind?: string } | undefined
@@ -150,5 +170,36 @@ describe('loadLiveRhizomeChatModels', () => {
 
     const listed = await loadLiveRhizomeChatModels([])
     expect(listed.find((model) => model.id === 'ollama/qwen2.5')?.displayName).toBe('Qwen 2.5')
+  })
+})
+
+describe('liveProviderHeadingNames', () => {
+  it('hides catalog locals the user never set up after they fail', async () => {
+    vi.mocked(callHost).mockRejectedValue(new Error('provider offline'))
+    await loadLiveRhizomeChatModels([])
+    expect(liveProviderHeadingNames([])).not.toContain('Ollama')
+    expect(liveProviderHeadingNames([])).not.toContain('LM Studio')
+  })
+
+  it('names a local provider after it answers', async () => {
+    vi.mocked(callHost).mockImplementation(async (_cmd, args) => {
+      const provider = args?.provider as { kind?: string } | undefined
+      if (provider?.kind === 'ollama') return ['llama3.2']
+      return []
+    })
+    await loadLiveRhizomeChatModels([])
+    expect(liveProviderHeadingNames([])).toContain('Ollama')
+  })
+
+  it('names a local provider the user set up', () => {
+    const home: AiModelProvider = {
+      id: 'home-ollama',
+      name: 'Home Ollama',
+      kind: 'ollama',
+      api_key_storage: 'none',
+      models: [{ id: 'llama3.2', display_name: 'Llama 3.2', capabilities }],
+    }
+    expect(liveProviderHeadingNames([home])).toContain('Home Ollama')
+    expect(liveProviderHeadingNames([home])).not.toContain('Ollama')
   })
 })

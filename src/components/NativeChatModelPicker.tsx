@@ -37,6 +37,7 @@ import {
   REMOVED_PROVIDER_ERROR,
   REMOVED_PROVIDER_LABEL,
   resolveRhizomeChatModel,
+  rhizomeModelRowLabel,
   rhizomeModelVisibleName,
   seedRhizomeChatModels,
   type RhizomeChatModel,
@@ -114,6 +115,7 @@ export function NativeChatModelPicker({
   const t = createTranslator(locale)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const filterRef = useRef<HTMLInputElement>(null)
+  const selectedRowRef = useRef<HTMLDivElement | null>(null)
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [models, setModels] = useState<RhizomeChatModel[]>(() => seedRhizomeChatModels(providers))
@@ -168,10 +170,7 @@ export function NativeChatModelPicker({
 
   useEffect(() => {
     if (!open) return
-    const selectedRow = document.querySelector<HTMLElement>(
-      '[data-testid="native-chat-model-menu"] [data-selected="true"]',
-    )
-    selectedRow?.scrollIntoView({ block: 'nearest' })
+    selectedRowRef.current?.scrollIntoView({ block: 'nearest' })
   }, [open, selectedId, models, query])
 
   const updateMenuPlacement = () => {
@@ -351,11 +350,12 @@ export function NativeChatModelPicker({
                     })()}
                   </DropdownMenuLabel>
                   {group.models.map((model) => {
-                    const label = rhizomeModelVisibleName(model)
+                    const label = rhizomeModelRowLabel(model, keyed)
                     const isSelected = model.id === selectedId
                     return (
                       <DropdownMenuItem
                         key={model.id}
+                        ref={isSelected ? selectedRowRef : undefined}
                         className={ROW_CLASS}
                         title={model.modelId}
                         data-testid={`native-chat-model-${model.id}`}
@@ -385,21 +385,29 @@ export function NativeChatModelPicker({
             <div className="shrink-0" data-testid="native-chat-model-footer">
               <div className={GROUP_SEP_CLASS} data-testid="native-chat-model-footer-sep" />
               {keylessCount > 0 ? (
-                <Button
-                  type="button"
-                  variant="link"
-                  className="h-auto w-full justify-start rounded-md px-2 py-1.5 text-[12px] font-normal text-primary underline-offset-4"
+                <div
+                  className="flex flex-wrap items-center gap-x-1 px-2 py-1.5 text-[12px]"
                   data-testid="native-chat-model-open-providers"
-                  onPointerDown={(event) => {
-                    event.preventDefault()
-                  }}
-                  onClick={() => {
-                    onOpenProviders?.()
-                    setOpen(false)
-                  }}
                 >
-                  {`${keylessCount} providers need a key · Open settings`}
-                </Button>
+                  <span className="text-muted-foreground" data-testid="native-chat-model-keyless-note">
+                    {`${keylessCount} providers need a key · `}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto p-0 text-[12px] font-normal text-primary underline-offset-4"
+                    data-testid="native-chat-model-open-settings"
+                    onPointerDown={(event) => {
+                      event.preventDefault()
+                    }}
+                    onClick={() => {
+                      onOpenProviders?.()
+                      setOpen(false)
+                    }}
+                  >
+                    Open settings
+                  </Button>
+                </div>
               ) : null}
               <p
                 className="px-2 py-1.5 text-[12px] text-muted-foreground"

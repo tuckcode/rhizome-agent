@@ -9,6 +9,7 @@ import {
   REMOVED_PROVIDER_ERROR,
   REMOVED_PROVIDER_LABEL,
   resolveRhizomeChatModel,
+  rhizomeModelRowLabel,
   rhizomeModelVisibleName,
   rhizomeProviderNeedsApiKey,
   seedRhizomeChatModels,
@@ -75,6 +76,29 @@ describe('seedRhizomeChatModels', () => {
     expect(listed.at(-1)?.id).toBe('free_tier_auto')
     expect(listed.find((model) => model.id === 'work-openai/gpt-4o')?.displayName).toBe('GPT-4o')
     expect(rhizomeModelVisibleName(listed.at(-1)!)).toBe('Free tier (auto)')
+  })
+
+  it('prefixes the provider when two display names collide', () => {
+    const openai = {
+      id: 'openai/gpt-4o',
+      providerId: 'openai',
+      providerKind: 'open_ai' as const,
+      providerName: 'OpenAI',
+      modelId: 'gpt-4o',
+      displayName: 'GPT-4o',
+      label: 'OpenAI · GPT-4o',
+    }
+    const azure = {
+      ...openai,
+      id: 'azure/gpt-4o',
+      providerId: 'azure',
+      providerKind: 'open_ai_compatible' as const,
+      providerName: 'Azure',
+      label: 'Azure · GPT-4o',
+    }
+    expect(rhizomeModelRowLabel(openai, [openai, azure])).toBe('OpenAI · GPT-4o')
+    expect(rhizomeModelRowLabel(azure, [openai, azure])).toBe('Azure · GPT-4o')
+    expect(rhizomeModelRowLabel(openai, [openai])).toBe('GPT-4o')
   })
 
   it('lists OpenRouter Claude models and still hides Anthropic and Claude Code', () => {

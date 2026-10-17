@@ -1,6 +1,7 @@
 import {
   isLocalAiProvider,
   LOCAL_AI_PROVIDER_KINDS,
+  normalizeAiModelProviders,
   type AiModelProvider,
 } from './aiTargets'
 import { callHost } from './callHost'
@@ -57,13 +58,9 @@ export function providersToListLive(providers?: AiModelProvider[] | null): AiMod
     if (!canListProviderModelsLive(provider)) continue
     jobs.set(providerModelsCacheKey(provider), provider)
   }
-  for (const provider of providers ?? []) {
+  for (const provider of normalizeAiModelProviders(providers)) {
     if (provider.kind === 'anthropic' || !canListProviderModelsLive(provider)) continue
-    const id = provider.id.trim() || provider.kind
-    const name = provider.name.trim()
-    if (!id || !name) continue
-    const listed = { ...provider, id, name }
-    jobs.set(providerModelsCacheKey(listed), listed)
+    jobs.set(providerModelsCacheKey(provider), provider)
   }
   return [...jobs.values()]
 }
@@ -80,8 +77,23 @@ export function offlineLiveProviderNames(providers?: AiModelProvider[] | null): 
     .map((provider) => provider.name)
 }
 
+function configuredLiveProviders(providers?: AiModelProvider[] | null): AiModelProvider[] {
+  return normalizeAiModelProviders(providers).filter((provider) => {
+    return provider.kind !== 'anthropic' && canListProviderModelsLive(provider)
+  })
+}
+
+function localProviderAnswered(provider: AiModelProvider): boolean {
+  const key = providerModelsCacheKey(provider)
+  return isLocalAiProvider(provider) && cached.has(key) && !failed.has(key)
+}
+
 export function liveProviderHeadingNames(providers?: AiModelProvider[] | null): string[] {
-  return providersToListLive(providers).map((provider) => provider.name)
+  const names = new Set(configuredLiveProviders(providers).map((provider) => provider.name))
+  for (const provider of providersToListLive(providers)) {
+    if (localProviderAnswered(provider)) names.add(provider.name)
+  }
+  return [...names]
 }
 
 export function liveModelDisplayName(id: string, apiName?: string | null): string {

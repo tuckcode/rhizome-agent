@@ -792,7 +792,9 @@ asks `list_ai_model_provider_models` (`GET {base_url}/models` via
 `list_provider_models`) for local providers and remote providers that
 hold a key. The renderer caches that list per provider for the session
 and drops the cache when a key, base URL, or provider changes. A failed
-call keeps the seed and marks the group offline. `discover_ai_models` still
+call keeps the seed. Offline headings are only for providers the user
+set up, or a local host that answered. Catalog Ollama and LM Studio stay
+quiet when they were never set up. `discover_ai_models` still
 accepts an API-key override for Settings tests.
 Catalog defaults keep kind-keyed ids (`open_ai/…`, `open_router/…`).
 Configured providers key on the provider id (`work-openai/gpt-4o`) so
