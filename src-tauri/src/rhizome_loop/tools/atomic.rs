@@ -331,8 +331,11 @@ mod tests {
             .unwrap()
             .is_none());
         let too_long = dir.path().join("a".repeat(300));
-        let error = dest_permissions(&too_long).unwrap_err();
-        assert!(error.contains("Failed to read file info"), "{error}");
+        match dest_permissions(&too_long) {
+            Ok(None) if cfg!(windows) => {}
+            Ok(other) => panic!("a too-long path must not look like an existing file: {other:?}"),
+            Err(error) => assert!(error.contains("Failed to read file info"), "{error}"),
+        }
     }
 
     #[cfg(unix)]

@@ -110,9 +110,14 @@ pub struct NativeSessionWriter {
     len: u64,
     header: SessionHeader,
     fail_io: bool,
+    /// Truncate, rewind, or sync failed. Later appends must not write.
+    poisoned: bool,
     /// Test hook: write this many bytes of the next line, then fail.
     #[cfg(test)]
     partial_write_limit: Option<usize>,
+    /// Test hook: 1 = truncate fails, 2 = rewind fails, 3 = sync fails.
+    #[cfg(test)]
+    repair_fault: u8,
     _lock: SessionLock,
 }
 
@@ -551,8 +556,11 @@ pub fn create_session_log(header: &SessionHeader) -> Result<NativeSessionWriter,
         len,
         header: header.clone(),
         fail_io: false,
+        poisoned: false,
         #[cfg(test)]
         partial_write_limit: None,
+        #[cfg(test)]
+        repair_fault: 0,
         _lock: lock,
     })
 }
@@ -575,33 +583,71 @@ pub fn open_session_writer(session_id: &str, next_seq: u64) -> Result<NativeSess
         len,
         header,
         fail_io: false,
+        poisoned: false,
         #[cfg(test)]
         partial_write_limit: None,
+        #[cfg(test)]
+        repair_fault: 0,
         _lock: lock,
     })
 }
 
+struct WriteLineError {
+    message: String,
+    /// Truncate, rewind, or sync failed. The writer must not append again.
+    poison: bool,
+}
+
 fn write_line(file: &mut File, line: &str) -> Result<(), String> {
     let good_len = file.metadata().ok().map(|meta| meta.len());
-    write_line_from(file, line, good_len, None)
+    write_line_from(file, line, good_len, None, 0).map_err(|error| error.message)
 }
 
 /// Writes one JSONL line. On any write error the file is truncated back to
-/// `good_len` so a short write cannot sit in front of a later good line.
+/// `good_len` and that length is synced. A failed repair is returned so the
+/// writer can stop; a later line must not be glued onto the torn bytes.
 fn write_line_from(
     file: &mut File,
     line: &str,
     good_len: Option<u64>,
     partial_limit: Option<usize>,
-) -> Result<(), String> {
+    repair_fault: u8,
+) -> Result<(), WriteLineError> {
     let outcome = write_payload(file, line, partial_limit);
-    if outcome.is_err() {
+    if let Err(write_error) = outcome {
         if let Some(good_len) = good_len {
-            let _ = file.set_len(good_len);
-            let _ = file.seek(SeekFrom::Start(good_len));
+            if let Err(repair) = repair_short_write(file, good_len, repair_fault) {
+                return Err(WriteLineError {
+                    message: format!("{write_error}; {repair}"),
+                    poison: true,
+                });
+            }
         }
+        return Err(WriteLineError {
+            message: write_error,
+            poison: false,
+        });
     }
-    outcome
+    Ok(())
+}
+
+/// Drops a short write and makes that shorter length durable.
+fn repair_short_write(file: &mut File, good_len: u64, fault: u8) -> Result<(), String> {
+    if fault == 1 {
+        return Err("truncate native session log: simulated failure".into());
+    }
+    file.set_len(good_len)
+        .map_err(|error| format!("truncate native session log: {error}"))?;
+    if fault == 2 {
+        return Err("rewind native session log: simulated failure".into());
+    }
+    file.seek(SeekFrom::Start(good_len))
+        .map_err(|error| format!("rewind native session log: {error}"))?;
+    if fault == 3 {
+        return Err("sync native session log: simulated failure".into());
+    }
+    file.sync_all()
+        .map_err(|error| format!("sync native session log: {error}"))
 }
 
 fn write_payload(file: &mut File, line: &str, partial_limit: Option<usize>) -> Result<(), String> {
@@ -644,7 +690,18 @@ impl NativeSessionWriter {
         self.partial_write_limit = Some(bytes);
     }
 
+    /// The next short-write repair fails at truncate (1), rewind (2), or sync (3).
+    #[cfg(test)]
+    pub fn fail_repair(&mut self, fault: u8) {
+        self.repair_fault = fault;
+    }
+
     pub fn append(&mut self, event: &DurableEvent) -> Result<(), AppendError> {
+        if self.poisoned {
+            return Err(AppendError::Io(
+                "native session log writer is unusable after a failed repair".into(),
+            ));
+        }
         if self.fail_io {
             self.fail_io = false;
             return Err(AppendError::Io(
@@ -674,8 +731,18 @@ impl NativeSessionWriter {
         let partial = self.partial_write_limit.take();
         #[cfg(not(test))]
         let partial = None;
-        write_line_from(&mut self.file, &encoded, Some(self.len), partial)
-            .map_err(AppendError::Io)?;
+        #[cfg(test)]
+        let fault = std::mem::take(&mut self.repair_fault);
+        #[cfg(not(test))]
+        let fault = 0;
+        if let Err(error) =
+            write_line_from(&mut self.file, &encoded, Some(self.len), partial, fault)
+        {
+            if error.poison {
+                self.poisoned = true;
+            }
+            return Err(AppendError::Io(error.message));
+        }
         self.len += add;
         self.next_seq += 1;
         Ok(())
@@ -1195,6 +1262,124 @@ mod tests {
             .collect();
         assert_eq!(texts, ["first", "second"]);
         assert_eq!(opened.warning, None);
+    }
+
+    #[test]
+    fn a_failed_truncate_poisons_the_writer() {
+        let _home = temp_home();
+        let (id, mut writer) = open_test_writer();
+        append_or_roll(&mut writer, &user_event("a")).unwrap();
+        writer.fail_after_partial_write(1);
+        writer.fail_repair(1);
+        let first = append_or_roll(&mut writer, &user_event("torn")).expect_err("short write");
+        assert_eq!(first, LOG_SAVE_NOTICE);
+        let later = append_or_roll(&mut writer, &user_event("after")).expect_err("poisoned");
+        assert_eq!(later, LOG_SAVE_NOTICE);
+        let bytes = std::fs::read(writer.path()).unwrap();
+        assert!(
+            !bytes.windows(5).any(|window| window == b"after"),
+            "a poisoned writer must not append the next event"
+        );
+        drop(writer);
+        assert_eq!(user_texts(&id), ["a"]);
+    }
+
+    #[test]
+    fn a_failed_rewind_poisons_the_writer() {
+        let _home = temp_home();
+        let (id, mut writer) = open_test_writer();
+        append_or_roll(&mut writer, &user_event("a")).unwrap();
+        let good_len = std::fs::metadata(writer.path()).unwrap().len();
+        writer.fail_after_partial_write(1);
+        writer.fail_repair(2);
+        assert_eq!(
+            append_or_roll(&mut writer, &user_event("torn")).unwrap_err(),
+            LOG_SAVE_NOTICE
+        );
+        assert_eq!(
+            std::fs::metadata(writer.path()).unwrap().len(),
+            good_len,
+            "truncate already succeeded"
+        );
+        assert_eq!(
+            append_or_roll(&mut writer, &user_event("after")).unwrap_err(),
+            LOG_SAVE_NOTICE
+        );
+        assert_eq!(
+            std::fs::metadata(writer.path()).unwrap().len(),
+            good_len,
+            "a failed rewind must not leave a hole for the next write"
+        );
+        drop(writer);
+        assert_eq!(user_texts(&id), ["a"]);
+    }
+
+    #[test]
+    fn a_failed_sync_after_truncate_poisons_the_writer() {
+        let _home = temp_home();
+        let (id, mut writer) = open_test_writer();
+        append_or_roll(&mut writer, &user_event("a")).unwrap();
+        writer.fail_after_partial_write(1);
+        writer.fail_repair(3);
+        assert_eq!(
+            append_or_roll(&mut writer, &user_event("torn")).unwrap_err(),
+            LOG_SAVE_NOTICE
+        );
+        assert_eq!(
+            append_or_roll(&mut writer, &user_event("after")).unwrap_err(),
+            LOG_SAVE_NOTICE
+        );
+        drop(writer);
+        assert_eq!(user_texts(&id), ["a"]);
+    }
+
+    #[test]
+    fn a_truncated_prefix_is_what_a_reopen_reads() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("session.jsonl");
+        let mut file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&path)
+            .unwrap();
+        file.write_all(b"good\nTORN").unwrap();
+        repair_short_write(&mut file, 5, 0).unwrap();
+        drop(file);
+        assert_eq!(std::fs::read(&path).unwrap(), b"good\n");
+    }
+
+    fn open_test_writer() -> (String, NativeSessionWriter) {
+        let id = uuid::Uuid::new_v4().to_string();
+        let header = SessionHeader {
+            version: NATIVE_LOG_VERSION,
+            session_id: id.clone(),
+            created_at: "2026-10-10T00:00:00Z".into(),
+            target: "openai/gpt-4o-mini".into(),
+            permission_mode: "safe".into(),
+            vault_path: None,
+            vault_paths: Vec::new(),
+            system_prompt: None,
+        };
+        (id, create_session_log(&header).unwrap())
+    }
+
+    fn user_event(text: &str) -> DurableEvent {
+        DurableEvent::User {
+            text: text.to_string(),
+        }
+    }
+
+    fn user_texts(id: &str) -> Vec<String> {
+        open_session_log(id)
+            .unwrap()
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                DurableEvent::User { text } => Some(text.clone()),
+                _ => None,
+            })
+            .collect()
     }
 
     #[test]

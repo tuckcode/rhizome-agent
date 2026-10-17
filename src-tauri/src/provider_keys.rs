@@ -12,9 +12,9 @@
 //! next read finds the same value in both places and finishes the removal.
 //! If the write or the read-back fails, the file copy stays and still works.
 //! A save that does not read back restores the previous keychain value when
-//! it can.
+//! it can. A previous entry that cannot be read does not block the new key.
 //!
-//! A legacy file that cannot be read is logged once and ignored, so a key
+//! A legacy file that cannot be read is logged once per provider and ignored, so a key
 //! already in the keychain still works. Key values never appear in an error
 //! message or that log line. Errors and `MigrationReport` name the provider
 //! id only.
@@ -124,23 +124,57 @@ impl ProviderKeys {
         if key.is_empty() {
             return Err("API key cannot be empty.".into());
         }
-        let previous = self.backend.get(&id)?;
+        let previous = match self.backend.get(&id) {
+            Ok(value) => Previous::Known(value),
+            Err(error) => {
+                log::warn!(
+                    "The previous key for {id} could not be read ({error}). The new key will still be saved if it reads back."
+                );
+                Previous::Unknown
+            }
+        };
         self.backend.set(&id, key)?;
         keys_changed();
-        if !keychain_holds(&self.backend.get(&id), Some(key)) {
-            let had_previous = previous.is_some();
-            let restored = match previous.as_deref() {
-                Some(old) => {
-                    self.backend.set(&id, old).is_ok()
-                        && keychain_holds(&self.backend.get(&id), Some(old))
-                }
-                None => {
-                    self.backend.delete(&id).is_ok() && keychain_holds(&self.backend.get(&id), None)
-                }
-            };
-            return Err(read_back_message(&id, restored, had_previous));
+        if keychain_holds(&self.backend.get(&id), Some(key)) {
+            return self.legacy.remove(&id);
         }
-        self.legacy.remove(&id)
+        let outcome = self.restore_after_mismatch(&id, &previous);
+        // A try_credential between the first set and this restore can cache
+        // the unverified value. Bump again so that cache entry is dropped.
+        keys_changed();
+        Err(read_back_message(&id, outcome))
+    }
+
+    fn restore_after_mismatch(&self, id: &str, previous: &Previous) -> ReadBack {
+        match previous {
+            Previous::Unknown => ReadBack::Unconfirmed {
+                previous_unknown: true,
+            },
+            Previous::Known(Some(old)) => {
+                if self.backend.set(id, old).is_err() {
+                    return ReadBack::NotRestored;
+                }
+                if keychain_holds(&self.backend.get(id), Some(old.as_str())) {
+                    ReadBack::RestoredPrevious
+                } else {
+                    ReadBack::Unconfirmed {
+                        previous_unknown: false,
+                    }
+                }
+            }
+            Previous::Known(None) => {
+                if self.backend.delete(id).is_err() {
+                    return ReadBack::NotRestored;
+                }
+                if keychain_holds(&self.backend.get(id), None) {
+                    ReadBack::RemovedNew
+                } else {
+                    ReadBack::Unconfirmed {
+                        previous_unknown: false,
+                    }
+                }
+            }
+        }
     }
 
     /// Removes the key from the keychain and from the legacy file. A
@@ -341,29 +375,55 @@ fn keychain_holds(got: &Result<Option<String>, String>, expected: Option<&str>) 
     }
 }
 
+enum Previous {
+    Known(Option<String>),
+    Unknown,
+}
+
+enum ReadBack {
+    RestoredPrevious,
+    RemovedNew,
+    /// The restore write landed, or there was nothing safe to write back,
+    /// and a following read did not confirm which value is stored.
+    Unconfirmed {
+        previous_unknown: bool,
+    },
+    /// The restore write itself failed.
+    NotRestored,
+}
+
 /// The read-back failed after the keychain write. The wording matches what
 /// restore managed to do.
-fn read_back_message(id: &str, restored: bool, had_previous: bool) -> String {
-    if restored && had_previous {
-        format!(
-            "The keychain did not return the key just saved for {id}. The previous key was restored."
-        )
-    } else if restored {
-        format!("The keychain did not return the key just saved for {id}. The new key was removed.")
-    } else {
-        format!(
-            "The keychain did not return the key just saved for {id}. The keychain value was replaced and could not be restored."
-        )
+fn read_back_message(id: &str, outcome: ReadBack) -> String {
+    let lead = format!("The keychain did not return the key just saved for {id}.");
+    match outcome {
+        ReadBack::RestoredPrevious => format!("{lead} The previous key was restored."),
+        ReadBack::RemovedNew => format!("{lead} The new key was removed."),
+        ReadBack::Unconfirmed { previous_unknown } => {
+            let unread = if previous_unknown {
+                " The previous key could not be read."
+            } else {
+                ""
+            };
+            format!("{lead}{unread} The keychain may hold the new key or the old one.")
+        }
+        ReadBack::NotRestored => {
+            format!("{lead} The keychain value was replaced and could not be restored.")
+        }
     }
 }
 
-/// Logs a legacy-file problem once. The line names the provider id and the
-/// file error, never a key value.
+/// Logs a legacy-file problem once per provider. The line names the provider
+/// id and the file error, never a key value.
 fn note_legacy(id: &str, error: &str) {
-    static ONCE: std::sync::Once = std::sync::Once::new();
-    ONCE.call_once(|| {
+    use std::collections::HashSet;
+    use std::sync::OnceLock;
+    static SEEN: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+    let seen = SEEN.get_or_init(|| Mutex::new(HashSet::new()));
+    let mut seen = seen.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    if seen.insert(id.to_string()) {
         log::warn!("The legacy provider key file could not be read ({id}): {error}");
-    });
+    }
 }
 
 impl KeyStore for ProviderKeys {
@@ -609,13 +669,18 @@ mod tests {
         fail_get: bool,
         /// 0-based `get` index that returns a value other than the one stored.
         mismatch_on_read: Option<usize>,
+        /// 0-based `get` index that fails.
+        fail_read_on: Option<usize>,
+        /// 0-based `set` index that fails.
+        fail_set_on: Option<usize>,
         reads: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+        sets: std::sync::atomic::AtomicUsize,
     }
 
     impl SecretBackend for MemoryBackend {
         fn get(&self, account: &str) -> Result<Option<String>, String> {
             let index = self.reads.fetch_add(1, Ordering::SeqCst);
-            if self.fail_get {
+            if self.fail_get || self.fail_read_on == Some(index) {
                 return Err(format!("keychain locked for {account}"));
             }
             let value = self.values.lock().unwrap().get(account).cloned();
@@ -633,7 +698,8 @@ mod tests {
         }
 
         fn set(&self, account: &str, value: &str) -> Result<(), String> {
-            if self.fail_set {
+            let index = self.sets.fetch_add(1, Ordering::SeqCst);
+            if self.fail_set || self.fail_set_on == Some(index) {
                 return Err(format!("keychain refused {account}"));
             }
             self.values
@@ -874,6 +940,82 @@ mod tests {
         assert!(!error.contains("gsk-new"), "a key value leaked: {error}");
         assert!(!error.contains("gsk-old"), "a key value leaked: {error}");
         assert_eq!(keys.get("groq").unwrap().as_deref(), Some("gsk-old"));
+    }
+
+    #[test]
+    fn a_broken_previous_entry_can_still_be_overwritten() {
+        let fixture = Fixture::with_file(&[]);
+        let keys = fixture.keys(MemoryBackend {
+            fail_read_on: Some(0),
+            ..MemoryBackend::with(&[("groq", "gsk-old")])
+        });
+
+        keys.save("groq", "gsk-new").unwrap();
+
+        assert_eq!(keys.get("groq").unwrap().as_deref(), Some("gsk-new"));
+    }
+
+    #[test]
+    fn an_unread_previous_key_is_named_when_the_new_key_does_not_read_back() {
+        let fixture = Fixture::with_file(&[]);
+        let before = KEY_GENERATION.load(Ordering::SeqCst);
+        let keys = fixture.keys(MemoryBackend {
+            fail_read_on: Some(0),
+            mismatch_on_read: Some(1),
+            ..MemoryBackend::with(&[("groq", "gsk-old")])
+        });
+
+        let error = keys.save("groq", "gsk-new").unwrap_err();
+
+        assert!(error.contains("previous key could not be read"), "{error}");
+        assert!(
+            error.contains("may hold the new key or the old one"),
+            "{error}"
+        );
+        assert!(!error.contains("could not be restored"), "{error}");
+        assert!(!error.contains("gsk-new"), "a key value leaked: {error}");
+        assert!(
+            KEY_GENERATION.load(Ordering::SeqCst) >= before + 2,
+            "the unverified value must not stay cached"
+        );
+    }
+
+    #[test]
+    fn a_failed_restore_write_says_the_key_could_not_be_restored() {
+        let fixture = Fixture::with_file(&[]);
+        let before = KEY_GENERATION.load(Ordering::SeqCst);
+        let keys = fixture.keys(MemoryBackend {
+            mismatch_on_read: Some(1),
+            fail_set_on: Some(1),
+            ..MemoryBackend::with(&[("groq", "gsk-old")])
+        });
+
+        let error = keys.save("groq", "gsk-new").unwrap_err();
+
+        assert!(error.contains("could not be restored"), "{error}");
+        assert!(!error.contains("may hold"), "{error}");
+        assert!(KEY_GENERATION.load(Ordering::SeqCst) >= before + 2);
+    }
+
+    #[test]
+    fn a_restore_that_does_not_read_back_does_not_claim_failure() {
+        let fixture = Fixture::with_file(&[]);
+        let before = KEY_GENERATION.load(Ordering::SeqCst);
+        let keys = fixture.keys(MemoryBackend {
+            mismatch_on_read: Some(1),
+            fail_read_on: Some(2),
+            ..MemoryBackend::with(&[("groq", "gsk-old")])
+        });
+
+        let error = keys.save("groq", "gsk-new").unwrap_err();
+
+        assert!(
+            error.contains("may hold the new key or the old one"),
+            "{error}"
+        );
+        assert!(!error.contains("could not be restored"), "{error}");
+        assert!(!error.contains("previous key could not be read"), "{error}");
+        assert!(KEY_GENERATION.load(Ordering::SeqCst) >= before + 2);
     }
 
     #[test]
