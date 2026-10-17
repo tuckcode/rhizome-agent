@@ -19,6 +19,7 @@ import {
   type AiAgentReadiness,
   type AiAgentsStatus,
 } from '../lib/aiAgents'
+import type { ChatEngine } from '../lib/chatEngine'
 import {
   aiTargetReady,
   targetAgent,
@@ -78,6 +79,7 @@ interface AiWorkspaceProps {
   aiModelProviders?: AiModelProvider[]
   conversationSettings?: AiWorkspaceConversationSetting[] | null
   conversationSettingsReady?: boolean
+  chatEngine?: ChatEngine
   defaultAiAgent?: AiAgentId
   defaultAiAgentReadiness?: AiAgentReadiness
   defaultAiAgentReady?: boolean
@@ -318,6 +320,7 @@ type ConversationSessionProps = {
   activeEntry?: VaultEntry | null
   activeNoteContent?: string | null
   aiAgentsStatus: AiAgentsStatus
+  chatEngine?: ChatEngine
   conversation: AiConversation
   defaultAiAgentReady: boolean
   entries?: VaultEntry[]
@@ -539,6 +542,7 @@ function ConversationWorkspaceHeader({
 function ConversationSession({
   active,
   activeEntry,
+  chatEngine,
   activeNoteContent,
   aiAgentsStatus,
   conversation,
@@ -601,6 +605,7 @@ function ConversationSession({
     onFileModified,
     onVaultChanged,
     sessionId: conversation.id,
+    chatEngine,
   })
   const running = controller.agent.status === 'thinking' || controller.agent.status === 'tool-executing'
   const composerMenuSide = mode === 'window' ? 'bottom' : 'top'
@@ -1061,6 +1066,7 @@ function ConversationSessions({
             activeEntry={workspace.activeEntry}
             activeNoteContent={workspace.activeNoteContent}
             aiAgentsStatus={workspace.aiAgentsStatus}
+            chatEngine={workspace.chatEngine}
             conversation={conversation}
             defaultAiAgentReady={workspace.defaultAiAgentReady}
             entries={workspace.entries}

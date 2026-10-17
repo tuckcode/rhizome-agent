@@ -205,8 +205,14 @@ describe('AiPanel', () => {
     }, vi.fn())
   })
 
-  it('renders panel with the default CLI agent header', () => {
+  it('does not treat a missing engine as Prime', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
+    expect(screen.queryByText('Prime · Harness')).toBeNull()
+    expect(screen.queryByTestId('ai-harness-skills')).toBeNull()
+  })
+
+  it('renders panel with the default CLI agent header', () => {
+    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" chatEngine="prime" />)
     expect(screen.getByText('Prime')).toBeTruthy()
     expect(screen.getByText('Prime · Harness')).toBeTruthy()
     expect(screen.getByTestId('ai-harness-skills')).toBeTruthy()
@@ -214,7 +220,7 @@ describe('AiPanel', () => {
   })
 
   it('starts Prime sessions in power user even when the vault still stores safe', () => {
-    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
+    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" chatEngine="prime" />)
 
     expect(screen.getByText('Prime · Harness')).toBeTruthy()
     expect(mockUseCliAiAgent).toHaveBeenCalledWith(
@@ -246,7 +252,7 @@ describe('AiPanel', () => {
   })
 
   it('does not expose a permission mode toggle for Prime', () => {
-    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
+    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" chatEngine="prime" />)
     expect(screen.queryByTestId('ai-permission-mode-toggle')).toBeNull()
     expect(screen.queryByRole('radio', { name: 'Full access' })).toBeNull()
     expect(screen.getByTestId('ai-harness-skills').textContent).toMatch(/rhizome-vault/)
@@ -255,7 +261,7 @@ describe('AiPanel', () => {
   it('shows working status while the AI agent is running', () => {
     mockStatus = 'thinking'
 
-    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
+    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" chatEngine="prime" />)
 
     expect(screen.getByText('Prime · working…')).toBeTruthy()
     expect(screen.queryByTestId('ai-permission-mode-toggle')).toBeNull()
@@ -277,7 +283,7 @@ describe('AiPanel', () => {
   })
 
   it('shows the default toolkit skills strip for Prime', () => {
-    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
+    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" chatEngine="prime" />)
     expect(screen.getByTestId('ai-harness-skills')).toHaveTextContent('rhizome-vault')
   })
 
@@ -714,6 +720,7 @@ describe('Chat home opens with its sessions column', () => {
         controller={primeController()}
         onClose={vi.fn()}
         showHeader={false}
+        chatEngine="prime"
         targetId="agent:prime"
       />,
     )
@@ -757,6 +764,7 @@ describe('Chat home opens with its sessions column', () => {
         controller={primeController()}
         onClose={vi.fn()}
         showHeader={false}
+        chatEngine="prime"
         targetId="agent:prime"
         sessionsRailSlot={slot}
       />,
@@ -860,6 +868,7 @@ describe('a pick in the rail Sessions list', () => {
         controller={primeController()}
         onClose={vi.fn()}
         showHeader={false}
+        chatEngine="prime"
         targetId="agent:prime"
         sessionsRailSlot={slot}
         onRailSessionPicked={onRailSessionPicked}
@@ -957,6 +966,7 @@ describe('the Goal button has one home', () => {
         controller={primeController()}
         onClose={vi.fn()}
         showHeader={false}
+        chatEngine="prime"
         targetId="agent:prime"
       />,
     )
@@ -985,6 +995,7 @@ describe('talking to a turn that is already running', () => {
         controller={primeController({ isActive: true, input })}
         onClose={vi.fn()}
         showHeader={false}
+        chatEngine="prime"
         targetId="agent:prime"
       />,
     )
@@ -1057,6 +1068,7 @@ describe('talking to a turn that is already running', () => {
         controller={controller}
         onClose={vi.fn()}
         showHeader={false}
+        chatEngine="prime"
         targetId="agent:prime"
       />
     )
@@ -1158,7 +1170,7 @@ describe('AiPanel Prime permission toggle', () => {
 
   it('does not treat a native-engine chat as a Prime target', () => {
     expect(aiPanelSource).toContain(
-      "const isPrimeTarget = view.targetKind === 'agent' && view.defaultAiAgent === 'prime' && chatEngine !== 'native'",
+      "const isPrimeTarget = view.targetKind === 'agent' && view.defaultAiAgent === 'prime' && chatEngine === 'prime'",
     )
   })
 

@@ -290,7 +290,7 @@ export function AiPanelView({
     handlePermissionModeChange,
     handleNewChat,
   } = controller
-  const isPrimeTarget = view.targetKind === 'agent' && view.defaultAiAgent === 'prime' && chatEngine !== 'native'
+  const isPrimeTarget = view.targetKind === 'agent' && view.defaultAiAgent === 'prime' && chatEngine === 'prime'
   const showSessionList = isPrimeTarget || chatEngine === 'native'
   const sessionListEngine = chatEngine === 'native' ? 'native' : 'prime'
   const forkPrime = forksPrimeEntry(isPrimeTarget, forkTargetsPrimeEntry)

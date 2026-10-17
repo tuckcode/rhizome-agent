@@ -1152,7 +1152,7 @@ describe('SettingsPanel', () => {
     )
     expect(screen.getByRole('switch', { name: 'Chat engine' })).toHaveAttribute('aria-checked', 'true')
     fireEvent.click(screen.getByTestId('settings-save'))
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ chat_engine: 'native' }))
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ chat_engine: null }))
     const saved = onSave.mock.calls.at(-1)?.[0]
     rerender(
       <SettingsPanel open={true} settings={saved} onSave={onSave} onClose={onClose} />

@@ -90,7 +90,7 @@ export default function ChatHome({
   defaultAiTarget,
   defaultAiAgentReadiness,
   defaultAiAgentReady,
-  chatEngine = 'prime',
+  chatEngine = 'native',
   chatEngineSettled = true,
   nativeTarget,
   onNativeTargetChange,
@@ -144,7 +144,8 @@ export default function ChatHome({
     hostNotInstalled: false,
     startedEngine,
   })
-  const isPrimeTarget = isPrimeChatTarget && effectiveEngineForStatus === 'prime'
+  const engineChromeReady = chatEngineSettled
+  const isPrimeTarget = engineChromeReady && isPrimeChatTarget && effectiveEngineForStatus === 'prime'
   const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath)
   const hostKnown = Boolean(primeHost.known)
   const hostNotInstalled = primeHost.problem?.code === 'not_installed'
@@ -156,9 +157,10 @@ export default function ChatHome({
     startedEngine,
   }
   const effectiveEngine = resolveEffectiveChatEngine(engineInput)
-  const showPrimeChrome = isPrimeChat && chatTarget?.kind !== 'api_model' && effectiveEngine === 'prime'
-  const rhizomeCatalog = effectiveEngine === 'native'
-  const showComposerDeck = isPrimeChat && (showPrimeChrome || rhizomeCatalog)
+  const showPrimeChrome = engineChromeReady && isPrimeChat && chatTarget?.kind !== 'api_model' && effectiveEngine === 'prime'
+  const rhizomeCatalog = engineChromeReady && effectiveEngine === 'native'
+  const showComposerDeck = engineChromeReady && isPrimeChat && (showPrimeChrome || rhizomeCatalog)
+  const panelEngine = engineChromeReady ? effectiveEngine : undefined
   if (
     chatEngineSettled
     && startedEngine === null
@@ -208,7 +210,7 @@ export default function ChatHome({
     <div
       className="flex min-h-0 min-w-0 flex-1 flex-col"
       data-testid="chat-home"
-      data-chat-engine={effectiveEngine}
+      data-chat-engine={panelEngine ?? 'pending'}
     >
       {showPrimeChrome ? (
         <PrimeSessionSubhead
@@ -243,9 +245,9 @@ export default function ChatHome({
           locale={locale}
           defaultAiAgent={defaultAiAgent}
           defaultAiTarget={chatTarget}
-          defaultAiAgentReadiness={defaultAiAgentReadiness}
-          defaultAiAgentReady={defaultAiAgentReady}
-          chatEngine={effectiveEngine}
+          defaultAiAgentReadiness={engineChromeReady ? defaultAiAgentReadiness : 'checking'}
+          defaultAiAgentReady={engineChromeReady ? defaultAiAgentReady : false}
+          chatEngine={panelEngine}
           nativeTarget={nativeTarget ?? undefined}
           vaultPath={vaultPath}
           vaultPaths={vaultPaths}
@@ -266,7 +268,7 @@ export default function ChatHome({
           sessionsRailSlot={sessionsRailSlot}
           onRailSessionPicked={onRailSessionPicked}
           onConversationReset={clearEngineLock}
-          forkTargetsPrimeEntry={effectiveEngine === 'prime'}
+          forkTargetsPrimeEntry={panelEngine === 'prime'}
           newChatRef={newChatRef}
           onOpenMycelium={onOpenSessionFootprint}
           notePane={

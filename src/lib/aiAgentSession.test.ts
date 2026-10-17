@@ -307,7 +307,6 @@ describe('aiAgentSession', () => {
           ready: false,
           vaultPath: '/vault',
           permissionMode: 'safe',
-          chatEngine: 'prime',
         },
         prompt: { text: 'Open a note', references: [] },
         reason: 'agent_unavailable',
@@ -319,6 +318,25 @@ describe('aiAgentSession', () => {
     for (const fallbackCase of fallbackCases) {
       await expectLocalResponse(fallbackCase)
     }
+  })
+
+  it('blocks a missing agent when no chat engine is passed', async () => {
+    nextMessageIdMock.mockReturnValue('msg-no-engine')
+    const { runtime, getMessages, getStatus } = createRuntime()
+
+    await sendAgentMessage({
+      runtime,
+      context: { agent: 'codex', ready: false, vaultPath: '/vault', permissionMode: 'safe' },
+      prompt: { text: 'Open a note' },
+    })
+
+    expect(streamAiAgentMock).not.toHaveBeenCalled()
+    expect(streamNativeChatMock).not.toHaveBeenCalled()
+    expect(getStatus()).not.toBe('thinking')
+    expect(getMessages()[0]?.isStreaming).not.toBe(true)
+    expect(getMessages()[0]?.response).toBe(
+      'Codex is not available on this machine. Install it or switch the default AI agent in Settings.',
+    )
   })
 
   it('starts a streaming session with formatted history and fresh refs', async () => {

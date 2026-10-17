@@ -225,9 +225,10 @@ pub struct Settings {
     /// `AGENTS.md` and it is not Prime `USER.md`.
     #[serde(default)]
     pub agent_profile: Option<String>,
-    /// Chat engine. Absent means Rhizome's native loop. `native` and
-    /// `prime` are stored as written. Any other value is dropped, so a
-    /// fresh file runs native. A saved `prime` stays Prime.
+    /// Chat engine. Absent means Rhizome's native loop. Settings writes
+    /// null for that default and `prime` only when someone picks Prime.
+    /// An explicit `native` already on disk is kept. Any other value,
+    /// including `hermes`, is dropped.
     #[serde(default)]
     pub chat_engine: Option<String>,
     /// Model id for a native Chat session, `provider/model` or `free_tier_auto`.
@@ -791,6 +792,18 @@ mod tests {
         });
         assert_eq!(kept_prime.chat_engine.as_deref(), Some("prime"));
         assert_eq!(kept_prime.native_chat_target, None);
+
+        let dropped_hermes = save_and_reload(Settings {
+            chat_engine: Some("hermes".into()),
+            ..Settings::default()
+        });
+        assert_eq!(dropped_hermes.chat_engine, None);
+
+        let dropped_bogus = save_and_reload(Settings {
+            chat_engine: Some("bogus".into()),
+            ..Settings::default()
+        });
+        assert_eq!(dropped_bogus.chat_engine, None);
     }
 
     #[test]
