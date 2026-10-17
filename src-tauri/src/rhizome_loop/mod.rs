@@ -6,12 +6,13 @@
 //! reading; the model has no `Cancelled` event. Tool-call `id`s stay
 //! on the history items that go back to the model.
 //! Allow-once is spent for echo. Read-only file tools (`read_file`,
-//! `list_dir`, `grep`, `glob`) auto-run in both modes. `create_note`
-//! is offered in both modes: Limited tools asks every call (Allow
-//! once and Deny); Power User runs it with no prompt. Power User bash
-//! asks each call unless a session grant matches the exact command.
-//! Unknown tools always ask and never match a session grant. Quit is
-//! `stop_and_drain`.
+//! `list_dir`, `grep`, `glob`) auto-run in both modes. `edit_file` and
+//! `write_file` ask in both modes unless a session grant covers that
+//! tool and path. `create_note` is offered in both modes: Limited
+//! tools asks every call (Allow once and Deny); Power User runs it
+//! with no prompt. Power User bash asks each call unless a session
+//! grant matches the exact command. Unknown tools always ask and
+//! never match a session grant. Quit is `stop_and_drain`.
 //! The turn / inbox vocabulary is the DeepSeek Harness idea. No DeepSeek
 //! code is copied.
 
@@ -28,7 +29,7 @@ pub use driver::{AgentLoop, ApprovalReply, DEFAULT_STEP_CAP};
 pub use fake_model::{FakeModel, ScriptPart};
 pub use model::Model;
 pub use policy::{approval_options, ApprovalOption};
-pub(crate) use tools::openai_tool_definition;
+pub(crate) use tools::{approval_preview, openai_tool_definition};
 pub use tools::resolve_for_write;
 pub use types::{DurableEvent, HistoryItem, ModelView, ToolCall, UNANSWERED_TOOL_OUTPUT};
 
@@ -384,6 +385,147 @@ mod tests {
         );
         assert_eq!(results[3].0, "glob");
         assert!(results[3].1.contains("note.md"), "{:?}", results[3]);
+    }
+
+    #[test]
+    fn mutate_tools_ask_before_writing_in_both_modes() {
+        for mode in [
+            AiAgentPermissionMode::Safe,
+            AiAgentPermissionMode::PowerUser,
+        ] {
+            let vault = tempfile::tempdir().unwrap();
+            let root = vault.path().canonicalize().unwrap();
+            let dest = root.join("note.md");
+            std::fs::write(&dest, "keep\n").unwrap();
+            let agent = AgentLoop::new();
+            agent.set_permission_mode(mode);
+            agent.set_vault(Some(root.to_string_lossy().into_owned()), Vec::new());
+            let asked = Arc::new(AtomicBool::new(false));
+            let flag = Arc::clone(&asked);
+            let note_path = dest.clone();
+            agent.set_approval_waiter(move |name, _| {
+                assert!(name == "write_file" || name == "edit_file", "{name}");
+                assert_eq!(std::fs::read_to_string(&note_path).unwrap(), "keep\n");
+                flag.store(true, Ordering::SeqCst);
+                ApprovalReply::Deny
+            });
+            let mut model = FakeModel::script(vec![vec![ScriptPart::Tool {
+                name: "write_file".into(),
+                args: serde_json::json!({ "path": "note.md", "content": "no\n" }).to_string(),
+            }]]);
+            agent.submit("overwrite");
+            agent.run_until_idle(&mut model);
+            assert!(
+                asked.load(Ordering::SeqCst),
+                "{mode:?} must ask before write_file: {:?}",
+                agent.events()
+            );
+            assert_eq!(std::fs::read_to_string(&dest).unwrap(), "keep\n");
+        }
+    }
+
+    #[test]
+    fn denied_write_file_leaves_the_file_untouched() {
+        let vault = tempfile::tempdir().unwrap();
+        let root = vault.path().canonicalize().unwrap();
+        let dest = root.join("note.md");
+        std::fs::write(&dest, "keep\n").unwrap();
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::Safe);
+        agent.set_vault(Some(root.to_string_lossy().into_owned()), Vec::new());
+        agent.set_approval_waiter(|_, _| ApprovalReply::Deny);
+        let mut model = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "write_file".into(),
+            args: serde_json::json!({ "path": "note.md", "content": "no\n" }).to_string(),
+        }]]);
+        agent.submit("overwrite");
+        agent.run_until_idle(&mut model);
+        assert_eq!(std::fs::read_to_string(&dest).unwrap(), "keep\n");
+        assert!(agent.events().iter().any(|event| {
+            matches!(event, DurableEvent::ToolDenied { name, .. } if name == "write_file")
+        }));
+        assert!(!agent.events().iter().any(|event| {
+            matches!(event, DurableEvent::ToolResult { name, .. } if name == "write_file")
+        }));
+    }
+
+    #[test]
+    fn approved_write_file_creates_a_new_file() {
+        let vault = tempfile::tempdir().unwrap();
+        let root = vault.path().canonicalize().unwrap();
+        let dest = root.join("fresh.md");
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::Safe);
+        agent.set_vault(Some(root.to_string_lossy().into_owned()), Vec::new());
+        agent.set_approval_waiter(|_, _| ApprovalReply::AllowOnce);
+        let mut model = FakeModel::script(vec![
+            vec![ScriptPart::Tool {
+                name: "write_file".into(),
+                args: serde_json::json!({ "path": "fresh.md", "content": "hello\n" }).to_string(),
+            }],
+            vec![ScriptPart::Text("done".into())],
+        ]);
+        agent.submit("create");
+        agent.run_until_idle(&mut model);
+        assert_eq!(std::fs::read_to_string(&dest).unwrap(), "hello\n");
+        assert!(agent.events().iter().any(|event| {
+            matches!(event, DurableEvent::ToolResult { name, .. } if name == "write_file")
+        }));
+    }
+
+    #[test]
+    fn allow_session_covers_later_edits_to_the_same_path_only() {
+        let vault = tempfile::tempdir().unwrap();
+        let root = vault.path().canonicalize().unwrap();
+        std::fs::write(root.join("a.md"), "one\n").unwrap();
+        std::fs::write(root.join("b.md"), "two\n").unwrap();
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::PowerUser);
+        agent.set_vault(Some(root.to_string_lossy().into_owned()), Vec::new());
+        let asks = Arc::new(AtomicUsize::new(0));
+        let count = Arc::clone(&asks);
+        agent.set_approval_waiter(move |_, _| {
+            let n = count.fetch_add(1, Ordering::SeqCst);
+            if n == 0 {
+                ApprovalReply::AllowSession
+            } else {
+                ApprovalReply::AllowOnce
+            }
+        });
+        let mut model = FakeModel::script(vec![vec![
+            ScriptPart::Tool {
+                name: "edit_file".into(),
+                args: serde_json::json!({
+                    "path": "a.md",
+                    "old_string": "one",
+                    "new_string": "ONE"
+                })
+                .to_string(),
+            },
+            ScriptPart::Tool {
+                name: "edit_file".into(),
+                args: serde_json::json!({
+                    "path": "a.md",
+                    "old_string": "ONE",
+                    "new_string": "uno"
+                })
+                .to_string(),
+            },
+            ScriptPart::Tool {
+                name: "edit_file".into(),
+                args: serde_json::json!({
+                    "path": "b.md",
+                    "old_string": "two",
+                    "new_string": "TWO"
+                })
+                .to_string(),
+            },
+        ]]);
+        agent.submit("edit");
+        agent.run_until_idle(&mut model);
+        assert_eq!(asks.load(Ordering::SeqCst), 2);
+        assert_eq!(std::fs::read_to_string(root.join("a.md")).unwrap(), "uno\n");
+        assert_eq!(std::fs::read_to_string(root.join("b.md")).unwrap(), "TWO\n");
     }
 
     #[test]

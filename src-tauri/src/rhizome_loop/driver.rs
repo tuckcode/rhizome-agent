@@ -352,7 +352,7 @@ impl AgentLoop {
 
     /// Adds a name to this loop's offered set. Production `offered_tools`
     /// comes from the tool registry: Safe = echo, read-only file tools,
-    /// and create_note. Power User also offers bash.
+    /// edit_file, write_file, and create_note. Power User also offers bash.
     pub fn offer_extra_tool_for_test(&self, name: impl Into<String>) {
         self.lock().extra_offered.push(name.into());
     }
@@ -611,9 +611,7 @@ impl AgentLoop {
             return;
         }
         match reply {
-            ApprovalReply::AllowOnce => {
-                self.record_run(id, name, args, name != "bash" && name != "create_note")
-            }
+            ApprovalReply::AllowOnce => self.record_run(id, name, args, spend_allow_once(name)),
             ApprovalReply::AllowSession => {
                 if name != "create_note" {
                     self.grant_for_session(name, args);
@@ -767,6 +765,15 @@ fn parsed_tool_args(raw: &str) -> Result<(), String> {
     } else {
         Ok(())
     }
+}
+
+fn spend_allow_once(name: &str) -> bool {
+    !matches!(
+        tools::lookup(name).map(|tool| tool.policy),
+        Some(tools::ToolPolicy::Bash)
+            | Some(tools::ToolPolicy::CreateNote)
+            | Some(tools::ToolPolicy::Mutate)
+    )
 }
 
 fn offered_names(shared: &Shared) -> Vec<String> {

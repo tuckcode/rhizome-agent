@@ -47,6 +47,10 @@ pub enum EngineEvent {
         tool: String,
         args: String,
         options: Vec<ApprovalOption>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        path: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        preview: Option<String>,
     },
     ApprovalDismissed {
         prompt_id: String,
@@ -413,6 +417,76 @@ mod tests {
             .collect();
         assert_eq!(ids, vec!["allow_once", "deny"]);
         assert!(!ids.contains(&"allow_session"));
+    }
+
+    #[test]
+    fn native_engine_write_file_prompt_includes_a_diff() {
+        let vault = tempfile::tempdir().unwrap();
+        let (tx, rx) = mpsc::channel();
+        let mut engine = NativeEngine::from_parts(
+            AgentLoop::new(),
+            FakeModel::script(vec![
+                vec![ScriptPart::Tool {
+                    name: "write_file".into(),
+                    args: serde_json::json!({
+                        "path": "fresh.md",
+                        "content": "hello\n",
+                    })
+                    .to_string(),
+                }],
+                vec![ScriptPart::Text("done".into())],
+            ]),
+        );
+        engine.set_vault(
+            Some(vault.path().to_string_lossy().into_owned()),
+            Vec::new(),
+        );
+        let control = engine.control();
+        let (done_tx, done_rx) = mpsc::channel();
+        thread::spawn(move || {
+            engine
+                .start(
+                    "write",
+                    Box::new(move |event| {
+                        let _ = tx.send(event);
+                    }),
+                )
+                .ok();
+            let _ = done_tx.send(());
+        });
+        let started = std::time::Instant::now();
+        let mut preview = None;
+        let mut prompt_id = String::new();
+        let mut option_ids = Vec::new();
+        while started.elapsed() < Duration::from_secs(2) {
+            match rx.recv_timeout(Duration::from_millis(50)) {
+                Ok(EngineEvent::ApprovalRequested {
+                    prompt_id: id,
+                    options,
+                    preview: card,
+                    path,
+                    ..
+                }) => {
+                    prompt_id = id;
+                    preview = card;
+                    option_ids = options.iter().map(|option| option.id.clone()).collect();
+                    assert_eq!(path.as_deref(), Some("fresh.md"));
+                    break;
+                }
+                Ok(_) => {}
+                Err(_) => {}
+            }
+        }
+        assert_eq!(option_ids, vec!["allow_once", "allow_session", "deny"]);
+        let diff = preview.expect("write_file approval must carry a diff");
+        assert!(diff.contains("--- /dev/null"), "{diff}");
+        assert!(diff.contains("+hello"), "{diff}");
+        assert!(!vault.path().join("fresh.md").exists());
+        control.reply_approval(&prompt_id, ApprovalReply::Deny);
+        done_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("turn finishes");
+        assert!(!vault.path().join("fresh.md").exists());
     }
 
     #[test]

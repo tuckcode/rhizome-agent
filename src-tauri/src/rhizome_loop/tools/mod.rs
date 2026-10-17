@@ -4,19 +4,24 @@
 //! `bash` is not a process. Limited tools never call it.
 //! `create_note` writes through `ai_model_tools::run_create_note_tool`.
 //! Read-only file tools stay inside canonical vault and workspace roots
-//! and auto-run in both permission modes. Secret-path blocking on those
-//! tools is a safety net, not a wall: a future shell tool will not be
-//! covered. Write tools must call `sandbox::resolve_for_write`, which
-//! always applies the denylist.
+//! and auto-run in both permission modes. `edit_file` and `write_file`
+//! use the same roots and ask before they write. Secret-path blocking
+//! on those tools is a safety net, not a wall: a future shell tool will
+//! not be covered. Write tools must call `sandbox::resolve_for_write`,
+//! which always applies the denylist.
 
 mod args;
+mod atomic;
+mod edit_file;
 mod glob;
 mod grep;
 mod list_dir;
+mod preview;
 mod read_file;
 mod sandbox;
 mod scan;
 mod walk;
+mod write_file;
 
 pub use sandbox::resolve_for_write;
 
@@ -35,6 +40,9 @@ pub enum ToolPolicy {
     Bash,
     /// Offered in both modes. Auto-runs. No approval card.
     ReadOnly,
+    /// Offered in both modes. Asks every call unless a session grant
+    /// already covers this tool and path.
+    Mutate,
 }
 
 type ToolRun = fn(&str, Option<&str>, &[String]) -> Result<String, String>;
@@ -50,7 +58,10 @@ impl Tool {
     pub fn offered_in(&self, mode: AiAgentPermissionMode) -> bool {
         match self.policy {
             ToolPolicy::Bash => mode == AiAgentPermissionMode::PowerUser,
-            ToolPolicy::Echo | ToolPolicy::CreateNote | ToolPolicy::ReadOnly => true,
+            ToolPolicy::Echo
+            | ToolPolicy::CreateNote
+            | ToolPolicy::ReadOnly
+            | ToolPolicy::Mutate => true,
         }
     }
 }
@@ -105,6 +116,18 @@ const TOOLS: &[Tool] = &[
         schema: glob::SCHEMA,
     },
     Tool {
+        name: "edit_file",
+        policy: ToolPolicy::Mutate,
+        run: edit_file::run,
+        schema: edit_file::SCHEMA,
+    },
+    Tool {
+        name: "write_file",
+        policy: ToolPolicy::Mutate,
+        run: write_file::run,
+        schema: write_file::SCHEMA,
+    },
+    Tool {
         name: "bash",
         policy: ToolPolicy::Bash,
         run: echo_args,
@@ -118,8 +141,8 @@ const TOOLS: &[Tool] = &[
     },
 ];
 
-/// Registered tools in offer order: echo, read-only file tools, bash,
-/// create_note.
+/// Registered tools in offer order: echo, read-only file tools,
+/// mutate file tools, bash, create_note.
 pub fn registered() -> &'static [Tool] {
     TOOLS
 }
@@ -145,6 +168,48 @@ pub fn openai_tool_definition(name: &str) -> Option<serde_json::Value> {
     lookup(name).map(|tool| {
         serde_json::from_str(tool.schema).expect("registered tool schema must be valid JSON")
     })
+}
+
+/// Path and unified-style diff for an approval card. `None` when the
+/// tool is not a file mutation or the args have no path.
+pub fn approval_preview(
+    name: &str,
+    args: &str,
+    vault_path: Option<&str>,
+    vault_paths: &[String],
+) -> Option<ApprovalPreview> {
+    let path = args::json_path(args).unwrap_or_default();
+    let diff = match name {
+        "edit_file" => {
+            edit_file::preview_diff(args, vault_path, vault_paths).unwrap_or_else(|error| error)
+        }
+        "write_file" => {
+            write_file::preview_diff(args, vault_path, vault_paths).unwrap_or_else(|error| error)
+        }
+        _ => return None,
+    };
+    Some(ApprovalPreview {
+        path: if path.is_empty() {
+            name.to_string()
+        } else {
+            path
+        },
+        diff,
+    })
+}
+
+pub struct ApprovalPreview {
+    pub path: String,
+    pub diff: String,
+}
+
+/// Session grants for mutate tools cover later calls of the same
+/// tool against the same path, not every file in the vault.
+pub fn mutate_session_matches(granted_args: &str, call_args: &str) -> bool {
+    match (args::json_path(granted_args), args::json_path(call_args)) {
+        (Some(granted), Some(call)) => granted == call,
+        _ => false,
+    }
 }
 
 fn echo_args(
@@ -187,6 +252,15 @@ mod tests {
         for name in ["read_file", "list_dir", "grep", "glob"] {
             assert!(names.contains(&name), "{names:?} should include {name}");
             assert_eq!(lookup(name).unwrap().policy, ToolPolicy::ReadOnly);
+        }
+    }
+
+    #[test]
+    fn registry_exposes_edit_file_and_write_file_as_mutate() {
+        let names: Vec<&str> = registered().iter().map(|tool| tool.name).collect();
+        for name in ["edit_file", "write_file"] {
+            assert!(names.contains(&name), "{names:?} should include {name}");
+            assert_eq!(lookup(name).unwrap().policy, ToolPolicy::Mutate);
         }
     }
 }

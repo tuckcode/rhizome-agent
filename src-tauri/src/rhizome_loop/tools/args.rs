@@ -50,3 +50,23 @@ pub fn optional_bool(args: &Value, key: &str, tool: &str) -> Result<Option<bool>
         _ => Err(format!("{tool} {key} must be a boolean.")),
     }
 }
+
+/// String field kept exactly as sent. Edit and write bodies must not
+/// be trimmed; a trailing newline is content.
+pub fn required_string<'a>(args: &'a Value, key: &str, tool: &str) -> Result<&'a str, String> {
+    match args.get(key) {
+        Some(Value::String(value)) => Ok(value.as_str()),
+        None | Some(Value::Null) => Err(format!("{tool} requires {key}.")),
+        _ => Err(format!("{tool} {key} must be a string.")),
+    }
+}
+
+/// Path from a tool-args JSON blob. Used for session grants.
+pub fn json_path(raw_args: &str) -> Option<String> {
+    let args: Value = serde_json::from_str(raw_args).ok()?;
+    args.get("path")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}

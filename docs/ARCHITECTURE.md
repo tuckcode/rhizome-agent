@@ -521,9 +521,13 @@ original and continue in a new session. With the Settings switch on,
 new chats call `native_chat_start` and pick a catalog model or Free tier (auto).
 `rhizome_provider_model.rs` is the native loop's OpenAI-compatible `Model`.
 The loop registry (`rhizome_loop/tools`) offers `echo`, read-only file tools
-(`read_file`, `list_dir`, `grep`, `glob`), `create_note`, and Power User `bash`.
+(`read_file`, `list_dir`, `grep`, `glob`), mutate file tools (`edit_file`,
+`write_file`), `create_note`, and Power User `bash`.
 Read-only tools stay inside canonical vault and workspace roots and auto-run;
-they do not open an approval card.
+they do not open an approval card. `edit_file` and `write_file` use the same
+roots, write through a temp file then rename, and ask in both permission
+modes unless a session grant already covers that tool and path. The Chat
+approval card shows the path and a unified-style preview.
 Secret-path blocking (`.env*` except `.env.example`, `.git/`, `*.pem` /
 `*.key` / `*.p12` / `*.pfx`, known private-key basenames and their
 backups) is a safety net, not a wall. It covers the native file tools

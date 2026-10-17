@@ -6,7 +6,9 @@ use std::time::{Duration, Instant};
 
 use crate::ai_agents::AiAgentPermissionMode;
 use crate::engines::native_log::{self, SharedWriter};
-use crate::rhizome_loop::{approval_options, AgentLoop, ApprovalReply, DurableEvent, Model};
+use crate::rhizome_loop::{
+    approval_options, approval_preview, AgentLoop, ApprovalReply, DurableEvent, Model,
+};
 use crate::rhizome_routing::ProviderAttempt;
 
 use super::{Engine, EngineEvent};
@@ -284,14 +286,19 @@ impl<M: Model> Engine for NativeEngine<M> {
         let prompt_seq = Arc::clone(&self.prompt_seq);
         let emit_for_wait = emit.clone();
         let wait_prompt = Arc::clone(&live_prompt);
+        let vault_for_wait = self.vault_path.clone();
+        let vaults_for_wait = self.vault_paths.clone();
         self.agent.set_approval_waiter(move |name, args| {
             let id = format!("prompt_{}", prompt_seq.fetch_add(1, Ordering::SeqCst) + 1);
             *wait_prompt.lock().expect("live prompt") = Some(id.clone());
+            let preview = approval_preview(name, args, vault_for_wait.as_deref(), &vaults_for_wait);
             emit_for_wait(EngineEvent::ApprovalRequested {
                 prompt_id: id.clone(),
                 tool: name.to_string(),
                 args: args.to_string(),
                 options: approval_options(mode, name),
+                path: preview.as_ref().map(|preview| preview.path.clone()),
+                preview: preview.as_ref().map(|preview| preview.diff.clone()),
             });
             let deadline = Instant::now() + timeout;
             let reply = loop {

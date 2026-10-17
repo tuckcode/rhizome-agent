@@ -10,7 +10,7 @@ export function groupConsecutiveToolActions(actions: AiAction[]): AiAction[] {
   const grouped: Array<{ action: AiAction; count: number; sameLabel: boolean }> = []
   for (const action of actions) {
     const last = grouped[grouped.length - 1]
-    if (!last || last.action.tool !== action.tool) {
+    if (!last || last.action.tool !== action.tool || action.approval || last.action.approval) {
       grouped.push({ action: { ...action }, count: 1, sameLabel: true })
       continue
     }

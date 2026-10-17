@@ -1,14 +1,17 @@
 //! Tool allow / deny for the Rhizome loop.
 //!
 //! Limited tools (`Safe`) may run `echo`, the read-only file tools,
-//! and `create_note`. `echo` and read-only tools auto-run.
-//! `create_note` asks every call (Allow once and Deny).
-//! Power User `echo` still auto-runs once from the shared table.
-//! Power User `create_note` and read-only tools run with no prompt.
-//! Power User `bash` asks a human for each call unless a session grant
-//! already matches. A name outside `offered_tools` is denied by the
-//! driver before this function runs. No waiter, or a cancelled wait,
-//! denies. An unknown name always asks and never matches a session grant.
+//! `edit_file`, `write_file`, and `create_note`. `echo` and read-only
+//! tools auto-run. `create_note` asks every call (Allow once and Deny).
+//! `edit_file` and `write_file` ask in both modes (Allow once, Allow
+//! for session, Deny) unless a session grant already covers that tool
+//! and path. Power User `echo` still auto-runs once from the shared
+//! table. Power User `create_note` and read-only tools run with no
+//! prompt. Power User `bash` asks a human for each call unless a
+//! session grant already matches. A name outside `offered_tools` is
+//! denied by the driver before this function runs. No waiter, or a
+//! cancelled wait, denies. An unknown name always asks and never
+//! matches a session grant.
 
 use crate::ai_agents::AiAgentPermissionMode;
 use crate::ai_model_tools::CREATE_NOTE_TOOL_NAME;
@@ -49,6 +52,7 @@ pub fn rule_tool(mode: AiAgentPermissionMode, name: &str, grant_spent: bool) -> 
             Ruling::Run { spend_grant: false }
         }
         Some(ToolPolicy::ReadOnly) => Ruling::Run { spend_grant: false },
+        Some(ToolPolicy::Mutate) => Ruling::Ask,
         Some(ToolPolicy::CreateNote) => match mode {
             AiAgentPermissionMode::Safe => Ruling::Ask,
             AiAgentPermissionMode::PowerUser => Ruling::Run { spend_grant: false },
@@ -90,6 +94,7 @@ pub fn session_matches(name: &str, granted_args: &str, call_args: &str) -> bool 
     match tools::lookup(name).map(|tool| tool.policy) {
         Some(ToolPolicy::CreateNote) => false,
         Some(ToolPolicy::Bash) => granted_args == call_args,
+        Some(ToolPolicy::Mutate) => tools::mutate_session_matches(granted_args, call_args),
         Some(ToolPolicy::Echo) | Some(ToolPolicy::ReadOnly) => true,
         None => false,
     }
@@ -203,6 +208,8 @@ mod tests {
                 "list_dir".to_string(),
                 "grep".to_string(),
                 "glob".to_string(),
+                "edit_file".to_string(),
+                "write_file".to_string(),
                 "create_note".to_string()
             ]
         );
@@ -214,6 +221,8 @@ mod tests {
                 "list_dir".to_string(),
                 "grep".to_string(),
                 "glob".to_string(),
+                "edit_file".to_string(),
+                "write_file".to_string(),
                 "bash".to_string(),
                 "create_note".to_string()
             ]
@@ -240,6 +249,60 @@ mod tests {
                 ),
                 "{name} must auto-run in Power User"
             );
+        }
+    }
+
+    #[test]
+    fn mutate_tools_ask_in_both_modes() {
+        use super::{rule_tool, Ruling};
+        use crate::ai_agents::AiAgentPermissionMode;
+
+        for name in ["edit_file", "write_file"] {
+            assert!(
+                matches!(
+                    rule_tool(AiAgentPermissionMode::Safe, name, false),
+                    Ruling::Ask
+                ),
+                "{name} must ask in Limited tools"
+            );
+            assert!(
+                matches!(
+                    rule_tool(AiAgentPermissionMode::PowerUser, name, false),
+                    Ruling::Ask
+                ),
+                "{name} must ask in Power User"
+            );
+        }
+    }
+
+    #[test]
+    fn session_grant_mutate_matches_the_same_path_only() {
+        let same = r#"{"path":"notes/a.md","content":"one"}"#;
+        let later = r#"{"path":"notes/a.md","content":"two"}"#;
+        let other = r#"{"path":"notes/b.md","content":"two"}"#;
+        assert!(session_matches("write_file", same, later));
+        assert!(!session_matches("write_file", same, other));
+        assert!(session_matches(
+            "edit_file",
+            r#"{"path":"a.md","old_string":"x","new_string":"y"}"#,
+            r#"{"path":"a.md","old_string":"a","new_string":"b"}"#
+        ));
+        assert!(!session_matches(
+            "edit_file",
+            r#"{"path":"a.md","old_string":"x","new_string":"y"}"#,
+            r#"{"path":"b.md","old_string":"x","new_string":"y"}"#
+        ));
+    }
+
+    #[test]
+    fn mutate_tools_offer_allow_once_session_and_deny() {
+        use super::approval_options;
+        use crate::ai_agents::AiAgentPermissionMode;
+
+        for name in ["edit_file", "write_file"] {
+            let options = approval_options(AiAgentPermissionMode::Safe, name);
+            let ids: Vec<&str> = options.iter().map(|option| option.id.as_str()).collect();
+            assert_eq!(ids, vec!["allow_once", "allow_session", "deny"], "{name}");
         }
     }
 }

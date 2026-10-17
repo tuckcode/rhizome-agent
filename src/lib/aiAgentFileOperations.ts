@@ -58,12 +58,14 @@ export function detectFileOperation(operation: AgentFileOperation): void {
       notifyBashOperation(context)
       return
     case 'Write':
+    case 'write_file':
       notifyWriteOperation(context)
       return
     case 'create_note':
       notifyCreateNoteOperation(context)
       return
     case 'Edit':
+    case 'edit_file':
       notifyEditOperation(context)
   }
 }

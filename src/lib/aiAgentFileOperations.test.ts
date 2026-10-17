@@ -49,6 +49,25 @@ describe('detectFileOperation', () => {
     expect(cb.onFileCreated).not.toHaveBeenCalled()
   })
 
+  it('treats native write_file and edit_file like Write and Edit', () => {
+    const created = makeCallbacks()
+    detectFileOperation({
+      toolName: 'write_file',
+      input: JSON.stringify({ path: `${VAULT}/note/new.md`, content: 'hi' }),
+      vaultPath: VAULT,
+      callbacks: created,
+    })
+    expect(created.onFileCreated).toHaveBeenCalledWith('note/new.md')
+    const edited = makeCallbacks()
+    detectFileOperation({
+      toolName: 'edit_file',
+      input: JSON.stringify({ path: `${VAULT}/note/test.md`, old_string: 'a', new_string: 'b' }),
+      vaultPath: VAULT,
+      callbacks: edited,
+    })
+    expect(edited.onFileModified).toHaveBeenCalledWith('note/test.md')
+  })
+
   it('refreshes the vault when a writable tool target cannot be resolved', () => {
     const cb = makeCallbacks()
     detectFileOperation({ toolName: 'Write', input: 'not-json', vaultPath: VAULT, callbacks: cb })
