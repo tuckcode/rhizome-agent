@@ -1,23 +1,30 @@
 //! Search file contents inside the allowed roots.
 
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read};
+use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
 
 use super::args;
 use super::sandbox::{self, Roots};
+use super::scan::{self, Control};
 use super::walk;
 
 pub const MAX_MATCHES: usize = 100;
+pub const MAX_MATCH_CHARS: usize = 500;
+pub const MAX_OUTPUT_BYTES: usize = 100_000;
+pub const MAX_FILES: usize = 2_000;
+pub const MAX_DURATION: Duration = Duration::from_secs(2);
+const REGEX_SIZE_LIMIT: usize = 1_048_576;
 const BINARY_PROBE: usize = 8_192;
 
 pub(crate) const SCHEMA: &str = r#"{
   "type": "function",
   "function": {
     "name": "grep",
-    "description": "Search text files inside the user's vault roots or current workspace. Uses a regex unless literal is true. Optional path limits the search; optional glob filters file names. Honours .gitignore. Each match is `path:line:text`. Results stop at 100 matches with a truncation note. Paths outside the allowed roots are refused.",
+    "description": "Search text files inside the user's vault roots or current workspace. Uses a regex unless literal is true. Optional path limits the search; optional glob filters file names. Honours .gitignore. Secret paths (.env*, .git/, *.pem, id_*) are omitted. Each match is `path:line:text`. Matching text is clipped to 500 characters. Results stop at 100 matches, 100000 output bytes, 2000 files, or 2 seconds, with a truncation note. Paths outside the allowed roots are refused.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -44,6 +51,72 @@ pub(crate) const SCHEMA: &str = r#"{
   }
 }"#;
 
+struct Limits {
+    matches: usize,
+    output_bytes: usize,
+    files: usize,
+    duration: Duration,
+}
+
+impl Limits {
+    fn production() -> Self {
+        Self {
+            matches: MAX_MATCHES,
+            output_bytes: MAX_OUTPUT_BYTES,
+            files: MAX_FILES,
+            duration: MAX_DURATION,
+        }
+    }
+}
+
+struct Budget<'a> {
+    limits: &'a Limits,
+    started: Instant,
+    files: usize,
+    output_bytes: usize,
+    note: Option<String>,
+}
+
+impl<'a> Budget<'a> {
+    fn new(limits: &'a Limits) -> Self {
+        Self {
+            limits,
+            started: Instant::now(),
+            files: 0,
+            output_bytes: 0,
+            note: None,
+        }
+    }
+
+    fn stopped(&self) -> bool {
+        self.note.is_some()
+    }
+
+    fn time_up(&mut self) -> bool {
+        if self.started.elapsed() >= self.limits.duration {
+            self.note = Some(format!(
+                "time budget is {}s",
+                self.limits.duration.as_secs().max(1)
+            ));
+            true
+        } else {
+            false
+        }
+    }
+
+    fn open_file(&mut self) -> bool {
+        if self.stopped() || self.time_up() {
+            return false;
+        }
+        if self.files >= self.limits.files {
+            self.note = Some(format!("file scan cap is {}", self.limits.files));
+            return false;
+        }
+        self.files += 1;
+        true
+    }
+}
+
 pub fn run(
     raw_args: &str,
     vault_path: Option<&str>,
@@ -58,6 +131,23 @@ fn run_with_cap(
     vault_paths: &[String],
     cap: usize,
 ) -> Result<String, String> {
+    run_with_limits(
+        raw_args,
+        vault_path,
+        vault_paths,
+        Limits {
+            matches: cap,
+            ..Limits::production()
+        },
+    )
+}
+
+fn run_with_limits(
+    raw_args: &str,
+    vault_path: Option<&str>,
+    vault_paths: &[String],
+    limits: Limits,
+) -> Result<String, String> {
     let args = args::parse_object(raw_args, "grep")?;
     let pattern = args::required_str(&args, "pattern", "grep")?;
     let literal = args::optional_bool(&args, "literal", "grep")?.unwrap_or(false);
@@ -68,15 +158,21 @@ fn run_with_cap(
     let roots = sandbox::allowed_roots(vault_path, vault_paths)?;
     let starts = search_starts(search_path, vault_path, vault_paths, &roots)?;
     let mut lines = Vec::new();
-    let mut truncated = false;
+    let mut budget = Budget::new(&limits);
     for start in starts {
-        if grep_start(&start, &roots, &regex, glob_set.as_ref(), cap, &mut lines) {
-            truncated = true;
+        if grep_start(
+            &start,
+            &roots,
+            &regex,
+            glob_set.as_ref(),
+            &mut budget,
+            &mut lines,
+        ) {
             break;
         }
     }
-    if truncated {
-        lines.push(format!("[truncated: result cap is {cap}]"));
+    if let Some(reason) = budget.note {
+        lines.push(format!("[truncated: {reason}]"));
     }
     Ok(lines.join("\n"))
 }
@@ -87,7 +183,11 @@ fn compile_pattern(pattern: &str, literal: bool) -> Result<Regex, String> {
     } else {
         pattern.to_string()
     };
-    Regex::new(&source).map_err(|error| format!("Invalid regex: {error}"))
+    RegexBuilder::new(&source)
+        .size_limit(REGEX_SIZE_LIMIT)
+        .dfa_size_limit(REGEX_SIZE_LIMIT)
+        .build()
+        .map_err(|error| format!("Invalid regex: {error}"))
 }
 
 fn search_starts(
@@ -102,30 +202,45 @@ fn search_starts(
     }
 }
 
-/// Returns true when the match cap is hit.
+/// Returns true when a budget stop is hit.
 fn grep_start(
     start: &Path,
     roots: &Roots,
     regex: &Regex,
     glob_set: Option<&globset::GlobSet>,
-    cap: usize,
+    budget: &mut Budget<'_>,
     lines: &mut Vec<String>,
 ) -> bool {
     if start.is_file() {
-        return grep_file(start, roots, regex, glob_set, cap, lines);
+        if sandbox::is_secret(start) {
+            return false;
+        }
+        return grep_file(start, roots, regex, glob_set, budget, lines);
     }
     if !start.is_dir() {
         return false;
     }
+    let mut walked = 0usize;
     for entry in walk::gitignore_walk(start).flatten() {
+        walked += 1;
+        if walked > walk::WALK_BUDGET {
+            budget.note = Some(format!("walk cap is {} entries", walk::WALK_BUDGET));
+            return true;
+        }
+        if budget.stopped() || budget.time_up() {
+            return true;
+        }
         if !walk::is_file_entry(&entry) {
             continue;
         }
         let path = entry.path();
+        if sandbox::is_secret(path) {
+            continue;
+        }
         if !roots.all.iter().any(|root| sandbox::is_within(path, root)) {
             continue;
         }
-        if grep_file(path, roots, regex, glob_set, cap, lines) {
+        if grep_file(path, roots, regex, glob_set, budget, lines) {
             return true;
         }
     }
@@ -137,7 +252,7 @@ fn grep_file(
     roots: &Roots,
     regex: &Regex,
     glob_set: Option<&globset::GlobSet>,
-    cap: usize,
+    budget: &mut Budget<'_>,
     lines: &mut Vec<String>,
 ) -> bool {
     let relative = sandbox::relative_to_root(path, roots);
@@ -149,22 +264,34 @@ fn grep_file(
     if file_is_binary(path) {
         return false;
     }
-    let Ok(file) = File::open(path) else {
-        return false;
-    };
-    let reader = BufReader::new(file);
-    for (index, line) in reader.lines().enumerate() {
-        let Ok(text) = line else {
-            return false;
-        };
-        if regex.is_match(&text) {
-            lines.push(format!("{relative}:{}:{text}", index + 1));
-            if lines.len() >= cap {
-                return true;
+    if !budget.open_file() {
+        return true;
+    }
+    let max_line_bytes = MAX_MATCH_CHARS * 4;
+    let scanned = scan::for_each_line(path, max_line_bytes, 1, |number, text| {
+        if regex.is_match(text) {
+            let clipped = scan::clip_chars(text, MAX_MATCH_CHARS);
+            let line = format!("{relative}:{number}:{clipped}");
+            if budget.output_bytes + line.len() > budget.limits.output_bytes {
+                budget.note = Some(format!(
+                    "output cap is {} bytes",
+                    budget.limits.output_bytes
+                ));
+                return Control::Stop;
+            }
+            budget.output_bytes += line.len() + 1;
+            lines.push(line);
+            if lines.len() >= budget.limits.matches {
+                budget.note = Some(format!("result cap is {}", budget.limits.matches));
+                return Control::Stop;
             }
         }
-    }
-    false
+        if budget.time_up() {
+            return Control::Stop;
+        }
+        Control::Continue
+    });
+    budget.stopped() || matches!(scanned, Ok(Control::Stop))
 }
 
 fn file_is_binary(path: &Path) -> bool {
@@ -258,8 +385,107 @@ mod tests {
         fs::write(Path::new(&root).join("a.md"), "x\nx\nx\n").unwrap();
         let out =
             run_with_cap(&json!({ "pattern": "x" }).to_string(), Some(&root), &[], 2).unwrap();
-        assert!(out.contains("[truncated: result cap is 2]"), "{out}");
+        assert!(out.contains("[truncated:"), "{out}");
         assert_eq!(out.lines().filter(|line| line.contains(":x")).count(), 2);
+    }
+
+    #[test]
+    fn matching_line_is_clipped_to_500_chars() {
+        let (_dir, root) = vault();
+        let body = "needle".to_string() + &"x".repeat(2_000);
+        fs::write(Path::new(&root).join("long.md"), &body).unwrap();
+        let out = run(
+            &json!({ "pattern": "needle" }).to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap();
+        let text = out.lines().next().unwrap().splitn(3, ':').nth(2).unwrap();
+        assert!(text.starts_with("needle"), "{text}");
+        assert!(text.ends_with('…'), "{text}");
+        assert_eq!(text.chars().count(), MAX_MATCH_CHARS + 1);
+        assert!(!text.contains(&"x".repeat(600)), "{text}");
+    }
+
+    #[test]
+    fn giant_single_line_is_scanned_in_chunks() {
+        let (_dir, root) = vault();
+        let body = "needle".to_string() + &"y".repeat(200_000);
+        fs::write(Path::new(&root).join("huge.md"), &body).unwrap();
+        let out = run(
+            &json!({ "pattern": "needle" }).to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap();
+        assert!(out.contains("huge.md:1:needle"), "{out}");
+        let text = out.lines().next().unwrap().splitn(3, ':').nth(2).unwrap();
+        assert!(text.len() < 3_000, "{}", text.len());
+    }
+
+    #[test]
+    fn output_byte_cap_stops_and_notes() {
+        let (_dir, root) = vault();
+        fs::write(Path::new(&root).join("a.md"), "needle\nneedle\nneedle\n").unwrap();
+        let out = run_with_limits(
+            &json!({ "pattern": "needle" }).to_string(),
+            Some(&root),
+            &[],
+            Limits {
+                matches: 100,
+                output_bytes: 20,
+                files: MAX_FILES,
+                duration: MAX_DURATION,
+            },
+        )
+        .unwrap();
+        assert!(out.contains("[truncated: output cap is 20 bytes]"), "{out}");
+        assert!(
+            out.lines()
+                .filter(|line| line.contains("needle") && !line.starts_with('['))
+                .count()
+                <= 2,
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn file_scan_cap_notes() {
+        let (_dir, root) = vault();
+        let root_path = Path::new(&root);
+        fs::write(root_path.join("a.md"), "needle\n").unwrap();
+        fs::write(root_path.join("b.md"), "needle\n").unwrap();
+        let out = run_with_limits(
+            &json!({ "pattern": "needle" }).to_string(),
+            Some(&root),
+            &[],
+            Limits {
+                matches: 100,
+                output_bytes: MAX_OUTPUT_BYTES,
+                files: 1,
+                duration: MAX_DURATION,
+            },
+        )
+        .unwrap();
+        assert!(out.contains("[truncated: file scan cap is 1]"), "{out}");
+        assert!(out.contains("needle"), "{out}");
+    }
+
+    #[test]
+    fn non_utf8_does_not_skip_the_rest_of_the_file() {
+        let (_dir, root) = vault();
+        let mut body = Vec::from("needle-one\n");
+        body.push(0xff);
+        body.extend_from_slice(b"\nneedle-two\n");
+        fs::write(Path::new(&root).join("mix.md"), &body).unwrap();
+        let out = run(
+            &json!({ "pattern": "needle" }).to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap();
+        assert!(out.contains("needle-one"), "{out}");
+        assert!(out.contains("needle-two"), "{out}");
     }
 
     #[test]
@@ -278,5 +504,69 @@ mod tests {
         )
         .unwrap_err();
         assert!(error.contains(sandbox::OUTSIDE_ROOTS), "{error}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlink_dir_inside_a_walk_is_not_followed() {
+        let (_dir, root) = vault();
+        let outside = tempfile::tempdir().unwrap();
+        fs::write(outside.path().join("secret.md"), "needle\n").unwrap();
+        let link = Path::new(&root).join("out");
+        std::os::unix::fs::symlink(outside.path(), &link).unwrap();
+        fs::write(Path::new(&root).join("open.md"), "needle\n").unwrap();
+        let out = run(
+            &json!({ "pattern": "needle" }).to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap();
+        assert!(out.contains("open.md:1:needle"), "{out}");
+        assert!(!out.contains("secret.md"), "{out}");
+    }
+
+    fn plant(root: &Path, rel: &str) {
+        let path = root.join(rel);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        fs::write(&path, "needle\n").unwrap();
+    }
+
+    #[test]
+    fn walks_silently_omit_secret_paths() {
+        let (_dir, root) = vault();
+        let root_path = Path::new(&root);
+        plant(root_path, ".env");
+        plant(root_path, ".env.local");
+        plant(root_path, "nested/.git/config");
+        plant(root_path, "key.pem");
+        plant(root_path, "id_rsa");
+        fs::write(root_path.join("open.md"), "needle\n").unwrap();
+        let out = run(
+            &json!({ "pattern": "needle" }).to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap();
+        assert!(out.contains("open.md:1:needle"), "{out}");
+        assert!(!out.contains(sandbox::BLOCKED_SECRET), "{out}");
+        assert!(!out.contains(".env"), "{out}");
+        assert!(!out.contains("config"), "{out}");
+        assert!(!out.contains("key.pem"), "{out}");
+        assert!(!out.contains("id_rsa"), "{out}");
+    }
+
+    #[test]
+    fn direct_secret_path_is_blocked() {
+        let (_dir, root) = vault();
+        plant(Path::new(&root), ".env.local");
+        let error = run(
+            &json!({ "pattern": "needle", "path": ".env.local" }).to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap_err();
+        assert!(error.contains(sandbox::BLOCKED_SECRET), "{error}");
     }
 }

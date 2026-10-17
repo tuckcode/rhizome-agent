@@ -12,7 +12,7 @@ pub(crate) const SCHEMA: &str = r#"{
   "type": "function",
   "function": {
     "name": "glob",
-    "description": "Find files whose paths match a glob under the user's vault roots or current workspace. Honours .gitignore. Results are sorted relative paths, one per line, and stop at 200 matches with a truncation note. A pattern without a slash also matches at any depth (`*.md` matches `notes/a.md`). Paths outside the allowed roots are refused.",
+    "description": "Find files whose paths match a glob under the user's vault roots or current workspace. Honours .gitignore. Secret paths (.env*, .git/, *.pem, id_*) are omitted. Results are sorted relative paths, one per line, and stop at 200 matches with a truncation note. A pattern without a slash also matches at any depth (`*.md` matches `notes/a.md`). Paths outside the allowed roots are refused.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -55,40 +55,54 @@ fn run_with_cap(
         None => roots.all.clone(),
     };
     let mut matches = Vec::new();
+    let mut truncated = false;
     for start in starts {
-        collect_matches(&start, &roots, &glob_set, &mut matches);
+        if collect_matches(&start, &roots, &glob_set, cap, &mut matches) {
+            truncated = true;
+            break;
+        }
     }
     matches.sort();
     matches.dedup();
-    let truncated = matches.len() > cap;
-    if truncated {
-        matches.truncate(cap);
-    }
     if truncated {
         matches.push(format!("[truncated: result cap is {cap}]"));
     }
     Ok(matches.join("\n"))
 }
 
+/// Returns true when a walk or result cap is hit.
 fn collect_matches(
     start: &Path,
     roots: &Roots,
     glob_set: &globset::GlobSet,
+    cap: usize,
     matches: &mut Vec<String>,
-) {
+) -> bool {
+    let mut walked = 0usize;
     for entry in walk::gitignore_walk(start).flatten() {
+        walked += 1;
+        if walked > walk::WALK_BUDGET {
+            return true;
+        }
         if !walk::is_file_entry(&entry) {
             continue;
         }
         let path = entry.path();
+        if sandbox::is_secret(path) {
+            continue;
+        }
         if !roots.all.iter().any(|root| sandbox::is_within(path, root)) {
             continue;
         }
         let relative = sandbox::relative_to_root(path, roots);
         if glob_set.is_match(&relative) {
             matches.push(relative);
+            if matches.len() >= cap {
+                return true;
+            }
         }
     }
+    false
 }
 
 #[cfg(test)]
@@ -147,6 +161,19 @@ mod tests {
         assert_eq!(out.lines().filter(|line| line.ends_with(".md")).count(), 2);
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn symlink_dir_inside_a_walk_is_not_followed() {
+        let (_dir, root) = vault();
+        let outside = tempfile::tempdir().unwrap();
+        fs::write(outside.path().join("secret.md"), "s\n").unwrap();
+        std::os::unix::fs::symlink(outside.path(), Path::new(&root).join("out")).unwrap();
+        fs::write(Path::new(&root).join("open.md"), "o\n").unwrap();
+        let out = run(&json!({ "pattern": "*.md" }).to_string(), Some(&root), &[]).unwrap();
+        assert!(out.contains("open.md"), "{out}");
+        assert!(!out.contains("secret.md"), "{out}");
+    }
+
     #[test]
     fn path_outside_roots_is_refused() {
         let (_dir, root) = vault();
@@ -162,5 +189,32 @@ mod tests {
         )
         .unwrap_err();
         assert!(error.contains(sandbox::OUTSIDE_ROOTS), "{error}");
+    }
+
+    fn plant(root: &Path, rel: &str) {
+        let path = root.join(rel);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        fs::write(&path, "s\n").unwrap();
+    }
+
+    #[test]
+    fn walks_silently_omit_secret_paths() {
+        let (_dir, root) = vault();
+        let root_path = Path::new(&root);
+        plant(root_path, ".env");
+        plant(root_path, ".env.local");
+        plant(root_path, "nested/.git/config");
+        plant(root_path, "key.pem");
+        plant(root_path, "id_rsa");
+        fs::write(root_path.join("open.md"), "o\n").unwrap();
+        let out = run(&json!({ "pattern": "*" }).to_string(), Some(&root), &[]).unwrap();
+        assert!(out.contains("open.md"), "{out}");
+        assert!(!out.contains(sandbox::BLOCKED_SECRET), "{out}");
+        assert!(!out.contains(".env"), "{out}");
+        assert!(!out.contains("config"), "{out}");
+        assert!(!out.contains("key.pem"), "{out}");
+        assert!(!out.contains("id_rsa"), "{out}");
     }
 }

@@ -12,6 +12,7 @@ mod grep;
 mod list_dir;
 mod read_file;
 mod sandbox;
+mod scan;
 mod walk;
 
 use crate::ai_agents::AiAgentPermissionMode;

@@ -1,11 +1,12 @@
 //! Read a text file inside the allowed roots.
 
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read};
+use std::io::Read;
 use std::path::Path;
 
 use super::args;
 use super::sandbox;
+use super::scan::{self, Control};
 
 pub const MAX_BYTES: usize = 100_000;
 const BINARY_PROBE: usize = 8_192;
@@ -15,7 +16,7 @@ pub(crate) const SCHEMA: &str = r#"{
   "type": "function",
   "function": {
     "name": "read_file",
-    "description": "Read a text file inside the user's vault roots or current workspace. Paths are canonicalized; anything outside those roots is refused. Optional offset (1-based line) and limit select a line window. Output longer than 100000 bytes is truncated with a note. Binary files are refused.",
+    "description": "Read a text file inside the user's vault roots or current workspace. Paths are canonicalized; anything outside those roots is refused. Secret files (.env*, anything under .git/, *.pem, id_*) return a blocked error. Optional offset (1-based line) and limit select a line window. Offset skips earlier lines without loading them. Output longer than 100000 bytes is truncated with a note. Non-UTF-8 text is decoded lossily. Files with a NUL byte are refused as binary.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -87,36 +88,37 @@ fn read_window(
     max_bytes: usize,
 ) -> Result<String, String> {
     let file_len = std::fs::metadata(path).map(|meta| meta.len()).unwrap_or(0);
-    let file = File::open(path).map_err(|error| format!("Failed to read file: {error}"))?;
-    let reader = BufReader::new(file);
     let mut out = String::new();
     let mut truncated = false;
     let mut seen = 0usize;
-    for (index, line) in reader.lines().enumerate() {
-        let line =
-            line.map_err(|_| format!("{BINARY_MESSAGE} Requested path: {}", path.display()))?;
-        let line_no = index + 1;
-        if line_no < offset {
-            continue;
-        }
+    let control = scan::for_each_line(path, max_bytes.max(1), offset, |_, text| {
         if let Some(limit) = limit {
             if seen >= limit {
-                break;
+                return Control::Stop;
             }
         }
         seen += 1;
         let add = if out.is_empty() {
-            line
+            text.to_string()
         } else {
-            format!("\n{line}")
+            format!("\n{text}")
         };
         if out.len() + add.len() > max_bytes {
             let remain = max_bytes.saturating_sub(out.len());
             out.push_str(&clip_to_bytes(&add, remain));
             truncated = true;
-            break;
+            return Control::Stop;
         }
         out.push_str(&add);
+        if text.len() >= max_bytes && file_len as usize > max_bytes {
+            truncated = true;
+            return Control::Stop;
+        }
+        Control::Continue
+    })
+    .map_err(|error| format!("Failed to read file: {error}"))?;
+    if control == Control::Stop && out.len() >= max_bytes {
+        truncated = true;
     }
     if truncated {
         out.push_str(&format!(
@@ -195,6 +197,61 @@ mod tests {
     }
 
     #[test]
+    fn non_utf8_text_is_decoded_lossily() {
+        let (_dir, root) = vault();
+        fs::write(
+            std::path::Path::new(&root).join("latin.txt"),
+            [b'c', b'a', 0xff, b'f', b'e'],
+        )
+        .unwrap();
+        let out = run(
+            &json!({ "path": "latin.txt" }).to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap();
+        assert!(!out.contains(BINARY_MESSAGE), "{out}");
+        assert!(out.contains("ca"), "{out}");
+        assert!(out.contains("fe"), "{out}");
+        assert!(out.contains('\u{FFFD}'), "{out}");
+    }
+
+    #[test]
+    fn giant_single_line_is_read_in_chunks_and_capped() {
+        let (_dir, root) = vault();
+        let body = "needle".to_string() + &"x".repeat(200_000);
+        fs::write(std::path::Path::new(&root).join("huge.md"), &body).unwrap();
+        let out = run_with_cap(
+            &json!({ "path": "huge.md" }).to_string(),
+            Some(&root),
+            &[],
+            32,
+        )
+        .unwrap();
+        assert!(out.starts_with("needle"), "{out}");
+        assert!(out.contains("[truncated:"), "{out}");
+        let shown = out.lines().next().unwrap();
+        assert!(shown.len() <= 32, "{shown}");
+        assert!(!out.contains(&"x".repeat(1_000)), "{out}");
+    }
+
+    #[test]
+    fn offset_skips_a_giant_first_line_without_returning_it() {
+        let (_dir, root) = vault();
+        let mut body = "x".repeat(200_000);
+        body.push('\n');
+        body.push_str("tail");
+        fs::write(std::path::Path::new(&root).join("huge.md"), &body).unwrap();
+        let out = run(
+            &json!({ "path": "huge.md", "offset": 2 }).to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap();
+        assert_eq!(out, "tail");
+    }
+
+    #[test]
     fn parent_traversal_is_refused() {
         let parent = tempfile::tempdir().unwrap();
         let vault = parent.path().join("vault");
@@ -208,5 +265,42 @@ mod tests {
         )
         .unwrap_err();
         assert!(error.contains(sandbox::OUTSIDE_ROOTS), "{error}");
+    }
+
+    fn plant(root: &std::path::Path, rel: &str) {
+        let path = root.join(rel);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        fs::write(&path, "secret-value\n").unwrap();
+    }
+
+    #[test]
+    fn each_secret_pattern_returns_blocked_error() {
+        let (_dir, root) = vault();
+        let root_path = std::path::Path::new(&root);
+        plant(root_path, ".env");
+        plant(root_path, ".env.local");
+        plant(root_path, "nested/.git/config");
+        plant(root_path, "key.pem");
+        plant(root_path, "id_rsa");
+        fs::write(root_path.join("open.md"), "ok\n").unwrap();
+        for requested in [
+            ".env",
+            ".env.local",
+            "nested/.git/config",
+            "key.pem",
+            "id_rsa",
+        ] {
+            let error =
+                run(&json!({ "path": requested }).to_string(), Some(&root), &[]).unwrap_err();
+            assert!(
+                error.contains(sandbox::BLOCKED_SECRET),
+                "expected blocked secret for {requested}: {error}"
+            );
+            assert!(!error.contains("secret-value"), "{error}");
+        }
+        let open = run(&json!({ "path": "open.md" }).to_string(), Some(&root), &[]).unwrap();
+        assert_eq!(open, "ok");
     }
 }

@@ -9,6 +9,7 @@ use std::path::{Path, PathBuf};
 
 pub const OUTSIDE_ROOTS: &str = "Path is outside the allowed vault and workspace roots.";
 pub const NO_ROOTS: &str = "No active vault or workspace is available.";
+pub const BLOCKED_SECRET: &str = "blocked: secret file";
 
 /// Canonical vault / workspace roots for one tool call.
 #[derive(Debug, Clone)]
@@ -82,6 +83,9 @@ pub fn resolve_in(requested: &str, roots: &Roots) -> Result<PathBuf, String> {
     if !roots.all.iter().any(|root| is_within(&resolved, root)) {
         return Err(format!("{OUTSIDE_ROOTS} Requested path: {trimmed}"));
     }
+    if is_secret(&resolved) {
+        return Err(format!("{BLOCKED_SECRET} Requested path: {trimmed}"));
+    }
     Ok(resolved)
 }
 
@@ -113,7 +117,38 @@ pub fn resolve_dir(
 }
 
 pub fn is_within(candidate: &Path, root: &Path) -> bool {
-    candidate.starts_with(root)
+    candidate.strip_prefix(root).is_ok()
+}
+
+/// Deny `.env*`, anything under `.git/`, `*.pem`, and `id_*`.
+/// Basename match is case-insensitive. Checked on the path as given
+/// and on its canonical target so a symlink cannot hide a secret.
+pub fn is_secret(path: &Path) -> bool {
+    if looks_secret(path) {
+        return true;
+    }
+    match path.canonicalize() {
+        Ok(canonical) if canonical != path => looks_secret(&canonical),
+        _ => false,
+    }
+}
+
+fn looks_secret(path: &Path) -> bool {
+    if path.components().any(component_is_git) {
+        return true;
+    }
+    let Some(name) = path.file_name() else {
+        return false;
+    };
+    let lower = name.to_string_lossy().to_ascii_lowercase();
+    lower.starts_with(".env") || lower.ends_with(".pem") || lower.starts_with("id_")
+}
+
+fn component_is_git(component: std::path::Component<'_>) -> bool {
+    match component {
+        std::path::Component::Normal(name) => name.to_string_lossy().eq_ignore_ascii_case(".git"),
+        _ => false,
+    }
 }
 
 /// Path relative to the longest matching allowed root, with `/`.
@@ -265,5 +300,149 @@ mod tests {
     fn missing_roots_return_a_clear_error() {
         let error = resolve("a.md", None, &[]).unwrap_err();
         assert_eq!(error, NO_ROOTS);
+    }
+
+    #[test]
+    fn sibling_root_prefix_collision_is_refused() {
+        let parent = tempfile::tempdir().unwrap();
+        let vault = parent.path().join("vault");
+        let evil = parent.path().join("vault-evil");
+        fs::create_dir(&vault).unwrap();
+        fs::create_dir(&evil).unwrap();
+        fs::write(evil.join("secret.md"), "no\n").unwrap();
+        let root = vault.canonicalize().unwrap();
+        let requested = evil.join("secret.md");
+        let error = resolve(
+            requested.to_str().unwrap(),
+            Some(root.to_str().unwrap()),
+            &[],
+        )
+        .unwrap_err();
+        assert!(
+            error.contains(OUTSIDE_ROOTS),
+            "vault-evil must not match the vault prefix: {error}"
+        );
+        assert!(!is_within(&requested.canonicalize().unwrap(), &root));
+    }
+
+    #[test]
+    fn missing_path_with_parent_dir_is_refused() {
+        let parent = tempfile::tempdir().unwrap();
+        let vault = parent.path().join("vault");
+        fs::create_dir(&vault).unwrap();
+        let root = vault.canonicalize().unwrap();
+        let error = resolve("../no-such.md", Some(root.to_str().unwrap()), &[]).unwrap_err();
+        assert!(
+            error.contains(OUTSIDE_ROOTS),
+            "missing .. path must name the outside-roots error, not file-not-found: {error}"
+        );
+        assert!(!error.to_lowercase().contains("not found"), "{error}");
+    }
+
+    fn plant(root: &Path, rel: &str) -> PathBuf {
+        let path = root.join(rel);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        fs::write(&path, "secret-value\n").unwrap();
+        path
+    }
+
+    fn assert_blocked(root: &str, requested: &str) {
+        let error = resolve(requested, Some(root), &[]).unwrap_err();
+        assert!(
+            error.contains(BLOCKED_SECRET),
+            "expected {BLOCKED_SECRET} for {requested}: {error}"
+        );
+        assert!(error.contains(requested), "{error}");
+    }
+
+    #[test]
+    fn env_file_is_blocked() {
+        let (_dir, root) = vault();
+        plant(Path::new(&root), ".env");
+        assert_blocked(&root, ".env");
+        assert!(is_secret(&PathBuf::from(&root).join(".env")));
+    }
+
+    #[test]
+    fn env_local_is_blocked() {
+        let (_dir, root) = vault();
+        plant(Path::new(&root), ".env.local");
+        assert_blocked(&root, ".env.local");
+        assert!(is_secret(&PathBuf::from(&root).join(".env.local")));
+    }
+
+    #[test]
+    fn nested_git_config_is_blocked() {
+        let (_dir, root) = vault();
+        plant(Path::new(&root), "nested/.git/config");
+        assert_blocked(&root, "nested/.git/config");
+        assert!(is_secret(
+            &PathBuf::from(&root)
+                .join("nested")
+                .join(".git")
+                .join("config")
+        ));
+    }
+
+    #[test]
+    fn pem_file_is_blocked() {
+        let (_dir, root) = vault();
+        plant(Path::new(&root), "key.pem");
+        assert_blocked(&root, "key.pem");
+        assert!(is_secret(&PathBuf::from(&root).join("key.pem")));
+    }
+
+    #[test]
+    fn id_prefix_file_is_blocked() {
+        let (_dir, root) = vault();
+        plant(Path::new(&root), "id_rsa");
+        assert_blocked(&root, "id_rsa");
+        assert!(is_secret(&PathBuf::from(&root).join("id_rsa")));
+    }
+
+    #[test]
+    fn secret_match_is_case_insensitive() {
+        let (_dir, root) = vault();
+        let root_path = Path::new(&root);
+        plant(root_path, ".ENV.LOCAL");
+        plant(root_path, "KEY.PEM");
+        plant(root_path, "ID_ED25519");
+        plant(root_path, "nested/.GIT/config");
+        assert_blocked(&root, ".ENV.LOCAL");
+        assert_blocked(&root, "KEY.PEM");
+        assert_blocked(&root, "ID_ED25519");
+        assert_blocked(&root, "nested/.GIT/config");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlink_to_env_local_is_blocked() {
+        let (_dir, root) = vault();
+        plant(Path::new(&root), ".env.local");
+        std::os::unix::fs::symlink(
+            Path::new(&root).join(".env.local"),
+            Path::new(&root).join("notes.md"),
+        )
+        .unwrap();
+        assert_blocked(&root, "notes.md");
+        assert!(is_secret(&PathBuf::from(&root).join("notes.md")));
+    }
+
+    #[test]
+    fn ordinary_names_are_not_blocked() {
+        let (_dir, root) = vault();
+        let root_path = Path::new(&root);
+        plant(root_path, "env.md");
+        plant(root_path, "identity.md");
+        plant(root_path, "pem.txt");
+        plant(root_path, "gitconfig.md");
+        resolve("env.md", Some(&root), &[]).unwrap();
+        resolve("identity.md", Some(&root), &[]).unwrap();
+        resolve("pem.txt", Some(&root), &[]).unwrap();
+        resolve("gitconfig.md", Some(&root), &[]).unwrap();
+        assert!(!is_secret(&root_path.join("env.md")));
+        assert!(!is_secret(&root_path.join("identity.md")));
     }
 }

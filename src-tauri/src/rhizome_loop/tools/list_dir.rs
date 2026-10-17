@@ -2,10 +2,9 @@
 
 use std::path::Path;
 
-use walkdir::WalkDir;
-
 use super::args;
 use super::sandbox;
+use super::walk;
 
 pub const MAX_ENTRIES: usize = 200;
 const MAX_DEPTH: usize = 32;
@@ -14,7 +13,7 @@ pub(crate) const SCHEMA: &str = r#"{
   "type": "function",
   "function": {
     "name": "list_dir",
-    "description": "List files and directories inside the user's vault roots or current workspace. Each line is `file` or `dir` then a relative path. Entries are sorted. Results stop at 200 entries with a truncation note. Optional depth defaults to 1 (direct children). Paths outside the allowed roots are refused.",
+    "description": "List files and directories inside the user's vault roots or current workspace. Each line is `file` or `dir` then a relative path. Honours .gitignore. Secret paths (.env*, .git/, *.pem, id_*) are omitted. Entries are sorted. Results stop at 200 entries with a truncation note. Optional depth defaults to 1 (direct children). Paths outside the allowed roots are refused.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -55,12 +54,8 @@ fn run_with_cap(
     }
     let depth = depth.min(MAX_DEPTH);
     let dir = sandbox::resolve_dir(requested, vault_path, vault_paths)?;
-    let mut entries = collect_entries(&dir, depth);
+    let (mut entries, truncated) = collect_entries(&dir, depth, cap);
     entries.sort_by(|left, right| left.path.cmp(&right.path));
-    let truncated = entries.len() > cap;
-    if truncated {
-        entries.truncate(cap);
-    }
     let mut lines: Vec<String> = entries
         .into_iter()
         .map(|entry| format!("{} {}", entry.kind, entry.path))
@@ -76,27 +71,31 @@ struct Listed {
     path: String,
 }
 
-fn collect_entries(dir: &Path, depth: usize) -> Vec<Listed> {
-    WalkDir::new(dir)
-        .follow_links(false)
-        .max_depth(depth)
-        .into_iter()
-        .filter_entry(|entry| entry.depth() == 0 || entry.file_name() != ".git")
-        .filter_map(Result::ok)
-        .filter(|entry| entry.depth() > 0)
-        .map(|entry| {
-            let kind = if entry.file_type().is_dir() {
-                "dir"
-            } else {
-                "file"
-            };
-            let relative = relative_from(dir, entry.path());
-            Listed {
-                kind,
-                path: relative,
-            }
-        })
-        .collect()
+fn collect_entries(dir: &Path, depth: usize, cap: usize) -> (Vec<Listed>, bool) {
+    let mut entries = Vec::new();
+    let mut walked = 0usize;
+    for entry in walk::gitignore_walk_depth(dir, depth).flatten() {
+        walked += 1;
+        if walked > walk::WALK_BUDGET {
+            return (entries, true);
+        }
+        if entry.depth() == 0 || sandbox::is_secret(entry.path()) {
+            continue;
+        }
+        let kind = if walk::is_dir_entry(&entry) {
+            "dir"
+        } else {
+            "file"
+        };
+        entries.push(Listed {
+            kind,
+            path: relative_from(dir, entry.path()),
+        });
+        if entries.len() >= cap {
+            return (entries, true);
+        }
+    }
+    (entries, false)
 }
 
 fn relative_from(dir: &Path, path: &Path) -> String {
@@ -169,6 +168,33 @@ mod tests {
     }
 
     #[test]
+    fn gitignore_hides_ignored_files() {
+        let (_dir, root) = vault();
+        let root_path = std::path::Path::new(&root);
+        fs::write(root_path.join(".gitignore"), "secret.md\n").unwrap();
+        fs::write(root_path.join("open.md"), "o\n").unwrap();
+        fs::write(root_path.join("secret.md"), "s\n").unwrap();
+        let out = run(&json!({}).to_string(), Some(&root), &[]).unwrap();
+        assert!(out.contains("file open.md"), "{out}");
+        assert!(out.contains("file .gitignore"), "{out}");
+        assert!(!out.contains("secret.md"), "{out}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn lists_a_symlink_without_following_it() {
+        let (_dir, root) = vault();
+        let outside = tempfile::tempdir().unwrap();
+        fs::write(outside.path().join("secret.md"), "no\n").unwrap();
+        std::os::unix::fs::symlink(outside.path(), Path::new(&root).join("out")).unwrap();
+        fs::write(Path::new(&root).join("inside.md"), "ok\n").unwrap();
+        let out = run(&json!({ "depth": 2 }).to_string(), Some(&root), &[]).unwrap();
+        assert!(out.contains("file inside.md"), "{out}");
+        assert!(out.contains("file out") || out.contains("dir out"), "{out}");
+        assert!(!out.contains("secret.md"), "{out}");
+    }
+
+    #[test]
     fn absolute_path_outside_is_refused() {
         let (_dir, root) = vault();
         let outside = tempfile::tempdir().unwrap();
@@ -179,5 +205,49 @@ mod tests {
         )
         .unwrap_err();
         assert!(error.contains(sandbox::OUTSIDE_ROOTS), "{error}");
+    }
+
+    fn plant(root: &Path, rel: &str) {
+        let path = root.join(rel);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        fs::write(&path, "secret-value\n").unwrap();
+    }
+
+    #[test]
+    fn walks_silently_omit_secret_paths() {
+        let (_dir, root) = vault();
+        let root_path = Path::new(&root);
+        plant(root_path, ".env");
+        plant(root_path, ".env.local");
+        plant(root_path, "nested/.git/config");
+        plant(root_path, "key.pem");
+        plant(root_path, "id_rsa");
+        fs::write(root_path.join("open.md"), "ok\n").unwrap();
+        let out = run(&json!({ "depth": 4 }).to_string(), Some(&root), &[]).unwrap();
+        assert!(out.contains("file open.md"), "{out}");
+        assert!(!out.contains(sandbox::BLOCKED_SECRET), "{out}");
+        assert!(!out.contains(".env"), "{out}");
+        assert!(!out.contains("config"), "{out}");
+        assert!(!out.contains("key.pem"), "{out}");
+        assert!(!out.contains("id_rsa"), "{out}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn walks_omit_a_symlink_to_env_local() {
+        let (_dir, root) = vault();
+        plant(Path::new(&root), ".env.local");
+        std::os::unix::fs::symlink(
+            Path::new(&root).join(".env.local"),
+            Path::new(&root).join("notes.md"),
+        )
+        .unwrap();
+        fs::write(Path::new(&root).join("open.md"), "ok\n").unwrap();
+        let out = run(&json!({}).to_string(), Some(&root), &[]).unwrap();
+        assert!(out.contains("file open.md"), "{out}");
+        assert!(!out.contains("notes.md"), "{out}");
+        assert!(!out.contains(".env.local"), "{out}");
     }
 }
