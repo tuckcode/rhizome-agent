@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render as rtlRender, screen, within } from '@testing-library/react'
+import type { ReactElement } from 'react'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { SettingsPanel } from './SettingsPanel'
 import type { Settings } from '../types'
 import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../hooks/appCommandCatalog'
@@ -89,6 +91,14 @@ function installMatchMedia(matches = false) {
       dispatchEvent: vi.fn(() => true),
     })),
   })
+}
+
+function render(ui: ReactElement) {
+  const result = rtlRender(<TooltipProvider>{ui}</TooltipProvider>)
+  return {
+    ...result,
+    rerender: (next: ReactElement) => result.rerender(<TooltipProvider>{next}</TooltipProvider>),
+  }
 }
 
 describe('SettingsPanel', () => {
