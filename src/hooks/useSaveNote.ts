@@ -19,22 +19,14 @@ export async function persistContent(path: string, content: string): Promise<voi
   }
 }
 
-/** SHA-256 of the text's UTF-8 bytes, lowercase hex. Null when Web Crypto is missing. */
-export async function contentHash(text: string): Promise<string | null> {
-  const subtle = globalThis.crypto?.subtle
-  if (!subtle) return null
-  const digest = await subtle.digest('SHA-256', new TextEncoder().encode(text))
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
-}
-
 /**
- * Hash of the note as the editor last read or wrote it. The content cache
- * holds that text: notes load into it, and saves and property edits update
- * it. No cached text means no check, the same as before.
+ * The note as the editor last read or wrote it. The content cache holds
+ * that text: notes load into it, and saves and property edits update it.
+ * No cached text means no check, the same as before. The text goes to Rust,
+ * which hashes it, so the save stays synchronous up to the invoke.
  */
-async function expectedHashFor(path: string): Promise<string | null> {
-  const cached = getCachedNoteContentEntry(path)?.value
-  return cached == null ? null : contentHash(cached)
+function expectedContentFor(path: string): string | null {
+  return getCachedNoteContentEntry(path)?.value ?? null
 }
 
 /**
@@ -47,8 +39,8 @@ export async function persistContentChecked(path: string, content: string): Prom
     await mockInvoke('save_note_content', { path, content })
     return content
   }
-  const expectedHash = await expectedHashFor(path)
-  const outcome = await invoke<SaveOutcome | null>('save_note_content_checked', { path, content, expectedHash })
+  const expectedContent = expectedContentFor(path)
+  const outcome = await invoke<SaveOutcome | null>('save_note_content_checked', { path, content, expectedContent })
   return outcome?.splicedContent ?? content
 }
 

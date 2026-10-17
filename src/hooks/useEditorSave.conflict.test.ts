@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { AUTO_SAVE_DEBOUNCE_MS, useEditorSave } from './useEditorSave'
-import { contentHash, useSaveNote } from './useSaveNote'
+import { useSaveNote } from './useSaveNote'
 import { cacheNoteContent, clearPrefetchCache } from './useTabManagement'
 
 const invokeFn = vi.fn<(cmd: string, args?: Record<string, unknown>) => Promise<unknown>>()
@@ -43,14 +43,8 @@ beforeEach(() => {
   clearPrefetchCache()
 })
 
-describe('contentHash', () => {
-  it('matches the Rust SHA-256 hex form', async () => {
-    expect(await contentHash('﻿---\r\nStatus: Done\r\n---\r\n')).toBe(sha256('﻿---\r\nStatus: Done\r\n---\r\n'))
-  })
-})
-
 describe('useSaveNote conflict check', () => {
-  it('sends the hash of the text the editor read', async () => {
+  it('sends the text the editor read', async () => {
     cacheNoteContent(PATH, OPENED)
     invokeFn.mockResolvedValue({ contentHash: sha256(BUFFER), splicedContent: null })
     const updateContent = vi.fn()
@@ -61,12 +55,12 @@ describe('useSaveNote conflict check', () => {
       saved = await result.current.saveNote(PATH, BUFFER)
     })
 
-    expect(savedArgs()).toEqual({ path: PATH, content: BUFFER, expectedHash: sha256(OPENED) })
+    expect(savedArgs()).toEqual({ path: PATH, content: BUFFER, expectedContent: OPENED })
     expect(saved).toBe(BUFFER)
     expect(updateContent).toHaveBeenCalledWith(PATH, BUFFER)
   })
 
-  it('sends no hash when the editor has no cached text', async () => {
+  it('sends no expected text when the editor has no cached text', async () => {
     invokeFn.mockResolvedValue({ contentHash: sha256(BUFFER), splicedContent: null })
     const { result } = renderHook(() => useSaveNote(vi.fn()))
 
@@ -74,7 +68,7 @@ describe('useSaveNote conflict check', () => {
       await result.current.saveNote(PATH, BUFFER)
     })
 
-    expect(savedArgs()?.expectedHash).toBeNull()
+    expect(savedArgs()?.expectedContent).toBeNull()
   })
 
   it('takes a spliced status as the new text and the next baseline', async () => {
@@ -92,7 +86,7 @@ describe('useSaveNote conflict check', () => {
     await act(async () => {
       await result.current.saveNote(PATH, SPLICED)
     })
-    expect(savedArgs(1)?.expectedHash).toBe(sha256(SPLICED))
+    expect(savedArgs(1)?.expectedContent).toBe(SPLICED)
   })
 })
 
@@ -128,7 +122,7 @@ describe('useEditorSave with a board move', () => {
       await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS)
     })
 
-    expect(savedArgs()).toEqual({ path: PATH, content: BUFFER, expectedHash: sha256(OPENED) })
+    expect(savedArgs()).toEqual({ path: PATH, content: BUFFER, expectedContent: OPENED })
     expect(tabContentAfter(setTabs)).toBe(SPLICED)
     expect(updateVaultContent).toHaveBeenLastCalledWith(PATH, SPLICED)
 
@@ -164,7 +158,7 @@ describe('useEditorSave with a board move', () => {
     expect(savedArgs(1)).toEqual({
       path: PATH,
       content: '---\nStatus: Done\n---\n# Plan\ntyped while the card moved, and more\n',
-      expectedHash: sha256(SPLICED),
+      expectedContent: SPLICED,
     })
   })
 
@@ -185,6 +179,6 @@ describe('useEditorSave with a board move', () => {
     await act(async () => {
       await result.current.handleSave()
     })
-    expect(savedArgs(1)).toEqual({ path: PATH, content: BUFFER, expectedHash: sha256(OPENED) })
+    expect(savedArgs(1)).toEqual({ path: PATH, content: BUFFER, expectedContent: OPENED })
   })
 })

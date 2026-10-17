@@ -169,15 +169,17 @@ pub async fn save_note_content(
     .map_err(|e| format!("Task panicked: {e}"))?
 }
 
-/// `save_note_content` with a conflict check. See
-/// [`vault::save_note_content_expecting`].
+/// `save_note_content` with a conflict check. `expected_content` is the
+/// note as the editor last read or wrote it. Its hash is the expected hash
+/// for [`vault::save_note_content_expecting`]. No text means no check.
 #[tauri::command]
 pub async fn save_note_content_checked(
     path: PathBuf,
     content: String,
     vault_path: Option<PathBuf>,
-    expected_hash: Option<String>,
+    expected_content: Option<String>,
 ) -> Result<vault::SaveOutcome, String> {
+    let expected_hash = expected_content.as_deref().map(crate::board::content_hash);
     tokio::task::spawn_blocking(move || {
         with_writable_note_path(path, vault_path, |validated_path, vault_root| {
             let outcome = vault::save_note_content_expecting(
