@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -239,12 +239,17 @@ impl<M: Model> Engine for NativeEngine<M> {
         let session_log = self.session_log.clone();
         self.agent.set_durable_listener(move |event| {
             if let Some(log) = &session_log {
-                if let Ok(mut writer) = log.lock() {
-                    match native_log::append_or_roll(&mut writer, &event) {
-                        Ok(None) => {}
-                        Ok(Some(message)) => live_emit(EngineEvent::error(message, false)),
-                        Err(message) => live_emit(EngineEvent::error(message, false)),
+                let mut writer = match log.lock() {
+                    Ok(writer) => writer,
+                    Err(poisoned) => {
+                        note_poisoned_log();
+                        poisoned.into_inner()
                     }
+                };
+                match native_log::append_or_roll(&mut writer, &event) {
+                    Ok(None) => {}
+                    Ok(Some(message)) => live_emit(EngineEvent::error(message, false)),
+                    Err(message) => live_emit(EngineEvent::error(message, false)),
                 }
             }
             if let Some(mapped) = Self::map_durable(event) {
@@ -427,6 +432,19 @@ impl NativeControl {
     }
 }
 
+static LOG_POISON_NOTICES: AtomicUsize = AtomicUsize::new(0);
+
+/// A poisoned log mutex used to stop logging for the rest of the session.
+/// Recover the guard and say so once.
+fn note_poisoned_log() {
+    static ONCE: AtomicBool = AtomicBool::new(false);
+    if ONCE.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    LOG_POISON_NOTICES.fetch_add(1, Ordering::SeqCst);
+    log::warn!("The native chat log lock was poisoned. Logging continues for this session.");
+}
+
 fn enqueue_approval(
     approval_tx: &ApprovalTx,
     live_prompt: &Arc<Mutex<Option<String>>>,
@@ -455,7 +473,7 @@ fn release_live_prompt(live_prompt: &Arc<Mutex<Option<String>>>, prompt_id: &str
 mod tests {
     use super::*;
     use crate::model_events::{ModelError, ModelErrorKind};
-    use crate::rhizome_loop::{AgentLoop, FakeModel, ScriptPart};
+    use crate::rhizome_loop::{AgentLoop, DurableEvent, FakeModel, ScriptPart};
     use std::panic::{catch_unwind, AssertUnwindSafe};
 
     fn with_temp_home<T>(body: impl FnOnce() -> T) -> T {
@@ -482,6 +500,44 @@ mod tests {
             Ok(value) => value,
             Err(panic) => std::panic::resume_unwind(panic),
         }
+    }
+
+    #[test]
+    fn a_poisoned_log_mutex_still_records_the_turn() {
+        with_temp_home(|| {
+            let mut engine = NativeEngine::saying("hello");
+            let session_id = uuid::Uuid::new_v4().to_string();
+            engine.ensure_log(&session_id).expect("log");
+            let log = Arc::clone(engine.session_log.as_ref().expect("writer"));
+            let _ = thread::spawn(move || {
+                let _guard = log.lock().expect("lock");
+                panic!("poison the log mutex");
+            })
+            .join();
+            let before = LOG_POISON_NOTICES.load(Ordering::SeqCst);
+            engine.start("hi", Box::new(|_| {})).expect("start");
+            assert_eq!(
+                LOG_POISON_NOTICES.load(Ordering::SeqCst),
+                before + 1,
+                "a poisoned log is reported once"
+            );
+            let opened = native_log::open_session_log(&session_id).expect("reopen");
+            assert!(
+                opened
+                    .events
+                    .iter()
+                    .any(|event| matches!(event, DurableEvent::User { text } if text == "hi")),
+                "logging must continue after the mutex is poisoned: {:?}",
+                opened.events
+            );
+            assert!(
+                opened.events.iter().any(
+                    |event| matches!(event, DurableEvent::Assistant { text } if text == "hello")
+                ),
+                "the reply must be stored after the mutex is poisoned: {:?}",
+                opened.events
+            );
+        });
     }
 
     #[test]
