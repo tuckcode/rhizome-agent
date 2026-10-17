@@ -14,7 +14,7 @@ This page is the install and recovery guide. Developer commands live in [`GETTIN
 | Notes | Open a local vault, save a note, reopen the same file, read and diff notes | A remote starter vault |
 | Layout | Chat opens on launch. Left rail: sessions, Views (Research, Graph, Mycelium, History), Settings. Notes and Changes sit in the sidebar. Show Notes, the View menu, or Cmd+2 still open Notes. Views use Ctrl+Cmd+1–4 on Mac and Ctrl+Shift+1–4 on Windows. | Portfolio, Today, kanban, or extra destinations |
 | Theme | Earth dark (default), Earth light, Loam, and Match system | |
-| Models | Free tier (auto), plus catalog providers you add a key for | The name Taproot (that rename is not on main) |
+| Models | **Taproot** (free automatic router), plus catalog providers you add a key for | |
 | Keys | System keychain (macOS Keychain, Windows Credential Manager, or Secret Service) | A JSON key file you edit by hand |
 | Updates | Replace the `.app`, or rebuild from source | An in-app updater |
 

@@ -170,7 +170,7 @@ These are Rhizome's product docs. Read them before you answer a question about h
 ## Where answers live
 
 - **Engines, models, keys, tools, permission modes:** \`pages/concepts/ai.md\`, \`pages/guides/configure-ai-models.md\`
-- **Free tier (auto) and provider fallback:** \`pages/concepts/free-models-and-routing.md\`
+- **Taproot (free automatic router) and provider fallback:** \`pages/concepts/free-models-and-routing.md\`
 - **Saving to the vault, recall, Claude Code import:** \`pages/concepts/vault-as-memory.md\`, \`pages/guides/import-a-session.md\`
 - **Sessions, resuming and saved chats:** \`pages/guides/sessions.md\`
 - **Where a Prime run went, which files it touched:** \`pages/concepts/mycelium.md\`

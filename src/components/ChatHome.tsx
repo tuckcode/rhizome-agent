@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState, useMemo } from 'react'
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import { AiPanel } from './AiPanel'
-import { PrimeSessionSubhead } from './PrimeSessionSubhead'
+import { CHAT_TOP_BAR_BAND_CLASS, PrimeSessionSubhead } from './PrimeSessionSubhead'
+import { overlayTitleBarBandStyle } from '../utils/trafficLights'
+import { SHEET_OFFSET_BAND_ATTR } from '../hooks/useNotesSheetOffset'
+import { useDragRegion } from '../hooks/useDragRegion'
 import { AgentActivityBand } from './AgentActivityBand'
 import { RlmFamilyBand } from './RlmFamilyBand'
 import { ChatComposerDeck } from './ChatComposerDeck'
@@ -15,6 +18,7 @@ import { usePanelWidth } from '../hooks/usePanelWidth'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 import { usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
 import { usePrimeActiveSessionTitle } from '../hooks/usePrimeActiveSessionTitle'
+import { sessionTitleRefreshKey } from '../lib/sessionHeaderTitle'
 import { resolveChatOpenNote } from '../utils/resolveChatOpenNote'
 import { agentTargets, type AiModelProvider, type AiTarget } from '../lib/aiTargets'
 import {
@@ -158,6 +162,12 @@ export default function ChatHome({
   }
   const effectiveEngine = resolveEffectiveChatEngine(engineInput)
   const showPrimeChrome = engineChromeReady && isPrimeChat && chatTarget?.kind !== 'api_model' && effectiveEngine === 'prime'
+  // The title strip and Command Palette are Chat chrome, not Prime-only.
+  // Tying them to `effectiveEngine === 'prime'` hid the whole top bar on
+  // Rhizome's native engine, including the header.
+  const showChatTopBarSlot = isPrimeChat && chatTarget?.kind !== 'api_model'
+  const showChatTopBar = engineChromeReady && showChatTopBarSlot
+  const showChatTopBarPlaceholder = !engineChromeReady && showChatTopBarSlot
   const rhizomeCatalog = engineChromeReady && effectiveEngine === 'native'
   const showComposerDeck = engineChromeReady && isPrimeChat && (showPrimeChrome || rhizomeCatalog)
   const panelEngine = engineChromeReady ? effectiveEngine : undefined
@@ -172,7 +182,22 @@ export default function ChatHome({
     setConversationId(newChatConversationId())
     setEngineLock(null)
   }
-  const sessionTitle = usePrimeActiveSessionTitle(primeHost?.sessionPath ?? null, primeHost?.isStreaming)
+  const [sessionMeta, setSessionMeta] = useState<{ path: string | null; title: string | null }>({
+    path: null,
+    title: null,
+  })
+  const handleSessionHeader = useCallback((next: { path: string | null; title: string | null }) => {
+    setSessionMeta((current) => (
+      current.path === next.path && current.title === next.title ? current : next
+    ))
+  }, [])
+  const sessionPath = sessionMeta.path ?? primeHost?.sessionPath ?? null
+  const listedTitle = usePrimeActiveSessionTitle(
+    sessionPath,
+    sessionTitleRefreshKey(primeHost?.isStreaming, sessionPath),
+  )
+  const sessionTitle = listedTitle ?? sessionMeta.title
+  const { onMouseDown: onDragRegionMouseDown } = useDragRegion<HTMLDivElement>()
   const newChatRef = useRef<(() => void) | null>(null)
   const [openNote, setOpenNote] = useState<{ path: string; label: string } | null>(null)
   // One read of the open note, shared by the pane and the agent. Chat used to
@@ -212,7 +237,20 @@ export default function ChatHome({
       data-testid="chat-home"
       data-chat-engine={panelEngine ?? 'pending'}
     >
-      {showPrimeChrome ? (
+      {showChatTopBarPlaceholder ? (
+        <div
+          aria-hidden="true"
+          className={CHAT_TOP_BAR_BAND_CLASS}
+          data-chat-top-bar="placeholder"
+          data-testid="chat-top-bar"
+          {...{ [SHEET_OFFSET_BAND_ATTR]: 'content' }}
+          style={overlayTitleBarBandStyle(railLayoutWidth)}
+          onMouseDown={onDragRegionMouseDown}
+        >
+          <span className="h-[13px] w-24 max-w-[40%] rounded-sm bg-muted-foreground/20" />
+        </div>
+      ) : null}
+      {showChatTopBar ? (
         <PrimeSessionSubhead
           railLayoutWidth={railLayoutWidth}
           locale={locale}
@@ -222,8 +260,10 @@ export default function ChatHome({
           startedAt={primeHost?.startedAt ?? null}
           problem={primeHost?.problem ?? null}
           sessionTitle={sessionTitle}
+          showSessionStatus={effectiveEngine === 'prime'}
           onNewChat={() => {
             clearEngineLock()
+            setSessionMeta({ path: null, title: null })
             newChatRef.current?.()
           }}
           onOpenFootprint={
@@ -268,6 +308,7 @@ export default function ChatHome({
           sessionsRailSlot={sessionsRailSlot}
           onRailSessionPicked={onRailSessionPicked}
           onConversationReset={clearEngineLock}
+          onSessionHeader={handleSessionHeader}
           forkTargetsPrimeEntry={panelEngine === 'prime'}
           newChatRef={newChatRef}
           onOpenMycelium={onOpenSessionFootprint}

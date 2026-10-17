@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const invoked = vi.hoisted(() => ({
   calls: [] as string[],
-  sessions: [] as Array<{ id: string; path: string; title?: string | null }>,
+  sessions: [] as Array<Record<string, string | null | undefined>>,
   returnsNull: false,
 }))
 
@@ -90,6 +90,58 @@ describe('usePrimeActiveSessionTitle', () => {
     rerender({ streaming: false })
 
     await waitFor(() => expect(result.current).toBe('Plan the launch'))
+  })
+
+  it('resolves a native session title from the native list', async () => {
+    invoked.sessions = [
+      {
+        sessionId: 'n1',
+        createdAt: '2026-10-17T00:00:00.000Z',
+        target: 'free_tier_auto',
+        title: 'Explain this repo',
+      },
+    ]
+
+    const { result } = renderHook(() => usePrimeActiveSessionTitle('rhizome-native:n1'))
+
+    await waitFor(() => {
+      expect(result.current).toBe('Explain this repo')
+    })
+    expect(invoked.calls).toEqual(['native_chat_list'])
+  })
+
+  it('bounds list calls when the caller passes a fresh inline array as the key', async () => {
+    // Without the setRead identity guard this loops (1287 host calls in 30ms).
+    invoked.sessions = [{ id: 'a', path: '/mock/sessions/a.jsonl', title: 'Plan the launch' }]
+    const { result } = renderHook(
+      () => usePrimeActiveSessionTitle('/mock/sessions/a.jsonl', [true, '/mock/sessions/a.jsonl']),
+    )
+    await waitFor(() => expect(result.current).toBe('Plan the launch'))
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(invoked.calls.length).toBeLessThanOrEqual(3)
+    expect(invoked.calls.every((command) => command === 'list_prime_session_summaries')).toBe(true)
+  })
+
+  it('bounds list calls across re-renders and refetches only when the key changes', async () => {
+    invoked.sessions = [{ id: 'a', path: '/mock/sessions/a.jsonl', title: 'Plan the launch' }]
+    const { rerender } = renderHook(
+      ({ key }) => usePrimeActiveSessionTitle('/mock/sessions/a.jsonl', key),
+      { initialProps: { key: '1|/mock/sessions/a.jsonl' } },
+    )
+    await waitFor(() => expect(invoked.calls).toHaveLength(1))
+
+    for (let index = 0; index < 20; index += 1) {
+      rerender({ key: '1|/mock/sessions/a.jsonl' })
+    }
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(invoked.calls).toEqual(['list_prime_session_summaries'])
+
+    rerender({ key: '0|/mock/sessions/a.jsonl' })
+    await waitFor(() => expect(invoked.calls).toHaveLength(2))
+    expect(invoked.calls).toEqual([
+      'list_prime_session_summaries',
+      'list_prime_session_summaries',
+    ])
   })
 
   it('never shows the previous session title after a switch', async () => {

@@ -120,7 +120,7 @@ export function ToolApprovalCard({
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-medium text-foreground">{title}</h2>
             <span
-              className="font-sans text-[11px] text-muted-foreground"
+              className="font-sans text-[11px] text-[var(--warn-text)]"
               data-testid="approval-status"
             >
               Needs approval

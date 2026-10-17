@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react'
 import { callHostOr } from '../lib/callHost'
+import {
+  isNativeSessionPath,
+  nativeChatListToSummaries,
+} from '../lib/nativeChatTranscript'
 import type { PrimeSessionSummary } from '../lib/primeSessionMeta'
 
 /**
@@ -33,11 +37,21 @@ export function usePrimeActiveSessionTitle(
     if (!sessionPath) return
 
     let cancelled = false
-    void callHostOr<PrimeSessionSummary[] | null>('list_prime_session_summaries', []).then((sessions) => {
+    const native = isNativeSessionPath(sessionPath)
+    const command = native ? 'native_chat_list' : 'list_prime_session_summaries'
+    void callHostOr<unknown>(command, []).then((rows) => {
       if (cancelled) return
       // A host (or a test mock) may answer null rather than a list.
-      const match = Array.isArray(sessions) ? sessions.find((session) => session.path === sessionPath) : undefined
-      setRead({ path: sessionPath, title: match?.title?.trim() || null })
+      const sessions: PrimeSessionSummary[] = native
+        ? nativeChatListToSummaries(rows)
+        : Array.isArray(rows) ? rows as PrimeSessionSummary[] : []
+      const match = sessions.find((session) => session.path === sessionPath)
+      const title = match?.title?.trim() || null
+      setRead((current) => (
+        current?.path === sessionPath && current.title === title
+          ? current
+          : { path: sessionPath, title }
+      ))
     })
 
     return () => {

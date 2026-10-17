@@ -28,6 +28,7 @@ describe('ToolApprovalCard', () => {
     expect(screen.getByTestId('approval-path')).toHaveTextContent('notes/plan.md')
     expect(screen.getByText('Edit file')).toBeInTheDocument()
     expect(screen.getByTestId('approval-status')).toHaveTextContent('Needs approval')
+    expect(screen.getByTestId('approval-status').className).toContain('text-[var(--warn-text)]')
     expect(screen.getByTestId('approval-diff')).toHaveTextContent('@@ -1,1 +1,1 @@')
     expect(screen.getByTestId('approval-diff')).toHaveTextContent('-draft')
     expect(screen.getByTestId('approval-diff')).toHaveTextContent('+ready')

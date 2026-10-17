@@ -538,6 +538,7 @@ import { streamNativeChat } from './utils/streamNativeChat'
 import { takeQueuedAiPrompt } from './utils/aiPromptBridge'
 import { panePresetStorageKey } from './lib/panePresetStorage'
 import { notesPanelModeStorageKey } from './lib/notesPanelMode'
+import { viewShortcutEventModifiers } from './lib/railViewShortcuts'
 
 const AI_AGENTS_ONBOARDING_DISMISSED_STORAGE_NAME = 'rhizome:ai-agents-onboarding-dismissed'
 const CLAUDE_CODE_ONBOARDING_DISMISSED_STORAGE_NAME = 'tolaria:claude-code-onboarding-dismissed'
@@ -870,6 +871,26 @@ describe('App', () => {
     expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
     expect(screen.getByTestId('notes-panel-rail')).toBeVisible()
     expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Open')
+  })
+
+  it('opens History from the view button and its shortcut when Notes is closed', async () => {
+    localStorage.setItem(notesPanelModeStorageKey('main'), 'rail')
+    render(<App />)
+    expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('command-rail-history'))
+    expect(await screen.findByTestId('pulse-header')).toBeInTheDocument()
+    expect(screen.getByTestId('vault-panel')).toBeInTheDocument()
+  })
+
+  it('opens History from its shortcut when Notes is closed', async () => {
+    localStorage.setItem(notesPanelModeStorageKey('main'), 'rail')
+    render(<App />)
+    expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
+    const mods = viewShortcutEventModifiers()
+    fireEvent.keyDown(window, { key: '4', code: 'Digit4', ...mods })
+    expect(await screen.findByTestId('pulse-header')).toBeInTheDocument()
   })
 
   it('keeps a saved Auto or Rail mode when a view switch opens the panel', async () => {

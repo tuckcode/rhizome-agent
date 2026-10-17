@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render as rtlRender, screen, fireEvent, act, waitFor, within } from '@testing-library/react'
 import { AiPanel, AiPanelView } from './AiPanel'
+import { sessionHeaderReport } from '../lib/sessionHeaderTitle'
 import { UNSUPPORTED_INLINE_PASTE_MESSAGE } from './InlineWikilinkInput'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { AiPanelController } from './useAiPanelController'
@@ -343,7 +344,63 @@ describe('AiPanel', () => {
 
   it('renders empty state without context', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
-    expect(screen.getAllByText('Ask Prime').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Ask Rhizome').length).toBeGreaterThan(0)
+  })
+
+  it('prefills the composer from an empty-state starter', () => {
+    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Explain this repo' }))
+    expect(screen.getByTestId('agent-input')).toHaveTextContent('Explain this repo')
+  })
+
+  it('reports the first user message as the session header title', async () => {
+    mockMessages = [{
+      id: 'm1',
+      userMessage: 'Explain this repo',
+      response: 'ok',
+      actions: [],
+    }]
+    const onSessionHeader = vi.fn()
+    render(
+      <AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" onSessionHeader={onSessionHeader} />,
+    )
+    await waitFor(() => {
+      expect(onSessionHeader).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Explain this repo' }),
+      )
+    })
+  })
+
+  it('collapses whitespace and caps a fallback title at 60 characters', async () => {
+    mockMessages = [{
+      id: 'm1',
+      userMessage: 'Plan\n\nthe   launch of a very long session title that should not fill the header forever',
+      response: 'ok',
+      actions: [],
+    }]
+    const onSessionHeader = vi.fn()
+    render(
+      <AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" onSessionHeader={onSessionHeader} />,
+    )
+    await waitFor(() => {
+      expect(onSessionHeader).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Plan the launch of a very long session title that should not…',
+        }),
+      )
+    })
+  })
+
+  it('does not title a new path from leftover messages before a native session exists', () => {
+    expect(sessionHeaderReport({
+      activeSessionPath: 'rhizome-native:new',
+      primeSessionPath: null,
+      nativeSessionId: null,
+      firstUserMessage: 'Explain this repo',
+    })).toEqual({
+      path: 'rhizome-native:new',
+      title: null,
+    })
   })
 
   it('names a native-engine empty chat Rhizome', () => {
@@ -365,7 +422,7 @@ describe('AiPanel', () => {
     render(
       <AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" activeEntry={entry} entries={[entry]} />
     )
-    expect(screen.getByText('Ask Prime about this note')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Ask Rhizome' })).toBeTruthy()
   })
 
   it('does not render a context bar for the active entry', () => {

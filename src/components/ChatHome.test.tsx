@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MutableRefObject } from 'react'
 
 const startNewChat = vi.fn()
+const sessionTitleMock = vi.hoisted(() => ({ title: null as string | null }))
 const primeHostMock = vi.hoisted(() => ({
   enabled: true,
   status: {
@@ -28,6 +29,7 @@ vi.mock('./AiPanel', () => ({
     newChatRef,
     onOpenNote,
     onConversationReset,
+    onSessionHeader,
     notePane,
     activeEntry,
     activeNoteContent,
@@ -40,6 +42,7 @@ vi.mock('./AiPanel', () => ({
     newChatRef?: MutableRefObject<(() => void) | null>
     onOpenNote?: (path: string) => void
     onConversationReset?: () => void
+    onSessionHeader?: (session: { path: string | null; title: string | null }) => void
     notePane?: React.ReactNode
     activeEntry?: { path: string } | null
     activeNoteContent?: string | null
@@ -52,6 +55,12 @@ vi.mock('./AiPanel', () => ({
     if (newChatRef) newChatRef.current = startNewChat
     return (
       <div data-testid="ai-panel-stub">
+        <button
+          type="button"
+          onClick={() => onSessionHeader?.({ path: 'rhizome-native:n1', title: 'Explain this repo' })}
+        >
+          Report session title
+        </button>
         <span data-testid="agent-active-note">{activeEntry?.path ?? 'none'}</span>
         <span data-testid="agent-note-body">{activeNoteContent ?? 'none'}</span>
         <span data-testid="agent-target-kind">{defaultAiTarget?.kind ?? 'none'}</span>
@@ -79,7 +88,12 @@ vi.mock('../hooks/usePrimeHostStatus', () => ({
   },
 }))
 
+vi.mock('../hooks/usePrimeActiveSessionTitle', () => ({
+  usePrimeActiveSessionTitle: () => sessionTitleMock.title,
+}))
+
 import ChatHome from './ChatHome'
+import { CHAT_TOP_BAR_BAND_CLASS } from './PrimeSessionSubhead'
 import { loadChatNoteContent } from '../utils/loadChatNoteContent'
 
 function livePrimeHost() {
@@ -100,6 +114,7 @@ function livePrimeHost() {
 describe('ChatHome', () => {
   beforeEach(() => {
     livePrimeHost()
+    sessionTitleMock.title = null
   })
 
   it('uses the native engine when the prop is omitted', () => {
@@ -161,6 +176,38 @@ describe('ChatHome', () => {
     expect(screen.getByRole('button', { name: 'New chat' })).toBeTruthy()
   })
 
+  it('reserves the Chat top bar height before the engine settles', () => {
+    expect(CHAT_TOP_BAR_BAND_CLASS).toContain('h-[39px]')
+    expect(CHAT_TOP_BAR_BAND_CLASS).toContain('box-border')
+    const props = {
+      locale: 'en' as const,
+      defaultAiAgent: 'prime' as const,
+      defaultAiAgentReadiness: 'ready' as const,
+      defaultAiAgentReady: true,
+      chatEngine: 'prime' as const,
+      vaultPath: '/Users/jdoe/Documents/Laputa',
+      vaultPaths: ['/Users/jdoe/Documents/Laputa'],
+      entries: [],
+      onExit: vi.fn(),
+    }
+    const { rerender } = render(<ChatHome {...props} chatEngineSettled={false} />)
+    const placeholder = screen.getByTestId('chat-top-bar')
+    expect(placeholder).toHaveAttribute('data-chat-top-bar', 'placeholder')
+    expect(placeholder).toHaveAttribute('aria-hidden', 'true')
+    expect(placeholder).toHaveAttribute('data-sheet-offset-band', 'content')
+    expect(placeholder).toHaveClass('app-titlebar-band', 'box-border', 'h-[39px]')
+    expect(placeholder.querySelector('button')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'New chat' })).toBeNull()
+
+    rerender(<ChatHome {...props} chatEngineSettled />)
+    const ready = screen.getByTestId('prime-session-subhead')
+    expect(ready).toHaveAttribute('data-chat-top-bar', 'ready')
+    expect(ready).toHaveAttribute('data-sheet-offset-band', 'content')
+    expect(ready).toHaveClass('app-titlebar-band', 'box-border', 'h-[39px]')
+    expect(screen.queryByTestId('chat-top-bar')).toBeNull()
+    expect(screen.getByRole('button', { name: 'New chat' })).toBeTruthy()
+  })
+
   it('starts a new chat from the Frame A subhead', () => {
     startNewChat.mockClear()
     render(
@@ -212,6 +259,68 @@ describe('ChatHome', () => {
     expect(screen.getByTestId('agent-target-kind')).toHaveTextContent('agent')
     expect(screen.getByTestId('composer-controls')).toHaveTextContent('yes')
     expect(screen.getByTestId('prime-session-subhead')).toBeInTheDocument()
+  })
+
+  it('keeps the chat top bar and Command Palette on the native engine', () => {
+    render(
+      <ChatHome
+        locale="en"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="ready"
+        defaultAiAgentReady
+        chatEngine="native"
+        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPaths={['/Users/jdoe/Documents/Laputa']}
+        entries={[]}
+        onExit={vi.fn()}
+        onOpenCommandPalette={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
+    expect(screen.getByTestId('prime-session-subhead')).toBeInTheDocument()
+    expect(screen.getByTestId('open-command-palette')).toHaveTextContent('Command Palette')
+    expect(screen.queryByTestId('prime-session-status')).toBeNull()
+  })
+
+  it('shows the session title in the header as soon as one exists', () => {
+    sessionTitleMock.title = 'Plan the launch'
+    const props = {
+      locale: 'en' as const,
+      defaultAiAgent: 'prime' as const,
+      defaultAiAgentReadiness: 'ready' as const,
+      defaultAiAgentReady: true,
+      vaultPath: '/Users/jdoe/Documents/Laputa',
+      vaultPaths: ['/Users/jdoe/Documents/Laputa'],
+      entries: [],
+      onExit: vi.fn(),
+    }
+    const { rerender } = render(<ChatHome {...props} />)
+
+    expect(screen.getByTestId('prime-session-title')).toHaveTextContent('Plan the launch')
+    sessionTitleMock.title = 'Ship the launch'
+    rerender(<ChatHome {...props} />)
+    expect(screen.getByTestId('prime-session-title')).toHaveTextContent('Ship the launch')
+  })
+
+  it('uses the open chat title when the session list has not named it yet', () => {
+    render(
+      <ChatHome
+        locale="en"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="ready"
+        defaultAiAgentReady
+        chatEngine="native"
+        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPaths={['/Users/jdoe/Documents/Laputa']}
+        entries={[]}
+        onExit={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByTestId('prime-session-title')).toHaveTextContent('New chat')
+    fireEvent.click(screen.getByRole('button', { name: 'Report session title' }))
+    expect(screen.getByTestId('prime-session-title')).toHaveTextContent('Explain this repo')
   })
 
   it('opens and closes a note beside chat without leaving ChatHome', () => {
@@ -496,6 +605,24 @@ describe('ChatHome composer wiring', () => {
   it('keeps a Settings API default on the Prime harness', () => {
     expect(chatHomeSource).toContain("if (defaultAiTarget?.kind === 'api_model')")
     expect(chatHomeSource).toContain("target.kind === 'agent' && target.agent === 'prime'")
+  })
+
+  it('uses a primitive session-title refresh key', () => {
+    expect(chatHomeSource).toContain('sessionTitleRefreshKey(primeHost?.isStreaming, sessionPath)')
+    expect(chatHomeSource).not.toContain('[primeHost?.isStreaming, sessionMeta.path]')
+  })
+
+  it('keeps the Chat top bar off the engine once settings have settled', () => {
+    expect(chatHomeSource).toContain(
+      'const showChatTopBarSlot = isPrimeChat && chatTarget?.kind !== \'api_model\'',
+    )
+    expect(chatHomeSource).toContain('const showChatTopBar = engineChromeReady && showChatTopBarSlot')
+    expect(chatHomeSource).toContain(
+      'const showChatTopBarPlaceholder = !engineChromeReady && showChatTopBarSlot',
+    )
+    expect(chatHomeSource).toContain('onMouseDown={onDragRegionMouseDown}')
+    expect(chatHomeSource).toContain('onSessionHeader={handleSessionHeader}')
+    expect(chatHomeSource).toContain('forkTargetsPrimeEntry={panelEngine === \'prime\'}')
   })
 
   it('polls Prime from the open chat engine, not the Settings switch', () => {

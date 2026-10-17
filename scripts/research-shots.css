@@ -1,0 +1,6 @@
+@source ".";
+
+[data-state="retry-focus"] [data-testid="research-library-scan-retry"]:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px var(--state-focus-ring);
+}

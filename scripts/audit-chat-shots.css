@@ -1,0 +1,15 @@
+@source ".";
+
+/* Playwright focus() does not always trip :focus-visible. The shot still
+   needs the same ring the product button uses for keyboard focus. */
+[data-state="approval-allow-focus"] [data-testid="approval-allow_once"] {
+  transition: none !important;
+}
+
+[data-state="approval-allow-focus"] [data-testid="approval-allow_once"]:focus,
+[data-state="approval-allow-focus"] [data-testid="approval-allow_once"]:focus-visible {
+  border-color: var(--primary) !important;
+  outline: 2px solid var(--primary) !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 45%, transparent) !important;
+}

@@ -518,7 +518,7 @@ scrub, reopen as cancelled with no restored grants. The id is a UUID.
 An OS file lock covers a second process and dies with it. Both windows
 may display a chat; only one turn runs. Damage and a full log keep the
 original and continue in a new session. With the Settings switch on,
-new chats call `native_chat_start` and pick a catalog model or Free tier (auto).
+new chats call `native_chat_start` and pick a catalog model or Taproot.
 `rhizome_provider_model.rs` is the native loop's OpenAI-compatible `Model`.
 The loop registry (`rhizome_loop/tools`) offers `echo`, read-only file tools
 (`read_file`, `list_dir`, `grep`, `glob`), mutate file tools (`edit_file`,

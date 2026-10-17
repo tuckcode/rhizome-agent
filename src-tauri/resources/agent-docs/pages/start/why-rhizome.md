@@ -3,7 +3,7 @@
 Source: start/why-rhizome.md
 URL: /start/why-rhizome
 
-Rhizome gives an AI agent a memory you can see. The things worth keeping become notes in a folder you own, and you can check what the agent did to your files after the fact.
+A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own. You can check what the agent did to your files after the fact.
 
 ## The problem it solves
 
@@ -25,7 +25,7 @@ If the vault is a Git repository, every change to it can be committed, including
 
 ## Free models, routed for you
 
-**Free tier (auto)** sends a chat to free hosted models (Groq, Mistral, LLM7, OpenRouter's free models, NVIDIA NIM) in a fixed order. When one fails or runs out of free use, Rhizome moves to the next. Models whose free tier trains on your prompts are left out. You can add your own endpoint as the last stop. It builds on two open-source projects, OmniRoute and freellmapi. [Free models and routing](../concepts/free-models-and-routing.md)
+**Taproot**, Rhizome's free automatic router, sends a chat to free hosted models (Groq, Mistral, LLM7, OpenRouter's free models, NVIDIA NIM) in a fixed order. When one fails or runs out of free use, Rhizome moves to the next. Models whose free tier trains on your prompts are left out. You can add your own endpoint as the last stop. It builds on two open-source projects, OmniRoute and freellmapi. [Free models and routing](../concepts/free-models-and-routing.md)
 
 ## Rhizome runs its own loop
 
