@@ -8,6 +8,7 @@ date: 2026-10-17
 
 **Origin:** MyNAEga · 2026-10-17 · knispo
 **Amends:** [ADR-0187](0187-native-is-the-only-chat-engine.md) decisions 3, 4 and 5, and the "optional engine" row of [ADR-0180](0180-rhizome-is-its-own-harness.md). The 0187 core tool policy and the 0180 borrowing rule are unchanged.
+**Does not supersede:** [ADR-0177](0177-rhizome-is-a-client-of-harnesses.md). 0177 was already superseded by ADR-0180 on 2026-10-09 and stays that way.
 
 ## Context
 
@@ -42,28 +43,53 @@ remove Prime entirely or just the picker:
 3. **No optional engine slot.** There is no setting that points chat at an
    outside harness. 0187 decision 4 and the 0180 "optional engine" row no
    longer hold.
-4. **Saved configs migrate once.** A user with Prime or Hermes saved is
-   moved to the native engine on first launch, with a test. Old keys are
-   still read so configs load; nothing writes them.
+4. **Saved choices move to native.** A saved Prime or Hermes engine
+   choice becomes native on load, with tests. Old keys are still read so
+   configs load. [#218](https://github.com/tuckcode/rhizome-agent/pull/218)
+   did the `chat_engine` part; the rest comes with the engine removal
+   (see Build order).
 5. **Open Prime chats.** 0187 decision 3 (Prime-locked chats keep their
-   lock) ends with the removal. Their history stays readable.
+   lock) ends with the removal. Their history stays readable. Since #218,
+   leftover Prime and Hermes chats show as Rhizome.
 6. **Borrowing stays.** Ideas and code from other harnesses still come in,
-   only through the 0180 borrowing rule: a library or a tracked copy,
+   only through the 0180 borrowing rule: as a library or as a tracked copy,
    under a licence compatible with AGPL-3.0, checked before it lands.
-   Credit and licence notices stay. A borrowed idea is not a tie.
+   Credit and licence notices stay. A borrowed idea or a borrowed piece of
+   code is not a tie: Rhizome never needs another harness installed or
+   running.
 7. **Not decided here.** The generic ACP client ([ADR-0178](0178-generic-acp-client.md))
    that lets a chat drive another agent CLI is a separate question. It stays
    as is until knispo makes that call.
 
 ## Build order
 
-1. Dank.bot's Chat switch makes native the default for new chats.
-2. G-baby's picker PR removes Prime and Hermes from Settings and adds the
-   one-time migration.
-3. Engine code removal in small PRs (Rust engine, frontend event handling,
-   resources, `install.sh`), each recounting `prime` and `hermes` mentions.
-4. What is left on purpose: ADR and docs history, changelog entries, credit
-   and licence lines.
+1. **Done: picker and settings removed.**
+   [#218](https://github.com/tuckcode/rhizome-agent/pull/218) (G-baby,
+   merged 2026-10-17) removed the Chat engine switch
+   (`ChatEngineSettings.tsx`) and the Prime engine settings from Settings
+   (the Advanced Prime card, Prime default model, model allow-list and
+   provider status sections). Old links to the Prime settings section now
+   open the AI section. Native is the only Chat engine.
+   - **One-time migration.** Any leftover `chat_engine` value (`prime`,
+     `hermes`, any case, or garbage) reads as `native`. `settings.rs`
+     writes that back to disk once per process, best-effort: a failed
+     write is logged and the settings still load. Settings saves now
+     write `native`.
+   - **Kept on purpose for now.** `default_ai_agent` set to Prime or
+     Hermes is not migrated yet, because distill, inbox and jobs still
+     read it. Saved `agent:prime` / `agent:hermes` chat targets stay, and
+     the workspace shows them as Rhizome. Codex, Claude Code and the other
+     CLI targets, and `model:` targets, are unchanged.
+   - Cmd+K offers **Use Rhizome instead** when the chosen agent is
+     missing.
+2. **Next: engine code removal in small PRs, owned by G-baby.** Move
+   distill, inbox and jobs off `default_ai_agent` / Prime onto native,
+   then migrate that key and the leftover targets. Then remove the Prime
+   Rust engine, frontend event handling and session code, the parked
+   Prime settings components, bundled resources, and `install.sh` steps,
+   and the Hermes option. Each PR recounts `prime` and `hermes` mentions.
+3. **What is left on purpose:** ADR and docs history, changelog entries,
+   credit and licence lines.
 
 ## Options considered
 
