@@ -1266,3 +1266,64 @@ describe('AiPanel last-conversation restore', () => {
     expect(block).not.toContain('vaultPath')
   })
 })
+
+describe('AiPanel predicted completion wiring', () => {
+  const note = "Let me know when you're ready and I'll draft the note."
+
+  function renderGhost({
+    agent = 'prime',
+    chatEngine = 'native',
+    permissionMode = 'safe',
+    withTarget = true,
+  }: {
+    agent?: 'prime' | 'codex' | 'hermes'
+    chatEngine?: 'native' | 'prime'
+    permissionMode?: 'safe' | 'power_user'
+    withTarget?: boolean
+  } = {}) {
+    return render(
+      <AiPanelView
+        controller={primeController({
+          permissionMode,
+          agent: {
+            ...primeController().agent,
+            messages: [{ userMessage: 'Go on', response: note, actions: [] }],
+          },
+        })}
+        onClose={vi.fn()}
+        showHeader={false}
+        chatEngine={chatEngine}
+        defaultAiAgent={agent}
+        defaultAiTarget={withTarget ? {
+          kind: 'agent',
+          agent,
+          id: `agent:${agent}`,
+          label: agent,
+          shortLabel: agent,
+        } : undefined}
+      />,
+    )
+  }
+
+  it('shows the ghost for native Safe and for a Prime target in Safe mode', () => {
+    const native = renderGhost({ chatEngine: 'native', agent: 'prime' })
+    expect(screen.getByTestId('composer-reply-completion')).toHaveTextContent('Yes — draft the note')
+    native.unmount()
+
+    renderGhost({ chatEngine: 'prime', agent: 'prime' })
+    expect(screen.getByTestId('composer-reply-completion')).toHaveTextContent('Yes — draft the note')
+  })
+
+  it('hides the ghost for Codex, Power User, and an undefined target', () => {
+    const codex = renderGhost({ agent: 'codex', chatEngine: 'native' })
+    expect(screen.queryByTestId('composer-reply-completion')).toBeNull()
+    codex.unmount()
+
+    const power = renderGhost({ agent: 'prime', chatEngine: 'native', permissionMode: 'power_user' })
+    expect(screen.queryByTestId('composer-reply-completion')).toBeNull()
+    power.unmount()
+
+    renderGhost({ agent: 'prime', chatEngine: 'native', withTarget: false })
+    expect(screen.queryByTestId('composer-reply-completion')).toBeNull()
+  })
+})

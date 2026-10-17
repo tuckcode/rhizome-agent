@@ -617,7 +617,8 @@ export function AiPanelView({
         onAttachImages={attachImages}
         onRemoveAttachment={removeAttachment}
         lastAgentMessage={getLastAgentMessage(agent.messages)}
-        targetKind={view.targetKind}
+        targetKind={defaultAiTarget?.kind}
+        agentId={defaultAiTarget?.kind === 'agent' ? defaultAiTarget.agent : view.defaultAiAgent}
         permissionMode={permissionMode}
         sessionPath={activeSessionPath}
         onOpenMycelium={onOpenMycelium}

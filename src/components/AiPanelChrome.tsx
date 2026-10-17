@@ -133,11 +133,13 @@ interface AiPanelComposerProps {
   /** The last agent message in the conversation, used to compute reply suggestions. */
   lastAgentMessage?: string | null
   /**
-   * Chat target kind. A CLI agent (`agent`) shows no predicted completion:
-   * accepting it with Tab would send an approval the CLI may not ask again.
+   * Chat target kind. Omitted when the panel has no resolved target, and
+   * then no predicted completion is shown.
    */
   targetKind?: AiTargetKind
-  /** Power User shows no predicted completion. */
+  /** Agent id when the target is a CLI or the native stream. */
+  agentId?: string | null
+  /** Only Safe mode may show a predicted completion. */
   permissionMode?: AiAgentPermissionMode
   /** Open this chat in Mycelium. Absent until the session has a path. */
   sessionPath?: string | null
@@ -1028,6 +1030,7 @@ export function AiPanelComposer({
   onCommandAction,
   lastAgentMessage,
   targetKind,
+  agentId,
   permissionMode,
   skillsLabel,
   skills,
@@ -1040,11 +1043,16 @@ export function AiPanelComposer({
   const [dismissedCompletionFor, setDismissedCompletionFor] = useState<string | null>(null)
   const replySuggestion = !isActive && lastAgentMessage ? suggestReply(lastAgentMessage) : null
   const offeredCompletion = replySuggestion?.kind === 'completion' ? replySuggestion.text : null
-  // Codex uses --ask-for-approval never in Power User (codex_cli.rs). A CLI
-  // agent, and Power User on any target, get no predicted completion.
+  // External CLIs and Power User get no predicted completion. Native stream
+  // and an API model may, and only in Safe mode. A missing target does not.
   const completionText =
     offeredCompletion
-    && allowPredictedCompletion({ text: offeredCompletion, targetKind, permissionMode })
+    && allowPredictedCompletion({
+      text: offeredCompletion,
+      targetKind,
+      agentId,
+      permissionMode,
+    })
     && input.trim().length === 0
     && dismissedCompletionFor !== lastAgentMessage
       ? offeredCompletion

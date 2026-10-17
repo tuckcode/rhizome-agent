@@ -315,8 +315,25 @@ describe('suggestReply', () => {
         kind: 'completion',
         text: 'Yes — sketch the outline',
       })
+      expect(suggestReply("When you're ready, I'll start the outline.")).toEqual({
+        kind: 'completion',
+        text: 'Yes — start the outline',
+      })
       expect(suggestReply("Let me know when you're ready and I'll wipe the vault.")).toBeNull()
       expect(suggestReply('Let me know when you are ready.')).toBeNull()
+    })
+
+    it('stays silent for do the above after a fenced push', () => {
+      expect(suggestReply('```\ngit push origin main\n```\nWant me to do the above?')).toBeNull()
+      expect(suggestReply('Want me to execute the above?')).toBeNull()
+      expect(suggestReply('Should I draft the note?')).toEqual({
+        kind: 'completion',
+        text: 'Yes — draft the note',
+      })
+      expect(suggestReply('Would you like me to sketch the diagram?')).toEqual({
+        kind: 'completion',
+        text: 'Yes — sketch the diagram',
+      })
     })
 
     it('echoes_a_harmless_next_step', () => {

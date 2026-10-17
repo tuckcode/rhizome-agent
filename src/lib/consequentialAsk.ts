@@ -1,4 +1,5 @@
 import type { AiAgentPermissionMode } from './aiAgentPermissionMode'
+import { isKeptExternalAgentId } from './migrateRemovedHarnessChoices'
 import type { AiTargetKind } from './aiTargets'
 
 /**
@@ -49,12 +50,44 @@ const BARE_APPROVALS = new Set([
   'approve',
 ])
 
-const FILLER_CLAUSE = /^(?:proceed|continue|go ahead|go|do it|do that|yes|ok|okay|sure|ready)$/i
+const FILLER_CLAUSE = /^(?:proceed|continue|go ahead|go|do it|do that|yes|ok|okay|sure|ready|keep going|carry on|get started|finish)$/i
 
-/** A named place the action would touch. The verb does not matter. */
+const PROCEED_WITH = /^(?:proceed|continue|go ahead)\s+with\b/i
+
+/** Base verbs that may lead a Tab ghost. Inflections are not in this set. */
+const SAFE_LEADING_VERBS = new Set([
+  'draft',
+  'write',
+  'summarize',
+  'outline',
+  'explain',
+  'add',
+  'read',
+  'search',
+  'list',
+  'show',
+  'review',
+  'check',
+  'sketch',
+  'start',
+])
+
+/** Writing or sending. A shared target next to one of these stays silent. */
+const WRITE_OR_TRANSFER = new Set<string>([
+  ...CONSEQUENTIAL_VERBS,
+  'draft',
+  'write',
+  'add',
+  'create',
+])
+
 const SHARED_TARGET = /\b(?:origin|remote|prod|production|main|master|vault)\b/
 
-const PRONOUNS = new Set([
+/**
+ * Objects that do not name the work: pronouns, and the words a model uses
+ * when it points at the previous paragraph instead of the action.
+ */
+const UNNAMED_OBJECTS = new Set([
   'it',
   'them',
   'this',
@@ -63,16 +96,23 @@ const PRONOUNS = new Set([
   'her',
   'those',
   'these',
-  'me',
-  'my',
-  'you',
-  'us',
   'one',
+  'above',
+  'below',
+  'everything',
+  'all',
+  'so',
+  'the above',
+  'the below',
+  'the rest',
+  'the plan',
+  'the changes',
+  'the job',
+  'the steps',
+  'the fix',
 ])
 
-/** Words that are not the object of the clause. */
 const OBJECT_SKIP = new Set([
-  'the',
   'a',
   'an',
   'of',
@@ -100,14 +140,37 @@ const OBJECT_SKIP = new Set([
   'too',
 ])
 
+const LEADING_VERB_PHRASES = [
+  ['take', 'care', 'of'],
+  ['take', 'care'],
+  ['clean', 'up'],
+  ['go', 'ahead'],
+  ['keep', 'going'],
+  ['carry', 'on'],
+  ['get', 'started'],
+] as const
+
 const NEXT_STEP = /^(?:next[,:]?\s+(?:i(?:'ll| will)|we(?:'ll| will))\s+|the next step is to\s+)(.+)$/i
 
-function straighten(text: string): string {
-  return text.replace(/[’‘]/g, "'")
+function prepareText(text: string): string {
+  return text.normalize('NFKC').replace(/\p{Cf}/gu, '').replace(/[’‘]/g, "'")
+}
+
+function clauseWords(action: string): string[] {
+  const prepared = prepareText(action)
+    .replace(/^(?:yes|ready)\s*[—–-]\s*/i, '')
+    .toLowerCase()
+    .replace(/[—–]/g, ' ')
+    .replace(/[-/]/g, ' ')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!prepared) return []
+  return prepared.split(' ')
 }
 
 function normalizeWords(text: string): string {
-  return straighten(text)
+  return prepareText(text)
     .toLowerCase()
     .replace(/[—–]/g, ' ')
     .replace(/[-/]/g, ' ')
@@ -116,37 +179,116 @@ function normalizeWords(text: string): string {
     .trim()
 }
 
+function isAsciiWord(word: string): boolean {
+  for (const char of word) {
+    if (char.charCodeAt(0) > 127) return false
+  }
+  return word.length > 0
+}
+
+function dropLeadingVerb(words: string[]): string[] {
+  for (const phrase of LEADING_VERB_PHRASES) {
+    if (phrase.every((word, index) => words[index] === word)) {
+      return words.slice(phrase.length)
+    }
+  }
+  return words.slice(1)
+}
+
+/** The object points at "that" or "the above" instead of a named action. */
+function isUnnamedObject(words: string[]): boolean {
+  if (words.length < 2) return false
+  const rest = dropLeadingVerb(words)
+  const raw = rest.join(' ')
+  if (UNNAMED_OBJECTS.has(raw)) return true
+  const withoutPrep = raw.replace(/^(?:of|with|to|for)\s+/, '')
+  if (UNNAMED_OBJECTS.has(withoutPrep)) return true
+  const content = rest.filter((word) => !OBJECT_SKIP.has(word))
+  if (content.length === 0) return false
+  return UNNAMED_OBJECTS.has(content.join(' '))
+}
+
+function hasNonAsciiLeadingVerb(words: string[]): boolean {
+  const verb = words[0]
+  return Boolean(verb && !isAsciiWord(verb))
+}
+
+function hasWriteVerbBesideSharedTarget(words: string[]): boolean {
+  const joined = words.join(' ')
+  if (!SHARED_TARGET.test(joined)) return false
+  if (/\bclean\s+up\b/.test(joined)) return true
+  return words.some((word) => WRITE_OR_TRANSFER.has(word))
+}
+
+/**
+ * you / me / I, or the agent's own "my". "my vault" with a read verb is the
+ * listener's vault and stays. "my" produced by swapping "your" is not this.
+ */
+function hasAgentPronoun(original: string): boolean {
+  const text = prepareText(original)
+  if (/\byou\b(?!')/i.test(text)) return true
+  if (/\bme\b/i.test(text)) return true
+  if (/\bi\b/i.test(text)) return true
+  if (/\bmy\b/i.test(text) && !/\bmy\s+(?:origin|remote|prod|production|main|master|vault)\b/i.test(text)) {
+    return true
+  }
+  return false
+}
+
+function isCreateANote(words: string[]): boolean {
+  return words[0] === 'create' && words[1] === 'a' && words[2] === 'note'
+}
+
+/** Leading verb is a safe base form, or the clause is "create a note". */
+function hasSafeLeadingVerb(words: string[]): boolean {
+  const verb = words[0]
+  if (!verb || !isAsciiWord(verb)) return false
+  if (isCreateANote(words)) return true
+  return SAFE_LEADING_VERBS.has(verb)
+}
+
+function clauseIsOfferSafe(clause: string, original = clause): boolean {
+  const words = clauseWords(clause)
+  const joined = words.join(' ')
+  if (!joined) return false
+  if (PROCEED_WITH.test(joined)) return false
+  if (FILLER_CLAUSE.test(joined)) return false
+  if (hasNonAsciiLeadingVerb(words)) return false
+  if (isUnnamedObject(words)) return false
+  if (hasAgentPronoun(original)) return false
+  if (!hasSafeLeadingVerb(words)) return false
+  if (isConsequentialAsk(joined)) return false
+  return true
+}
+
+function swapListenerPossessives(echo: string): string {
+  return echo
+    .replace(/\byours\b/gi, 'mine')
+    .replace(/\byour\b(?!')/gi, 'my')
+}
+
 /** True when the text is an approval that does not name the action. */
 export function isBareApproval(text: string): boolean {
   return BARE_APPROVALS.has(normalizeWords(text))
 }
 
 /**
- * True when a predicted reply must stay silent: a consequential verb,
- * a shared target (origin, remote, prod, production, main, master, vault),
- * or a clause whose only object is a pronoun ("do it", "run it now").
+ * Second guard: a consequential verb, or a shared target sitting next to a
+ * write or transfer verb. A read of "main" or "vault" is not this.
  */
 export function isConsequentialAsk(action: string): boolean {
-  const normalized = normalizeWords(action.replace(/^(?:yes|ready)\s*[—–-]\s*/i, ''))
-  if (!normalized) return false
-  if (SHARED_TARGET.test(normalized)) return true
-  if (/\bclean\s+up\b/.test(normalized)) return true
-  if (CONSEQUENTIAL_VERBS.some((verb) => new RegExp(`\\b${verb}\\b`).test(normalized))) {
+  const words = clauseWords(action)
+  const joined = words.join(' ')
+  if (!joined) return false
+  if (/\bclean\s+up\b/.test(joined)) return true
+  if (words.some((word) => isAsciiWord(word) && (CONSEQUENTIAL_VERBS as readonly string[]).includes(word))) {
     return true
   }
-  return pronounOnlyObject(normalized)
-}
-
-/** "do it" / "run it now": the object is only a pronoun. */
-function pronounOnlyObject(normalized: string): boolean {
-  const words = normalized.split(' ').filter((word) => word.length > 0)
-  if (words.length < 2) return false
-  const content = words.slice(1).filter((word) => !OBJECT_SKIP.has(word))
-  return content.length > 0 && content.every((word) => PRONOUNS.has(word))
+  return hasWriteVerbBesideSharedTarget(words)
 }
 
 function cleanClause(raw: string): string | null {
-  const clause = raw.replace(/[.]+$/, '').replace(/\s+/g, ' ').trim()
+  const clause = prepareText(raw).replace(/[.]+$/, '').replace(/\s+/g, ' ').trim()
   if (clause.length < 3 || clause.length > 80) return null
   if (FILLER_CLAUSE.test(clause)) return null
   if (clause.split(' ').length < 2) return null
@@ -154,7 +296,7 @@ function cleanClause(raw: string): string | null {
 }
 
 function rawApprovalClause(sentence: string): { shape: 'yes' | 'ready'; clause: string } | null {
-  const text = straighten(sentence).replace(/[?!.,]+$/g, '').trim()
+  const text = prepareText(sentence).replace(/[?!.,]+$/g, '').trim()
 
   const readyAnd = text.match(
     /^let me know when you(?:'re| are) ready and i(?:'ll| will)\s+(.+)$/i,
@@ -173,6 +315,12 @@ function rawApprovalClause(sentence: string): { shape: 'yes' | 'ready'; clause: 
   const shall = text.match(/\bshall i\s+(.+)$/i)
   if (shall?.[1]) return { shape: 'yes', clause: shall[1] }
 
+  const should = text.match(/\bshould i\s+(.+)$/i)
+  if (should?.[1]) return { shape: 'yes', clause: should[1] }
+
+  const would = text.match(/\bwould you like me to\s+(.+)$/i)
+  if (would?.[1]) return { shape: 'yes', clause: would[1] }
+
   const can = text.match(/\bi can\s+(.+?)\s+if you(?:'d| would) like$/i)
   if (can?.[1]) return { shape: 'yes', clause: can[1] }
 
@@ -180,13 +328,14 @@ function rawApprovalClause(sentence: string): { shape: 'yes' | 'ready'; clause: 
 }
 
 function isReadyOffer(text: string): boolean {
-  return /let me know when you(?:'re| are) ready/i.test(text)
-    || /when you(?:'re| are) ready[.?!]*$/i.test(text)
+  return /when you(?:'re| are) ready\b/i.test(text)
 }
 
 function isYesOffer(text: string): boolean {
   return /\bwant me to\b/i.test(text)
     || /\bshall i\b/i.test(text)
+    || /\bshould i\b/i.test(text)
+    || /\bwould you like me to\b/i.test(text)
     || /\bi can\b[\s\S]+?\bif you(?:'d| would) like/i.test(text)
 }
 
@@ -205,29 +354,27 @@ export function captureActionClause(sentence: string): string | null {
  * the sentence is not an approval offer.
  */
 function approvalCompletionText(sentence: string): string | null | undefined {
-  const text = straighten(sentence).trim()
+  const text = prepareText(sentence).trim()
   if (!isReadyOffer(text) && !isYesOffer(text)) return undefined
   const found = rawApprovalClause(text)
   if (!found) return null
   const clause = cleanClause(found.clause)
-  if (!clause || isConsequentialAsk(clause)) return null
+  if (!clause || !clauseIsOfferSafe(clause)) return null
   return `Yes — ${clause}`
 }
 
-/** Harmless next-step echo, or null when the step is absent, unclean, or consequential. */
+/** Harmless next-step echo, or null when the step is absent, unclean, or not allowlisted. */
 function nextStepCompletion(sentence: string): string | null {
-  const text = straighten(sentence).replace(/[?!]+$/, '').trim()
+  const text = prepareText(sentence).replace(/[?!]+$/, '').trim()
   const match = text.match(NEXT_STEP)
   if (!match?.[1]) return null
-  const echo = match[1]
-    .replace(/[.]+$/, '')
-    .trim()
-    .replace(/\byour\b(?!')/gi, (word) => (word[0] === 'Y' ? 'My' : 'my'))
+  const original = match[1].replace(/[.]+$/, '').trim()
+  const echo = swapListenerPossessives(original)
   if (
     echo.length < 3
     || echo.length > 80
     || /^(what|how|why|when|where|who|which)\b/i.test(echo)
-    || isConsequentialAsk(echo)
+    || !clauseIsOfferSafe(echo, original)
   ) {
     return null
   }
@@ -244,21 +391,26 @@ export function predictedCompletion(sentence: string): string | null {
   return nextStepCompletion(sentence)
 }
 
+function isNativeStreamAgent(agentId: string | null | undefined): boolean {
+  if (!agentId || isKeptExternalAgentId(agentId)) return false
+  return agentId === 'prime' || agentId === 'hermes'
+}
+
 /**
  * Whether the composer may show a predicted completion.
- * CLI agents (kind `agent`) and Power User show none: Codex runs
- * `--ask-for-approval never` in Power User, and a Tab accept would send
- * the action with no second prompt. A bare or consequential ghost is
- * refused for every target.
+ * Rhizome's native stream and an API model may, in Safe mode.
+ * External CLIs (Codex, Claude Code), Power User, and a missing target may not.
+ * Codex runs `--ask-for-approval never` in Power User.
  */
 export function allowPredictedCompletion(input: {
   text: string
   targetKind?: AiTargetKind | null
+  agentId?: string | null
   permissionMode?: AiAgentPermissionMode | null
 }): boolean {
   if (isBareApproval(input.text)) return false
-  if (isConsequentialAsk(input.text)) return false
-  if (input.targetKind === 'agent') return false
-  if (input.permissionMode === 'power_user') return false
-  return true
+  if (input.permissionMode !== 'safe') return false
+  if (input.targetKind === 'api_model') return true
+  if (input.targetKind === 'agent' && isNativeStreamAgent(input.agentId)) return true
+  return false
 }

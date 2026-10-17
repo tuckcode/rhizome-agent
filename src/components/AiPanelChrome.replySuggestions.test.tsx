@@ -274,6 +274,7 @@ describe('AiPanelComposer reply suggestions', () => {
     const { unmount } = renderComposer({
       lastAgentMessage: 'Want me to sketch the diagram?',
       targetKind: 'agent',
+      agentId: 'codex',
       permissionMode: 'safe',
     })
     expect(screen.queryByTestId('composer-reply-completion')).toBeNull()
@@ -294,6 +295,34 @@ describe('AiPanelComposer reply suggestions', () => {
     renderComposer({
       lastAgentMessage: 'Next I will sketch the diagram.',
       targetKind: 'agent',
+      agentId: 'claude_code',
+      permissionMode: 'safe',
+    })
+    expect(screen.queryByTestId('composer-reply-completion')).toBeNull()
+  })
+
+  it('shows a named ghost for the native stream in Safe mode', () => {
+    vi.mocked(replySuggestionsLib.suggestReply).mockReturnValue({
+      kind: 'completion',
+      text: 'Yes — draft the note',
+    })
+    renderComposer({
+      lastAgentMessage: "Let me know when you're ready and I'll draft the note.",
+      targetKind: 'agent',
+      agentId: 'prime',
+      permissionMode: 'safe',
+    })
+    expect(screen.getByTestId('composer-reply-completion')).toHaveTextContent('Yes — draft the note')
+  })
+
+  it('hides a ghost when the target is omitted', () => {
+    vi.mocked(replySuggestionsLib.suggestReply).mockReturnValue({
+      kind: 'completion',
+      text: 'Yes — draft the note',
+    })
+    renderComposer({
+      lastAgentMessage: "Let me know when you're ready and I'll draft the note.",
+      agentId: 'prime',
       permissionMode: 'safe',
     })
     expect(screen.queryByTestId('composer-reply-completion')).toBeNull()
