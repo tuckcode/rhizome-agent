@@ -404,11 +404,17 @@ fn first_secret_value_restart(
         if sep == b'=' && bytes.get(index + 1) == Some(&b'=') {
             continue;
         }
-        let Some((name, quoted, name_start)) = name_touching_separator(window, index) else {
+        let Some((name, mut quoted, name_start)) = name_touching_separator(window, index) else {
             continue;
         };
         if !assignment_name_is_secret(name, quoted, scrubbers) {
-            continue;
+            // `"MY_KEY=` inside another value is a quoted name here, and a
+            // quoted `*_KEY` is not a secret. The quote is only the left
+            // boundary, so try the name again as unquoted.
+            if !(quoted && assignment_name_is_secret(name, false, scrubbers)) {
+                continue;
+            }
+            quoted = false;
         }
         if secret_value_needs_rescan(window, index + 1, name, scrubbers) {
             let name_abs = value_start + name_start;
@@ -456,27 +462,19 @@ fn secret_value_needs_rescan(
         let inner = span.get(first.len_utf8()..).unwrap_or("");
         return !value_rejected_by_first_char(inner);
     }
-    // A spaceless tail has no natural end. A short prefix is enough to tell
-    // a real secret from a value the cap merely cut off.
-    const RESCAN_PREFIX: usize = 64;
     let mut end = rest.len();
-    let mut stopped = false;
     for (offset, ch) in rest.char_indices() {
         if ch.is_whitespace() || ch == '#' {
-            end = offset;
-            stopped = true;
-            break;
-        }
-        if offset >= RESCAN_PREFIX {
             end = offset;
             break;
         }
     }
     let visible = &rest[..end];
+    let hits_window_end = end == rest.len();
     if assignment_value_is_secret(visible, name, scrubbers) {
         return true;
     }
-    !stopped && end == rest.len() && !value_rejected_by_first_char(visible)
+    hits_window_end && !value_rejected_by_first_char(visible)
 }
 
 fn value_rejected_by_first_char(value: &str) -> bool {
@@ -726,13 +724,21 @@ fn assignment_value_is_secret(raw: &str, name: &str, scrubbers: &ScrubRegexes) -
     // the regex match because of an escaped quote.
     let opening = raw.chars().next().filter(|ch| *ch == '"' || *ch == '\'');
     let quoted = opening.is_some();
-    let inner = if let Some(quote) = opening {
+    let (inner, closed) = if let Some(quote) = opening {
         let body = &raw[quote.len_utf8()..];
         let close: &str = if quote == '"' { "\"" } else { "'" };
-        body.strip_suffix(close).unwrap_or(body)
+        match body.strip_suffix(close) {
+            Some(inner) => (inner, true),
+            None => (body, false),
+        }
     } else {
-        raw
+        (raw, false)
     };
+    // `set PASSWORD=" and then press enter` is prose. An unclosed quote
+    // whose first character is a space has no secret token.
+    if quoted && !closed && inner.chars().next().is_some_and(char::is_whitespace) {
+        return false;
+    }
     let value = inner.trim_end_matches(['}', ']', ')', ',', ';']);
     if is_strict_jwt(value) {
         return true;
@@ -2337,6 +2343,46 @@ mod tests {
     }
 
     #[test]
+    fn scrub_secrets_redacts_a_dotted_secret_past_a_code_looking_prefix() {
+        let dotted = "abcdef.".repeat(16);
+        let marker = "x9y8z7w6";
+        let tail = "Q".repeat(520);
+        let input = format!("x=\",{{=é中api_key=Zqabc.def.ghi.{dotted}{marker}{tail}}}");
+        let scrubbed = scrub_secrets(&input);
+        assert!(
+            !scrubbed.contains(marker),
+            "a dotted secret past a code-looking prefix must be redacted"
+        );
+        assert!(
+            !scrubbed.contains(tail.as_str()),
+            "the tail past the code-looking prefix must be redacted"
+        );
+        assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_an_unquoted_key_inside_a_quoted_window() {
+        let marker = "Zq9AB12Xv7";
+        let tail = "Q".repeat(500);
+        let input = format!("a=\"MY_KEY={marker}{tail}");
+        let scrubbed = scrub_secrets(&input);
+        assert!(
+            !scrubbed.contains(marker),
+            "an unquoted key inside a quoted window must be redacted"
+        );
+        assert!(
+            !scrubbed.contains(tail.as_str()),
+            "the key value must be redacted"
+        );
+        assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_prose_after_an_empty_unclosed_quote() {
+        assert_unchanged("set PASSWORD=\" and then press enter");
+    }
+
+    #[test]
     fn scrub_secrets_redacts_a_quoted_name_when_the_cap_lands_on_its_closing_quote() {
         let secret = "hunter2hunter2";
         for name in ["password", "token", "client_secret"] {
@@ -2494,9 +2540,9 @@ mod tests {
 
     fn scrub_absolute_limit() -> std::time::Duration {
         if cfg!(debug_assertions) {
-            std::time::Duration::from_secs(20)
+            std::time::Duration::from_secs(5)
         } else {
-            std::time::Duration::from_secs(2)
+            std::time::Duration::from_millis(500)
         }
     }
 
