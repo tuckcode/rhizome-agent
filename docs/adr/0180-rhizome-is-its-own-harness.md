@@ -8,6 +8,7 @@ supersedes: "0177"
 ---
 
 **Origin:** Cursor Grok 4.6 · 2026-10-09 · Atticus / knispo room consensus (reverses #40 option 1)
+**Amended 2026-10-17:** The optional engine row no longer holds; Prime and Hermes come out per [ADR-0189](0189-no-ties-to-outside-harnesses.md). The borrowing rule stands.
 **Amended 2026-10-10:** Provider curation for the native loop is [ADR-0182](0182-free-tier-provider-routing.md).
 
 ## Context
