@@ -1223,7 +1223,14 @@ mod tests {
             assert_eq!(body["model"], model_id, "{model_id}");
         }
 
-        for model_id in ["gpt-4.1", "gpt-5-nano", "gpt-5.3", "gpt-5.40", "gpt-5.55"] {
+        for model_id in [
+            "gpt-4.1",
+            "gpt-5-nano",
+            "gpt-5.3",
+            "gpt-5.40",
+            "gpt-5.55",
+            "gpt-6-lunatic",
+        ] {
             let (events, requests) =
                 stream_tool_body(model_id, AiModelProviderKind::OpenAi, echo_tool());
             assert!(
@@ -1283,14 +1290,20 @@ mod tests {
             );
         }
 
-        for (model_id, name) in [("gpt-6-luna-pro", "GPT-6 Luna"), ("GPT-5.4-pro", "GPT-5.4")] {
+        for (model_id, name) in [
+            ("gpt-6-luna-pro", "GPT-6 Luna"),
+            ("GPT-5.4-pro", "GPT-5.4"),
+            ("gpt-6-luna-mini-pro", "GPT-6 Luna"),
+        ] {
             let (events, requests) =
                 stream_tool_body(model_id, AiModelProviderKind::OpenAiCompatible, echo_tool());
             assert!(requests.is_empty(), "{model_id}");
             let error = only_error(&events);
             assert_eq!(
                 error.message,
-                format!("{name} Pro is not available over Chat Completions."),
+                format!(
+                    "{name} Pro doesn't work in Rhizome chat yet. Pick GPT-6 Sol or Luna instead."
+                ),
                 "{model_id}"
             );
         }
@@ -1367,7 +1380,7 @@ mod tests {
 
         assert_eq!(
             error,
-            "GPT-6 Sol Pro is not available over Chat Completions."
+            "GPT-6 Sol Pro doesn't work in Rhizome chat yet. Pick GPT-6 Sol or Luna instead."
         );
         assert!(server.requests.lock().unwrap().is_empty());
     }
