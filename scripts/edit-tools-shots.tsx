@@ -10,7 +10,7 @@ import overwritePreview from './edit-tools-previews/overwrite.diff?raw'
 import longPreview from './edit-tools-previews/long.diff?raw'
 
 type ShotTheme = 'graphite' | 'earth'
-type ShotState = 'edit' | 'new' | 'overwrite' | 'long'
+type ShotState = 'edit' | 'new' | 'overwrite' | 'long' | 'long-scrolled'
 
 const OPTIONS = [
   { id: 'allow_once', label: 'Allow once' },
@@ -20,7 +20,7 @@ const OPTIONS = [
 
 const params = new URLSearchParams(window.location.search)
 const theme = (params.get('theme') === 'earth' ? 'earth' : 'graphite') as ShotTheme
-const state = (['edit', 'new', 'overwrite', 'long'].includes(params.get('state') ?? '')
+const state = (['edit', 'new', 'overwrite', 'long', 'long-scrolled'].includes(params.get('state') ?? '')
   ? params.get('state')
   : 'edit') as ShotState
 
@@ -61,6 +61,12 @@ const PREVIEW: Record<
     path: 'notes/weekly-review.md',
     preview: longPreview,
     label: 'long diff',
+  },
+  'long-scrolled': {
+    tool: 'edit_file',
+    path: 'notes/weekly-review.md',
+    preview: longPreview,
+    label: 'long diff, scrolled',
   },
 }
 

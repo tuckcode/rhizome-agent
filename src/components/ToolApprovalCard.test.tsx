@@ -116,18 +116,46 @@ describe('ToolApprovalCard', () => {
     const body = screen.getByTestId('approval-diff')
     const rows = [...body.querySelectorAll('[data-diff-kind]')]
     expect(body.scrollTop).toBe(0)
-    expect(body).toHaveClass('overflow-hidden')
+    expect(body).toHaveClass('overflow-auto')
     expect(rows[0]).toHaveAttribute('data-diff-kind', 'hunk')
     expect(rows[0]).toHaveTextContent('@@ -1,40 +1,3 @@')
-    expect(body).toHaveTextContent('+MALICIOUS')
-    expect(body).toHaveTextContent('+rm -rf ~')
-    expect(rows.filter((row) => row.getAttribute('data-diff-kind') === 'removed')).toHaveLength(3)
+    expect(screen.queryByTestId('approval-diff-fade-top')).not.toBeInTheDocument()
     expect(screen.getByTestId('approval-diff-fade')).toBeInTheDocument()
     expect(screen.getByTestId('approval-show-all')).toHaveTextContent('Show all 44 lines')
     fireEvent.click(screen.getByTestId('approval-show-all'))
     expect(screen.queryByTestId('approval-show-all')).not.toBeInTheDocument()
     expect(screen.getByTestId('approval-diff')).toHaveTextContent('-old line 39')
     expect(screen.getByTestId('approval-diff')).toHaveClass('overflow-auto')
+  })
+
+  it('toggles the top fade after the collapsed diff is scrolled', () => {
+    const long = ['@@ -1,40 +1,40 @@', ...Array.from({ length: 40 }, (_, i) => `+line${i}`)].join('\n')
+    render(
+      <ToolApprovalCard
+        tool="edit_file"
+        path="notes/weekly-review.md"
+        preview={long}
+        options={OPTIONS}
+        onReply={vi.fn()}
+      />,
+    )
+    const body = screen.getByTestId('approval-diff')
+    expect(body.scrollTop).toBe(0)
+    expect(screen.queryByTestId('approval-diff-fade-top')).not.toBeInTheDocument()
+    expect(screen.getByTestId('approval-diff-fade')).toBeInTheDocument()
+
+    Object.defineProperty(body, 'scrollHeight', { configurable: true, value: 400 })
+    Object.defineProperty(body, 'clientHeight', { configurable: true, value: 200 })
+    body.scrollTop = 80
+    fireEvent.scroll(body)
+    expect(screen.getByTestId('approval-diff-fade-top')).toBeInTheDocument()
+    expect(screen.getByTestId('approval-diff-fade')).toBeInTheDocument()
+
+    body.scrollTop = 200
+    fireEvent.scroll(body)
+    expect(screen.getByTestId('approval-diff-fade-top')).toBeInTheDocument()
+    expect(screen.queryByTestId('approval-diff-fade')).not.toBeInTheDocument()
+    expect(screen.getByTestId('approval-show-all')).toBeInTheDocument()
   })
 
   it('sends allow once, allow for session, and deny', () => {

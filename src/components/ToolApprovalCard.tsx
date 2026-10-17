@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState, type UIEvent } from 'react'
 import { FilePlus, NotePencil, PencilSimple } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { DiffView } from './DiffView'
@@ -33,6 +33,14 @@ function optionVariant(id: string): 'default' | 'outline' | 'ghost' {
   return 'outline'
 }
 
+const NEAR_EDGE_PX = 1
+
+function hasMoreBelow(el: HTMLElement): boolean {
+  const canScroll = el.scrollHeight > el.clientHeight + NEAR_EDGE_PX
+  if (!canScroll) return true
+  return el.scrollHeight - el.scrollTop - el.clientHeight > NEAR_EDGE_PX
+}
+
 export function ToolApprovalCard({
   busy = false,
   created: createdProp,
@@ -47,8 +55,25 @@ export function ToolApprovalCard({
   const overwrite = overwriteProp ?? (tool === 'write_file' && !created)
   const title = approvalTitle(tool, created)
   const [expanded, setExpanded] = useState(false)
+  const [scrollTop, setScrollTop] = useState(0)
+  const [moreBelow, setMoreBelow] = useState(true)
+  const scrollerRef = useRef<HTMLDivElement>(null)
   const lineCount = compactDiffLines(preview ?? '').length
   const overflows = !expanded && lineCount > APPROVAL_COLLAPSE_AFTER
+
+  function syncScroll(el: HTMLElement) {
+    setScrollTop(el.scrollTop)
+    setMoreBelow(hasMoreBelow(el))
+  }
+
+  useLayoutEffect(() => {
+    const el = scrollerRef.current
+    if (el) syncScroll(el)
+  }, [preview, expanded, overflows])
+
+  function onDiffScroll(event: UIEvent<HTMLDivElement>) {
+    syncScroll(event.currentTarget)
+  }
 
   function expandDiff() {
     setExpanded(true)
@@ -57,6 +82,9 @@ export function ToolApprovalCard({
   function choose(optionId: string) {
     onReply(optionId as NativeApprovalChoice)
   }
+
+  const showTopFade = overflows && scrollTop > 0
+  const showBottomFade = overflows && moreBelow
 
   return (
     <section
@@ -104,16 +132,26 @@ export function ToolApprovalCard({
       </header>
       <div className="relative border-y border-border bg-muted/40">
         <div
-          className={expanded ? 'overflow-auto' : 'max-h-64 overflow-hidden'}
+          ref={scrollerRef}
+          className={expanded ? 'overflow-auto' : 'max-h-64 overflow-auto'}
           data-testid="approval-diff"
+          onScroll={onDiffScroll}
         >
           <div className={overflows ? 'pb-14' : undefined}>
-            <DiffView collapsed={overflows} compact diff={preview ?? ''} />
+            <DiffView compact diff={preview ?? ''} />
           </div>
         </div>
-        {overflows && (
+        {showTopFade ? (
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 h-10 bg-gradient-to-b from-card to-transparent"
+            data-testid="approval-diff-fade-top"
+          />
+        ) : null}
+        {overflows ? (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col justify-end">
-            <div className="h-10 bg-gradient-to-t from-card to-transparent" data-testid="approval-diff-fade" />
+            {showBottomFade ? (
+              <div className="h-10 bg-gradient-to-t from-card to-transparent" data-testid="approval-diff-fade" />
+            ) : null}
             <div className="pointer-events-auto bg-card px-3 pb-2">
               <Button
                 size="sm"
@@ -126,7 +164,7 @@ export function ToolApprovalCard({
               </Button>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
       <footer className="flex flex-wrap items-center justify-end gap-1.5 px-3 py-2">
         {options.map((option) => (
