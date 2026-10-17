@@ -34,9 +34,9 @@ pub fn models_json_path() -> Option<PathBuf> {
 ///
 /// `reasoning` is tri-state. `supported_parameters` decides yes or no. The
 /// `reasoning` object only adds efforts and `mandatory`. A missing
-/// `supported_parameters` list is unknown (`None`), not false. Prime stores
-/// `true` or `false` and omits the field when the value is unknown. `input`
-/// is only `text` and `image`.
+/// `supported_parameters` list is unknown (`None`), not a verified negative.
+/// Prime's schema wants a boolean, so the file stores `false` for unknown.
+/// `input` is only `text` and `image`.
 /// Nous also sends video, file, and audio. Those tokens are dropped. Prime's
 /// schema rejects them, and a rejected file hides the whole provider.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -173,10 +173,10 @@ fn models_file_with_nous(mut root: Value, models: &[NousCatalogModel]) -> Value 
             let mut entry = json!({
                 "id": model.id,
                 "input": model.input,
+                // Unknown is stored as false so a catalog without
+                // supported_parameters does not omit a field Prime requires.
+                "reasoning": model.reasoning.unwrap_or(false),
             });
-            if let Some(reasoning) = model.reasoning {
-                entry["reasoning"] = json!(reasoning);
-            }
             if let Some(map) = &model.thinking_level_map {
                 entry["thinkingLevelMap"] = map.clone();
             }
@@ -410,6 +410,16 @@ mod tests {
                 .get("thinkingLevelMap")
                 .is_none());
         }
+    }
+
+    #[test]
+    fn unknown_reasoning_is_stored_as_false() {
+        let merged =
+            merge_nous_portal(&json!({}), &[row("acme/unknown", None, &["text"])]).unwrap();
+        assert_eq!(
+            merged["providers"]["nous-portal"]["models"][0]["reasoning"],
+            false
+        );
     }
 
     #[test]

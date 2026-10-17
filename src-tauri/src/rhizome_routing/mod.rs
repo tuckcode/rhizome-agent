@@ -552,7 +552,8 @@ mod tests {
             TEST_LIMITS,
         );
         assert_eq!(run(&mut router), done("ok"));
-        let body: Value = serde_json::from_str(&server.requests.lock().unwrap()[0].1).unwrap();
+        let body = server.requests.lock().unwrap()[0].1.clone();
+        let body: Value = serde_json::from_str(&body).unwrap();
         for key in [
             "reasoning_effort",
             "reasoning",
