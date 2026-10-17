@@ -2,6 +2,8 @@ use std::io::Read;
 use std::path::Path;
 use std::time::Duration;
 
+use serde::{Deserialize, Serialize};
+
 use crate::hidden_command;
 use crate::rhizome_write_location::ArtifactKind;
 
@@ -282,13 +284,27 @@ fn search_rhizome_wiki_local(
     crate::rhizome_api::search_with_service(service.inner(), Path::new(vault_path), query, limit)
 }
 
+/// One row of `rhizome_scan_library`. Field names match the Research panel's
+/// `JSON.parse` (`id`, `path`, `title`, `description`, `type`, `tag`, `date`).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+struct LibraryScanItem {
+    id: String,
+    path: String,
+    title: String,
+    description: String,
+    #[serde(rename = "type")]
+    item_type: String,
+    tag: String,
+    date: u64,
+}
+
 /// Scan the vault's artifact tree (see `docs/VAULT_CONTRACT.md`) and return
 /// JSON with found items, one artifact kind at a time. Scans the nested
 /// `wiki/` layout, or the flat pre-`wiki/` layout for vaults that already
 /// use it (see `rhizome_write_location::vault_uses_flat_layout`).
 fn scan_vault_library(vault_path: &str) -> Result<String, String> {
     let vault = Path::new(vault_path);
-    let mut items: Vec<String> = Vec::new();
+    let mut items = Vec::new();
 
     for kind in ArtifactKind::ALL {
         let rel_dir = crate::rhizome_write_location::artifact_dir(vault, kind);
@@ -296,7 +312,11 @@ fn scan_vault_library(vault_path: &str) -> Result<String, String> {
         scan_dir_items(&dir, kind.item_type(), kind.tag(), rel_dir, &mut items);
     }
 
-    Ok(format!("[{}]", items.join(",")))
+    encode_library_items(&items)
+}
+
+fn encode_library_items(items: &[LibraryScanItem]) -> Result<String, String> {
+    serde_json::to_string(items).map_err(|e| format!("Failed to encode library scan: {}", e))
 }
 
 fn scan_dir_items(
@@ -304,7 +324,7 @@ fn scan_dir_items(
     item_type: &str,
     tag: &str,
     relative_prefix: &str,
-    items: &mut Vec<String>,
+    items: &mut Vec<LibraryScanItem>,
 ) {
     use std::fs;
 
@@ -344,10 +364,15 @@ fn scan_dir_items(
                 String::new()
             };
             let relative_path = format!("{}/{}", relative_prefix, name);
-            items.push(format!(
-                r#"{{"id":"{}","path":"{}","title":"{}","description":"{}","type":"{}","tag":"{}","date":{}}}"#,
-                name, relative_path, title, desc_str.replace('"', "'"), item_type, tag, modified
-            ));
+            items.push(LibraryScanItem {
+                id: name,
+                path: relative_path,
+                title,
+                description: desc_str,
+                item_type: item_type.to_string(),
+                tag: tag.to_string(),
+                date: modified,
+            });
         }
     }
 }
@@ -724,6 +749,59 @@ mod library_scan_tests {
         let vault = tempfile::tempdir().unwrap();
         let json = scan_vault_library(vault.path().to_str().unwrap()).unwrap();
         assert_eq!(json, "[]");
+    }
+
+    /// A quote, backslash, tab, or newline in a filename or description used
+    /// to be interpolated into a hand-built JSON string (quotes in the
+    /// description were only swapped for apostrophes). `JSON.parse` then
+    /// failed and Research showed "Couldn't scan this library." on every
+    /// Retry. The scan encodes through `serde_json` so those characters
+    /// round-trip.
+    #[test]
+    fn scan_vault_library_round_trips_backslash_quotes_tab_and_newline() {
+        let description = "quote \" backslash \\ tab \t newline \n";
+        let filename = "quote \" backslash \\ tab \t newline \n.md";
+        let item = LibraryScanItem {
+            id: filename.to_string(),
+            path: format!("wiki/concepts/{filename}"),
+            title: "nasty".to_string(),
+            description: description.to_string(),
+            item_type: "card".to_string(),
+            tag: "Concept".to_string(),
+            date: 42,
+        };
+        let json = encode_library_items(std::slice::from_ref(&item)).unwrap();
+        let parsed: Vec<LibraryScanItem> = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, vec![item]);
+
+        // The description reader keeps a single line, so a raw newline cannot
+        // sit inside the on-disk blurb. The filename can, on Unix. Quote,
+        // backslash, and tab travel in both.
+        let vault = tempfile::tempdir().unwrap();
+        let dir = vault.path().join("wiki/concepts");
+        std::fs::create_dir_all(&dir).unwrap();
+        let disk_description = "quote \" backslash \\ tab \t kept";
+        let disk_name = if cfg!(unix) {
+            filename.to_string()
+        } else {
+            "controls.md".to_string()
+        };
+        std::fs::write(dir.join(&disk_name), format!("title\n{disk_description}\n")).unwrap();
+
+        let scanned = scan_vault_library(vault.path().to_str().unwrap()).unwrap();
+        let scanned_items: Vec<LibraryScanItem> = serde_json::from_str(&scanned).unwrap();
+        assert_eq!(scanned_items.len(), 1);
+        assert_eq!(scanned_items[0].id, disk_name);
+        assert_eq!(scanned_items[0].path, format!("wiki/concepts/{disk_name}"));
+        assert_eq!(scanned_items[0].description, disk_description);
+        assert!(scanned_items[0].description.contains('"'));
+        assert!(scanned_items[0].description.contains('\\'));
+        assert!(scanned_items[0].description.contains('\t'));
+        if cfg!(unix) {
+            assert!(scanned_items[0].id.contains('\n'));
+            assert!(scanned_items[0].id.contains('\\'));
+            assert!(scanned_items[0].path.contains('\n'));
+        }
     }
 }
 

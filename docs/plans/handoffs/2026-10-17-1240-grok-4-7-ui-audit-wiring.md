@@ -7,7 +7,7 @@ description: >-
   notes panel, Inbox list and badge share one array, Mycelium uses
   session summaries and first-user titles, shortcut labels share one
   helper, Tolaria smoke string updated.
-commits: pending
+commits: 6e05a677
 ---
 
 # UI audit wiring — 2026-10-17
