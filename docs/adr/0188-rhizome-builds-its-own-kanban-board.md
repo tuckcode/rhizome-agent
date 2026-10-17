@@ -42,11 +42,11 @@ Three vitest files fail if the word kanban appears in
 `src-tauri/Cargo.toml`:
 
 - `src/lib/parked-organs.test.ts`, test "does not vendor TokenJuice or
-  add kanban.db" (line 9).
+  add kanban.db" (line 5, assertion line 9).
 - `src/lib/leftover-kanban-parked.test.ts`, test "does not vendor
-  TokenJuice or add kanban.db" (line 9).
+  TokenJuice or add kanban.db" (line 5, assertion line 9).
 - `src/lib/leftover-tokenjuice-parked.test.ts`, test "does not add a
-  kanban crate" (line 12).
+  kanban crate" (line 10, assertion line 12).
 
 [ADR-0144](0144-collections-and-presentations.md) does not park Kanban.
 It already names boards as a future collection presentation that groups
