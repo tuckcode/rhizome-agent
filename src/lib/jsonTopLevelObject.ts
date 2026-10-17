@@ -4,7 +4,7 @@ const JSON_WS = /[ \t\n\r]/u
 const JSON_NUMBER = /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/u
 
 export function topLevelJsonValueLiterals(raw: string): Record<string, string> | undefined {
-  const input = raw.trim()
+  const input = trimJsonWs(raw)
   if (!input.startsWith('{')) return undefined
   let index = 1
   const last: Record<string, string> = {}
@@ -38,6 +38,14 @@ function finishObject(
 ): Record<string, string> | undefined {
   const end = skipWs(input, index)
   return end === input.length ? last : undefined
+}
+
+function trimJsonWs(raw: string): string {
+  let start = 0
+  let end = raw.length
+  while (start < end && JSON_WS.test(raw[start] ?? '')) start += 1
+  while (end > start && JSON_WS.test(raw[end - 1] ?? '')) end -= 1
+  return raw.slice(start, end)
 }
 
 function skipWs(input: string, index: number): number {

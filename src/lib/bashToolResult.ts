@@ -192,10 +192,9 @@ export function truncateCommand(command: string, max = DEFAULT_COMMAND_MAX): str
 }
 
 export function cutCommand(command: string, max = DEFAULT_COMMAND_MAX): CutCommand {
-  const collapsed = command.replace(/ {2,}/gu, ' ').replace(/^ +| +$/gu, '')
-  const chars = [...collapsed]
+  const chars = [...command]
   if (chars.length <= max) {
-    return { text: collapsed, truncated: false, hiddenPastCut: false }
+    return { text: command, truncated: false, hiddenPastCut: false }
   }
   const kept = chars.slice(0, Math.max(0, max - 1))
   const rest = chars.slice(kept.length).join('')

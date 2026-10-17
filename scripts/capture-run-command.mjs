@@ -17,6 +17,7 @@ const shots = [
   ['graphite', 'result-superseded'],
   ['graphite', 'result-timed-out'],
   ['graphite', 'result-truncated'],
+  ['graphite', 'result-hidden-long'],
   ['graphite', 'result-focus'],
   ['earth', 'approval-short'],
   ['earth', 'approval-long'],
@@ -28,6 +29,7 @@ const shots = [
   ['earth', 'result-superseded'],
   ['earth', 'result-timed-out'],
   ['earth', 'result-truncated'],
+  ['earth', 'result-hidden-long'],
   ['earth', 'result-focus'],
 ]
 

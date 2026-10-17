@@ -151,8 +151,8 @@ describe('timeout and trim copy', () => {
 })
 
 describe('truncateCommand', () => {
-  it('collapses plain spaces but keeps a real newline', () => {
-    expect(truncateCommand('rg foo\n  wiki/')).toBe('rg foo\n wiki/')
+  it('keeps original spacing and a real newline', () => {
+    expect(truncateCommand('rg foo\n  wiki/')).toBe('rg foo\n  wiki/')
   })
 
   it('clips a long command with an ellipsis', () => {

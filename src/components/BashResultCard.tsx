@@ -6,6 +6,7 @@ import {
   parseBashToolResult,
   trimmedOutputNote,
 } from '../lib/bashToolResult'
+import { commandHasHiddenChars } from '../lib/visibleCommand'
 import { VisibleCommand } from './VisibleCommand'
 
 export interface BashResultCardProps {
@@ -65,7 +66,7 @@ function BashResultSummary({
   command,
   expanded,
   extra,
-  hiddenPastCut,
+  hasHiddenChars,
   onToggle,
   verb,
   verbDanger,
@@ -73,7 +74,7 @@ function BashResultSummary({
   command: string
   expanded: boolean
   extra?: { kind: string; text: string; danger: boolean }
-  hiddenPastCut: boolean
+  hasHiddenChars: boolean
   onToggle: () => void
   verb: string
   verbDanger: boolean
@@ -89,23 +90,24 @@ function BashResultSummary({
       <span className="shrink-0 text-muted-foreground">
         {expanded ? <CaretDown size={12} /> : <CaretRight size={12} />}
       </span>
-      <span className="min-w-0 flex-1 truncate" data-testid="bash-result-summary">
-        <span className={dangerClass(verbDanger)}>{verb}</span>
-        {' '}
-        <code className="rounded-sm bg-[var(--syntax-monospace-bg)] px-0.5 font-mono text-[12px]">
-          <VisibleCommand command={command} />
-        </code>
-        {hiddenPastCut ? (
+      <span className="flex min-w-0 flex-1 items-center gap-1" data-testid="bash-result-summary">
+        <span className={`shrink-0 ${dangerClass(verbDanger) ?? ''}`}>{verb}</span>
+        <span className="min-w-0 flex-1 truncate" data-testid="bash-result-command-clip">
+          <code className="rounded-sm bg-[var(--syntax-monospace-bg)] px-0.5 font-mono text-[12px]">
+            <VisibleCommand command={command} />
+          </code>
+        </span>
+        {hasHiddenChars ? (
           <span
-            className="text-[var(--danger-text)]"
-            data-testid="bash-result-hidden-past-cut"
+            className="shrink-0 text-[var(--danger-text)]"
+            data-testid="bash-result-hidden-chars"
           >
-            {' '}
-            hidden characters
+            {' · '}
+            has hidden characters
           </span>
         ) : null}
         {extra ? (
-          <>
+          <span className="shrink-0">
             {' · '}
             <span
               className={dangerClass(extra.danger)}
@@ -113,7 +115,7 @@ function BashResultSummary({
             >
               {extra.text}
             </span>
-          </>
+          </span>
         ) : null}
       </span>
     </button>
@@ -152,6 +154,14 @@ function BashResultDetails({
             className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-[var(--editor-code-block-background)] px-1.5 py-1 font-mono text-[11px] leading-4 text-[var(--editor-code-block-text)]"
             data-testid="bash-result-command"
           >
+            <span
+              aria-hidden
+              className="select-none text-muted-foreground"
+              data-testid="bash-result-prompt"
+            >
+              $
+              {' '}
+            </span>
             <VisibleCommand command={command} />
           </pre>
         </div>
@@ -188,7 +198,8 @@ export function BashResultCard({
 }: BashResultCardProps) {
   const result = parseBashToolResult(output)
   const row = bashResultRowStatus(status, result, { denied, superseded })
-  const cut = cutCommand(command ?? 'command')
+  const source = command ?? 'command'
+  const cut = cutCommand(source)
 
   return (
     <div
@@ -199,7 +210,7 @@ export function BashResultCard({
         command={cut.text}
         expanded={expanded}
         extra={row.extra}
-        hiddenPastCut={cut.hiddenPastCut}
+        hasHiddenChars={commandHasHiddenChars(source)}
         onToggle={onToggle}
         verb={row.verb}
         verbDanger={row.verbDanger}

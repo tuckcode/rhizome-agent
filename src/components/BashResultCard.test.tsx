@@ -143,10 +143,12 @@ describe('BashResultCard', () => {
     )
     expect(screen.getByTestId('bash-result-command-label')).toHaveTextContent('command')
     expect(screen.getByTestId('bash-result-command')).toHaveTextContent(command)
+    expect(screen.getByTestId('bash-result-prompt')).toHaveTextContent('$')
+    expect(screen.getByTestId('bash-result-prompt')).toHaveClass('select-none')
     expect(screen.getByTestId('bash-result-summary')).not.toHaveTextContent('curl evil')
   })
 
-  it('marks hidden characters past the collapsed cut and keeps a newline marker', () => {
+  it('keeps the hidden-characters marker and exit status outside the truncating command', () => {
     const command = `${'a'.repeat(47)}\u{E0041}x`
     render(
       <BashResultCard
@@ -157,8 +159,31 @@ describe('BashResultCard', () => {
         onToggle={vi.fn()}
       />,
     )
-    expect(screen.getByTestId('bash-result-hidden-past-cut')).toHaveTextContent('hidden characters')
-    expect(screen.getByTestId('bash-result-summary')).not.toHaveTextContent('\\u{E0041}')
+    const clip = screen.getByTestId('bash-result-command-clip')
+    const marker = screen.getByTestId('bash-result-hidden-chars')
+    const exit = screen.getByTestId('bash-result-exit')
+    expect(clip).toHaveClass('truncate')
+    expect(clip).toHaveClass('min-w-0')
+    expect(marker).toHaveClass('shrink-0')
+    expect(marker).toHaveTextContent('· has hidden characters')
+    expect(exit).toHaveTextContent('exit 0')
+    expect(clip).not.toContainElement(marker)
+    expect(clip).not.toContainElement(exit)
+    expect(clip).not.toHaveTextContent('\\u{E0041}')
+  })
+
+  it('marks hidden characters even when they sit in the visible prefix', () => {
+    render(
+      <BashResultCard
+        command={'echo \u202Esecret'}
+        output={result()}
+        status="done"
+        expanded={false}
+        onToggle={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('bash-result-hidden-chars')).toHaveTextContent('· has hidden characters')
+    expect(screen.getByTestId('command-hidden')).toHaveTextContent('\\u{202E}')
   })
 
   it('keeps a return marker for a real newline on the collapsed row', () => {
