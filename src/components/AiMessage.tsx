@@ -19,7 +19,7 @@ import { AiActionCard, type AiActionStatus } from './AiActionCard'
 import { BashResultCard } from './BashResultCard'
 import { ToolApprovalCard } from './ToolApprovalCard'
 import {
-  commandFromToolArgs,
+  bashCommandFromArgs,
   isBashTool,
   timeoutSecsFromToolArgs,
   type NativeApprovalChoice,
@@ -353,8 +353,8 @@ function ActionCardRow({
         capped={action.approval.capped}
         created={action.approval.created}
         overwrite={action.approval.overwrite}
-        command={commandFromToolArgs(action.approval.args)}
-        timeoutSecs={timeoutSecsFromToolArgs(action.approval.args)}
+        command={bashCommandFromArgs(action.approval.args) ?? bashCommandFromArgs(action.input)}
+        timeoutSecs={timeoutSecsFromToolArgs(action.input) ?? timeoutSecsFromToolArgs(action.approval.args)}
         options={action.approval.options}
         busy={action.approval.busy}
         onReply={(choice) => action.approval?.onReply?.(choice)}
@@ -364,7 +364,7 @@ function ActionCardRow({
   if (isBashTool(action.tool)) {
     return (
       <BashResultCard
-        command={commandFromToolArgs(action.input)}
+        command={bashCommandFromArgs(action.input)}
         output={action.output}
         status={action.status}
         expanded={expanded}

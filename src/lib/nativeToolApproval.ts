@@ -78,17 +78,31 @@ export function pathFromToolArgs(args?: string): string | undefined {
   }
 }
 
-export function commandFromToolArgs(args?: string): string | undefined {
-  const trimmed = args?.trim()
-  if (!trimmed) return undefined
+/**
+ * Command for the Run command card and result row.
+ * ApprovalRequested.args is the raw command (driver shown_args, not trimmed).
+ * Tool-call input may still be JSON `{command, timeout_secs}`.
+ */
+export function bashCommandFromArgs(args?: string): string | undefined {
+  if (args === undefined) return undefined
   try {
-    const parsed = JSON.parse(trimmed) as { command?: unknown; cmd?: unknown }
-    if (typeof parsed.command === 'string' && parsed.command.trim()) return parsed.command
-    if (typeof parsed.cmd === 'string' && parsed.cmd.trim()) return parsed.cmd
-    return undefined
+    const parsed: unknown = JSON.parse(args)
+    if (isCommandObject(parsed)) return parsed.command
   } catch {
-    return trimmed
+    // Raw command string from ApprovalRequested.args.
   }
+  return args
+}
+
+export function commandFromToolArgs(args?: string): string | undefined {
+  return bashCommandFromArgs(args)
+}
+
+function isCommandObject(value: unknown): value is { command: string } {
+  return typeof value === 'object'
+    && value !== null
+    && !Array.isArray(value)
+    && typeof (value as { command?: unknown }).command === 'string'
 }
 
 export function timeoutSecsFromToolArgs(args?: string): number | undefined {

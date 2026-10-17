@@ -99,6 +99,8 @@ export function ToolApprovalCard({
 
   const showTopFade = overflows && scrollTop > 0
   const showBottomFade = overflows && moreBelow
+  // Shell runner omits allow_session for bash. Filter here too so main,
+  // which still sends it, asks every run in v1.
   const visibleOptions = bash
     ? options.filter((option) => option.id !== 'allow_session')
     : options

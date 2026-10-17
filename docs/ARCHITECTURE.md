@@ -534,9 +534,12 @@ shows the path and a unified-style preview computed once with `similar`
 `real.md via link.md`. Power User `bash` uses Allow once and Deny on the Chat card in v1 (the
 UI hides Allow for session even if the loop still offers it). The card
 title is Run command and the body is the command, not a diff. Hidden
-control characters are shown as `\u{XXXX}` badges. The card matches a
-pending call on `ApprovalRequested.call_id` when that field is present
-and falls back to the tool name on main until the shell runner ships it.
+control characters are shown as `\u{XXXX}` badges. `ApprovalRequested.args` for bash is the raw command string (not JSON,
+not trimmed). The card matches a pending call on
+`ApprovalRequested.call_id` when that field is present and falls back to
+the tool name on main until the shell runner ships it. The loop does not
+offer Allow for session on bash; the card also hides that option so v1
+on main still asks every run.
 Structured output is `{kind:"bash_result", exit_code, timed_out, stopped,
 stdout, stderr, stdout_truncated, stderr_truncated, stdout_lines_hidden?,
 stderr_lines_hidden?}`. After the tool finishes, Chat shows one row per

@@ -275,6 +275,22 @@ describe('ToolApprovalCard', () => {
     expect(writeClipboardText).toHaveBeenCalledWith(command)
   })
 
+  it('copies a command with leading and trailing whitespace exactly', () => {
+    writeClipboardText.mockResolvedValue(undefined)
+    const command = '  echo hi  '
+    render(
+      <ToolApprovalCard
+        tool="bash"
+        command={command}
+        options={OPTIONS}
+        onReply={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('approval-command').textContent).toBe(command)
+    fireEvent.click(screen.getByRole('button', { name: 'Copy command' }))
+    expect(writeClipboardText).toHaveBeenCalledWith(command)
+  })
+
   it('does not treat Claude Code Bash as the native bash card', () => {
     render(
       <ToolApprovalCard

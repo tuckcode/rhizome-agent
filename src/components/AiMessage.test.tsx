@@ -518,10 +518,10 @@ describe('AiMessage', () => {
           toolId: 't1',
           label: 'ls',
           status: 'pending',
-          input: '{"command":"wrong"}',
+          input: '{"command":"wrong","timeout_secs":30}',
           approval: {
             promptId: 'p1',
-            args: '{"command":"ls"}',
+            args: 'ls',
             options: [
               { id: 'allow_once', label: 'Allow once' },
               { id: 'allow_session', label: 'Allow for session' },
@@ -534,6 +534,8 @@ describe('AiMessage', () => {
     fireEvent.click(screen.getByTestId('tool-use-toggle'))
     expect(screen.getByText('Run command')).toBeTruthy()
     expect(screen.getByTestId('approval-command')).toHaveTextContent('ls')
+    expect(screen.getByTestId('approval-timeout')).toHaveTextContent('Stops after 30 seconds.')
+    expect(screen.queryByRole('button', { name: 'Allow for session' })).toBeNull()
 
     rerender(
       <AiMessage
@@ -560,6 +562,61 @@ describe('AiMessage', () => {
     expect(screen.getByTestId('bash-result-card')).toBeTruthy()
     expect(screen.getByTestId('bash-result-exit')).toHaveTextContent('exit 0')
     expect(screen.queryByTestId('tool-approval-card')).toBeNull()
+  })
+
+  it('shows a raw ApprovalRequested command with surrounding whitespace and copies it exactly', () => {
+    writeClipboardText.mockResolvedValue(undefined)
+    render(
+      <AiMessage
+        userMessage="list files"
+        actions={[{
+          tool: 'bash',
+          toolId: 't1',
+          label: 'ls',
+          status: 'pending',
+          input: '{"command":"  ls notes  ","timeout_secs":30}',
+          approval: {
+            promptId: 'p1',
+            args: '  ls notes  ',
+            options: [
+              { id: 'allow_once', label: 'Allow once' },
+              { id: 'deny', label: 'Deny' },
+            ],
+          },
+        }]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByTestId('approval-command').textContent).toBe('  ls notes  ')
+    fireEvent.click(screen.getByRole('button', { name: 'Copy command' }))
+    expect(writeClipboardText).toHaveBeenCalledWith('  ls notes  ')
+  })
+
+  it('reads the result command from JSON tool-call input without trimming', () => {
+    render(
+      <AiMessage
+        userMessage="list files"
+        actions={[{
+          tool: 'bash',
+          toolId: 't1',
+          label: 'ls',
+          status: 'done',
+          input: '{"command":"  ls notes  "}',
+          output: JSON.stringify({
+            kind: 'bash_result',
+            exit_code: 0,
+            timed_out: false,
+            stopped: false,
+            stdout: 'notes\n',
+            stderr: '',
+            stdout_truncated: false,
+            stderr_truncated: false,
+          }),
+        }]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByTestId('bash-result-summary').textContent).toContain('ls notes')
   })
 
   it('keeps two consecutive bash calls as separate cards', () => {
