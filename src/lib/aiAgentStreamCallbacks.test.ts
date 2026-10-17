@@ -888,13 +888,157 @@ describe('aiAgentStreamCallbacks', () => {
       options: [{ id: 'allow_once', label: 'Allow once' }],
       path: 'notes/a.md',
       preview: '-x\n+y\n',
+      callId: 'call_1',
       reply,
     })
     const action = messages.getMessages()[0]?.actions[0]
     expect(action?.approval?.promptId).toBe('prompt_1')
     expect(action?.approval?.path).toBe('notes/a.md')
+    expect(action?.approval?.args).toBe('{"path":"notes/a.md","old_string":"x","new_string":"y"}')
+    expect(action?.approval?.callId).toBe('call_1')
     action?.approval?.onReply?.('allow_once')
     expect(reply).toHaveBeenCalledWith('allow_once')
     expect(messages.getMessages()[0]?.actions[0]?.approval?.busy).toBe(true)
+  })
+
+  it('attaches an approval to the pending bash call with the same call id', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'run',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const callbacks = createStreamCallbacks({
+      agent: 'prime',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: createStatusStore().setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef: { current: '' },
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+    callbacks.onToolStart('bash', 'call_old', '{"command":"pwd"}')
+    callbacks.onToolStart('bash', 'call_2', '{"command":"ls"}')
+    callbacks.onApprovalRequested?.({
+      promptId: 'prompt_2',
+      tool: 'bash',
+      callId: 'call_2',
+      args: '{"command":"ls"}',
+      options: [{ id: 'allow_once', label: 'Allow once' }],
+      reply: vi.fn(),
+    })
+    const actions = messages.getMessages()[0]?.actions ?? []
+    expect(actions[0]?.approval).toBeUndefined()
+    expect(actions[1]?.approval?.promptId).toBe('prompt_2')
+    expect(actions[1]?.approval?.args).toBe('{"command":"ls"}')
+    expect(actions[1]?.approval?.callId).toBe('call_2')
+  })
+
+  it('falls back to the last pending action of the same tool when call_id is absent', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'run',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const callbacks = createStreamCallbacks({
+      agent: 'prime',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: createStatusStore().setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef: { current: '' },
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+    callbacks.onToolStart('edit_file', 'call_edit', '{"path":"a.md","old_string":"x","new_string":"y"}')
+    callbacks.onToolStart('bash', 'call_old', '{"command":"pwd"}')
+    callbacks.onToolStart('bash', 'call_new', '{"command":"ls"}')
+    callbacks.onApprovalRequested?.({
+      promptId: 'prompt_fallback',
+      tool: 'bash',
+      args: '{"command":"ls"}',
+      options: [{ id: 'allow_once', label: 'Allow once' }],
+      reply: vi.fn(),
+    })
+    const actions = messages.getMessages()[0]?.actions ?? []
+    expect(actions[0]?.approval).toBeUndefined()
+    expect(actions[1]?.approval).toBeUndefined()
+    expect(actions[2]?.approval?.promptId).toBe('prompt_fallback')
+    expect(actions[2]?.approval?.args).toBe('{"command":"ls"}')
+    expect(actions[2]?.approval?.callId).toBeUndefined()
+  })
+
+  it('settles the old pending bash call when call_id does not match', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'run',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const callbacks = createStreamCallbacks({
+      agent: 'prime',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: createStatusStore().setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef: { current: '' },
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+    callbacks.onToolStart('bash', 'call_old', '{"command":"pwd"}')
+    callbacks.onApprovalRequested?.({
+      promptId: 'prompt_new',
+      tool: 'bash',
+      callId: 'call_missing',
+      args: '{"command":"echo hi","x":"$(touch /tmp/pwned)"}',
+      options: [{ id: 'allow_once', label: 'Allow once' }],
+      reply: vi.fn(),
+    })
+    const actions = messages.getMessages()[0]?.actions ?? []
+    expect(actions[0]?.status).toBe('error')
+    expect(actions[0]?.superseded).toBe(true)
+    expect(actions[0]?.approval).toBeUndefined()
+    expect(actions[1]?.toolId).toBe('call_missing')
+    expect(actions[1]?.command).toBe('{"command":"echo hi","x":"$(touch /tmp/pwned)"}')
+    expect(actions[1]?.input).toBe('{"command":"echo hi","x":"$(touch /tmp/pwned)"}')
+    expect(actions[1]?.approval?.args).toBe('{"command":"echo hi","x":"$(touch /tmp/pwned)"}')
+  })
+
+  it('marks a denied tool from the deny event', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'run',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const callbacks = createStreamCallbacks({
+      agent: 'prime',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: createStatusStore().setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef: { current: '' },
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+    callbacks.onToolStart('bash', 'call_1', '{"command":"ls"}')
+    callbacks.onToolDenied?.('call_1', 'nope')
+    const action = messages.getMessages()[0]?.actions[0]
+    expect(action?.denied).toBe(true)
+    expect(action?.status).toBe('error')
   })
 })

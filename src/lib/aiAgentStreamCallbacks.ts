@@ -2,7 +2,12 @@ import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
 import { appendLocalMarker, type AgentStatus, type AiAgentMessage } from './aiAgentConversation'
 import { detectFileOperation, type AgentFileCallbacks } from './aiAgentFileOperations'
 import type { NativeApprovalPrompt } from './nativeToolApproval'
-import { pathFromToolArgs } from './nativeToolApproval'
+import {
+  approvalCallId,
+  isBashTool,
+  matchPendingApprovalAction,
+  pathFromToolArgs,
+} from './nativeToolApproval'
 import {
   markReasoningDone,
   updateMessage,
@@ -340,6 +345,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
             ? {
                 ...action,
                 status: 'error' as const,
+                denied: true,
                 output: reason,
                 approval: undefined,
               }
@@ -353,20 +359,19 @@ export function createStreamCallbacks(context: StreamMutationContext) {
       setStatus('tool-executing')
       updateMessage(setMessages, activeMessageId, (message) => {
         const path = prompt.path || pathFromToolArgs(prompt.args)
-        const match = [...message.actions].reverse().find((action) => (
-          action.status === 'pending'
-          && action.tool === prompt.tool
-          && !action.approval
-        ))
+        const match = matchPendingApprovalAction(message.actions, prompt)
+        const callId = approvalCallId(prompt)
         const approval = {
           promptId: prompt.promptId,
           options: prompt.options,
+          args: prompt.args,
           preview: prompt.preview,
           notes: prompt.notes,
           capped: prompt.capped,
           path,
           created: prompt.created,
           overwrite: prompt.overwrite,
+          callId: prompt.callId,
           onReply: (choice: Parameters<NativeApprovalPrompt['reply']>[0]) => {
             updateMessage(setMessages, activeMessageId, (current) => ({
               ...current,
@@ -379,18 +384,27 @@ export function createStreamCallbacks(context: StreamMutationContext) {
             prompt.reply(choice)
           },
         }
+        const command = isBashTool(prompt.tool) ? prompt.args : undefined
         if (!match) {
+          const settled = callId
+            ? message.actions.map((action) => (
+              action.status === 'pending' && action.tool === prompt.tool && !action.approval
+                ? { ...action, status: 'error' as const, superseded: true }
+                : action
+            ))
+            : message.actions
           return {
             ...message,
             actions: [
-              ...message.actions,
+              ...settled,
               {
                 tool: prompt.tool,
-                toolId: prompt.promptId,
+                toolId: callId ?? prompt.promptId,
                 label: prompt.tool,
                 path,
                 status: 'pending' as const,
                 input: prompt.args,
+                command,
                 approval,
               },
             ],
@@ -399,7 +413,14 @@ export function createStreamCallbacks(context: StreamMutationContext) {
         return {
           ...message,
           actions: message.actions.map((action) => (
-            action.toolId === match.toolId ? { ...action, path: path ?? action.path, approval } : action
+            action.toolId === match.toolId
+              ? {
+                  ...action,
+                  path: path ?? action.path,
+                  command: command ?? action.command,
+                  approval,
+                }
+              : action
           )),
         }
       })
@@ -414,6 +435,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
             ? {
                 ...action,
                 status: 'error' as const,
+                denied: true,
                 output: action.output ?? 'approval cancelled',
                 approval: undefined,
               }

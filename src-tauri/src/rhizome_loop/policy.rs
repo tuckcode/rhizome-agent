@@ -7,8 +7,8 @@
 //! for session, Deny) unless a session grant already covers that tool
 //! and path. Power User `echo` still auto-runs once from the shared
 //! table. Power User `create_note` and read-only tools run with no
-//! prompt. Power User `bash` asks a human for each call unless a
-//! session grant already matches. A name outside `offered_tools` is
+//! prompt. Power User `bash` asks a human for every call. There is
+//! no session grant. A name outside `offered_tools` is
 //! denied by the driver before this function runs. No waiter, or a
 //! cancelled wait, denies. An unknown name always asks and never
 //! matches a session grant.
@@ -86,10 +86,9 @@ pub fn offered_tools(mode: AiAgentPermissionMode) -> Vec<String> {
 }
 
 /// A session grant covers later calls of the same tool.
-/// Bash matches the exact command only so a session cannot
-/// become "run any shell". `create_note` never matches: Limited
-/// tools ask every call (Allow once and Deny only). An unknown
-/// name never matches.
+/// Bash never matches: every call asks. `create_note` never
+/// matches: Limited tools ask every call (Allow once and Deny
+/// only). An unknown name never matches.
 #[cfg(test)]
 pub fn session_matches(name: &str, granted_args: &str, call_args: &str) -> bool {
     session_matches_in(name, granted_args, call_args, None, &[])
@@ -103,8 +102,7 @@ pub fn session_matches_in(
     vault_paths: &[String],
 ) -> bool {
     match tools::lookup(name).map(|tool| tool.policy) {
-        Some(ToolPolicy::CreateNote) => false,
-        Some(ToolPolicy::Bash) => granted_args == call_args,
+        Some(ToolPolicy::CreateNote) | Some(ToolPolicy::Bash) => false,
         Some(ToolPolicy::Mutate) => {
             tools::mutate_session_matches(granted_args, call_args, vault_path, vault_paths)
         }
@@ -117,7 +115,11 @@ pub fn session_matches_in(
 /// Limited tools is Allow once and Deny. Other asks also offer
 /// Allow for session.
 pub fn approval_options(mode: AiAgentPermissionMode, name: &str) -> Vec<ApprovalOption> {
-    if name == CREATE_NOTE_TOOL_NAME {
+    let bash = matches!(
+        tools::lookup(name).map(|tool| tool.policy),
+        Some(ToolPolicy::Bash)
+    );
+    if name == CREATE_NOTE_TOOL_NAME || bash {
         return vec![allow_once_choice(), deny_choice()];
     }
     let _ = mode;
@@ -177,9 +179,23 @@ mod tests {
     }
 
     #[test]
-    fn session_grant_bash_matches_exact_command_only() {
-        assert!(session_matches("bash", "ls", "ls"));
-        assert!(!session_matches("bash", "ls", "pwd"));
+    fn session_grant_does_not_apply_to_bash() {
+        assert!(!session_matches("bash", "ls", "ls"));
+        assert!(!session_matches(
+            "bash",
+            r#"{"command":"echo hi"}"#,
+            r#"{"command":"echo hi"}"#
+        ));
+    }
+
+    #[test]
+    fn bash_options_are_allow_once_and_deny() {
+        use super::approval_options;
+        use crate::ai_agents::AiAgentPermissionMode;
+
+        let options = approval_options(AiAgentPermissionMode::PowerUser, "bash");
+        let ids: Vec<&str> = options.iter().map(|option| option.id.as_str()).collect();
+        assert_eq!(ids, vec!["allow_once", "deny"]);
     }
 
     #[test]
