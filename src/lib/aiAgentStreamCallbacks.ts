@@ -4,6 +4,8 @@ import { detectFileOperation, type AgentFileCallbacks } from './aiAgentFileOpera
 import type { NativeApprovalPrompt } from './nativeToolApproval'
 import {
   approvalCallId,
+  commandFromToolCallInput,
+  isBashTool,
   matchPendingApprovalAction,
   pathFromToolArgs,
 } from './nativeToolApproval'
@@ -383,6 +385,9 @@ export function createStreamCallbacks(context: StreamMutationContext) {
             prompt.reply(choice)
           },
         }
+        const command = isBashTool(prompt.tool)
+          ? commandFromToolCallInput(prompt.args)
+          : undefined
         if (!match) {
           const settled = callId
             ? message.actions.map((action) => (
@@ -402,7 +407,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
                 path,
                 status: 'pending' as const,
                 input: prompt.args,
-                command: callId ? prompt.args : undefined,
+                command,
                 approval,
               },
             ],
@@ -415,7 +420,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
               ? {
                   ...action,
                   path: path ?? action.path,
-                  command: callId ? prompt.args : action.command,
+                  command: command ?? action.command,
                   approval,
                 }
               : action

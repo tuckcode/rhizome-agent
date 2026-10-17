@@ -531,26 +531,49 @@ a session grant already covers that tool and path. `edit_file` refuses
 files over 2 MiB rather than loading them whole. The Chat approval card
 shows the path and a unified-style preview computed once with `similar`
 (250ms deadline, 40/40 cap, leftover notes). A symlink target is labelled
-`real.md via link.md`. Power User `bash` uses Allow once and Deny on the Chat card in v1 (the
-UI hides Allow for session even if the loop still offers it). The card
-title is Run command and the body is the command, not a diff. Hidden
-control characters are shown as `\u{XXXX}` badges. When
-`ApprovalRequested.call_id` is present, `args` is the literal command
-(never JSON-parsed). Timeout copy matches the runner: default 60s, clamp
-300s. The card matches a pending call on
-`ApprovalRequested.call_id` when that field is present and falls back to
-the tool name on main until the shell runner ships it. The loop does not
-offer Allow for session on bash; the card also hides that option so v1
-on main still asks every run.
-Structured output is `{kind:"bash_result", exit_code, timed_out, stopped,
-stdout, stderr, stdout_truncated, stderr_truncated, stdout_lines_hidden?,
-stderr_lines_hidden?}`. After the tool finishes, Chat shows one row per
-call with the command and exit status, expandable to stdout and stderr.
-There is no live streaming in this view.
+`real.md via link.md`.
+Power User `bash` runs one command with the vault root as its working
+directory (`sh -c` on Unix, `cmd /S /C` on Windows). The model cannot
+choose that directory. The child environment starts empty and keeps an
+allowlist (`PATH`, `HOME`, `USER`, `LANG`, `TERM`, `TMPDIR`, plus Windows
+system variables such as `SystemRoot`, `COMSPEC`, and `PATHEXT`). `HOME`
+is passed through, so a command can still read `~/.ssh` and `~/.aws`.
+stdin is closed. A child that calls `setsid` or `nohup` leaves the
+process group. On Linux it can outlive the group. After the leader
+exits or is killed, readers poll for 750ms. They use non-blocking
+reads and a stop flag, then they are joined, so a detached child does
+not leave a thread behind. The result's stderr then contains
+`[background process still holds output; detached]`. On Unix, timeout
+and cancel send SIGTERM and wait about 2s before SIGKILL. Windows has
+no SIGTERM for a Job Object, so timeout and cancel terminate the job
+immediately. An invalid `timeout_secs` (0, negative, a float, a string
+including `"7"`, or any other non-whole-number) uses the 60s default.
+stdout and stderr each keep the first 15360 bytes and a
+rolling last 15360 bytes (30720 bytes per stream). A trimmed stream
+inserts one marker, `\n… [N lines hidden] …\n`, between those parts.
+`N` is the number of lines fully dropped from the middle. A line
+the head or the tail still shows is not counted, even when the cut
+lands in the middle of it. The
+result is JSON: `{"kind":"bash_result","exit_code":number|null,"timed_out":boolean,"stopped":boolean,"stdout":string,"stderr":string,"stdout_truncated":boolean,"stderr_truncated":boolean}`
+plus `stdout_lines_hidden` and `stderr_lines_hidden` only when that
+stream was trimmed. `stopped` is true when the user cancelled the
+command. The default timeout is 60s and the hard cap is
+300s. Every call asks; there is no session grant. The approval card
+receives the full command string, and the run is bound to the tool-call
+id plus a hash of that command, checked again before spawn. Cancel kills
+the process group. On Unix the command is its own process group
+(`process-wrap`). On Windows it is a Job Object created suspended,
+assigned, then resumed, with `KILL_ON_JOB_CLOSE`.
+The Chat card title is Run command. The body is the command, shown through
+VisibleCommand (`\u{XXXX}` badges for hidden characters), not a diff.
+Allow once and Deny are offered; Allow for session is hidden. The card
+matches a pending call on `ApprovalRequested.call_id`. After the tool
+finishes, Chat shows one row per call with the command and exit status,
+expandable to stdout and stderr. There is no live streaming in this view.
 Secret-path blocking (`.env*` except `.env.example`, `.git/`, `*.pem` /
 `*.key` / `*.p12` / `*.pfx`, known private-key basenames and their
 backups) is a safety net, not a wall. It covers the native file tools
-only. A future shell tool will not be covered. Settings → AI Agents →
+only. `bash` is not covered. Settings → AI Agents →
 Safety has a toggle (on by default) that disables the denylist for
 **reads** only (`sandbox::resolve_for_read`); write tools always apply
 it via `sandbox::resolve_for_write`.

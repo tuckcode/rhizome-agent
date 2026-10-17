@@ -16,10 +16,7 @@ export interface NativeApprovalPrompt {
   promptId: string
   tool: string
   args: string
-  /**
-   * Tool-call id. Mapped from EngineEvent::ApprovalRequested.call_id
-   * (shell runner PR). Optional on main until that event field ships.
-   */
+  /** Mapped from EngineEvent::ApprovalRequested.call_id. */
   callId?: string
   options: NativeApprovalOption[]
   path?: string
@@ -47,8 +44,8 @@ export function approvalCallId(
 /**
  * Match an approval prompt to a pending tool action.
  * Prefer EngineEvent::ApprovalRequested.call_id (mapped to callId).
- * On main the event has no call_id yet, so fall back to the last pending
- * action of the same tool that has no approval.
+ * If call_id is absent, fall back to the last pending action of the same
+ * tool that has no approval.
  */
 export function matchPendingApprovalAction<T extends ApprovalMatchAction>(
   actions: T[],
@@ -82,15 +79,17 @@ export function pathFromToolArgs(args?: string): string | undefined {
 }
 
 /**
- * ApprovalRequested.args for bash is the literal command. Never JSON-parse it.
+ * Command shown on the bash approval card. #202 sends tool-call JSON in
+ * ApprovalRequested.args (`{"command":"..."}`); a non-JSON string is shown
+ * as-is.
  */
 export function bashApprovalCommand(args?: string): string | undefined {
-  return args
+  return commandFromToolCallInput(args)
 }
 
 /**
- * Tool-call input may be JSON `{command, timeout_secs}`. Read .command only
- * from that object. Do not use this on approval.args.
+ * Tool-call input and ApprovalRequested.args may be JSON
+ * `{command, timeout_secs}`. Read .command only from that object.
  */
 export function commandFromToolCallInput(args?: string): string | undefined {
   if (args === undefined) return undefined

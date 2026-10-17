@@ -338,35 +338,35 @@ describe('useVaultLoader', () => {
   it('uses cached active mounted workspace entries on startup in Tauri mode', async () => {
     await enableTauriMode()
     const brian = { label: 'Brian', path: '/brian', alias: 'brian', available: true, mounted: true }
-    const laputa = { label: 'Laputa', path: '/laputa', alias: 'laputa', available: true, mounted: true }
-    const vaults = [laputa, brian]
-    const laputaStartupResponses: Partial<Record<string, VaultEntry[]>> = {
+    const mainVault = { label: 'Vault', path: '/vault', alias: 'vault', available: true, mounted: true }
+    const vaults = [mainVault, brian]
+    const mainVaultStartupResponses: Partial<Record<string, VaultEntry[]>> = {
       reload_vault: [
-        { ...mockEntries[0], path: '/laputa/note/fresh.md', filename: 'fresh.md', title: 'Fresh' },
+        { ...mockEntries[0], path: '/vault/note/fresh.md', filename: 'fresh.md', title: 'Fresh' },
       ],
       list_vault: [
-        { ...mockEntries[0], path: '/laputa/note/cached.md', filename: 'cached.md', title: 'Cached' },
+        { ...mockEntries[0], path: '/vault/note/cached.md', filename: 'cached.md', title: 'Cached' },
       ],
     }
 
     backendInvokeFn.mockImplementation(((cmd: string, args?: Record<string, unknown>) => {
-      const response = args?.path === '/laputa' ? laputaStartupResponses[cmd] : undefined
+      const response = args?.path === '/vault' ? mainVaultStartupResponses[cmd] : undefined
       if (response) return Promise.resolve(response)
       if (EMPTY_ARRAY_COMMANDS.has(cmd)) return Promise.resolve([])
       return Promise.resolve(null)
     }) as typeof defaultMockInvoke)
 
-    const { result } = renderHook(() => useVaultLoader('/laputa', vaults, '/laputa', vaults))
+    const { result } = renderHook(() => useVaultLoader('/vault', vaults, '/vault', vaults))
 
     await waitFor(() => {
       expect(result.current.entries.map((entry) => entry.title)).toEqual(['Cached'])
     })
 
-    const laputaLoadCommands = backendInvokeFn.mock.calls
-      .filter(([, args]) => args?.path === '/laputa')
+    const mainVaultLoadCommands = backendInvokeFn.mock.calls
+      .filter(([, args]) => args?.path === '/vault')
       .map(([command]) => command)
-    expect(laputaLoadCommands).toContain('list_vault')
-    expect(laputaLoadCommands).not.toContain('reload_vault')
+    expect(mainVaultLoadCommands).toContain('list_vault')
+    expect(mainVaultLoadCommands).not.toContain('reload_vault')
   })
 
   it('marks the vault unavailable when the initial load finds a missing active vault', async () => {

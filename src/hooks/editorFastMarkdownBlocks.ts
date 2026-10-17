@@ -102,7 +102,7 @@ const HTML_BLOCK_RE = /^[ \t]{0,3}<\/?[A-Za-z][^>]*>/u
 const MARKDOWN_IMAGE_RE = /(^|[^\\])!\[[^\]]*\]\(/u
 const REFERENCE_LINK_RE = /^[ \t]{0,3}\[[^\]]+\]:[ \t]+/u
 const UNSUPPORTED_BLOCK_RE = /^[ \t]{0,3}(?:#{7,}|:::+|\[\^.+\]:)/u
-const DURABLE_MARKDOWN_TOKEN_RE = /^@@TOLARIA_[A-Z_]+:.+@@$/u
+const DURABLE_MARKDOWN_TOKEN_RE = /^@@(?:RHIZOME|TOLARIA)_[A-Z_]+:.+@@$/u
 const TEXT_STYLE_KEYS: Array<keyof TextStyles> = ['bold', 'code', 'italic', 'strike']
 
 const textEncoder = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null

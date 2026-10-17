@@ -145,8 +145,8 @@ describe('useRecentVaultWrites', () => {
 
   it('filters recent app-owned writes for tilde-mounted vault roots', () => {
     const { result } = renderHook(() => useRecentVaultWrites({
-      vaultPath: '/Users/luca/Workspace/laputa',
-      vaultPaths: ['/Users/luca/Workspace/laputa', '~/Workspace/refactoring-vault'],
+      vaultPath: '/Users/mock/Workspace/vault',
+      vaultPaths: ['/Users/mock/Workspace/vault', '~/Workspace/refactoring-vault'],
       now: () => 1000,
     }))
 
@@ -155,9 +155,9 @@ describe('useRecentVaultWrites', () => {
     })
 
     expect(result.current.filterExternalPaths([
-      '/Users/luca/Workspace/laputa/notes/external.md',
+      '/Users/mock/Workspace/vault/notes/external.md',
       '/Users/luca/Workspace/refactoring-vault/notes/self.md',
-    ])).toEqual(['/Users/luca/Workspace/laputa/notes/external.md'])
+    ])).toEqual(['/Users/mock/Workspace/vault/notes/external.md'])
   })
 
   it.each([

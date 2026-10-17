@@ -145,7 +145,7 @@ describe('useLayoutPanels', () => {
     expect(result.current.noteListWidth).toBe(240)
   })
 
-  it('persists resized panel widths with the Tolaria storage key', () => {
+  it('persists resized panel widths with the legacy storage key', () => {
     storePanelWidths(LEGACY_APP_STORAGE_KEYS.layoutPanels, {
       sidebar: 260,
       noteList: 340,

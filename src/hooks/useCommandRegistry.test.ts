@@ -666,7 +666,7 @@ describe('useCommandRegistry', () => {
 
   it('keeps root folder reveal and copy commands enabled without destructive actions', () => {
     expectFolderCommandStates({
-      selection: { kind: 'folder', path: '', rootPath: '/Users/luca/Laputa' },
+      selection: { kind: 'folder', path: '', rootPath: '/Users/mock/Vault' },
       onRenameFolder: vi.fn(),
       onDeleteFolder: vi.fn(),
       onRevealSelectedFolder: vi.fn(),

@@ -50,11 +50,11 @@ const GO_LANGUAGE_REGISTRATION = {
   },
 }
 
-type TolariaCodeHighlighter = Awaited<ReturnType<typeof createBundledShikiHighlighter>>
-type TolariaLoadLanguage = TolariaCodeHighlighter['loadLanguage']
-type TolariaLanguageInput = Parameters<TolariaLoadLanguage>[number]
-type TolariaLanguageLoader = () => Promise<TolariaLanguageInput[]>
-type TolariaNamedLanguageRegistration = Record<string, unknown> & {
+type RhizomeCodeHighlighter = Awaited<ReturnType<typeof createBundledShikiHighlighter>>
+type RhizomeLoadLanguage = RhizomeCodeHighlighter['loadLanguage']
+type RhizomeLanguageInput = Parameters<RhizomeLoadLanguage>[number]
+type RhizomeLanguageLoader = () => Promise<RhizomeLanguageInput[]>
+type RhizomeNamedLanguageRegistration = Record<string, unknown> & {
   name: string
   displayName?: string
   aliases?: string[]
@@ -76,31 +76,31 @@ function prioritizeTheme(themes: string[], theme: string) {
   return [theme, ...themes.filter((candidate) => candidate !== theme)]
 }
 
-function languageInputs(languages: readonly TolariaLanguageInput[]): TolariaLanguageInput[] {
+function languageInputs(languages: readonly RhizomeLanguageInput[]): RhizomeLanguageInput[] {
   return [...languages]
 }
 
-function namedLanguageRegistration(value: TolariaLanguageInput): TolariaNamedLanguageRegistration | null {
+function namedLanguageRegistration(value: RhizomeLanguageInput): RhizomeNamedLanguageRegistration | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return null
   const record = value as Record<string, unknown>
   return typeof record.name === 'string'
-    ? record as TolariaNamedLanguageRegistration
+    ? record as RhizomeNamedLanguageRegistration
     : null
 }
 
 function renameLanguageRegistration(
-  languages: readonly TolariaLanguageInput[],
+  languages: readonly RhizomeLanguageInput[],
   sourceName: string,
   nextLanguage: { name: string; displayName: string; aliases: string[] },
-): TolariaLanguageInput[] {
+): RhizomeLanguageInput[] {
   return languages.map((language) => {
     const registration = namedLanguageRegistration(language)
     if (!registration || registration.name !== sourceName) return language
-    return { ...registration, ...nextLanguage } as TolariaLanguageInput
+    return { ...registration, ...nextLanguage } as RhizomeLanguageInput
   })
 }
 
-async function loadVbScriptLanguage(): Promise<TolariaLanguageInput[]> {
+async function loadVbScriptLanguage(): Promise<RhizomeLanguageInput[]> {
   const language = await import('@shikijs/langs/vb')
   return renameLanguageRegistration(language.default, 'vb', {
     name: 'vbscript',
@@ -109,7 +109,7 @@ async function loadVbScriptLanguage(): Promise<TolariaLanguageInput[]> {
   })
 }
 
-const EXTRA_LANGUAGE_LOADERS = new Map<string, TolariaLanguageLoader>([
+const EXTRA_LANGUAGE_LOADERS = new Map<string, RhizomeLanguageLoader>([
   ['powershell', async () => languageInputs((await import('@shikijs/langs/powershell')).default)],
   ['vbscript', loadVbScriptLanguage],
   ['dart', async () => languageInputs((await import('@shikijs/langs/dart')).default)],
@@ -131,36 +131,36 @@ const EXTRA_LANGUAGE_LOADERS = new Map<string, TolariaLanguageLoader>([
   ['toml', async () => languageInputs((await import('@shikijs/langs/toml')).default)],
 ])
 
-function expandGoLanguage(language: string): TolariaLanguageInput[] | null {
+function expandGoLanguage(language: string): RhizomeLanguageInput[] | null {
   return canonicalKnownCodeBlockLanguage(language) === 'go'
-    ? [GO_LANGUAGE_REGISTRATION as TolariaLanguageInput]
+    ? [GO_LANGUAGE_REGISTRATION as RhizomeLanguageInput]
     : null
 }
 
-async function expandExternalLanguage(language: string): Promise<TolariaLanguageInput[] | null> {
+async function expandExternalLanguage(language: string): Promise<RhizomeLanguageInput[] | null> {
   const canonicalLanguage = canonicalKnownCodeBlockLanguage(language) ?? language.trim().toLowerCase()
   const loadLanguage = EXTRA_LANGUAGE_LOADERS.get(canonicalLanguage)
   return loadLanguage ? loadLanguage() : null
 }
 
-async function expandLanguage(language: TolariaLanguageInput): Promise<TolariaLanguageInput[]> {
+async function expandLanguage(language: RhizomeLanguageInput): Promise<RhizomeLanguageInput[]> {
   if (typeof language !== 'string') return [language]
   return expandGoLanguage(language) ?? await expandExternalLanguage(language) ?? [language]
 }
 
-async function createTolariaCodeHighlighter(): Promise<TolariaCodeHighlighter> {
+async function createRhizomeCodeHighlighter(): Promise<RhizomeCodeHighlighter> {
   const highlighter = await createBundledShikiHighlighter({ themes: ['github-dark', 'github-light'], langs: [] })
   return {
     ...highlighter,
     getLoadedThemes: () => prioritizeTheme(highlighter.getLoadedThemes(), currentCodeBlockTheme()),
-    loadLanguage: async (...languages: TolariaLanguageInput[]) => {
+    loadLanguage: async (...languages: RhizomeLanguageInput[]) => {
       const expandedLanguages = await Promise.all(languages.map(expandLanguage))
       return highlighter.loadLanguage(...expandedLanguages.flat())
     },
   }
 }
 
-export function createTolariaCodeBlockOptions(): Partial<CodeBlockOptions> {
+export function createRhizomeCodeBlockOptions(): Partial<CodeBlockOptions> {
   return {
     ...codeBlockOptions,
     defaultLanguage: 'text',
@@ -177,6 +177,6 @@ export function createTolariaCodeBlockOptions(): Partial<CodeBlockOptions> {
  * editor extension. Returns null where WebKit lacks the regex features
  * Shiki needs, so those editors render code as plain text.
  */
-export function createTolariaSyntaxHighlighting(): SyntaxHighlightingOptions | null {
-  return supportsShikiRegexFeatures() ? { createHighlighter: createTolariaCodeHighlighter } : null
+export function createRhizomeSyntaxHighlighting(): SyntaxHighlightingOptions | null {
+  return supportsShikiRegexFeatures() ? { createHighlighter: createRhizomeCodeHighlighter } : null
 }

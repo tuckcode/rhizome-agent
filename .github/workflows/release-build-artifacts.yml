@@ -13,6 +13,10 @@ on:
       upload_macos_dmg:
         required: true
         type: boolean
+      build_linux_windows:
+        required: false
+        type: boolean
+        default: true
 
 env:
   # Bump this when Tauri/Rust target artifacts capture stale absolute paths.
@@ -283,6 +287,7 @@ jobs:
 
   build-linux:
     name: Build (linux-x86_64)
+    if: ${{ inputs.build_linux_windows }}
     # ubuntu-24.04: glibc 2.39 provides __isoc23_strtoll. ubuntu-22.04 failed
     # at rust-lld with undefined symbol __isoc23_strtoll (toolchain/prebuilt
     # objects compiled against newer glibc headers). Trade-off: the AppImage/
@@ -471,6 +476,7 @@ jobs:
 
   build-windows:
     name: Build (windows-x86_64)
+    if: ${{ inputs.build_linux_windows }}
     runs-on: windows-latest
 
     steps:

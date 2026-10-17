@@ -153,7 +153,7 @@ describe('native stream events', () => {
     }))
   })
 
-  it('leaves callId unset when ApprovalRequested has no call_id (main today)', () => {
+  it('leaves callId unset when ApprovalRequested has no call_id', () => {
     const next = callbacks()
     next.onApprovalRequested = vi.fn()
     expect(applyNativeEvent({

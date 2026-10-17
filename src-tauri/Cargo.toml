@@ -43,6 +43,10 @@ base64 = "0.22"
 regex = "1"
 # Timed Myers diffs for mutate-tool approval previews (Apache-2.0 OR MIT).
 similar = "2.7"
+# Unix process groups and the command-wrapper types for native bash.
+# Apache-2.0 OR MIT. 8.2.1 keeps the 1.77 MSRV; its std JobObject leaves
+# KILL_ON_JOB_CLOSE off, so the Windows job lives in tools/shell.rs.
+process-wrap = { version = "=8.2.1", default-features = false, features = ["std", "process-group"] }
 # gitignore-aware walks and glob matching for native read tools.
 # MIT/Unlicense; already common in the Rust search stack (ripgrep).
 ignore = "0.4"
@@ -70,6 +74,14 @@ fastembed = { version = "5.17.2", default-features = false, features = [
 
 [target.'cfg(windows)'.dependencies]
 keyring = { version = "3.6.3", features = ["windows-native"] }
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_JobObjects",
+    "Win32_System_Pipes",
+    "Win32_System_Threading",
+] }
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_Security",
@@ -94,6 +106,11 @@ keyring = { version = "3.6.3", features = ["sync-secret-service", "crypto-rust"]
 # (Finder tags / quarantine on macOS). MIT OR Apache-2.0.
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
+# `signal` is killpg. `process` is the wait-status types beside libc::waitid.
+# `fs` is the safe fcntl that sets O_NONBLOCK. Apache-2.0 OR MIT.
+# process-wrap already uses 0.30. Features are declared here so this crate
+# does not depend on process-wrap enabling them.
+nix = { version = "0.30", default-features = false, features = ["fs", "process", "signal"] }
 xattr = "1"
 
 [dev-dependencies]

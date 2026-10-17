@@ -55,7 +55,7 @@ export interface AiActionApproval {
   path?: string
   created?: boolean
   overwrite?: boolean
-  /** Mapped from ApprovalRequested.call_id when the shell runner sends it. */
+  /** Mapped from ApprovalRequested.call_id. */
   callId?: string
   busy?: boolean
   onReply?: (choice: NativeApprovalChoice) => void
@@ -69,7 +69,7 @@ export interface AiAction {
   status: AiActionStatus
   input?: string
   output?: string
-  /** Literal bash command from ApprovalRequested.args when call_id is present. */
+  /** Bash command shown on the result row. */
   command?: string
   /** Set from a deny / approval-cancelled event, not from output text. */
   denied?: boolean

@@ -165,7 +165,7 @@ describe('redactCredentialTokens', () => {
 
 describe('sanitizeDiagnosticText', () => {
   it('still redacts paths and tokens and collapses whitespace', () => {
-    const input = `Load failed for /Users/luca/Laputa/private.md\nwith token ${GITHUB_PAT}`
+    const input = `Load failed for /Users/mock/Vault/private.md\nwith token ${GITHUB_PAT}`
     expect(sanitizeDiagnosticText({ text: input })).toBe(
       `Load failed for [redacted-path] with token ${TOKEN_REDACTION}`,
     )

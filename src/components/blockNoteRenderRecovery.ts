@@ -4,7 +4,7 @@ import {
 } from './richEditorRecoveryClassifier'
 
 const BLOCKNOTE_RECOVERY_BOUNDARY_NAME = 'BlockNoteRenderRecoveryBoundary'
-const RECOVERED_BLOCKNOTE_RENDER_ERROR_MARK = '__tolariaRecoveredBlockNoteRenderError'
+const RECOVERED_BLOCKNOTE_RENDER_ERROR_MARK = '__rhizomeRecoveredBlockNoteRenderError'
 export type { BlockNoteRenderRecoveryReason } from './richEditorRecoveryClassifier'
 
 type MarkedRecoveredBlockNoteRenderError = Error & {

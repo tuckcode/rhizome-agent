@@ -180,4 +180,20 @@ describe('math markdown round-trip', () => {
     expect(readCompletedInlineMathAtEnd({ text: String.raw`Energy is $E=mc^2\$` })).toBeNull()
     expect(readCompletedInlineMathAtEnd({ text: '$$x^2$$' })).toBeNull()
   })
+
+  it('still injects math from the previous token prefix', () => {
+    const blocks = [{
+      type: 'paragraph',
+      content: [{ type: 'text', text: 'Energy is @@TOLARIA_MATH_INLINE:E%3Dmc%5E2@@ in prose.', styles: {} }],
+      children: [],
+    }]
+
+    const [block] = injectMathInBlocks(blocks) as Array<{ content: unknown[] }>
+
+    expect(block.content).toEqual([
+      { type: 'text', text: 'Energy is ', styles: {} },
+      { type: MATH_INLINE_TYPE, props: { latex: 'E=mc^2' }, content: undefined },
+      { type: 'text', text: ' in prose.', styles: {} },
+    ])
+  })
 })

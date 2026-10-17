@@ -27,7 +27,7 @@ function now(): number {
 function readDirectMarkdownMetrics(
   editor: DirectMarkdownCapableSerializer,
 ): BlockNoteDirectMarkdownMetrics | undefined {
-  return editor.__tolariaLastDirectMarkdownMetrics
+  return editor.__rhizomeLastDirectMarkdownMetrics
 }
 
 export function serializeRichEditorBodyToMarkdown(
@@ -45,7 +45,7 @@ function serializeRichEditorBodyToMarkdownWithTrace(
 ): string {
   const startedAt = now()
   const directEditor = editor as DirectMarkdownCapableSerializer
-  delete directEditor.__tolariaLastDirectMarkdownMetrics
+  delete directEditor.__rhizomeLastDirectMarkdownMetrics
   const document = blocks ?? editor.document
   const restored = restoreWikilinksInBlocks(document)
   const body = compactMarkdown(serializeDurableEditorBlocks(editor, restored, vaultPath))

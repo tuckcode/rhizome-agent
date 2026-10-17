@@ -35,14 +35,14 @@
   text-align: start;
 }
 
-.tolaria-rich-editor-text-direction-rtl,
-[data-tolaria-text-direction="rtl"],
-[data-tolaria-text-direction="rtl"] :is(blockquote, .bn-inline-content, .tola-callout) {
+.rhizome-rich-editor-text-direction-rtl,
+[data-rhizome-text-direction="rtl"],
+[data-rhizome-text-direction="rtl"] :is(blockquote, .bn-inline-content, .rhizome-callout) {
   direction: rtl;
 }
 
-[data-tolaria-text-direction="rtl"]:is(blockquote),
-[data-tolaria-text-direction="rtl"] blockquote {
+[data-rhizome-text-direction="rtl"]:is(blockquote),
+[data-rhizome-text-direction="rtl"] blockquote {
   border-left-width: 0;
   border-inline-start: var(--blockquote-border-left-width, 3px) solid var(--blockquote-border-left-color, var(--border));
   padding-inline-start: var(--blockquote-padding-left, 0.75em);
@@ -98,9 +98,9 @@
   background: transparent;
 }
 
-.editor__blocknote-container .bn-block-outer.tolaria-rich-editor-block-selected {
-  --tolaria-block-selection-right-outset: 10px;
-  --tolaria-block-selection-top-outset: 2px;
+.editor__blocknote-container .bn-block-outer.rhizome-rich-editor-block-selected {
+  --rhizome-block-selection-right-outset: 10px;
+  --rhizome-block-selection-top-outset: 2px;
 
   caret-color: transparent;
   isolation: isolate;
@@ -108,20 +108,20 @@
   position: relative;
 }
 
-.editor__blocknote-container .bn-block-outer.tolaria-rich-editor-block-selected *,
-.editor__blocknote-container .bn-block.tolaria-rich-editor-block-selected,
-.editor__blocknote-container .bn-block.tolaria-rich-editor-block-selected * {
+.editor__blocknote-container .bn-block-outer.rhizome-rich-editor-block-selected *,
+.editor__blocknote-container .bn-block.rhizome-rich-editor-block-selected,
+.editor__blocknote-container .bn-block.rhizome-rich-editor-block-selected * {
   caret-color: transparent;
 }
 
-.editor__blocknote-container .bn-block-outer.tolaria-rich-editor-block-selected::after {
+.editor__blocknote-container .bn-block-outer.rhizome-rich-editor-block-selected::after {
   background: color-mix(in srgb, var(--colors-selection) 82%, transparent);
   border-radius: 6px;
   content: "";
   inset:
-    calc(var(--tolaria-block-selection-top-outset) * -1)
-    calc(var(--tolaria-block-selection-right-outset) * -1)
-    calc(var(--tolaria-block-selection-top-outset) * -1)
+    calc(var(--rhizome-block-selection-top-outset) * -1)
+    calc(var(--rhizome-block-selection-right-outset) * -1)
+    calc(var(--rhizome-block-selection-top-outset) * -1)
     0;
   pointer-events: none;
   position: absolute;
@@ -129,26 +129,26 @@
 }
 
 .editor__blocknote-container
-  .bn-block-outer.tolaria-rich-editor-block-selected:has(> .bn-block > .bn-block-content[data-content-type="paragraph"])::after {
+  .bn-block-outer.rhizome-rich-editor-block-selected:has(> .bn-block > .bn-block-content[data-content-type="paragraph"])::after {
   bottom: calc(var(--editor-paragraph-spacing) - 2px);
 }
 
-.editor__blocknote-container .bn-block-outer.tolaria-rich-editor-block-selected:has(hr)::after {
+.editor__blocknote-container .bn-block-outer.rhizome-rich-editor-block-selected:has(hr)::after {
   content: none;
 }
 
-.editor__blocknote-container .bn-block-outer.tolaria-rich-editor-block-selected > .bn-block {
+.editor__blocknote-container .bn-block-outer.rhizome-rich-editor-block-selected > .bn-block {
   position: relative;
   z-index: 1;
 }
 
-.editor__blocknote-container .bn-block.tolaria-rich-editor-block-selected {
+.editor__blocknote-container .bn-block.rhizome-rich-editor-block-selected {
   background: color-mix(in srgb, var(--colors-selection) 82%, transparent);
   border-radius: 6px;
   box-decoration-break: clone;
 }
 
-.editor__blocknote-container .bn-block.tolaria-rich-editor-block-selected:has(hr) {
+.editor__blocknote-container .bn-block.rhizome-rich-editor-block-selected:has(hr) {
   background: transparent;
 }
 
@@ -470,7 +470,7 @@
   max-height: calc(100dvh - 32px);
   overflow: hidden;
   padding: 0;
-  zoom: var(--tolaria-overlay-zoom-inverse, 1);
+  zoom: var(--rhizome-overlay-zoom-inverse, 1);
 }
 
 .mermaid-diagram__dialog-viewport {
@@ -656,7 +656,7 @@ body.tldraw-whiteboard-fullscreen-open {
   cursor: pointer;
 }
 
-/* Code blocks follow Tolaria's theme instead of BlockNote's fixed dark shell. */
+/* Code blocks follow Rhizome's theme instead of BlockNote's fixed dark shell. */
 .editor__blocknote-container .bn-block-content[data-content-type="codeBlock"] {
   background-color: var(--editor-code-block-background) !important;
   border: 1px solid var(--editor-code-block-border);

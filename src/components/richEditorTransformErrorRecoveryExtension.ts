@@ -8,7 +8,7 @@ import {
 } from './richEditorRecoveryClassifier'
 export { isStaleBlockReferenceError } from './richEditorRecoveryClassifier'
 
-const DISPATCH_RECOVERY_STATE_KEY = '__tolariaRichEditorTransformErrorRecovery'
+const DISPATCH_RECOVERY_STATE_KEY = '__rhizomeRichEditorTransformErrorRecovery'
 
 type RichEditorDispatch = (transaction: unknown) => unknown
 type RichEditorPropRunner<T> = (prop: T) => unknown

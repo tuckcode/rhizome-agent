@@ -579,7 +579,7 @@ describe('AiMessage', () => {
           approval: {
             promptId: 'p1',
             callId: 't1',
-            args: '  ls notes  ',
+            args: '{"command":"  ls notes  ","timeout_secs":30}',
             options: [
               { id: 'allow_once', label: 'Allow once' },
               { id: 'deny', label: 'Deny' },
@@ -594,9 +594,9 @@ describe('AiMessage', () => {
     expect(writeClipboardText).toHaveBeenCalledWith('  ls notes  ')
   })
 
-  it('shows JSON-looking approval args literally when call_id is present', () => {
+  it('shows the command field from #202 JSON ApprovalRequested.args', () => {
     writeClipboardText.mockResolvedValue(undefined)
-    const raw = '{"command":"ls"}'
+    const args = '{"command":"ls"}'
     render(
       <AiMessage
         userMessage="list files"
@@ -605,25 +605,25 @@ describe('AiMessage', () => {
           toolId: 't1',
           label: 'ls',
           status: 'pending',
-          input: '{"command":"echo hi"}',
+          input: args,
           approval: {
             promptId: 'p1',
             callId: 't1',
-            args: raw,
+            args,
             options: [{ id: 'allow_once', label: 'Allow once' }, { id: 'deny', label: 'Deny' }],
           },
         }]}
       />,
     )
     fireEvent.click(screen.getByTestId('tool-use-toggle'))
-    expect(screen.getByTestId('approval-command').textContent).toBe(raw)
+    expect(screen.getByTestId('approval-command').textContent).toBe('ls')
     fireEvent.click(screen.getByRole('button', { name: 'Copy command' }))
-    expect(writeClipboardText).toHaveBeenCalledWith(raw)
+    expect(writeClipboardText).toHaveBeenCalledWith('ls')
   })
 
-  it('shows the full pwned command instead of the inner echo hi', () => {
+  it('shows the runner command field, not extra JSON keys, for #202 args', () => {
     writeClipboardText.mockResolvedValue(undefined)
-    const raw = '{"command":"echo hi","x":"$(touch /tmp/pwned)"}'
+    const args = '{"command":"echo hi","x":"$(touch /tmp/pwned)"}'
     render(
       <AiMessage
         userMessage="run"
@@ -632,22 +632,22 @@ describe('AiMessage', () => {
           toolId: 'call_1',
           label: 'bash',
           status: 'pending',
-          input: raw,
-          command: raw,
+          input: args,
+          command: 'echo hi',
           approval: {
             promptId: 'p1',
             callId: 'call_1',
-            args: raw,
+            args,
             options: [{ id: 'allow_once', label: 'Allow once' }, { id: 'deny', label: 'Deny' }],
           },
         }]}
       />,
     )
     fireEvent.click(screen.getByTestId('tool-use-toggle'))
-    expect(screen.getByTestId('approval-command').textContent).toBe(raw)
-    expect(screen.getByTestId('approval-command').textContent).toContain('pwned')
+    expect(screen.getByTestId('approval-command').textContent).toBe('echo hi')
+    expect(screen.getByTestId('approval-command').textContent).not.toContain('pwned')
     fireEvent.click(screen.getByRole('button', { name: 'Copy command' }))
-    expect(writeClipboardText).toHaveBeenCalledWith(raw)
+    expect(writeClipboardText).toHaveBeenCalledWith('echo hi')
   })
 
   it('reads the result command from JSON tool-call input without trimming', () => {

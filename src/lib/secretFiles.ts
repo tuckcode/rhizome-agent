@@ -5,7 +5,7 @@ export const DEFAULT_BLOCK_SECRET_FILES = true
 export const SECRET_FILES_LABEL = 'Hide secret files from the agent'
 
 export const SECRET_FILES_HELPER_ON =
-  "The agent's file tools skip private keys, .env files and files with similar names."
+  "The agent's file tools skip private keys, .env files and files with similar names. Commands it runs in the terminal can still open them."
 
 export const SECRET_FILES_HELPER_OFF =
   "Off: the agent's file tools can open private keys and .env files."

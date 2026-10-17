@@ -888,12 +888,14 @@ describe('aiAgentStreamCallbacks', () => {
       options: [{ id: 'allow_once', label: 'Allow once' }],
       path: 'notes/a.md',
       preview: '-x\n+y\n',
+      callId: 'call_1',
       reply,
     })
     const action = messages.getMessages()[0]?.actions[0]
     expect(action?.approval?.promptId).toBe('prompt_1')
     expect(action?.approval?.path).toBe('notes/a.md')
     expect(action?.approval?.args).toBe('{"path":"notes/a.md","old_string":"x","new_string":"y"}')
+    expect(action?.approval?.callId).toBe('call_1')
     action?.approval?.onReply?.('allow_once')
     expect(reply).toHaveBeenCalledWith('allow_once')
     expect(messages.getMessages()[0]?.actions[0]?.approval?.busy).toBe(true)
@@ -1008,7 +1010,7 @@ describe('aiAgentStreamCallbacks', () => {
     expect(actions[0]?.superseded).toBe(true)
     expect(actions[0]?.approval).toBeUndefined()
     expect(actions[1]?.toolId).toBe('call_missing')
-    expect(actions[1]?.command).toBe('{"command":"echo hi","x":"$(touch /tmp/pwned)"}')
+    expect(actions[1]?.command).toBe('echo hi')
     expect(actions[1]?.input).toBe('{"command":"echo hi","x":"$(touch /tmp/pwned)"}')
     expect(actions[1]?.approval?.args).toBe('{"command":"echo hi","x":"$(touch /tmp/pwned)"}')
   })

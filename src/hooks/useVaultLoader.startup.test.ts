@@ -6,7 +6,7 @@ import { useVaultLoader } from './useVaultLoader'
 
 const backendInvokeFn = vi.fn()
 let mockIsTauri = true
-const ACTIVE_VAULT_PATH = '/laputa'
+const ACTIVE_VAULT_PATH = '/vault'
 const EMPTY_ARRAY_COMMANDS = new Set(['get_modified_files', 'list_vault_folders', 'list_views'])
 
 vi.mock('@tauri-apps/api/core', () => ({
@@ -89,7 +89,7 @@ describe('useVaultLoader startup recovery', () => {
   })
 
   it('reloads the active workspace only after an empty cached startup scan', async () => {
-    const laputa: VaultOption = { label: 'Laputa', path: ACTIVE_VAULT_PATH, available: true, mounted: true }
+    const mainVault: VaultOption = { label: 'Vault', path: ACTIVE_VAULT_PATH, available: true, mounted: true }
     const startupMock = buildUpgradeStartupMock()
     backendInvokeFn.mockImplementation(startupMock.invoke)
 
@@ -103,7 +103,7 @@ describe('useVaultLoader startup recovery', () => {
     })
     expect(result.current.entries).toEqual([])
 
-    rerender({ vaults: [laputa] })
+    rerender({ vaults: [mainVault] })
 
     await waitFor(() => {
       expect(result.current.entries.map((entry) => entry.title)).toEqual(['Recovered'])
