@@ -438,7 +438,7 @@ it's phrased.
 - **pnpm 10 vs 11 lockfile mismatch:** CI pins pnpm 10. Local is pnpm 11. Regenerate with `CI=true npx pnpm@10 install --no-frozen-lockfile`.
 - **Local QA scripts don't exist** — `~/.openclaw/skills/tolaria-qa/scripts/` is a dead path. Fix already applied: AGENTS.md native QA block and QA scripts section now reference `computer-use` instead.
 - **`tests/smoke/fix-crash-create-note.spec.ts` is timing-flaky** — pre-existing, unrelated to shell waves. Worth a fix-flaky pass per AGENTS.md.
-- **TAURI_SIGNING_PRIVATE_KEY missing** / **Updater pubkey placeholder** — free Tauri updater key, not a paid Authenticode cert. `tauri.conf.json` pubkey is `PLACEHOLDER_KNISPO_TAURI_UPDATER_PUBKEY`. Don't invent a key. Replace it with `pnpm tauri signer generate` output in a follow-up commit, and set the private key as `TAURI_SIGNING_PRIVATE_KEY` (password: `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`).
+- **TAURI_SIGNING_PRIVATE_KEY missing** / **Updater pubkey placeholder** — free Tauri updater key, not a paid Authenticode cert. `tauri.conf.json` pubkey is `PLACEHOLDER_KNISPO_TAURI_UPDATER_PUBKEY`. Don't invent a key. Generate it outside the repo with `pnpm tauri signer generate -w ~/.tauri/rhizome-updater.key`. Paste `.key.pub` into `plugins.updater.pubkey`. Put `.key` in `TAURI_SIGNING_PRIVATE_KEY` and the password in `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Never commit the private key.
 
 ## 15. OBSOLETE — MCP server path mismatch (fixed in 2fa620a5)
 

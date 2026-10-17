@@ -23,7 +23,6 @@
     "core:event:default",
     "dialog:default",
     "deep-link:default",
-    "updater:default",
     "process:default",
     "opener:default"
   ]

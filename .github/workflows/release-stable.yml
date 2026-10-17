@@ -346,7 +346,12 @@ jobs:
       - name: Publish moving stable update feed
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash .github/scripts/publish-update-feed.sh stable-latest stable-latest.json
+        run: |
+          if jq -e '[.platforms[] | has("signature")] | all' stable-latest.json >/dev/null; then
+            bash .github/scripts/publish-update-feed.sh stable-latest stable-latest.json
+          else
+            echo "::warning::stable-latest.json has no updater signatures on every platform — leaving the stable-latest feed unchanged."
+          fi
 
   # ─────────────────────────────────────────────────────────────
   # Phase 4: Trigger the main-branch GitHub Pages deployment

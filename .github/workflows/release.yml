@@ -421,7 +421,12 @@ jobs:
       - name: Publish moving alpha update feed
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: bash .github/scripts/publish-update-feed.sh alpha-latest alpha-latest.json
+        run: |
+          if jq -e '[.platforms[] | has("signature")] | all' alpha-latest.json >/dev/null; then
+            bash .github/scripts/publish-update-feed.sh alpha-latest alpha-latest.json
+          else
+            echo "::warning::alpha-latest.json has no updater signatures on every platform — leaving the alpha-latest feed unchanged."
+          fi
 
   # ─────────────────────────────────────────────────────────────
   # Phase 4: Update GitHub Pages with docs, release history, and download assets

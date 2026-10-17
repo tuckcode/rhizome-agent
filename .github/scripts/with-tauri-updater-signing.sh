@@ -29,4 +29,4 @@ else
   extra+=('{"bundle":{"createUpdaterArtifacts":false}}')
 fi
 
-exec "$@" "${extra[@]}"
+exec "$@" ${extra[@]+"${extra[@]}"}

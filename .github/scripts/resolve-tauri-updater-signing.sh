@@ -5,7 +5,6 @@
 set -euo pipefail
 
 key="${TAURI_SIGNING_PRIVATE_KEY:-}"
-password="${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}"
 output="${GITHUB_OUTPUT:-}"
 
 write_output() {
@@ -26,6 +25,6 @@ if [ -z "${RUNNER_TEMP:-}" ]; then
 fi
 
 printf '%s' "$key" > "$RUNNER_TEMP/tauri-signing-private-key"
-printf '%s' "$password" > "$RUNNER_TEMP/tauri-signing-private-key-password"
+printf '%s' "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" > "$RUNNER_TEMP/tauri-signing-private-key-password"
 chmod 600 "$RUNNER_TEMP/tauri-signing-private-key" "$RUNNER_TEMP/tauri-signing-private-key-password"
 write_output "updater_signing=true"

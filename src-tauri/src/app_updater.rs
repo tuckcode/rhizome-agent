@@ -54,11 +54,41 @@ pub fn endpoint_for_release_channel(release_channel: Option<&str>) -> &'static s
     }
 }
 
-/// The updater plugin returns this when the tag or asset is not published yet.
-pub fn feed_has_no_release(message: &str) -> bool {
-    message
-        .to_ascii_lowercase()
-        .contains("could not fetch a valid release json")
+/// Shown for check and install while `plugins.updater.pubkey` is still the placeholder.
+pub const IN_APP_UPDATES_UNAVAILABLE: &str = "In-app updates aren't available yet.";
+
+/// Stop before any feed request. A placeholder key cannot verify a download.
+pub fn refuse_placeholder_pubkey(pubkey: &str) -> Result<(), String> {
+    if pubkey == UPDATER_PUBKEY_PLACEHOLDER {
+        Err(IN_APP_UPDATES_UNAVAILABLE.into())
+    } else {
+        Ok(())
+    }
+}
+
+/// Read the feed ourselves. The updater plugin reports every failed status as
+/// `ReleaseNotFound`, which would look like "up to date".
+///
+/// `Ok(None)` is only HTTP 404. 403, 429, and 5xx are errors. A 2xx body that
+/// is not a JSON object is an error.
+pub fn interpret_feed_response(
+    status: u16,
+    body: &str,
+) -> Result<Option<serde_json::Value>, String> {
+    if status == 404 {
+        return Ok(None);
+    }
+    if !(200..300).contains(&status) {
+        log::warn!("updater feed responded with status {status}");
+        return Err("Could not check for updates.".into());
+    }
+    match serde_json::from_str::<serde_json::Value>(body) {
+        Ok(value) if value.is_object() => Ok(Some(value)),
+        _ => {
+            log::warn!("updater feed was not a JSON object");
+            Err("Could not check for updates.".into())
+        }
+    }
 }
 
 pub fn ensure_expected_version(found: &str, expected: &str) -> Result<(), String> {
@@ -71,26 +101,35 @@ pub fn ensure_expected_version(found: &str, expected: &str) -> Result<(), String
     }
 }
 
-/// The updater plugin rejects a platform entry that has no `signature`.
-/// Unsigned release feeds stay downloadable, and they are not installable.
-pub fn updater_platform_signature(
-    feed: &serde_json::Value,
-    target: &str,
-) -> Result<String, String> {
-    let platforms = feed
-        .get("platforms")
-        .and_then(|value| value.as_object())
-        .ok_or_else(|| "Update feed is missing platforms.".to_string())?;
-    let platform = platforms
-        .get(target)
-        .ok_or_else(|| format!("Update feed has no {target} build."))?;
-    platform
-        .get("signature")
+fn configured_updater_pubkey<R: Runtime>(app_handle: &AppHandle<R>) -> String {
+    app_handle
+        .config()
+        .plugins
+        .0
+        .get("updater")
+        .and_then(|value| value.get("pubkey"))
         .and_then(|value| value.as_str())
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToOwned::to_owned)
-        .ok_or_else(|| format!("Update feed has no signature for {target}."))
+        .unwrap_or("")
+        .to_string()
+}
+
+fn fetch_feed(endpoint: &str) -> Result<Option<serde_json::Value>, String> {
+    let response = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .build()
+        .map_err(|error| {
+            log::warn!("updater client failed: {error}");
+            "Could not check for updates.".to_string()
+        })?
+        .get(endpoint)
+        .send()
+        .map_err(|error| {
+            log::warn!("updater feed request failed: {error}");
+            "Could not check for updates.".to_string()
+        })?;
+    let status = response.status().as_u16();
+    let body = response.text().unwrap_or_default();
+    interpret_feed_response(status, &body)
 }
 
 fn metadata_from_update(update: &tauri_plugin_updater::Update) -> AppUpdateMetadata {
@@ -106,19 +145,44 @@ async fn find_update<R: Runtime>(
     app_handle: &AppHandle<R>,
     release_channel: Option<&str>,
 ) -> Result<Option<tauri_plugin_updater::Update>, String> {
-    let endpoint = endpoint_for_release_channel(release_channel);
-    let url = Url::parse(endpoint).map_err(|error| error.to_string())?;
+    // Local config only. Do not touch the network while the key is a placeholder.
+    refuse_placeholder_pubkey(&configured_updater_pubkey(app_handle))?;
+
+    let endpoint = endpoint_for_release_channel(release_channel).to_string();
+    let endpoint_for_probe = endpoint.clone();
+    let manifest = tokio::task::spawn_blocking(move || fetch_feed(&endpoint_for_probe))
+        .await
+        .map_err(|error| {
+            log::warn!("updater feed probe panicked: {error}");
+            "Could not check for updates.".to_string()
+        })??;
+    if manifest.is_none() {
+        return Ok(None);
+    }
+
+    let url = Url::parse(&endpoint).map_err(|error| {
+        log::warn!("updater endpoint was not a URL: {error}");
+        "Could not check for updates.".to_string()
+    })?;
     let updater = app_handle
         .updater_builder()
         .endpoints(vec![url])
-        .map_err(|error| error.to_string())?
+        .map_err(|error| {
+            log::warn!("updater builder rejected the endpoint: {error}");
+            "Could not check for updates.".to_string()
+        })?
         .build()
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| {
+            log::warn!("updater builder failed: {error}");
+            "Could not check for updates.".to_string()
+        })?;
 
     match updater.check().await {
         Ok(update) => Ok(update),
-        Err(error) if feed_has_no_release(&error.to_string()) => Ok(None),
-        Err(error) => Err(format!("Could not read the update feed: {error}")),
+        Err(error) => {
+            log::warn!("updater plugin check failed: {error}");
+            Err("Could not check for updates.".into())
+        }
     }
 }
 
@@ -160,7 +224,10 @@ pub async fn download_and_install_app_update<R: Runtime>(
             || {},
         )
         .await
-        .map_err(|error| format!("Could not install the update: {error}"))?;
+        .map_err(|error| {
+            log::warn!("updater install failed: {error}");
+            "Could not install the update.".to_string()
+        })?;
 
     let _ = on_event.send(AppUpdateDownloadEvent::Finished);
     Ok(())
@@ -169,9 +236,9 @@ pub async fn download_and_install_app_update<R: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::{
-        endpoint_for_release_channel, ensure_expected_version, feed_has_no_release,
-        updater_platform_signature, AppUpdateDownloadEvent, AppUpdateMetadata, ALPHA_UPDATE_FEED,
-        STABLE_UPDATE_FEED, UPDATER_PUBKEY_PLACEHOLDER,
+        endpoint_for_release_channel, ensure_expected_version, interpret_feed_response,
+        refuse_placeholder_pubkey, AppUpdateDownloadEvent, AppUpdateMetadata, ALPHA_UPDATE_FEED,
+        IN_APP_UPDATES_UNAVAILABLE, STABLE_UPDATE_FEED, UPDATER_PUBKEY_PLACEHOLDER,
     };
     use serde_json::json;
 
@@ -204,30 +271,31 @@ mod tests {
     }
 
     #[test]
-    fn tauri_config_points_at_the_alpha_feed_and_a_placeholder_key() {
-        let config: serde_json::Value =
-            serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
-
-        assert_eq!(config["bundle"]["createUpdaterArtifacts"], true);
+    fn find_update_stops_before_the_network_when_the_pubkey_is_a_placeholder() {
         assert_eq!(
-            config["plugins"]["updater"]["endpoints"][0],
-            ALPHA_UPDATE_FEED
+            refuse_placeholder_pubkey(UPDATER_PUBKEY_PLACEHOLDER).unwrap_err(),
+            IN_APP_UPDATES_UNAVAILABLE
         );
-        assert_eq!(
-            config["plugins"]["updater"]["pubkey"],
-            UPDATER_PUBKEY_PLACEHOLDER
-        );
+        assert!(refuse_placeholder_pubkey("dW50cnVzdGVkIGNvbW1lbnQ").is_ok());
     }
 
     #[test]
-    fn a_missing_feed_is_not_an_update() {
-        assert!(feed_has_no_release(
-            "Could not fetch a valid release JSON from the remote"
-        ));
-        assert!(!feed_has_no_release(
-            "the platform `darwin-aarch64` was not found in the response `platforms` object"
-        ));
-        assert!(!feed_has_no_release("error sending request"));
+    fn find_update_treats_only_404_as_no_update() {
+        assert!(interpret_feed_response(404, "missing").unwrap().is_none());
+        for status in [403, 429, 500, 502] {
+            assert!(
+                interpret_feed_response(status, "nope").is_err(),
+                "status {status} must not look like up to date"
+            );
+        }
+    }
+
+    #[test]
+    fn find_update_rejects_a_malformed_feed() {
+        assert!(interpret_feed_response(200, "not-json").is_err());
+        assert!(interpret_feed_response(200, "[]").is_err());
+        let feed = interpret_feed_response(200, r#"{"version":"2026.10.17-alpha.1"}"#).unwrap();
+        assert_eq!(feed.unwrap()["version"], "2026.10.17-alpha.1");
     }
 
     #[test]
@@ -237,38 +305,6 @@ mod tests {
             ensure_expected_version("2026.10.17-alpha.3", "2026.10.17-alpha.2").unwrap_err(),
             "The update feed now offers 2026.10.17-alpha.3, not 2026.10.17-alpha.2. Check for updates again."
         );
-    }
-
-    #[test]
-    fn a_platform_without_a_signature_is_not_installable() {
-        let signed = json!({
-            "version": "2026.10.17-alpha.1",
-            "platforms": {
-                "darwin-aarch64": {
-                    "signature": "sig-contents",
-                    "url": "https://github.com/tuckcode/rhizome-agent/releases/download/alpha-v2026.10.17-alpha.0001/app.tar.gz"
-                }
-            }
-        });
-        assert_eq!(
-            updater_platform_signature(&signed, "darwin-aarch64").unwrap(),
-            "sig-contents"
-        );
-
-        let unsigned = json!({
-            "version": "2026.10.17-alpha.1",
-            "platforms": {
-                "darwin-aarch64": {
-                    "url": "https://example.com/app.tar.gz",
-                    "download_url": "https://example.com/app.tar.gz"
-                }
-            }
-        });
-        assert_eq!(
-            updater_platform_signature(&unsigned, "darwin-aarch64").unwrap_err(),
-            "Update feed has no signature for darwin-aarch64."
-        );
-        assert!(updater_platform_signature(&signed, "linux-x86_64").is_err());
     }
 
     #[test]

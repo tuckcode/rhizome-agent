@@ -2197,10 +2197,11 @@ Rhizome has two update paths. The **app** path (`app_updater.rs`,
 `useUpdater`, `UpdateBanner`) checks the moving GitHub release tag for
 the selected channel (`alpha-latest` or `stable-latest`), then downloads
 and installs through the Tauri updater plugin. Restart stays on the
-existing Restart control. The feed is installable only when the release
-was signed and `plugins.updater.pubkey` is the matching minisign key.
-That pubkey is the placeholder `PLACEHOLDER_KNISPO_TAURI_UPDATER_PUBKEY`
-until a follow-up commit replaces it. The **Chat-engine** path
+existing Restart control. While the pubkey is
+`PLACEHOLDER_KNISPO_TAURI_UPDATER_PUBKEY`, check and install return
+before any feed request. A real key is generated outside the repo with
+`pnpm tauri signer generate -w ~/.tauri/rhizome-updater.key`. The
+**Chat-engine** path
 (`prime_update.rs`, `usePrimeUpdate`) checks GitHub, then
 `apply_prime_update` runs the resolved `prime-agent update` only after
 Update now. The host refuses when `is_streaming()` is true. The client

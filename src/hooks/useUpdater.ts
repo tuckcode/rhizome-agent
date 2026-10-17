@@ -51,13 +51,22 @@ function createVersionInfo(version: string): UpdateVersionInfo {
   }
 }
 
+const IN_APP_UPDATES_UNAVAILABLE = "In-app updates aren't available yet."
+
+function updateCheckDetail(error: unknown): string {
+  if (error instanceof Error) return error.message.trim()
+  if (typeof error === 'string') return error.trim()
+  return ''
+}
+
 function buildUpdateCheckErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim()) {
-    return `Could not check for updates: ${error.message}`
+  const detail = updateCheckDetail(error)
+  if (detail) {
+    console.warn('[updater] Failed to check for updates', detail)
+  } else {
+    console.warn('[updater] Failed to check for updates')
   }
-  if (typeof error === 'string' && error.trim()) {
-    return `Could not check for updates: ${error}`
-  }
+  if (detail === IN_APP_UPDATES_UNAVAILABLE) return detail
   return 'Could not check for updates'
 }
 
@@ -118,7 +127,6 @@ export function useUpdater(
       setStatus(toAvailableStatus(update))
       return { kind: 'available', ...versionInfo }
     } catch (error) {
-      console.warn('[updater] Failed to check for updates')
       setStatus({ state: 'error' })
       return { kind: 'error', message: buildUpdateCheckErrorMessage(error) }
     }

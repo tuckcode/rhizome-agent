@@ -71,11 +71,19 @@ pnpm tauri build --target x86_64-unknown-linux-gnu --bundles deb,rpm,appimage
 
 Release validation verifies that the Linux job produced an AppImage and at least one installer bundle. A signed release also produces updater signature files (`.sig`).
 
-The app checks for updates on startup, and from the existing Check for updates control. Alpha reads `https://github.com/tuckcode/rhizome-agent/releases/download/alpha-latest/alpha-latest.json`. Stable reads the same kind of URL on the `stable-latest` tag. Those tags are prereleases on purpose: GitHub's `releases/latest/download` URL does not serve alpha releases. Update now downloads and installs through the Tauri updater. Restart uses the existing Restart control.
+The app checks for updates on startup, and from the existing Check for updates control. Alpha reads `https://github.com/tuckcode/rhizome-agent/releases/download/alpha-latest/alpha-latest.json`. Stable reads the same kind of URL on the `stable-latest` tag. Those tags are prereleases on purpose: GitHub's `releases/latest/download` URL does not serve alpha releases. Update now downloads and installs through the Tauri updater. Restart uses the existing Restart control. While `plugins.updater.pubkey` is still `PLACEHOLDER_KNISPO_TAURI_UPDATER_PUBKEY`, check and install stop before any network call and say that in-app updates are not available yet.
 
-In-app install works only after two things are true. The release was signed with the `TAURI_SIGNING_PRIVATE_KEY` secret (and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` when the key has a password). And `plugins.updater.pubkey` in `src-tauri/tauri.conf.json` is the matching minisign public key. Today that field is the placeholder `PLACEHOLDER_KNISPO_TAURI_UPDATER_PUBKEY`. Replace it with the output of `pnpm tauri signer generate`. Do not invent a key. Until that follow-up is in a build you installed, install a new disk image or rebuild.
+`plugins.updater.endpoints` stays in `src-tauri/tauri.conf.json` even though Rust always passes the channel URL at runtime. Tauri ignores a runtime endpoint list when the config list is empty, so the app would never request the feed. The checked-in URL is the alpha feed. Rust replaces it with the stable feed unless the release channel is alpha.
 
-A local `pnpm tauri build` with `createUpdaterArtifacts` on needs `TAURI_SIGNING_PRIVATE_KEY` in the environment. An unsigned local build can pass `--config '{"bundle":{"createUpdaterArtifacts":false}}'`. Release builds do that themselves when the secret is missing.
+Generate the minisign key outside this repo:
+
+```bash
+pnpm tauri signer generate -w ~/.tauri/rhizome-updater.key
+```
+
+Paste the single line from `~/.tauri/rhizome-updater.key.pub` into `plugins.updater.pubkey`. Put the contents of `~/.tauri/rhizome-updater.key` in the GitHub secret `TAURI_SIGNING_PRIVATE_KEY`, and the password you chose in `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Do not commit the private key. `.gitignore` already ignores `*.key` and `*.key.pub`. Back the key up. Losing it strands every installed copy, because those copies will only accept updates signed by this key. Commit the public key in the same release that first sets those secrets, or in a release before that one.
+
+Release builds export the key only when the secret is non-empty. An unsigned build still ships the versioned downloads, and it turns `createUpdaterArtifacts` off for that build. The moving `alpha-latest` and `stable-latest` feeds are republished only when every platform object in the feed JSON has a `signature`. An unsigned feed must not replace the last signed feed. A local `pnpm tauri build` with `createUpdaterArtifacts` on needs `TAURI_SIGNING_PRIVATE_KEY` in the environment. An unsigned local build can pass `--config '{"bundle":{"createUpdaterArtifacts":false}}'`.
 
 ## Quick Start
 

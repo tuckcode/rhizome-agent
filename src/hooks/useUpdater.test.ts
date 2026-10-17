@@ -273,10 +273,34 @@ describe('useUpdater', () => {
 
     expect(outcome).toEqual({
       kind: 'error',
-      message: 'Could not check for updates: network error',
+      message: 'Could not check for updates',
     })
-    expect(console.warn).toHaveBeenCalledWith('[updater] Failed to check for updates')
+    expect(console.warn).toHaveBeenCalledWith('[updater] Failed to check for updates', 'network error')
     expect(result.current.status).toEqual({ state: 'error' })
+  })
+
+  it('keeps the honest unavailable sentence and hides other plugin text', async () => {
+    const unavailable = await performManualCheck(
+      'stable',
+      new Error("In-app updates aren't available yet."),
+    )
+    expect(unavailable.outcome).toEqual({
+      kind: 'error',
+      message: "In-app updates aren't available yet.",
+    })
+
+    const plugin = await performManualCheck(
+      'stable',
+      new Error('Could not fetch a valid release JSON from the remote'),
+    )
+    expect(plugin.outcome).toEqual({
+      kind: 'error',
+      message: 'Could not check for updates',
+    })
+    expect(console.warn).toHaveBeenCalledWith(
+      '[updater] Failed to check for updates',
+      'Could not fetch a valid release JSON from the remote',
+    )
   })
 
   it('dismiss resets the banner state', async () => {
