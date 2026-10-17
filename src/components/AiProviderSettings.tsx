@@ -442,6 +442,7 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
 
   return (
     <div className="rounded-md border border-border bg-card p-3" data-testid="ai-provider-settings" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div data-testid="ai-provider-preset-form" className="flex flex-col gap-3">
       <div>
         <div className="text-sm font-medium text-foreground">{providerModeTitle(mode, t)}</div>
         <div className="mt-1 text-xs leading-5 text-muted-foreground">{providerModeDescription(mode, t)}</div>
@@ -517,6 +518,7 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
         >
           {testState === 'testing' ? t('settings.aiProviders.testing') : t('settings.aiProviders.test')}
         </Button>
+      </div>
       </div>
       {mode === 'api' ? <FreeTierSettings /> : null}
     </div>
