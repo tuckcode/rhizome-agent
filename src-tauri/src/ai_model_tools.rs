@@ -57,15 +57,15 @@ pub(crate) struct CreatedNoteToolResult {
     pub(crate) output: String,
 }
 
-/// GPT-6 Sol and GPT-6 Luna default to medium reasoning. Chat Completions
-/// rejects their function tools unless `reasoning_effort` is `none`.
-/// GPT-5.4 through GPT-5.6 already default to `none`; the field is still
+/// GPT-6 Sol, GPT-6 Luna, GPT-5.5, and GPT-5.6 default to medium reasoning.
+/// Chat Completions rejects their function tools unless `reasoning_effort`
+/// is `none`. Only GPT-5.4 already defaults to `none`; the field is still
 /// sent when tools are present so the request does not depend on that
 /// default. Match the model id, not the host. An Azure deployment name
 /// often differs from the model id, so this override does not fire for
 /// those names. OpenRouter is left unchanged: the OpenRouter kind, and any
-/// base URL whose host is `openrouter.ai` (Taproot stores that route as
-/// `open_ai_compatible`).
+/// base URL whose host is `openrouter.ai` or a subdomain of it (Taproot
+/// stores that route as `open_ai_compatible`).
 const CHAT_TOOLS_REASONING_NONE_PREFIXES: &[(&str, &str)] = &[
     ("gpt-6-sol", "GPT-6 Sol"),
     ("gpt-6-luna", "GPT-6 Luna"),
@@ -91,7 +91,7 @@ pub(crate) enum ChatToolsReasoning {
     /// The streaming loop stops with this message. The optional create-note
     /// call omits the tool and still sends the chat.
     OmitTools(String),
-    /// Stop before any HTTP call. A `-pro` id is not on Chat Completions.
+    /// Stop before any HTTP call. A `-pro` id does not work in Rhizome chat.
     Refuse(String),
 }
 
@@ -115,9 +115,7 @@ pub(crate) fn chat_tools_reasoning(
     }
     if let Some((name, rest)) = bounded_family(&bare, CHAT_TOOLS_REASONING_NONE_PREFIXES) {
         if is_pro_suffix(rest) {
-            return ChatToolsReasoning::Refuse(format!(
-                "{name} Pro is not available over Chat Completions."
-            ));
+            return ChatToolsReasoning::Refuse(pro_refusal(name, rest));
         }
         return ChatToolsReasoning::None;
     }
@@ -161,12 +159,49 @@ fn bounded_family<'a>(
     found.map(|(_, name, rest)| (name, rest))
 }
 
+/// `pro` as its own `-` segment, including after another suffix (`mini-pro`).
 fn is_pro_suffix(rest: &str) -> bool {
-    rest == "pro" || rest.starts_with("pro-")
+    rest.split('-').any(|part| part == "pro")
+}
+
+/// "GPT-6 Luna Mini Pro doesn't work…" when the segments before `pro` are
+/// known. Anything else falls back to a generic sentence.
+fn pro_refusal(base_name: &str, rest: &str) -> String {
+    let Some(display) = pro_display_name(base_name, rest) else {
+        return "This Pro model doesn't work in Rhizome chat yet.".into();
+    };
+    let pick = if base_name.starts_with("GPT-5") {
+        format!("Pick {base_name} instead.")
+    } else {
+        "Pick GPT-6 Sol or Luna instead.".into()
+    };
+    format!("{display} doesn't work in Rhizome chat yet. {pick}")
+}
+
+fn pro_display_name(base_name: &str, rest: &str) -> Option<String> {
+    let mut qualifiers = Vec::new();
+    for part in rest.split('-') {
+        if part == "pro" {
+            let mut name = base_name.to_string();
+            for qualifier in qualifiers {
+                name.push(' ');
+                name.push_str(qualifier);
+            }
+            name.push_str(" Pro");
+            return Some(name);
+        }
+        let qualifier = match part {
+            "mini" => "Mini",
+            _ => return None,
+        };
+        qualifiers.push(qualifier);
+    }
+    None
 }
 
 fn is_openrouter_base(base_url: Option<&str>) -> bool {
-    base_url_host(base_url).is_some_and(|host| host == "openrouter.ai")
+    base_url_host(base_url)
+        .is_some_and(|host| host == "openrouter.ai" || host.ends_with(".openrouter.ai"))
 }
 
 fn base_url_host(base_url: Option<&str>) -> Option<String> {
@@ -673,7 +708,14 @@ mod tests {
             assert!(payload.get("tools").is_some(), "{model_id}");
         }
 
-        for model_id in ["gpt-4.1", "gpt-5.3", "gpt-5.40", "gpt-5.55", "gpt-5-nano"] {
+        for model_id in [
+            "gpt-4.1",
+            "gpt-5.3",
+            "gpt-5.40",
+            "gpt-5.55",
+            "gpt-5-nano",
+            "gpt-6-lunatic",
+        ] {
             let payload = payload_for(model_id, AiModelProviderKind::OpenAi, true);
             assert!(payload.get("tools").is_some(), "{model_id}");
             assert!(payload.get("reasoning_effort").is_none(), "{model_id}");
@@ -737,15 +779,88 @@ mod tests {
             );
         }
 
-        for (model_id, name) in [("gpt-6-luna-pro", "GPT-6 Luna"), ("gpt-5.4-pro", "GPT-5.4")] {
+        for (model_id, message) in [
+            (
+                "gpt-6-luna-pro",
+                "GPT-6 Luna Pro doesn't work in Rhizome chat yet. Pick GPT-6 Sol or Luna instead.",
+            ),
+            (
+                "gpt-5.4-pro",
+                "GPT-5.4 Pro doesn't work in Rhizome chat yet. Pick GPT-5.4 instead.",
+            ),
+            (
+                "gpt-5.6-pro",
+                "GPT-5.6 Pro doesn't work in Rhizome chat yet. Pick GPT-5.6 instead.",
+            ),
+            (
+                "gpt-6-luna-mini-pro",
+                "GPT-6 Luna Mini Pro doesn't work in Rhizome chat yet. Pick GPT-6 Sol or Luna instead.",
+            ),
+            (
+                "gpt-6-sol-mini-pro-2026-01-01",
+                "GPT-6 Sol Mini Pro doesn't work in Rhizome chat yet. Pick GPT-6 Sol or Luna instead.",
+            ),
+            (
+                "gpt-6-luna-custom-pro",
+                "This Pro model doesn't work in Rhizome chat yet.",
+            ),
+        ] {
             assert_eq!(
                 reasoning_for(model_id, AiModelProviderKind::OpenAi, None, true),
-                ChatToolsReasoning::Refuse(format!(
-                    "{name} Pro is not available over Chat Completions."
-                )),
+                ChatToolsReasoning::Refuse(message.into()),
                 "{model_id}"
             );
         }
+
+        for base_url in [
+            "https://openrouter.ai.evil.com/api/v1",
+            "https://evilopenrouter.ai/api/v1",
+            "https://evil.com/openrouter.ai",
+            "https://openrouter.ai@evil.com/api/v1",
+            "openrouter.ai.evil.com",
+            "evil.com/openrouter.ai",
+            "openrouter.ai@evil.com",
+        ] {
+            assert_eq!(
+                reasoning_for(
+                    "gpt-6-luna",
+                    AiModelProviderKind::OpenAiCompatible,
+                    Some(base_url),
+                    true,
+                ),
+                ChatToolsReasoning::None,
+                "{base_url}"
+            );
+            let mut provider = provider();
+            provider.kind = AiModelProviderKind::OpenAiCompatible;
+            provider.base_url = Some(base_url.into());
+            provider.models[0].id = "gpt-6-luna".into();
+            provider.models[0].capabilities.tools = true;
+            let mut request = request_with_provider(provider, Some("vault".into()), Vec::new());
+            request.model_id = "gpt-6-luna".into();
+            let payload = openai_chat_payload(&request);
+            assert_eq!(payload["reasoning_effort"], "none", "{base_url}");
+        }
+
+        assert_eq!(
+            reasoning_for(
+                "gpt-6-luna",
+                AiModelProviderKind::OpenAiCompatible,
+                Some("https://api.openrouter.ai/api/v1"),
+                true,
+            ),
+            ChatToolsReasoning::Unchanged
+        );
+        let mut subdomain = provider();
+        subdomain.kind = AiModelProviderKind::OpenAiCompatible;
+        subdomain.base_url = Some("https://api.openrouter.ai/api/v1".into());
+        subdomain.models[0].id = "gpt-6-luna".into();
+        subdomain.models[0].capabilities.tools = true;
+        let mut request = request_with_provider(subdomain, Some("vault".into()), Vec::new());
+        request.model_id = "gpt-6-luna".into();
+        let payload = openai_chat_payload(&request);
+        assert!(payload.get("tools").is_some());
+        assert!(payload.get("reasoning_effort").is_none());
     }
 
     #[test]
