@@ -57,6 +57,55 @@ pub(crate) struct CreatedNoteToolResult {
     pub(crate) output: String,
 }
 
+/// GPT-6 Sol, GPT-6 Luna, and GPT-5.4 through GPT-5.6 default to medium
+/// reasoning. Chat Completions rejects their function tools unless
+/// `reasoning_effort` is `none`. Hard-coded (same prefixes as the reasoning
+/// catalog's GPT-6 tiers, plus the 5.4–5.6 family) so Azure, a custom base
+/// URL, and a proxy match on the model id. OpenRouter is left unchanged.
+const CHAT_TOOLS_REASONING_NONE_PREFIXES: &[&str] =
+    &["gpt-6-sol", "gpt-6-luna", "gpt-5.4", "gpt-5.5", "gpt-5.6"];
+
+/// These models do not accept `reasoning_effort: "none"`. Chat Completions
+/// cannot run tools for them yet (issue #225).
+const CHAT_TOOLS_UNSUPPORTED_PREFIXES: &[&str] = &["gpt-6-astra", "gpt-6.1-sol"];
+
+/// `Ok(Some("none"))` when this tool turn must send `reasoning_effort`.
+/// `Err` when the model cannot take tools on Chat Completions at all.
+/// `Ok(None)` leaves the body unchanged.
+pub(crate) fn chat_tools_reasoning_effort(
+    kind: &AiModelProviderKind,
+    model_id: &str,
+    tools_present: bool,
+) -> Result<Option<&'static str>, String> {
+    if !tools_present || *kind == AiModelProviderKind::OpenRouter {
+        return Ok(None);
+    }
+    let bare = bare_chat_model_id(model_id);
+    if prefix_match(&bare, CHAT_TOOLS_UNSUPPORTED_PREFIXES) {
+        return Err(format!(
+            "{} can't use tools over Chat Completions yet.",
+            model_id.trim()
+        ));
+    }
+    if prefix_match(&bare, CHAT_TOOLS_REASONING_NONE_PREFIXES) {
+        return Ok(Some("none"));
+    }
+    Ok(None)
+}
+
+fn bare_chat_model_id(model_id: &str) -> String {
+    model_id
+        .trim()
+        .rsplit('/')
+        .next()
+        .unwrap_or("")
+        .to_ascii_lowercase()
+}
+
+fn prefix_match(bare: &str, prefixes: &[&str]) -> bool {
+    prefixes.iter().any(|prefix| bare.starts_with(prefix))
+}
+
 pub(crate) fn openai_chat_payload(request: &AiModelStreamRequest) -> serde_json::Value {
     let mut payload = serde_json::json!({
         "model": request.model_id,
@@ -66,6 +115,11 @@ pub(crate) fn openai_chat_payload(request: &AiModelStreamRequest) -> serde_json:
     if should_offer_openai_tools(request) {
         payload["tools"] = serde_json::Value::Array(vec![openai_create_note_tool()]);
         payload["tool_choice"] = serde_json::Value::String("auto".into());
+        if let Ok(Some(effort)) =
+            chat_tools_reasoning_effort(&request.provider.kind, &request.model_id, true)
+        {
+            payload["reasoning_effort"] = serde_json::Value::String(effort.into());
+        }
     }
     payload
 }
@@ -94,7 +148,7 @@ fn openai_chat_messages(request: &AiModelStreamRequest) -> Vec<serde_json::Value
     messages
 }
 
-fn should_offer_openai_tools(request: &AiModelStreamRequest) -> bool {
+pub(crate) fn should_offer_openai_tools(request: &AiModelStreamRequest) -> bool {
     let has_active_vault = non_empty_option(request.vault_path.as_deref()).is_some();
     has_active_vault
         && (request.provider.kind == AiModelProviderKind::OpenAi
@@ -498,6 +552,58 @@ mod tests {
 
         assert!(payload.get("tools").is_none());
         assert!(payload.get("tool_choice").is_none());
+    }
+
+    fn payload_for(model_id: &str, kind: AiModelProviderKind, vault: bool) -> serde_json::Value {
+        let mut provider = provider();
+        provider.kind = kind;
+        provider.models[0].id = model_id.into();
+        provider.models[0].capabilities.tools = true;
+        let mut request =
+            request_with_provider(provider, vault.then(|| "vault".into()), Vec::new());
+        request.model_id = model_id.into();
+        openai_chat_payload(&request)
+    }
+
+    #[test]
+    fn openai_payload_sends_reasoning_none_only_with_tools_on_the_gpt_family() {
+        for model_id in [
+            "gpt-6-sol",
+            "gpt-6-luna",
+            "gpt-5.4",
+            "gpt-5.5-mini",
+            "gpt-5.6-terra",
+            "openai/gpt-6-luna",
+        ] {
+            let payload = payload_for(model_id, AiModelProviderKind::OpenAi, true);
+            assert_eq!(payload["reasoning_effort"], "none", "{model_id}");
+            assert!(payload.get("tools").is_some(), "{model_id}");
+        }
+
+        let gpt41 = payload_for("gpt-4.1", AiModelProviderKind::OpenAi, true);
+        assert!(gpt41.get("tools").is_some());
+        assert!(gpt41.get("reasoning_effort").is_none());
+
+        let no_tools = payload_for("gpt-6-luna", AiModelProviderKind::OpenAi, false);
+        assert!(no_tools.get("tools").is_none());
+        assert!(no_tools.get("reasoning_effort").is_none());
+
+        for model_id in ["openai/gpt-6-luna", "gpt-6-astra", "gpt-6.1-sol"] {
+            let payload = payload_for(model_id, AiModelProviderKind::OpenRouter, true);
+            assert!(payload.get("tools").is_some(), "{model_id}");
+            assert!(payload.get("reasoning_effort").is_none(), "{model_id}");
+        }
+
+        for model_id in ["gpt-6-astra", "gpt-6-astra-900k", "gpt-6.1-sol"] {
+            let payload = payload_for(model_id, AiModelProviderKind::OpenAi, true);
+            assert!(payload.get("tools").is_some(), "{model_id}");
+            assert!(payload.get("reasoning_effort").is_none(), "{model_id}");
+            assert_eq!(
+                chat_tools_reasoning_effort(&AiModelProviderKind::OpenAi, model_id, true)
+                    .unwrap_err(),
+                format!("{model_id} can't use tools over Chat Completions yet.")
+            );
+        }
     }
 
     #[test]
