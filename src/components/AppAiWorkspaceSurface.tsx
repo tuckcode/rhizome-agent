@@ -13,6 +13,7 @@ interface AppAiWorkspaceSurfaceProps {
   aiAgentsStatus: AiAgentsStatus
   aiModelProviders?: AiModelProvider[]
   chatEngine?: ChatEngine
+  nativeTarget?: string
   conversationSettings?: AiWorkspaceConversationSetting[] | null
   conversationSettingsReady?: boolean
   defaultAiAgent: AiAgentId
@@ -51,6 +52,7 @@ export function AppAiWorkspaceSurface({
   aiAgentsStatus,
   aiModelProviders,
   chatEngine,
+  nativeTarget,
   conversationSettings,
   conversationSettingsReady,
   defaultAiAgent,
@@ -89,6 +91,7 @@ export function AppAiWorkspaceSurface({
       aiAgentsStatus={aiAgentsStatus}
       aiModelProviders={aiModelProviders}
       chatEngine={chatEngine}
+      nativeTarget={nativeTarget}
       conversationSettings={conversationSettings}
       conversationSettingsReady={conversationSettingsReady}
       defaultAiAgent={defaultAiAgent}

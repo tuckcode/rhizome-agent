@@ -80,6 +80,7 @@ interface AiWorkspaceProps {
   conversationSettings?: AiWorkspaceConversationSetting[] | null
   conversationSettingsReady?: boolean
   chatEngine?: ChatEngine
+  nativeTarget?: string
   defaultAiAgent?: AiAgentId
   defaultAiAgentReadiness?: AiAgentReadiness
   defaultAiAgentReady?: boolean
@@ -321,6 +322,7 @@ type ConversationSessionProps = {
   activeNoteContent?: string | null
   aiAgentsStatus: AiAgentsStatus
   chatEngine?: ChatEngine
+  nativeTarget?: string
   conversation: AiConversation
   defaultAiAgentReady: boolean
   entries?: VaultEntry[]
@@ -539,10 +541,17 @@ function ConversationWorkspaceHeader({
   )
 }
 
+/** The Chat engine applies to Prime conversations. Codex, Claude, and API models keep their own target. */
+function engineForWorkspaceTarget(target: AiTarget, chatEngine: ChatEngine | undefined): ChatEngine | undefined {
+  if (target.kind === 'agent' && target.agent === 'prime') return chatEngine
+  return undefined
+}
+
 function ConversationSession({
   active,
   activeEntry,
   chatEngine,
+  nativeTarget,
   activeNoteContent,
   aiAgentsStatus,
   conversation,
@@ -586,6 +595,7 @@ function ConversationSession({
     openTabs,
   })
   const readiness = agentReadinessForTarget(target, aiAgentsStatus)
+  const sessionEngine = engineForWorkspaceTarget(target, chatEngine)
   const controller = useAiPanelController({
     vaultPath,
     vaultPaths,
@@ -605,7 +615,8 @@ function ConversationSession({
     onFileModified,
     onVaultChanged,
     sessionId: conversation.id,
-    chatEngine,
+    chatEngine: sessionEngine,
+    nativeTarget: sessionEngine === 'native' ? nativeTarget : undefined,
   })
   const running = controller.agent.status === 'thinking' || controller.agent.status === 'tool-executing'
   const composerMenuSide = mode === 'window' ? 'bottom' : 'top'
@@ -1067,6 +1078,7 @@ function ConversationSessions({
             activeNoteContent={workspace.activeNoteContent}
             aiAgentsStatus={workspace.aiAgentsStatus}
             chatEngine={workspace.chatEngine}
+            nativeTarget={workspace.nativeTarget}
             conversation={conversation}
             defaultAiAgentReady={workspace.defaultAiAgentReady}
             entries={workspace.entries}

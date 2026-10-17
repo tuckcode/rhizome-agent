@@ -722,6 +722,90 @@ describe('AiWorkspace', () => {
     ])
   })
 
+  it('routes only Prime conversations through the Chat engine', () => {
+    const statuses = installedStatuses()
+    statuses.codex = createAiAgentAvailability('missing', null)
+    const cases = [
+      {
+        id: 'codex-chat',
+        title: 'Codex chat',
+        targetId: 'agent:codex',
+        engine: 'native' as const,
+        nativeTarget: 'open_ai/gpt-4o',
+        agent: 'codex',
+        expectEngine: undefined,
+        expectNativeTarget: undefined,
+        expectReadiness: 'missing',
+      },
+      {
+        id: 'model-chat',
+        title: 'Model chat',
+        targetId: 'model:openai/gpt-4.1',
+        engine: 'native' as const,
+        nativeTarget: 'open_ai/gpt-4o',
+        agent: 'prime',
+        expectEngine: undefined,
+        expectNativeTarget: undefined,
+        expectKind: 'api_model',
+      },
+      {
+        id: 'prime-native',
+        title: 'Prime native',
+        targetId: 'agent:prime',
+        engine: 'native' as const,
+        nativeTarget: 'open_ai/gpt-4o',
+        agent: 'prime',
+        expectEngine: 'native',
+        expectNativeTarget: 'open_ai/gpt-4o',
+      },
+      {
+        id: 'prime-prime',
+        title: 'Prime prime',
+        targetId: 'agent:prime',
+        engine: 'prime' as const,
+        nativeTarget: 'open_ai/gpt-4o',
+        agent: 'prime',
+        expectEngine: 'prime',
+        expectNativeTarget: undefined,
+      },
+    ]
+
+    for (const item of cases) {
+      controllerCalls = []
+      const { unmount } = render(
+        <AiWorkspace
+          open
+          mode="side"
+          chatEngine={item.engine}
+          nativeTarget={item.nativeTarget}
+          aiAgentsStatus={statuses}
+          aiModelProviders={providers}
+          conversationSettings={[{
+            id: item.id,
+            title: item.title,
+            target_id: item.targetId,
+            archived: false,
+          }]}
+          vaultPath="/tmp/vault"
+          onClose={vi.fn()}
+        />,
+      )
+      const call = controllerCalls.at(-1) as {
+        chatEngine?: string
+        nativeTarget?: string
+        defaultAiAgent?: string
+        defaultAiAgentReadiness?: string
+        defaultAiTarget?: { kind?: string }
+      }
+      expect(call.defaultAiAgent).toBe(item.agent)
+      expect(call.chatEngine).toBe(item.expectEngine)
+      expect(call.nativeTarget).toBe(item.expectNativeTarget)
+      if (item.expectReadiness) expect(call.defaultAiAgentReadiness).toBe(item.expectReadiness)
+      if (item.expectKind) expect(call.defaultAiTarget?.kind).toBe(item.expectKind)
+      unmount()
+    }
+  })
+
   it('opens with the workspace sidebar collapsed and expands from the sidebar header', () => {
     render(<AiWorkspace open mode="window" aiAgentsStatus={installedStatuses()} aiModelProviders={providers} vaultPath="/tmp/vault" onClose={vi.fn()} />)
 

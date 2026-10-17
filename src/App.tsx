@@ -2019,7 +2019,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       open={effectiveShowAIChat}
       aiAgentsStatus={aiAgentsStatus}
       aiModelProviders={settings.ai_model_providers ?? []}
-      chatEngine={chatEngine}
+      chatEngine={settingsLoaded ? chatEngine : undefined}
+      nativeTarget={settingsLoaded ? settings.native_chat_target ?? undefined : undefined}
       conversationSettings={settings.ai_workspace_conversations ?? null}
       conversationSettingsReady={settingsLoaded}
       defaultAiAgent={aiAgentPreferences.defaultAiAgent}
