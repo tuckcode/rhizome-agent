@@ -1330,8 +1330,15 @@ mod tests {
 
     #[test]
     fn scrub_secrets_redacts_a_pem_block() {
-        let pem = "-----BEGIN PRIVATE KEY-----\nabcd\n-----END PRIVATE KEY-----";
-        assert_redacted(pem, "abcd");
+        let pem = format!(
+            "{}{}\n{}\n{}{}",
+            "-----BEGIN ",
+            "PRIVATE KEY-----",
+            "abcd",
+            "-----END ",
+            "PRIVATE KEY-----",
+        );
+        assert_redacted(&pem, "abcd");
     }
 
     #[test]
