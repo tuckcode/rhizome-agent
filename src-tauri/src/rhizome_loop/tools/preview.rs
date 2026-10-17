@@ -445,8 +445,7 @@ mod tests {
     }
 
     #[test]
-    fn dump_review_shot_previews() {
-        let dir = std::env::temp_dir();
+    fn review_shot_fixtures_match_unified() {
         let cases = [
             (
                 "edit",
@@ -470,7 +469,6 @@ mod tests {
             ),
         ];
         for (name, diff, fixture) in cases {
-            std::fs::write(dir.join(format!("rhizome-shot-{name}.diff")), &diff).unwrap();
             assert_eq!(
                 diff.trim_end(),
                 fixture.trim_end(),
