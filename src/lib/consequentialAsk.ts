@@ -134,7 +134,25 @@ const GHOST_ADJECTIVES = new Set(['second', 'main', 'new', 'short', 'next', 'qui
 const IT_VERBS = new Set(['explain', 'summarize', 'summarise', 'translate'])
 const THIS_VERBS = new Set(['summarize', 'summarise', 'translate'])
 
-const SECRET_OBJECT = /\.env\b|\bapi keys?\b|\bprivate keys?\b|\bpasswords?\b|\btokens?\b|\bsecrets?\b|\bcredentials\b|\bssh keys?\b/i
+const SECRET_OBJECT = /\.env\b|\.pem\b|\bapi ?keys?\b|\bapikeys?\b|\bprivate ?keys?\b|\bprivatekeys?\b|\bpasswords?\b|\btokens?\b|\baccesstokens?\b|\bsecrets?\b|\bcredentials?\b|\bssh\b|\bid_rsa\b|\bkeychain\b/i
+const TAIL_STOP = new Set([
+  'and', 'then', 'or', 'also', 'plus', 'but', 'so', 'to', 'by', 'before', 'after', 'while',
+  'it', 'them', 'this', 'that', 'all', 'every', 'each', 'everything',
+])
+const EXPLAIN_STOP = new Set([
+  ...TAIL_STOP,
+  'once', 'via', 'using', 'with', 'on', 'in', 'into', 'for', 'from', 'as', 'well', 'followed',
+  'it', 'them', 'this', 'that', 'all', 'every', 'each', 'now',
+])
+const DENY_WORD = /^(?:push|delete|remove|drop|deploy|ship|merge|pay|send|post|rm|run|migrate|apply|wipe|reset|force|publish|sync|overwrite|commit|rebase|revert|execute|approve|install|kill)\w*$/i
+const JOINED_SECRET = /^(?:apikey|apikeys|privatekey|privatekeys|accesstoken|accesstokens|password|passwords|secret|secrets|token|tokens|credentials|credential)$/i
+const LANGUAGES = new Set([
+  'english', 'french', 'spanish', 'german', 'italian', 'portuguese', 'dutch',
+  'japanese', 'chinese', 'korean', 'russian', 'arabic', 'hindi', 'polish', 'swedish',
+])
+const SINGULAR_EDIT_OBJECTS = new Set(['note', 'section', 'intro', 'introduction', 'paragraph', 'typo'])
+const SINGULAR_EDIT_VERBS = new Set(['rewrite', 'edit', 'format', 'fix'])
+const NO_THREAD_TEXT_NAME = new Set(['add', 'write', 'edit', 'writeup'])
 
 function visibleClause(raw: string): string | null {
   const clause = prepareText(raw).replace(/[.]+$/, '').trim()
@@ -176,11 +194,11 @@ function ghostTokens(display: string): string[] | null {
   text = text.replace(/\bmake a note\b/g, ' makeanote ')
   text = text.replace(/\bjot down\b/g, ' jotdown ')
   text = text.replace(/\bcreate a note\b/g, ' createanote ')
-  text = text.replace(/\b(?:in|into) this note\b/g, ' dest ')
+  text = text.replace(/\b(?:in|into) this note\b/g, ' destthis ')
   text = text.replace(/\b(?:in|into) the note\b/g, ' dest ')
   text = text.replace(/\b(?:in|into) my notes\b/g, ' dest ')
   text = text.replace(/\bfor me\b/g, ' forme ')
-  text = text.replace(/\bthat mentions\b/g, ' thatmentions ')
+  text = text.replace(/\bthat mentions?\b/g, ' thatmentions ')
   text = text.replace(/\ba few\b/g, ' afew ')
   text = text.replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
   if (!text) return null
@@ -199,12 +217,28 @@ function ghostGrammarAccepts(display: string): boolean {
     index += 1
     if (tokens[index] !== 'thatmentions') return false
     index += 1
-    if (index >= tokens.length) return false
-    return tokens.slice(index).every((token) => /^[a-z0-9]+$/.test(token))
+    const tail = tokens.slice(index)
+    if (tail.length < 1 || tail.length > 3) return false
+    return tail.every((token) => (
+      /^[a-z0-9]+$/.test(token)
+      && !TAIL_STOP.has(token)
+      && !DENY_WORD.test(token)
+      && !JOINED_SECRET.test(token)
+      && !SECRET_OBJECT.test(token)
+    ))
   }
   if (!GHOST_VERBS.has(verb)) return false
-  if (verb === 'continue' && index === tokens.length) return true
-  if (GHOST_DETERMINERS.has(tokens[index] ?? '')) index += 1
+  if (verb === 'makeanote' || verb === 'createanote') {
+    if (index < tokens.length && (tokens[index] === 'dest' || tokens[index] === 'forme' || tokens[index] === 'destthis')) {
+      index += 1
+    }
+    return index === tokens.length
+  }
+  let determiner = ''
+  if (GHOST_DETERMINERS.has(tokens[index] ?? '')) {
+    determiner = tokens[index] ?? ''
+    index += 1
+  }
   while (GHOST_ADJECTIVES.has(tokens[index] ?? '')) index += 1
   const object = tokens[index]
   if (!object) return false
@@ -218,7 +252,15 @@ function ghostGrammarAccepts(display: string): boolean {
   } else if (verb === 'fix' && !FIX_OBJECTS.has(object)) {
     return false
   }
-  if (index < tokens.length && (tokens[index] === 'dest' || tokens[index] === 'forme')) {
+  if (SINGULAR_EDIT_VERBS.has(verb)) {
+    if (determiner === 'my' || determiner === 'these' || determiner === 'those') return false
+    if (!SINGULAR_EDIT_OBJECTS.has(object)) return false
+  }
+  if (NO_THREAD_TEXT_NAME.has(verb) && (object === 'thread' || object === 'text' || object === 'name' || object === 'names')) {
+    return false
+  }
+  if (index < tokens.length && (tokens[index] === 'dest' || tokens[index] === 'forme' || tokens[index] === 'destthis')) {
+    if (SINGULAR_EDIT_VERBS.has(verb) && tokens[index] !== 'destthis') return false
     index += 1
   }
   return index === tokens.length
@@ -374,7 +416,50 @@ export function captureActionClause(sentence: string): string | null {
  * Named approval ghost, null when the offer must stay silent, undefined when
  * the sentence is not an approval offer.
  */
-function approvalCompletionText(sentence: string): string | null | undefined {
+function explainTopicOk(topic: string): boolean {
+  const parts = topic.split(' ')
+  if (parts.length < 1 || parts.length > 5) return false
+  if (parts.some((word) => EXPLAIN_STOP.has(word) || !/^[a-z0-9]+$/.test(word))) return false
+  if (/\w+ing\b/.test(topic)) return false
+  if (SECRET_OBJECT.test(topic)) return false
+  return true
+}
+
+/** Narrow restores for clauses the closed grammar does not already accept. */
+function restoreGhostClause(display: string, fullMessage?: string): boolean {
+  if (ghostHasStructuralBreak(display) || SECRET_OBJECT.test(display)) return false
+  const clause = display.toLowerCase().replace(/\s+/g, ' ')
+    .replace(/\bwrite-up\b/g, 'write up')
+    .replace(/\bre-write\b/g, 'rewrite')
+    .trim()
+  if (/^read the readme(?: md)?$/.test(clause)) return true
+  const explained = clause.match(/^explain (?:how )?(.+?)(?: works)?$/)
+  if (explained?.[1] && explainTopicOk(explained[1])) return true
+  if (/^write up the (?:meeting |call |standup |interview |lecture )?(?:notes|summary)$/.test(clause)) return true
+  if (/^(?:make a note of (?:this|that)|jot (?:this|that) down|note (?:this|that) down)$/.test(clause)) {
+    const source = fullMessage ?? display
+    if (SECRET_OBJECT.test(source) || /```/.test(source)) return false
+    return true
+  }
+  if (/^find (?:related|similar) notes$/.test(clause)) return true
+  if (/^compare the (?:two |three )?(?:approaches|options)$/.test(clause)) return true
+  if (/^draft a reply(?: to the (?:email|message|thread))?$/.test(clause)) return true
+  const translated = clause.match(/^translate (?:this|it) (?:to|into) ([a-z]+)$/)
+  if (translated?.[1] && LANGUAGES.has(translated[1])) return true
+  if (/^summarize what you (?:said|sent|found|wrote)$/.test(clause)) return true
+  const called = clause.match(/^create a note called ([a-z0-9]+(?: [a-z0-9]+){0,3})$/)
+  if (
+    called?.[1]
+    && explainTopicOk(called[1])
+    && !DENY_WORD.test(called[1])
+    && !called[1].split(' ').some((word) => DENY_WORD.test(word))
+  ) {
+    return true
+  }
+  return false
+}
+
+function approvalCompletionText(sentence: string, fullMessage?: string): string | null | undefined {
   const text = prepareText(sentence).trim()
   if (!isReadyOffer(text) && !isYesOffer(text)) return undefined
   const found = rawApprovalClause(text)
@@ -382,18 +467,18 @@ function approvalCompletionText(sentence: string): string | null | undefined {
   const clause = visibleClause(found.clause)
   if (!clause) return null
   const swapped = swapListenerPossessives(clause)
-  if (!ghostGrammarAccepts(swapped)) return null
+  if (!ghostGrammarAccepts(swapped) && !restoreGhostClause(swapped, fullMessage)) return null
   return `Yes — ${swapped}`
 }
 
 /** Harmless next-step echo, or null when the step is absent, unclean, or not allowlisted. */
-function nextStepCompletion(sentence: string): string | null {
+function nextStepCompletion(sentence: string, fullMessage?: string): string | null {
   const text = prepareText(sentence).replace(/[?!]+$/, '').trim()
   const match = text.match(NEXT_STEP)
   if (!match?.[1]) return null
   const original = match[1].replace(/[.]+$/, '').trim()
   const echo = swapListenerPossessives(original)
-  if (!ghostGrammarAccepts(echo)) return null
+  if (!ghostGrammarAccepts(echo) && !restoreGhostClause(echo, fullMessage)) return null
   return echo.charAt(0).toUpperCase() + echo.slice(1)
 }
 
@@ -401,10 +486,11 @@ function nextStepCompletion(sentence: string): string | null {
  * The one Tab ghost for this sentence, or null.
  * An approval is named or absent. A next-step echo is harmless or absent.
  */
-export function predictedCompletion(sentence: string): string | null {
-  const approval = approvalCompletionText(sentence)
+export function predictedCompletion(sentence: string, fullMessage?: string): string | null {
+  const source = fullMessage ?? sentence
+  const approval = approvalCompletionText(sentence, source)
   if (approval !== undefined) return approval
-  return nextStepCompletion(sentence)
+  return nextStepCompletion(sentence, source)
 }
 
 function isNativeStreamAgent(agentId: string | null | undefined): boolean {

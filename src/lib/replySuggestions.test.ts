@@ -331,6 +331,8 @@ describe('suggestReply', () => {
       })
       expect(suggestReply('Want me to draft the note\nand push it?')).toBeNull()
       expect(suggestReply('Want me to:\n- draft the note\n- push it?')).toBeNull()
+      expect(suggestReply('Would you like me to draft the note\nand push it?')).toBeNull()
+      expect(suggestReply('I can draft the note\nif you would like.')).toBeNull()
     })
 
     it('echoes_a_harmless_next_step', () => {

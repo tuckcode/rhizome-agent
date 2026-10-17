@@ -56,7 +56,13 @@ export function suggestReply(agentMessage: string): ReplySuggestion | null {
 
   // A consent offer split across lines or bullets is not a closed choice.
   // The ghost grammar also rejects that shape; do not turn it into pills.
-  if (/\b(?:want me to|shall i|should i)\b/i.test(trimmed) && /[\n\r]/.test(trimmed)) {
+  if (
+    /[\n\r]/.test(trimmed)
+    && (
+      /\b(?:want me to|shall i|should i|would you like me to)\b/i.test(trimmed)
+      || /\bi can\b[\s\S]+?\bif you(?:'d| would) like/i.test(trimmed)
+    )
+  ) {
     return null
   }
 
@@ -103,7 +109,7 @@ function lastSentenceOf(text: string): string {
 }
 
 function tryExtractCompletion(text: string): ReplySuggestion | null {
-  const completion = predictedCompletion(lastSentenceOf(text))
+  const completion = predictedCompletion(lastSentenceOf(text), text)
   if (!completion) return null
   return { kind: 'completion', text: completion }
 }

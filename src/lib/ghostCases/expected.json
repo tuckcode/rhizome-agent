@@ -314,7 +314,7 @@
     },
     {
       "phrase": "Want me to read the README?",
-      "ghost": null
+      "ghost": "Yes — read the README"
     },
     {
       "phrase": "Want me to summarize the thread?",
@@ -322,7 +322,7 @@
     },
     {
       "phrase": "Want me to explain how merge sort works?",
-      "ghost": null
+      "ghost": "Yes — explain how merge sort works"
     },
     {
       "phrase": "Want me to explain the difference between rebase and merge?",
@@ -330,7 +330,7 @@
     },
     {
       "phrase": "Want me to explain git push?",
-      "ghost": null
+      "ghost": "Yes — explain git push"
     },
     {
       "phrase": "Want me to list the remote branches?",
@@ -358,7 +358,7 @@
     },
     {
       "phrase": "Want me to draft a reply to the email?",
-      "ghost": null
+      "ghost": "Yes — draft a reply to the email"
     },
     {
       "phrase": "Want me to add tags to these notes?",
@@ -370,11 +370,11 @@
     },
     {
       "phrase": "Want me to summarize what you sent?",
-      "ghost": null
+      "ghost": "Yes — summarize what you sent"
     },
     {
       "phrase": "Want me to write up the meeting notes?",
-      "ghost": null
+      "ghost": "Yes — write up the meeting notes"
     },
     {
       "phrase": "Want me to create a note for this?",
@@ -382,23 +382,23 @@
     },
     {
       "phrase": "Want me to create a note called Plan?",
-      "ghost": null
+      "ghost": "Yes — create a note called Plan"
     },
     {
       "phrase": "Want me to make a note of this?",
-      "ghost": null
+      "ghost": "Yes — make a note of this"
     },
     {
       "phrase": "Want me to jot that down?",
-      "ghost": null
+      "ghost": "Yes — jot that down"
     },
     {
       "phrase": "Want me to note that down?",
-      "ghost": null
+      "ghost": "Yes — note that down"
     },
     {
       "phrase": "Want me to translate this to French?",
-      "ghost": null
+      "ghost": "Yes — translate this to French"
     },
     {
       "phrase": "Want me to look into it?",
@@ -414,11 +414,11 @@
     },
     {
       "phrase": "Want me to find related notes?",
-      "ghost": null
+      "ghost": "Yes — find related notes"
     },
     {
       "phrase": "Want me to compare the two approaches?",
-      "ghost": null
+      "ghost": "Yes — compare the two approaches"
     },
     {
       "phrase": "Want me to brainstorm some titles?",
@@ -1620,7 +1620,7 @@
   "cases245f_53e7.json": [
     {
       "phrase": "Want me to draft a reply?",
-      "ghost": null
+      "ghost": "Yes — draft a reply"
     },
     {
       "phrase": "Want me to summarize the article?",
@@ -1752,7 +1752,7 @@
     },
     {
       "phrase": "Want me to edit the draft?",
-      "ghost": "Yes — edit the draft"
+      "ghost": null
     },
     {
       "phrase": "Want me to update the note?",
@@ -1816,7 +1816,7 @@
     },
     {
       "phrase": "Want me to find similar notes?",
-      "ghost": null
+      "ghost": "Yes — find similar notes"
     },
     {
       "phrase": "Want me to write a summary of this?",
@@ -1948,7 +1948,7 @@
     },
     {
       "phrase": "Want me to explain why the test fails?",
-      "ghost": null
+      "ghost": "Yes — explain why the test fails"
     },
     {
       "phrase": "Want me to explain the error and how to fix it?",
@@ -2052,7 +2052,7 @@
     },
     {
       "phrase": "Next, I'll compare the options.",
-      "ghost": null
+      "ghost": "Compare the options"
     },
     {
       "phrase": "Next, I'll look at the logs.",
@@ -2060,7 +2060,7 @@
     },
     {
       "phrase": "Next, I'll explain the tradeoffs.",
-      "ghost": null
+      "ghost": "Explain the tradeoffs"
     },
     {
       "phrase": "Next, I'll write the conclusion.",
@@ -2080,7 +2080,7 @@
     },
     {
       "phrase": "Shall I continue?",
-      "ghost": "Yes — continue"
+      "ghost": null
     },
     {
       "phrase": "Shall I draft the note?",
@@ -2092,11 +2092,951 @@
     },
     {
       "phrase": "Would you like me to explain the code?",
-      "ghost": null
+      "ghost": "Yes — explain the code"
     },
     {
       "phrase": "I can summarize the thread if you'd like.",
       "ghost": "Yes — summarize the thread"
+    }
+  ],
+  "cases245g_432d.json": [
+    {
+      "phrase": "Shall I continue?",
+      "ghost": null
+    },
+    {
+      "phrase": "I've staged the force push to main. Shall I continue?",
+      "ghost": null
+    },
+    {
+      "phrase": "The migration will drop the users table. Want me to continue?",
+      "ghost": null
+    },
+    {
+      "phrase": "Next, I'll continue.",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to continue the deploy?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to continue the migration?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to continue the note?",
+      "ghost": "Yes — continue the note"
+    },
+    {
+      "phrase": "Want me to continue with the push?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to edit all notes?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to edit every note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to edit each note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to rewrite all the notes?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to rewrite the whole note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to rewrite these notes?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to rewrite my notes?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to rewrite 500 notes?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to rewrite the 500 notes?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to format the notes?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to format all notes?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to format these notes?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to edit the notes?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to fix the typos?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to fix all typos?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to fix the typos in my notes?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to add a note?",
+      "ghost": "Yes — add a note"
+    },
+    {
+      "phrase": "Want me to add the notes?",
+      "ghost": "Yes — add the notes"
+    },
+    {
+      "phrase": "Want me to add my notes?",
+      "ghost": "Yes — add my notes"
+    },
+    {
+      "phrase": "Want me to add the summary?",
+      "ghost": "Yes — add the summary"
+    },
+    {
+      "phrase": "Want me to add the thread?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to add the text?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to add a name?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to add the names?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to add the title?",
+      "ghost": "Yes — add the title"
+    },
+    {
+      "phrase": "Want me to edit the title?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to rephrase the title?",
+      "ghost": "Yes — rephrase the title"
+    },
+    {
+      "phrase": "Want me to rewrite the thread?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to write the thread?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to list the names?",
+      "ghost": "Yes — list the names"
+    },
+    {
+      "phrase": "Want me to list my notes?",
+      "ghost": "Yes — list my notes"
+    },
+    {
+      "phrase": "Want me to list the notes?",
+      "ghost": "Yes — list the notes"
+    },
+    {
+      "phrase": "Want me to write the production summary?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to write the deploy notes?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to write the secret note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to write the main section?",
+      "ghost": "Yes — write the main section"
+    },
+    {
+      "phrase": "Want me to edit the main section?",
+      "ghost": "Yes — edit the main section"
+    },
+    {
+      "phrase": "Want me to edit the production notes?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to rewrite the deploy notes?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to write the new main notes?",
+      "ghost": "Yes — write the new main notes"
+    },
+    {
+      "phrase": "Want me to edit the main notes?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to write two notes?",
+      "ghost": "Yes — write two notes"
+    },
+    {
+      "phrase": "Want me to write three new notes?",
+      "ghost": "Yes — write three new notes"
+    },
+    {
+      "phrase": "Want me to write the new short quick main note?",
+      "ghost": "Yes — write the new short quick main note"
+    },
+    {
+      "phrase": "Want me to add a new main section?",
+      "ghost": "Yes — add a new main section"
+    },
+    {
+      "phrase": "Want me to add the main note?",
+      "ghost": "Yes — add the main note"
+    },
+    {
+      "phrase": "Want me to edit the main note?",
+      "ghost": "Yes — edit the main note"
+    },
+    {
+      "phrase": "Want me to find notes that mention Paris?",
+      "ghost": "Yes — find notes that mention Paris"
+    },
+    {
+      "phrase": "Want me to find the note that mentions Paris?",
+      "ghost": "Yes — find the note that mentions Paris"
+    },
+    {
+      "phrase": "Want me to find notes that mentions delete everything?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to find the note that mentions Paris and delete it?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to find the note that mentions Paris then push?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to find the note that mentions Paris and push it to main?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to search notes that mentions the deploy and run it?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to find my notes that mentions Paris?",
+      "ghost": "Yes — find my notes that mentions Paris"
+    },
+    {
+      "phrase": "Want me to find the note that mentions my password?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to find the note that mentions the API key?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to find the note that mentions api key?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to find the note that mentions apikey?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to find the note that mentions tokens?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to find all notes that mentions Paris and rewrite them?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to find note that mentions Paris?",
+      "ghost": "Yes — find note that mentions Paris"
+    },
+    {
+      "phrase": "Want me to search the notes that mentions Paris?",
+      "ghost": "Yes — search the notes that mentions Paris"
+    },
+    {
+      "phrase": "Want me to find the note that mentions it?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to explain it?",
+      "ghost": "Yes — explain it"
+    },
+    {
+      "phrase": "Want me to summarize it?",
+      "ghost": "Yes — summarize it"
+    },
+    {
+      "phrase": "Want me to translate it?",
+      "ghost": "Yes — translate it"
+    },
+    {
+      "phrase": "Want me to summarize this?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to translate this?",
+      "ghost": null
+    },
+    {
+      "phrase": "```\ngit push --force origin main\n```\nWant me to write it up?",
+      "ghost": null
+    },
+    {
+      "phrase": "Here is the command: git push --force origin main. Want me to explain it?",
+      "ghost": "Yes — explain it"
+    },
+    {
+      "phrase": "I can run git push --force. Want me to summarize it?",
+      "ghost": "Yes — summarize it"
+    },
+    {
+      "phrase": "I'll push to main next. Want me to draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "I'll delete the branch after. Shall I draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "Running rm -rf now. Want me to summarize the thread?",
+      "ghost": "Yes — summarize the thread"
+    },
+    {
+      "phrase": "Want me to re-write the intro?",
+      "ghost": "Yes — re-write the intro"
+    },
+    {
+      "phrase": "Want me to rewrite the intro?",
+      "ghost": "Yes — rewrite the intro"
+    },
+    {
+      "phrase": "Want me to write-up the notes?",
+      "ghost": "Yes — write-up the notes"
+    },
+    {
+      "phrase": "Want me to writeup the notes?",
+      "ghost": "Yes — writeup the notes"
+    },
+    {
+      "phrase": "Want me to e-mail the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to email the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to check-in the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to co-write the intro?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to re-format the notes?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to DRAFT THE NOTE?",
+      "ghost": "Yes — DRAFT THE NOTE"
+    },
+    {
+      "phrase": "Want me to dRaFt tHe NoTe?",
+      "ghost": "Yes — dRaFt tHe NoTe"
+    },
+    {
+      "phrase": "Want me to ｄｒａｆｔ the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "Want me to draft the note‍?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "Want me to dr​aft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "Want me to draft the nоte?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to draft thе note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to draft the note!?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "Want me to draft the note?!",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "Want me to draft the note...?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "Want me to draft the note…?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "Want me to draft the note.?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "Want me to draft \"the note\"?",
+      "ghost": "Yes — draft \"the note\""
+    },
+    {
+      "phrase": "Want me to draft 'the note'?",
+      "ghost": "Yes — draft 'the note'"
+    },
+    {
+      "phrase": "Want me to draft the \"note\"?",
+      "ghost": "Yes — draft the \"note\""
+    },
+    {
+      "phrase": "Want me to draft the note \"push\"?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to draft the note `push`?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to draft the `note`?",
+      "ghost": "Yes — draft the `note`"
+    },
+    {
+      "phrase": "Want me to draft the note in this note?",
+      "ghost": "Yes — draft the note in this note"
+    },
+    {
+      "phrase": "Want me to add a summary in this note?",
+      "ghost": "Yes — add a summary in this note"
+    },
+    {
+      "phrase": "Want me to add a summary in this note on the server?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to add a summary in this note and push?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to add a summary into the note?",
+      "ghost": "Yes — add a summary into the note"
+    },
+    {
+      "phrase": "Want me to add a summary in my notes?",
+      "ghost": "Yes — add a summary in my notes"
+    },
+    {
+      "phrase": "Want me to add a summary in the note for me?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to add a summary for me?",
+      "ghost": "Yes — add a summary for me"
+    },
+    {
+      "phrase": "Want me to add a summary in this note for me?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to add a summary in the notes?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to add a summary to this note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to write the summary in this note in production?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to draft the note for me in production?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to add the note in this note?",
+      "ghost": "Yes — add the note in this note"
+    },
+    {
+      "phrase": "Want me to fix the typo in this note?",
+      "ghost": "Yes — fix the typo in this note"
+    },
+    {
+      "phrase": "Want me to fix the typo in the main note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to fix the intro?",
+      "ghost": "Yes — fix the intro"
+    },
+    {
+      "phrase": "Want me to fix the typo please?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to quickly fix the typo?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to just fix the typo?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to fix the typo now?",
+      "ghost": null
+    },
+    {
+      "phrase": "Next, I'll fix the typo",
+      "ghost": "Fix the typo"
+    },
+    {
+      "phrase": "Next I'll fix the typo.",
+      "ghost": "Fix the typo"
+    },
+    {
+      "phrase": "Next: I'll fix the typo.",
+      "ghost": "Fix the typo"
+    },
+    {
+      "phrase": "The next step is to fix the typo.",
+      "ghost": "Fix the typo"
+    },
+    {
+      "phrase": "Next, I'll fix the typo and then push.",
+      "ghost": null
+    },
+    {
+      "phrase": "Next, I'll fix the typo. Then I'll push.",
+      "ghost": null
+    },
+    {
+      "phrase": "I'll push next. Next, I'll fix the typo.",
+      "ghost": "Fix the typo"
+    },
+    {
+      "phrase": "Next, I'll draft the note in this note.",
+      "ghost": "Draft the note in this note"
+    },
+    {
+      "phrase": "Want me to summarize the thread for me?",
+      "ghost": "Yes — summarize the thread for me"
+    },
+    {
+      "phrase": "Want me to summarize Q&A?",
+      "ghost": "Yes — summarize Q&A"
+    },
+    {
+      "phrase": "Want me to summarize Q&A & push?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to explain C++?",
+      "ghost": "Yes — explain C++"
+    },
+    {
+      "phrase": "Want me to explain C++ ++?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to add a TL;DR?",
+      "ghost": "Yes — add a TL;DR"
+    },
+    {
+      "phrase": "Want me to add a TL;DR; push?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to list the pros and cons?",
+      "ghost": "Yes — list the pros and cons"
+    },
+    {
+      "phrase": "Want me to list the pros and cons and push?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to draft the intro and conclusion?",
+      "ghost": "Yes — draft the intro and conclusion"
+    },
+    {
+      "phrase": "Want me to draft the intro and conclusion and deploy?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to compare the two notes?",
+      "ghost": "Yes — compare the two notes"
+    },
+    {
+      "phrase": "Want me to compare these two notes?",
+      "ghost": "Yes — compare these two notes"
+    },
+    {
+      "phrase": "Want me to compare the notes?",
+      "ghost": "Yes — compare the notes"
+    },
+    {
+      "phrase": "Want me to suggest some titles?",
+      "ghost": "Yes — suggest some titles"
+    },
+    {
+      "phrase": "Want me to suggest the note?",
+      "ghost": "Yes — suggest the note"
+    },
+    {
+      "phrase": "Want me to suggest a few notes?",
+      "ghost": "Yes — suggest a few notes"
+    },
+    {
+      "phrase": "Want me to brainstorm a few notes?",
+      "ghost": "Yes — brainstorm a few notes"
+    },
+    {
+      "phrase": "Want me to list a few names?",
+      "ghost": "Yes — list a few names"
+    },
+    {
+      "phrase": "Want me to continue the list?",
+      "ghost": "Yes — continue the list"
+    },
+    {
+      "phrase": "Want me to walk through the notes?",
+      "ghost": "Yes — walk through the notes"
+    },
+    {
+      "phrase": "Want me to walk through the main points?",
+      "ghost": "Yes — walk through the main points"
+    },
+    {
+      "phrase": "Want me to make a note?",
+      "ghost": "Yes — make a note"
+    },
+    {
+      "phrase": "Want me to make a note note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to create a note note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to create a note summary?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to jot down the note?",
+      "ghost": "Yes — jot down the note"
+    },
+    {
+      "phrase": "Want me to jot down the main points?",
+      "ghost": "Yes — jot down the main points"
+    },
+    {
+      "phrase": "Want me to jot down the notes in this note?",
+      "ghost": "Yes — jot down the notes in this note"
+    },
+    {
+      "phrase": "Should I draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "Would you like me to draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "I can draft the note if you would like.",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "When you are ready, I will draft the note.",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "Let me know when you're ready and I'll draft the note.",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "Want me to draft the note for the team?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to draft the note for Bob?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to draft the note to Bob?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to draft the summary for the client?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to draft the reply?",
+      "ghost": null
+    }
+  ],
+  "cases245h_ed23.json": [
+    {
+      "phrase": "Want me to read the README?",
+      "ghost": "Yes — read the README"
+    },
+    {
+      "phrase": "Want me to read the README.md?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to read the .env?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to read the README and push?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to read the readme then delete it?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to explain how merge sort works?",
+      "ghost": "Yes — explain how merge sort works"
+    },
+    {
+      "phrase": "Want me to explain git push?",
+      "ghost": "Yes — explain git push"
+    },
+    {
+      "phrase": "Want me to explain git push by running it?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to explain git push to main?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to explain how force pushing works?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to explain the api key?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to explain git push then do it?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to explain it?",
+      "ghost": "Yes — explain it"
+    },
+    {
+      "phrase": "Want me to explain how the deploy works and run it?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to explain push and do it?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to explain git reset hard now?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to explain git push origin main?",
+      "ghost": "Yes — explain git push origin main"
+    },
+    {
+      "phrase": "Want me to explain rm rf?",
+      "ghost": "Yes — explain rm rf"
+    },
+    {
+      "phrase": "Want me to explain how to delete the branch?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to explain deleting the branch?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to write up the meeting notes?",
+      "ghost": "Yes — write up the meeting notes"
+    },
+    {
+      "phrase": "Want me to write up the meeting notes and post them?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to write up the notes in Slack?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to write up the API key notes?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to make a note of this?",
+      "ghost": "Yes — make a note of this"
+    },
+    {
+      "phrase": "Your API key is sk-123. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to jot that down?",
+      "ghost": "Yes — jot that down"
+    },
+    {
+      "phrase": "Want me to note that down?",
+      "ghost": "Yes — note that down"
+    },
+    {
+      "phrase": "Want me to make a note of this and push?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to find related notes?",
+      "ghost": "Yes — find related notes"
+    },
+    {
+      "phrase": "Want me to find related notes and merge them?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to find similar notes to delete?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to compare the two approaches?",
+      "ghost": "Yes — compare the two approaches"
+    },
+    {
+      "phrase": "Want me to compare the options and pick one?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to compare the two approaches then apply the best?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to draft a reply to the email?",
+      "ghost": "Yes — draft a reply to the email"
+    },
+    {
+      "phrase": "Want me to draft a reply to the email and send it?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to draft a reply?",
+      "ghost": "Yes — draft a reply"
+    },
+    {
+      "phrase": "Want me to draft a reply to the client?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to draft a reply and post it?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to translate this to French?",
+      "ghost": "Yes — translate this to French"
+    },
+    {
+      "phrase": "Want me to translate it into Spanish?",
+      "ghost": "Yes — translate it into Spanish"
+    },
+    {
+      "phrase": "Want me to translate this to Klingon?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to translate this to French and email it?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to translate this to prod?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to summarize what you sent?",
+      "ghost": "Yes — summarize what you sent"
+    },
+    {
+      "phrase": "Want me to summarize what you found?",
+      "ghost": "Yes — summarize what you found"
+    },
+    {
+      "phrase": "Want me to summarize what you sent and forward it?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to create a note called Plan?",
+      "ghost": "Yes — create a note called Plan"
+    },
+    {
+      "phrase": "Want me to create a note called Deploy Plan?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to create a note called Plan then push?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to create a note called push to main?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to create a note called rm rf?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to create a note called My Passwords?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to create a note called Plan in production?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to create a note called a b c d e?",
+      "ghost": null
     }
   ]
 }
