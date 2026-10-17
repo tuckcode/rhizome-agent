@@ -8,6 +8,8 @@ import {
 } from '../helpers/fixtureVault'
 
 const RAW_EDITOR = '[data-testid="raw-editor-codemirror"]'
+// The raw toggle is the CmdOrCtrl+Backslash menu accelerator.
+const TOGGLE_RAW = process.platform === 'darwin' ? 'Meta+Backslash' : 'Control+Backslash'
 const LIST_ROWS = '[data-testid="note-list-container"] [data-note-path]'
 const SORT_BUTTON = '[data-testid="sort-button-__list__"]'
 const SORT_OPTION_MODIFIED = '[data-testid="sort-option-modified"]'
@@ -37,11 +39,28 @@ function setAllMarkdownModifiedTimes(rootDir: string, timestamp: Date) {
   }
 }
 
+/** A narrow list header moves the sort button into the "More list actions" menu. */
+async function openListSort(page: Page) {
+  const overflow = page.getByTestId('note-list-header-overflow-trigger')
+  if (await overflow.isVisible().catch(() => false)) await overflow.click()
+  await page.locator(SORT_BUTTON).click()
+}
+
+async function closeListMenus(page: Page) {
+  const menus = page.locator('[data-testid="note-list-header-overflow-menu"], [data-testid="sort-menu-__list__"]')
+  for (let attempt = 0; attempt < 3 && (await menus.count()) > 0; attempt += 1) {
+    await page.keyboard.press('Escape')
+  }
+  await expect(menus).toHaveCount(0)
+}
+
 async function sortListByModifiedDesc(page: Page) {
-  await page.locator(SORT_BUTTON).click()
+  await openListSort(page)
   await page.locator(SORT_OPTION_MODIFIED).click()
-  await page.locator(SORT_BUTTON).click()
+  await closeListMenus(page)
+  await openListSort(page)
   await page.locator(SORT_DIRECTION_DESC).click()
+  await closeListMenus(page)
 }
 
 async function listOrder(page: Page): Promise<string[]> {
@@ -154,12 +173,12 @@ test.describe('editor mode modified-date ordering', () => {
 
     const modifiedBeforeToggle = fs.statSync(alphaPath).mtimeMs
 
-    await page.keyboard.press('Control+Backslash')
+    await page.keyboard.press(TOGGLE_RAW)
     await expect(page.locator(RAW_EDITOR)).toBeVisible({ timeout: 5_000 })
     await page.waitForTimeout(700)
     expect(fs.statSync(alphaPath).mtimeMs).toBe(modifiedBeforeToggle)
 
-    await page.keyboard.press('Control+Backslash')
+    await page.keyboard.press(TOGGLE_RAW)
     await expect(page.locator('.bn-editor')).toBeVisible({ timeout: 5_000 })
     await page.waitForTimeout(700)
     expect(fs.statSync(alphaPath).mtimeMs).toBe(modifiedBeforeToggle)
@@ -169,7 +188,7 @@ test.describe('editor mode modified-date ordering', () => {
     expect(orderAfterViewToggle.indexOf(alphaPath)).toBe(baselineIndex)
     expect(await trackedSaveCount(page)).toBe(0)
 
-    await page.keyboard.press('Control+Backslash')
+    await page.keyboard.press(TOGGLE_RAW)
     await expect(page.locator(RAW_EDITOR)).toBeVisible({ timeout: 5_000 })
 
     const rawContent = await getRawEditorContent(page)
@@ -181,7 +200,7 @@ test.describe('editor mode modified-date ordering', () => {
     await expect.poll(() => fs.statSync(alphaPath).mtimeMs).toBeGreaterThan(modifiedBeforeToggle)
     await expect.poll(() => trackedSaveCount(page)).toBeGreaterThan(0)
 
-    await page.keyboard.press('Control+Backslash')
+    await page.keyboard.press(TOGGLE_RAW)
     await expect(page.locator('.bn-editor')).toContainText(appendedText, { timeout: 5_000 })
   })
 })

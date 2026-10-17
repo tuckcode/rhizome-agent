@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { executeCommand, openCommandPalette } from './helpers'
 import { seedAutoGitSavedChange } from './testBridge'
-import { pinNotesShellLaunch } from '../helpers/fixtureVault'
+import { openAllNotesList, pinNotesShellLaunch } from '../helpers/fixtureVault'
 
 type MockHandler = (args?: Record<string, unknown>) => unknown
 
@@ -114,8 +114,7 @@ function installAutoGitMocks() {
 }
 
 async function openFirstNote(page: Page) {
-  const noteList = page.locator('[data-testid="note-list-container"]')
-  await noteList.waitFor({ timeout: 5_000 })
+  const noteList = await openAllNotesList(page)
   await noteList.locator('.cursor-pointer').first().click()
   await expect(page.locator('.bn-editor')).toBeVisible({ timeout: 5_000 })
 }
@@ -130,8 +129,13 @@ async function openAutoGitSettings(page: Page) {
   const autoGitSwitch = settingsPanel.getByRole('switch', { name: 'AutoGit' })
   await expect(autoGitSwitch).toBeEnabled({ timeout: 5_000 })
   await autoGitSwitch.click({ force: true })
-  await page.getByTestId('settings-autogit-idle-threshold').fill('2')
-  await page.getByTestId('settings-autogit-inactive-threshold').fill('2')
+  // The threshold inputs stay disabled until the git controls load.
+  const idleThreshold = page.getByTestId('settings-autogit-idle-threshold')
+  const inactiveThreshold = page.getByTestId('settings-autogit-inactive-threshold')
+  await expect(idleThreshold).toBeEditable({ timeout: 5_000 })
+  await idleThreshold.fill('2')
+  await expect(inactiveThreshold).toBeEditable({ timeout: 5_000 })
+  await inactiveThreshold.fill('2')
   await page.getByTestId('settings-save').click()
   await expect(settingsPanel).not.toBeVisible({ timeout: 5_000 })
 }
@@ -142,16 +146,19 @@ async function expectDirtyPathCount(page: Page, expectedCount: number) {
   ).toBe(expectedCount)
 }
 
+/** A checkpoint waits for the 2s idle threshold plus a 1s AutoGit tick. */
+const CHECKPOINT_TIMEOUT_MS = 10_000
+
 async function expectCommitMessageCount(page: Page, expectedCount: number) {
   await expect.poll(async () =>
     page.evaluate(() => (window as Window & { __gitCommitMessages?: string[] }).__gitCommitMessages?.length ?? 0),
-  ).toBe(expectedCount)
+  { timeout: CHECKPOINT_TIMEOUT_MS }).toBe(expectedCount)
 }
 
 async function expectCommitAttemptCount(page: Page, expectedCount: number) {
   await expect.poll(async () =>
     page.evaluate(() => (window as Window & { __gitCommitAttempts?: number }).__gitCommitAttempts ?? 0),
-  ).toBe(expectedCount)
+  { timeout: CHECKPOINT_TIMEOUT_MS }).toBe(expectedCount)
 }
 
 async function expectCommitMessage(page: Page, index: number, expectedMessage: string) {
@@ -195,61 +202,71 @@ async function setMockGitCommitFailure(page: Page, message: string | null) {
   }, message)
 }
 
+/** The command-rail shell folds Commit into the vault·git pill menu. */
 async function triggerQuickCommit(page: Page) {
-  const commitButton = page.getByTestId('status-commit-push')
+  await page.getByTestId('status-vault-trigger').click()
+  const commitButton = page.getByTestId('vault-menu-commit')
   await expect(commitButton).toBeEnabled({ timeout: 5_000 })
   await commitButton.click()
 }
 
-test('@smoke AutoGit checkpoints on idle, and the bottom bar reuses the same message', async ({ page }) => {
-  await page.addInitScript(installAutoGitMocks)
-  await pinNotesShellLaunch(page)
-  await page.goto('/')
-  await page.waitForLoadState('networkidle')
+// Each test sets a 2s idle threshold in Settings and then waits for real
+// AutoGit ticks, so passing runs take 15-20s against the 20s default.
+test.describe('AutoGit checkpoints', () => {
+  test.describe.configure({ timeout: 45_000 })
 
-  await openAutoGitSettings(page)
-  await openFirstNote(page)
+  test('@smoke AutoGit checkpoints on idle, and the bottom bar reuses the same message', async ({ page }) => {
+    await page.addInitScript(installAutoGitMocks)
+    await pinNotesShellLaunch(page)
+    await page.goto('/')
+    await page.waitForLoadState('networkidle')
 
-  await seedSavedChange(page)
-  await expectCheckpoint(page, 1)
+    await openAutoGitSettings(page)
+    await openFirstNote(page)
 
-  await seedSavedChange(page)
-  await triggerQuickCommit(page)
-  await expectCheckpoint(page, 2)
+    await seedSavedChange(page)
+    await expectCheckpoint(page, 1)
 
-  await expect(page.locator('.fixed.bottom-8')).toContainText('Committed and pushed', { timeout: 5_000 })
-})
+    await seedSavedChange(page)
+    await triggerQuickCommit(page)
+    await expectCheckpoint(page, 2)
 
-test('AutoGit checkpoints when the app is inactive', async ({ page }) => {
-  await page.addInitScript(installAutoGitMocks)
-  await page.goto('/')
-  await page.waitForLoadState('networkidle')
+    await expect(page.locator('.fixed.bottom-8')).toContainText('Committed and pushed', { timeout: 5_000 })
+  })
 
-  await openAutoGitSettings(page)
-  await openFirstNote(page)
-  await setMockAppActive(page, false)
+  test('AutoGit checkpoints when the app is inactive', async ({ page }) => {
+    await page.addInitScript(installAutoGitMocks)
+    await page.goto('/')
+    await page.waitForLoadState('networkidle')
 
-  await seedSavedChange(page)
-  await expectCheckpoint(page, 1)
-})
+    await openAutoGitSettings(page)
+    await openFirstNote(page)
+    await setMockAppActive(page, false)
 
-test('AutoGit does not retry a failed checkpoint until the next saved change', async ({ page }) => {
-  await page.addInitScript(installAutoGitMocks)
-  await page.goto('/')
-  await page.waitForLoadState('networkidle')
+    await seedSavedChange(page)
+    await expectCheckpoint(page, 1)
+  })
 
-  await openAutoGitSettings(page)
-  await openFirstNote(page)
-  await setMockGitCommitFailure(page, 'Author identity unknown')
+  test('AutoGit does not retry a failed checkpoint until the next saved change', async ({ page }) => {
+    await page.addInitScript(installAutoGitMocks)
+    await page.goto('/')
+    await page.waitForLoadState('networkidle')
 
-  await seedSavedChange(page)
-  await expectCommitAttemptCount(page, 1)
-  await expectDirtyPathCount(page, 1)
-  await expect(page.locator('.fixed.bottom-8')).toContainText('Set a Git author before AutoGit can commit', { timeout: 5_000 })
+    await openAutoGitSettings(page)
+    await openFirstNote(page)
+    await setMockGitCommitFailure(page, 'Author identity unknown')
 
-  await page.waitForTimeout(3_500)
-  await expectCommitAttemptCount(page, 1)
+    await seedSavedChange(page)
+    await expectCommitAttemptCount(page, 1)
+    await expectDirtyPathCount(page, 1)
+    await expect(page.locator('.fixed.bottom-8')).toContainText('Set a Git author before AutoGit can commit', { timeout: 5_000 })
 
-  await seedSavedChange(page)
-  await expectCommitAttemptCount(page, 2)
+    // The idle threshold has already passed, so a retry would come on the
+    // next 1s AutoGit tick. Two ticks with no new attempt is enough.
+    await page.waitForTimeout(2_000)
+    await expectCommitAttemptCount(page, 1)
+
+    await seedSavedChange(page)
+    await expectCommitAttemptCount(page, 2)
+  })
 })
