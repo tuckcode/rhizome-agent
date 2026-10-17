@@ -1850,24 +1850,6 @@ mod tests {
         }
     }
 
-    /// `ping -n 30` waits about 29 seconds. A short shell timeout must
-    /// kill that process and report a timeout.
-    #[cfg(windows)]
-    const HOLD_PING: &str = r#"$ErrorActionPreference = 'Stop'
-$child = Start-Process -FilePath ping.exe -ArgumentList '-n','30','127.0.0.1' -PassThru -WindowStyle Hidden
-Set-Content -LiteralPath 'ping.pid' -Value $child.Id -Encoding ascii
-Wait-Process -Id $child.Id
-"#;
-
-    /// cmd (parent) → powershell → ping. The job has to take all three.
-    #[cfg(windows)]
-    const TREE_PING: &str = r#"$ErrorActionPreference = 'Stop'
-$parent = (Get-CimInstance Win32_Process -Filter "ProcessId=$PID").ParentProcessId
-$child = Start-Process -FilePath ping.exe -ArgumentList '-n','30','127.0.0.1' -PassThru -WindowStyle Hidden
-Set-Content -LiteralPath 'tree.pids' -Value @($parent, $PID, $child.Id) -Encoding ascii
-Wait-Process -Id $child.Id
-"#;
-
     #[cfg(windows)]
     #[test]
     fn echo_hi_returns_hi_and_exit_code_0() {
@@ -1882,90 +1864,140 @@ Wait-Process -Id $child.Id
         assert_eq!(value["stopped"], false);
     }
 
+    /// `ping -n 30` waits about 29 seconds. A short shell timeout must
+    /// kill that process and report a timeout. The `rem` token is only
+    /// there so the test can find this cmd in the process list.
     #[cfg(windows)]
     #[test]
     fn ping_past_the_timeout_is_killed() {
         let (_dir, root) = root_dir();
-        let root_path = std::path::Path::new(&root);
-        std::fs::write(root_path.join("hold.ps1"), HOLD_PING).unwrap();
+        let token = dir_token(&root);
+        let command = format!("ping -n 30 127.0.0.1 & rem {token}");
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let slot = Arc::clone(&seen);
+        let watch = token.clone();
+        thread::spawn(move || {
+            for _ in 0..80 {
+                let pids = pids_for_token(&watch);
+                if pids.len() >= 2 {
+                    *slot.lock().unwrap() = pids;
+                    return;
+                }
+                thread::sleep(Duration::from_millis(100));
+            }
+        });
         let started = Instant::now();
-        let output = run_approved(
-            "powershell -NoProfile -ExecutionPolicy Bypass -File hold.ps1",
-            &root,
-            Some(Duration::from_secs(12)),
-        )
-        .unwrap();
-        // `ping -n 30` takes about 29s. Returning inside 22s means the
-        // job kill did not wait for it.
-        assert!(started.elapsed() < Duration::from_secs(22), "{output}");
+        let output = run_approved(&command, &root, Some(Duration::from_secs(8))).unwrap();
+        assert!(started.elapsed() < Duration::from_secs(18), "{output}");
         let value = bash_json(&output);
         assert_eq!(value["timed_out"], true, "{output}");
         assert_eq!(value["stopped"], false, "{output}");
         assert!(value["exit_code"].is_null(), "{output}");
-        for pid in read_pids(&root_path.join("ping.pid")) {
+        let pids = seen.lock().unwrap().clone();
+        assert!(
+            pids.len() >= 2,
+            "never saw cmd and ping for {token}: {output}"
+        );
+        for pid in pids {
             assert_dead(pid);
         }
     }
 
+    /// cmd → cmd → ping. Cancel must remove every one of them.
     #[cfg(windows)]
     #[test]
     fn cancel_mid_run_kills_the_process_tree() {
         let (_dir, root) = root_dir();
-        let root_path = std::path::Path::new(&root);
-        let pids_path = root_path.join("tree.pids");
-        std::fs::write(root_path.join("tree.ps1"), TREE_PING).unwrap();
-        let command = "powershell -NoProfile -ExecutionPolicy Bypass -File tree.ps1";
+        let token = dir_token(&root);
+        let command = format!("cmd /d /c \"ping -n 30 127.0.0.1\" & rem {token}");
         let cancel = Arc::new(AtomicBool::new(false));
+        let seen = Arc::new(Mutex::new(Vec::new()));
         let flag = Arc::clone(&cancel);
-        let watch = pids_path.clone();
+        let slot = Arc::clone(&seen);
+        let watch = token.clone();
         thread::spawn(move || {
-            for _ in 0..600 {
-                if let Ok(text) = std::fs::read_to_string(&watch) {
-                    if text.split_whitespace().count() >= 3 {
-                        flag.store(true, Ordering::SeqCst);
-                        return;
-                    }
+            for _ in 0..200 {
+                let pids = pids_for_token(&watch);
+                if pids.len() >= 3 {
+                    *slot.lock().unwrap() = pids;
+                    flag.store(true, Ordering::SeqCst);
+                    return;
                 }
-                thread::sleep(Duration::from_millis(50));
+                thread::sleep(Duration::from_millis(100));
             }
         });
-        let stamp = approval_stamp("call-1", command);
+        let stamp = approval_stamp("call-1", &command);
         let started = Instant::now();
         let output = run_command(
-            command,
+            &command,
             Some(&root),
             "call-1",
             Some(&stamp),
             &|| cancel.load(Ordering::SeqCst),
-            Some(Duration::from_secs(45)),
+            Some(Duration::from_secs(30)),
         )
         .unwrap();
-        assert!(started.elapsed() < Duration::from_secs(40), "{output}");
+        assert!(started.elapsed() < Duration::from_secs(25), "{output}");
         let value = bash_json(&output);
         assert_eq!(value["stopped"], true, "{output}");
         assert_eq!(value["timed_out"], false, "{output}");
         assert!(value["exit_code"].is_null(), "{output}");
-        let pids = read_pids(&pids_path);
-        assert!(pids.len() >= 3, "{pids:?}");
-        assert!(pids.iter().all(|pid| *pid > 0), "{pids:?}");
+        let pids = seen.lock().unwrap().clone();
+        assert!(
+            pids.len() >= 3,
+            "never saw the cmd/cmd/ping tree for {token}: {output}"
+        );
         for pid in pids {
             assert_dead(pid);
         }
     }
 
     #[cfg(windows)]
-    fn read_pids(path: &std::path::Path) -> Vec<u32> {
-        let text = std::fs::read_to_string(path)
-            .unwrap_or_else(|error| panic!("missing pid file {}: {error}", path.display()));
-        let pids: Vec<u32> = text
+    fn dir_token(root: &str) -> String {
+        std::path::Path::new(root)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("rhizome-bash")
+            .to_string()
+    }
+
+    /// cmd.exe whose command line contains `token`, plus every cmd.exe
+    /// and ping.exe descended from it. The query runs in the test
+    /// process, outside the job.
+    #[cfg(windows)]
+    fn pids_for_token(token: &str) -> Vec<u32> {
+        let script = format!(
+            "$token = '{token}'\n\
+$procs = @(Get-CimInstance Win32_Process | Where-Object {{ $_.Name -eq 'cmd.exe' -or $_.Name -eq 'ping.exe' }})\n\
+$ids = New-Object System.Collections.Generic.List[int]\n\
+foreach ($proc in $procs) {{\n\
+  if ($proc.Name -eq 'cmd.exe' -and $proc.CommandLine -like \"*$token*\") {{ [void]$ids.Add([int]$proc.ProcessId) }}\n\
+}}\n\
+$changed = $true\n\
+while ($changed) {{\n\
+  $changed = $false\n\
+  foreach ($proc in $procs) {{\n\
+    $procId = [int]$proc.ProcessId\n\
+    $parentId = [int]$proc.ParentProcessId\n\
+    if ($ids.Contains($parentId) -and -not $ids.Contains($procId)) {{\n\
+      [void]$ids.Add($procId)\n\
+      $changed = $true\n\
+    }}\n\
+  }}\n\
+}}\n\
+$ids -join ' '\n"
+        );
+        let output = std::process::Command::new("powershell.exe")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+            .output()
+            .unwrap_or_else(|error| panic!("powershell: {error}"));
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(output.status.success(), "powershell failed: {stderr}");
+        String::from_utf8_lossy(&output.stdout)
             .split_whitespace()
-            .map(|part| {
-                part.parse()
-                    .unwrap_or_else(|_| panic!("pid in {}: {text}", path.display()))
-            })
-            .collect();
-        assert!(!pids.is_empty(), "no pids in {}", path.display());
-        pids
+            .filter_map(|part| part.parse().ok())
+            .filter(|pid| *pid > 0)
+            .collect()
     }
 
     #[cfg(windows)]
