@@ -11,9 +11,9 @@
 //! deleted when it holds no keys. A crash between those steps is safe: the
 //! next read finds the same value in both places and finishes the removal.
 //! If the write or the read-back fails, the file copy stays and still works.
-//!
-//! Nothing here writes to a log. Key values never appear in an error
-//! message. Errors and `MigrationReport` name the provider id only.
+//! A legacy file that cannot be read is treated as empty and logged once.
+//! Key values never appear in an error message or that log line.
+//! Errors and `MigrationReport` name the provider id only.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -94,9 +94,9 @@ impl ProviderKeys {
         let stored = match self.backend.get(&id) {
             Ok(stored) => stored.filter(|key| !key.trim().is_empty()),
             // A locked or missing keychain must not break a key that still
-            // sits in the legacy file. Nothing is logged: this module never
-            // writes provider data to a log.
-            Err(_) => return self.legacy.key(&id),
+            // sits in the legacy file. A legacy file that cannot be read is
+            // "no legacy key", not a failure of the keychain value.
+            Err(_) => return Ok(self.legacy.key(&id)),
         };
         match self.migrate_one(&id, stored.as_deref())? {
             Step::Moved(key) | Step::Kept(key, _) => Ok(Some(key)),
@@ -116,7 +116,7 @@ impl ProviderKeys {
         keys_changed();
         if self.backend.get(&id)?.as_deref() != Some(key) {
             return Err(format!(
-                "The keychain did not return the key just saved for {id}. Nothing else changed."
+                "The keychain did not return the key just saved for {id}. The new key was written to the keychain. The legacy file was left unchanged."
             ));
         }
         self.legacy.remove(&id)
@@ -140,7 +140,7 @@ impl ProviderKeys {
     fn read_credential(&self, provider_id: &str) -> Result<Option<Credential>, String> {
         let id = normalize_id(provider_id)?;
         if let Err(error) = self.backend.get(&id) {
-            if self.legacy.key(&id)?.is_none() {
+            if self.legacy.key(&id).is_none() {
                 return Err(keychain_error(&id, &error));
             }
         }
@@ -175,8 +175,8 @@ impl ProviderKeys {
                 }
             }
         }
-        for id in self.legacy.ids().unwrap_or_default() {
-            if let Ok(Some(value)) = self.legacy.key(&id) {
+        for id in self.legacy.ids() {
+            if let Some(value) = self.legacy.key(&id) {
                 keep(value);
             }
         }
@@ -186,7 +186,7 @@ impl ProviderKeys {
     /// Moves every legacy file key into the keychain.
     pub fn migrate_all(&self) -> Result<MigrationReport, String> {
         let mut report = MigrationReport::default();
-        for id in self.legacy.ids()? {
+        for id in self.legacy.ids() {
             let stored = match self.backend.get(&id) {
                 Ok(stored) => stored,
                 Err(error) => {
@@ -206,7 +206,7 @@ impl ProviderKeys {
     /// One key: write, read back, then remove the file copy (ADR-0183).
     /// `stored` is what the keychain holds for `id` now.
     fn migrate_one(&self, id: &str, stored: Option<&str>) -> Result<Step, String> {
-        let Some(file_key) = self.legacy.key(id)? else {
+        let Some(file_key) = self.legacy.key(id) else {
             return Ok(Step::NoFileKey);
         };
         match stored {
@@ -247,24 +247,33 @@ struct LegacyFile {
 }
 
 impl LegacyFile {
-    fn ids(&self) -> Result<Vec<String>, String> {
-        Ok(read_legacy(&self.path)?
-            .provider_api_keys
-            .into_keys()
-            .collect())
+    /// A missing file is empty. A file that cannot be read is also empty:
+    /// it must not hide a key that is already in the keychain.
+    fn secrets(&self) -> LegacySecrets {
+        match read_legacy(&self.path) {
+            Ok(secrets) => secrets,
+            Err(error) => {
+                log_bad_legacy(&error);
+                LegacySecrets::default()
+            }
+        }
     }
 
-    fn key(&self, id: &str) -> Result<Option<String>, String> {
-        Ok(read_legacy(&self.path)?
+    fn ids(&self) -> Vec<String> {
+        self.secrets().provider_api_keys.into_keys().collect()
+    }
+
+    fn key(&self, id: &str) -> Option<String> {
+        self.secrets()
             .provider_api_keys
             .get(id)
             .map(|key| key.trim().to_string())
-            .filter(|key| !key.is_empty()))
+            .filter(|key| !key.is_empty())
     }
 
     /// Deletes the file when the last key leaves it.
     fn remove(&self, id: &str) -> Result<(), String> {
-        let mut secrets = read_legacy(&self.path)?;
+        let mut secrets = self.secrets();
         if secrets.provider_api_keys.remove(id).is_none() {
             return Ok(());
         }
@@ -286,6 +295,16 @@ enum Step {
 
 /// The keychain account suffix for a provider's account id (Cloudflare).
 const ACCOUNT_SUFFIX: &str = ":account";
+
+/// A bad legacy file is logged once. The message names the read failure,
+/// never a key value.
+fn log_bad_legacy(error: &str) {
+    static ONCE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    if ONCE.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    log::warn!("Ignoring the legacy provider key file: {error}");
+}
 
 /// Names the provider and the keychain failure. Never holds a key value.
 fn keychain_error(id: &str, error: &str) -> String {
@@ -803,6 +822,77 @@ mod tests {
 
         assert_eq!(keys.get("a").unwrap().as_deref(), Some("sk-a"));
         assert!(fixture.file_keys().unwrap().contains_key("a"));
+    }
+
+    #[test]
+    fn a_corrupt_legacy_file_does_not_hide_a_keychain_key() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(LEGACY_FILE_NAME);
+        std::fs::write(&path, "{").unwrap();
+        let keys = ProviderKeys::new(
+            Box::new(MemoryBackend::with(&[("groq", "gsk-live")])),
+            path.clone(),
+        );
+
+        assert_eq!(keys.get("groq").unwrap().as_deref(), Some("gsk-live"));
+        assert_eq!(
+            keys.try_credential("groq").unwrap().unwrap().api_key,
+            "gsk-live"
+        );
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "{");
+    }
+
+    #[test]
+    fn an_empty_legacy_file_does_not_hide_a_keychain_key() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(LEGACY_FILE_NAME);
+        std::fs::write(&path, "").unwrap();
+        let keys = ProviderKeys::new(Box::new(MemoryBackend::with(&[("groq", "gsk-live")])), path);
+
+        assert_eq!(keys.get("groq").unwrap().as_deref(), Some("gsk-live"));
+        assert!(keys.migrate_all().unwrap().moved.is_empty());
+    }
+
+    #[test]
+    fn a_corrupt_legacy_file_and_a_locked_keychain_report_the_keychain() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join(LEGACY_FILE_NAME);
+        std::fs::write(&path, "not-json").unwrap();
+        let keys = ProviderKeys::new(
+            Box::new(MemoryBackend {
+                fail_get: true,
+                ..Default::default()
+            }),
+            path,
+        );
+
+        let error = keys.try_credential("groq").unwrap_err();
+        assert!(
+            error.contains("keychain could not be read for groq"),
+            "{error}"
+        );
+        assert!(
+            !error.contains("Failed to parse"),
+            "a bad legacy file must not replace the keychain error: {error}"
+        );
+    }
+
+    #[test]
+    fn a_read_back_mismatch_says_the_keychain_was_written() {
+        let fixture = Fixture::with_file(&[("groq", "old-file-key")]);
+        let keys = fixture.keys(MemoryBackend {
+            corrupt_read_back: true,
+            ..Default::default()
+        });
+
+        let error = keys.save("groq", "new-key").unwrap_err();
+
+        assert!(error.contains("written to the keychain"), "{error}");
+        assert!(!error.contains("Nothing else changed"), "{error}");
+        assert_eq!(
+            fixture.file_keys().unwrap().get("groq").map(String::as_str),
+            Some("old-file-key")
+        );
     }
 
     #[test]
