@@ -143,10 +143,11 @@ export function bashResultRowStatus(
   }
 }
 
+/** Accept a JSON integer or an integer string. Floats and other invalid values fall back to 60. Values over 300 clamp to 300. */
 export function bashTimeoutSecs(value?: unknown): number {
   const n = coerceTimeout(value)
-  if (n === undefined || !Number.isFinite(n) || n <= 0) return BASH_DEFAULT_TIMEOUT_SECS
-  return Math.min(Math.floor(n), BASH_MAX_TIMEOUT_SECS)
+  if (n === undefined || n <= 0) return BASH_DEFAULT_TIMEOUT_SECS
+  return Math.min(n, BASH_MAX_TIMEOUT_SECS)
 }
 
 export function bashTimeoutLabel(timeoutSecs?: unknown): string {
@@ -179,10 +180,14 @@ function numberOrZero(value: unknown): number | undefined {
 }
 
 function coerceTimeout(value: unknown): number | undefined {
-  if (typeof value === 'number') return value
-  if (typeof value === 'string' && value.trim() !== '') {
-    const n = Number(value)
-    return Number.isFinite(n) ? n : undefined
+  if (typeof value === 'number') {
+    if (!Number.isInteger(value)) return undefined
+    return value
+  }
+  if (typeof value === 'string') {
+    const text = value.trim()
+    if (!/^[0-9]+$/u.test(text)) return undefined
+    return Number(text)
   }
   return undefined
 }

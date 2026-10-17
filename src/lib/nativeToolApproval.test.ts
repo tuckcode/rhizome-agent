@@ -54,6 +54,8 @@ describe('native tool approval helpers', () => {
     expect(timeoutSecsFromToolArgs('{"command":"  rg foo wiki/  ","timeout_secs":30}')).toBe(30)
     expect(timeoutSecsFromToolArgs('{"command":"ls"}')).toBeUndefined()
     expect(timeoutSecsFromToolArgs('{"command":"ls","timeout_secs":"7"}')).toBe(7)
+    expect(timeoutSecsFromToolArgs('{"command":"ls","timeout_secs":7.5}')).toBe(60)
+    expect(timeoutSecsFromToolArgs('{"command":"ls","timeout_secs":"7.5"}')).toBe(60)
     expect(timeoutSecsFromToolArgs('{"command":"ls","timeout_secs":0}')).toBe(60)
     expect(timeoutSecsFromToolArgs('{"command":"ls","timeout_secs":500}')).toBe(300)
   })
