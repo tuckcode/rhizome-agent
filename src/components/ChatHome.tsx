@@ -36,6 +36,8 @@ interface ChatHomeProps {
   defaultAiAgentReadiness: AiAgentReadiness
   defaultAiAgentReady: boolean
   chatEngine?: 'prime' | 'native'
+  /** False while Settings are still loading, so the open chat does not lock the empty default. */
+  chatEngineSettled?: boolean
   nativeTarget?: string | null
   onNativeTargetChange?: (target: string) => void
   aiModelProviders?: AiModelProvider[] | null
@@ -89,6 +91,7 @@ export default function ChatHome({
   defaultAiAgentReadiness,
   defaultAiAgentReady,
   chatEngine = 'prime',
+  chatEngineSettled = true,
   nativeTarget,
   onNativeTargetChange,
   aiModelProviders,
@@ -156,7 +159,11 @@ export default function ChatHome({
   const showPrimeChrome = isPrimeChat && chatTarget?.kind !== 'api_model' && effectiveEngine === 'prime'
   const rhizomeCatalog = effectiveEngine === 'native'
   const showComposerDeck = isPrimeChat && (showPrimeChrome || rhizomeCatalog)
-  if (startedEngine === null && shouldLockEffectiveChatEngine(engineInput)) {
+  if (
+    chatEngineSettled
+    && startedEngine === null
+    && shouldLockEffectiveChatEngine(engineInput)
+  ) {
     setEngineLock({ engine: effectiveEngine, ...lockScope })
   }
   const clearEngineLock = () => {

@@ -29,6 +29,8 @@ pub use driver::{AgentLoop, ApprovalReply, DEFAULT_STEP_CAP};
 pub use fake_model::{FakeModel, ScriptPart};
 pub use model::Model;
 pub use policy::{approval_options, ApprovalOption};
+#[cfg(test)]
+pub(crate) use tools::command_from_args;
 pub use tools::resolve_for_write;
 pub(crate) use tools::{openai_tool_definition, require_mutate_card};
 pub use types::{DurableEvent, HistoryItem, ModelView, ToolCall, UNANSWERED_TOOL_OUTPUT};

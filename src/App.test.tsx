@@ -777,6 +777,7 @@ describe('App', () => {
     }
     mockCommandResults.list_prime_sessions = [{ path: '/prime/sessions/session-1.jsonl', name: 'session-1' }]
     mockCommandResults.read_prime_session_transcript = []
+    mockCommandResults.get_settings = createSettings({ chat_engine: 'prime' })
     render(<App />)
     fireEvent.click(await screen.findByTestId('prime-session-footprint'))
     expect(await screen.findByTestId('connections-panel')).toBeInTheDocument()
@@ -847,6 +848,7 @@ describe('App', () => {
     }
     mockCommandResults.list_prime_sessions = [{ path: '/prime/sessions/session-1.jsonl', name: 'session-1' }]
     mockCommandResults.read_prime_session_transcript = []
+    mockCommandResults.get_settings = createSettings({ chat_engine: 'prime' })
     render(<App />)
     expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
@@ -1123,6 +1125,7 @@ describe('App', () => {
     mockCommandResults.get_settings = createSettings({
       auto_advance_inbox_after_organize: null,
       default_ai_agent: 'prime',
+      chat_engine: 'prime',
     })
     mockCommandResults.get_ai_agents_status = {
       prime: { installed: true, version: 'mock' },
@@ -1171,6 +1174,7 @@ describe('App', () => {
     mockCommandResults.get_settings = createSettings({
       auto_advance_inbox_after_organize: null,
       default_ai_agent: 'prime',
+      chat_engine: 'prime',
     })
     mockCommandResults.get_ai_agents_status = {
       prime: { installed: true, version: 'mock' },
@@ -1241,6 +1245,7 @@ describe('App', () => {
       resolveSettings?.(createSettings({
         auto_advance_inbox_after_organize: null,
         default_ai_agent: 'prime',
+        chat_engine: 'prime',
       }))
     })
 

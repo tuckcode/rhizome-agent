@@ -453,6 +453,7 @@ describe('AiPanel', () => {
         defaultAiAgent="prime"
         defaultAiAgentReadiness="missing"
         defaultAiAgentReady={false}
+        chatEngine="prime"
       />,
     )
 
@@ -475,6 +476,7 @@ describe('AiPanel', () => {
         vaultPath="/tmp/vault"
         defaultAiAgent="codex"
         defaultAiAgentReadiness="checking"
+        chatEngine="prime"
       />,
     )
 

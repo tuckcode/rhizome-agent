@@ -27,6 +27,8 @@ mod walk;
 mod write_file;
 
 pub use sandbox::resolve_for_write;
+#[cfg(test)]
+pub(crate) use shell::command_from_args;
 pub(crate) use shell::{approval_stamp as bash_stamp, command_from_args as bash_command};
 #[cfg(test)]
 pub use text::CHANGED_SINCE_APPROVAL;
