@@ -57,6 +57,11 @@ describe('native chat user errors', () => {
       `No free-tier provider key is set. ${NATIVE_NO_KEY_GUIDANCE}`,
     )
   })
+
+  it('leaves a locked or denied keychain error unchanged', () => {
+    const message = 'The keychain could not be read for groq. It may be locked, or access was denied.'
+    expect(nativeChatUserError(message)).toBe(message)
+  })
 })
 
 describe('native stream events', () => {

@@ -42,7 +42,11 @@ fn dest_permissions(path: &Path) -> Result<Option<std::fs::Permissions>, String>
             }
             Ok(Some(meta.permissions()))
         }
-        Err(_) => Ok(None),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(format!(
+            "Failed to read file info for {}: {error}",
+            path.display()
+        )),
     }
 }
 
@@ -140,6 +144,21 @@ fn open_exclusive_tmp(
     }
 }
 
+fn copy_xattr_value(to: &Path, name: &std::ffi::OsStr, value: &[u8]) {
+    #[cfg(unix)]
+    if let Err(error) = xattr::set(to, name, value) {
+        log::warn!(
+            "Could not copy extended attribute {} onto {}: {error}",
+            name.to_string_lossy(),
+            to.display()
+        );
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (to, name, value);
+    }
+}
+
 fn copy_xattrs(from: &Path, to: &Path) {
     #[cfg(unix)]
     {
@@ -151,7 +170,7 @@ fn copy_xattrs(from: &Path, to: &Path) {
         };
         for name in attrs {
             if let Ok(Some(value)) = xattr::get(from, &name) {
-                let _ = xattr::set(to, &name, &value);
+                copy_xattr_value(to, &name, &value);
             }
         }
     }
@@ -303,5 +322,43 @@ mod tests {
             Some(&b"tag"[..])
         );
         assert_eq!(fs::read_to_string(&dest).unwrap(), "new\n");
+    }
+
+    #[test]
+    fn only_a_missing_file_counts_as_new() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(dest_permissions(&dir.path().join("fresh.md"))
+            .unwrap()
+            .is_none());
+        let too_long = dir.path().join("a".repeat(300));
+        match dest_permissions(&too_long) {
+            Ok(None) if cfg!(windows) => {}
+            Ok(other) => panic!("a too-long path must not look like an existing file: {other:?}"),
+            Err(error) => assert!(error.contains("Failed to read file info"), "{error}"),
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_failed_extended_attribute_copy_is_logged_and_keeps_the_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("note.md");
+        fs::write(&dest, "ok\n").unwrap();
+        // Longer than macOS XATTR_MAXNAMELEN (127) and Linux XATTR_NAME_MAX
+        // (255). A short name with a space is a real attribute on macOS, so
+        // the copy succeeds there and this test never reaches the failure path.
+        let name = format!("user.{}", "n".repeat(300));
+        let name = std::ffi::OsStr::new(name.as_str());
+        let rejected = xattr::set(&dest, name, b"x");
+        assert!(
+            rejected.is_err(),
+            "this name must be rejected so the copy failure is what the test runs: {rejected:?}"
+        );
+        copy_xattr_value(&dest, name, b"x");
+        assert_eq!(fs::read_to_string(&dest).unwrap(), "ok\n");
+        assert!(
+            xattr::get(&dest, name).ok().flatten().is_none(),
+            "a failed copy must not leave the attribute on the file"
+        );
     }
 }
