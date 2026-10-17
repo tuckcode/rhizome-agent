@@ -225,8 +225,10 @@ pub struct Settings {
     /// `AGENTS.md` and it is not Prime `USER.md`.
     #[serde(default)]
     pub agent_profile: Option<String>,
-    /// Chat engine. Absent or anything other than `native` means Prime.
-    /// Phase 6 (plan step 4). No migration: nothing on disk is `native` yet.
+    /// Chat engine. Absent means Rhizome's native loop. Settings writes
+    /// null for that default and `prime` only when someone picks Prime.
+    /// An explicit `native` already on disk is kept. Any other value,
+    /// including `hermes`, is dropped.
     #[serde(default)]
     pub chat_engine: Option<String>,
     /// Model id for a native Chat session, `provider/model` or `free_tier_auto`.
@@ -533,9 +535,11 @@ fn normalize_settings(settings: Settings) -> Settings {
     }
 }
 
+/// Absent on disk means native. Only `native` and `prime` are stored.
 fn normalize_chat_engine(value: Option<String>) -> Option<String> {
     match value.as_deref().map(str::trim) {
         Some("native") => Some("native".into()),
+        Some("prime") => Some("prime".into()),
         _ => None,
     }
 }
@@ -766,28 +770,40 @@ mod tests {
     }
 
     #[test]
-    fn chat_engine_defaults_to_prime_and_native_persists() {
+    fn chat_engine_defaults_to_native_and_prime_persists() {
         let fresh = save_and_reload(Settings::default());
         assert_eq!(fresh.chat_engine, None);
 
-        let kept = save_and_reload(Settings {
+        let kept_native = save_and_reload(Settings {
             chat_engine: Some("native".into()),
             native_chat_target: Some("open_ai/gpt-4.1-mini".into()),
             ..Settings::default()
         });
-        assert_eq!(kept.chat_engine.as_deref(), Some("native"));
+        assert_eq!(kept_native.chat_engine.as_deref(), Some("native"));
         assert_eq!(
-            kept.native_chat_target.as_deref(),
+            kept_native.native_chat_target.as_deref(),
             Some("open_ai/gpt-4.1-mini")
         );
 
-        let dropped = save_and_reload(Settings {
+        let kept_prime = save_and_reload(Settings {
             chat_engine: Some("prime".into()),
             native_chat_target: Some("anthropic/claude-3-5-sonnet-latest".into()),
             ..Settings::default()
         });
-        assert_eq!(dropped.chat_engine, None);
-        assert_eq!(dropped.native_chat_target, None);
+        assert_eq!(kept_prime.chat_engine.as_deref(), Some("prime"));
+        assert_eq!(kept_prime.native_chat_target, None);
+
+        let dropped_hermes = save_and_reload(Settings {
+            chat_engine: Some("hermes".into()),
+            ..Settings::default()
+        });
+        assert_eq!(dropped_hermes.chat_engine, None);
+
+        let dropped_bogus = save_and_reload(Settings {
+            chat_engine: Some("bogus".into()),
+            ..Settings::default()
+        });
+        assert_eq!(dropped_bogus.chat_engine, None);
     }
 
     #[test]

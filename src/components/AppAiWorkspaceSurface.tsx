@@ -1,4 +1,5 @@
 import type { AiAgentId, AiAgentReadiness, AiAgentsStatus } from '../lib/aiAgents'
+import type { ChatEngine } from '../lib/chatEngine'
 import type { AiModelProvider, AiTarget } from '../lib/aiTargets'
 import type { AppLocale } from '../lib/i18n'
 import type { NoteListItem } from '../utils/ai-context'
@@ -11,6 +12,8 @@ interface AppAiWorkspaceSurfaceProps {
   activeNoteContent?: string | null
   aiAgentsStatus: AiAgentsStatus
   aiModelProviders?: AiModelProvider[]
+  chatEngine?: ChatEngine
+  nativeTarget?: string
   conversationSettings?: AiWorkspaceConversationSetting[] | null
   conversationSettingsReady?: boolean
   defaultAiAgent: AiAgentId
@@ -48,6 +51,8 @@ export function AppAiWorkspaceSurface({
   activeNoteContent,
   aiAgentsStatus,
   aiModelProviders,
+  chatEngine,
+  nativeTarget,
   conversationSettings,
   conversationSettingsReady,
   defaultAiAgent,
@@ -85,6 +90,8 @@ export function AppAiWorkspaceSurface({
       open={open}
       aiAgentsStatus={aiAgentsStatus}
       aiModelProviders={aiModelProviders}
+      chatEngine={chatEngine}
+      nativeTarget={nativeTarget}
       conversationSettings={conversationSettings}
       conversationSettingsReady={conversationSettingsReady}
       defaultAiAgent={defaultAiAgent}

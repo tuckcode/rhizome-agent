@@ -37,6 +37,8 @@ interface ChatHomeProps {
   defaultAiAgentReadiness: AiAgentReadiness
   defaultAiAgentReady: boolean
   chatEngine?: 'prime' | 'native'
+  /** False while Settings are still loading, so the open chat does not lock the empty default. */
+  chatEngineSettled?: boolean
   nativeTarget?: string | null
   onNativeTargetChange?: (target: string) => void
   aiModelProviders?: AiModelProvider[] | null
@@ -89,7 +91,8 @@ export default function ChatHome({
   defaultAiTarget,
   defaultAiAgentReadiness,
   defaultAiAgentReady,
-  chatEngine = 'prime',
+  chatEngine = 'native',
+  chatEngineSettled = true,
   nativeTarget,
   onNativeTargetChange,
   aiModelProviders,
@@ -142,7 +145,8 @@ export default function ChatHome({
     hostNotInstalled: false,
     startedEngine,
   })
-  const isPrimeTarget = isPrimeChatTarget && effectiveEngineForStatus === 'prime'
+  const engineChromeReady = chatEngineSettled
+  const isPrimeTarget = engineChromeReady && isPrimeChatTarget && effectiveEngineForStatus === 'prime'
   const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath)
   const hostKnown = Boolean(primeHost.known)
   const hostNotInstalled = primeHost.problem?.code === 'not_installed'
@@ -154,14 +158,19 @@ export default function ChatHome({
     startedEngine,
   }
   const effectiveEngine = resolveEffectiveChatEngine(engineInput)
-  const showPrimeChrome = isPrimeChat && chatTarget?.kind !== 'api_model' && effectiveEngine === 'prime'
+  const showPrimeChrome = engineChromeReady && isPrimeChat && chatTarget?.kind !== 'api_model' && effectiveEngine === 'prime'
   // The title strip and Command Palette are Chat chrome, not Prime-only.
   // Tying them to `effectiveEngine === 'prime'` hid the whole top bar on
   // Rhizome's native engine, including the header.
-  const showChatTopBar = isPrimeChat && chatTarget?.kind !== 'api_model'
-  const rhizomeCatalog = effectiveEngine === 'native'
-  const showComposerDeck = isPrimeChat && (showPrimeChrome || rhizomeCatalog)
-  if (startedEngine === null && shouldLockEffectiveChatEngine(engineInput)) {
+  const showChatTopBar = engineChromeReady && isPrimeChat && chatTarget?.kind !== 'api_model'
+  const rhizomeCatalog = engineChromeReady && effectiveEngine === 'native'
+  const showComposerDeck = engineChromeReady && isPrimeChat && (showPrimeChrome || rhizomeCatalog)
+  const panelEngine = engineChromeReady ? effectiveEngine : undefined
+  if (
+    chatEngineSettled
+    && startedEngine === null
+    && shouldLockEffectiveChatEngine(engineInput)
+  ) {
     setEngineLock({ engine: effectiveEngine, ...lockScope })
   }
   const clearEngineLock = () => {
@@ -220,7 +229,7 @@ export default function ChatHome({
     <div
       className="flex min-h-0 min-w-0 flex-1 flex-col"
       data-testid="chat-home"
-      data-chat-engine={effectiveEngine}
+      data-chat-engine={panelEngine ?? 'pending'}
     >
       {showChatTopBar ? (
         <PrimeSessionSubhead
@@ -257,9 +266,9 @@ export default function ChatHome({
           locale={locale}
           defaultAiAgent={defaultAiAgent}
           defaultAiTarget={chatTarget}
-          defaultAiAgentReadiness={defaultAiAgentReadiness}
-          defaultAiAgentReady={defaultAiAgentReady}
-          chatEngine={effectiveEngine}
+          defaultAiAgentReadiness={engineChromeReady ? defaultAiAgentReadiness : 'checking'}
+          defaultAiAgentReady={engineChromeReady ? defaultAiAgentReady : false}
+          chatEngine={panelEngine}
           nativeTarget={nativeTarget ?? undefined}
           vaultPath={vaultPath}
           vaultPaths={vaultPaths}
@@ -281,7 +290,7 @@ export default function ChatHome({
           onRailSessionPicked={onRailSessionPicked}
           onConversationReset={clearEngineLock}
           onSessionHeader={handleSessionHeader}
-          forkTargetsPrimeEntry={effectiveEngine === 'prime'}
+          forkTargetsPrimeEntry={panelEngine === 'prime'}
           newChatRef={newChatRef}
           onOpenMycelium={onOpenSessionFootprint}
           notePane={
