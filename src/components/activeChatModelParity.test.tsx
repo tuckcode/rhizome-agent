@@ -1,4 +1,6 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render as rtlRender, screen, waitFor, within } from '@testing-library/react'
+import type { ReactElement } from 'react'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AiModelProvider } from '../lib/aiTargets'
 import type { Settings } from '../types'
@@ -62,6 +64,10 @@ afterEach(() => {
   resetPrimeHostStatus()
 })
 
+function render(ui: ReactElement) {
+  return rtlRender(<TooltipProvider>{ui}</TooltipProvider>)
+}
+
 function pickers() {
   return screen.getAllByTestId('native-chat-model-picker')
 }
@@ -95,8 +101,11 @@ describe('Settings and the composer chip', () => {
       'ollama/llama3.2',
     ])
     const chip = chipPicker()
-    expect(within(chip).getByTestId('native-chat-model-trigger-label')).toHaveTextContent('llama3.2')
-    expect(within(chip).getByTestId('native-chat-model-trigger')).toHaveAccessibleName(/^llama3\.2,/)
+    const chipText = within(chip).getByTestId('native-chat-model-trigger-label').textContent ?? ''
+    expect(chipText).toBe('llama3.2')
+    const row = pickers().find((node) => node.getAttribute('data-variant') === 'row')
+    expect(within(row!).getByTestId('native-chat-model-trigger-label').textContent).toContain(chipText)
+    expect(within(chip).getByTestId('native-chat-model-trigger')).toHaveAccessibleName('llama3.2, Ollama')
   })
 
   it('keeps a user-picked model on both surfaces and starts the chip name with that model', () => {

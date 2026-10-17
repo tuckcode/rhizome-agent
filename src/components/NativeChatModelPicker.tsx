@@ -45,7 +45,7 @@ import {
 } from '../lib/rhizomeChatModels'
 import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
 import { SETTINGS_MENU_Z_CLASS } from '../lib/settingsMenuLayer'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { trackPrimeModelChanged, trackRhizomeModelChanged } from '../lib/productAnalytics'
 import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
 
@@ -164,11 +164,11 @@ export function NativeChatModelPicker({
   const rowLabel = prime ? displayName : (selectedRhizome?.label ?? displayName)
   const visibleText = chip ? displayName : rowLabel
   const tooltipTitle = providerName ? `${providerName} · ${displayName}` : displayName
-  const tooltipId = rawId ?? displayName
+  const showRawId = rawId != null && rawId !== displayName
   // WCAG 2.5.3: the accessible name starts with the text the control shows.
   const accessibleName = chip
-    ? [displayName, providerName, rawId].filter((part): part is string => Boolean(part)).join(', ')
-    : [rowLabel, rawId].filter((part): part is string => Boolean(part)).join(', ')
+    ? [displayName, providerName, showRawId ? rawId : null].filter((part): part is string => Boolean(part)).join(', ')
+    : [rowLabel, showRawId ? rawId : null].filter((part): part is string => Boolean(part)).join(', ')
   const keyed = excludeKeylessRhizomeModels(listed, providers, selectedId)
   const visibleRhizome = filterRhizomeChatModels(keyed, query)
   const needle = query.trim().toLowerCase()
@@ -312,7 +312,6 @@ export function NativeChatModelPicker({
           setOpen(next)
         }}
       >
-        <TooltipProvider delayDuration={300}>
         <Tooltip>
           <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>
@@ -325,7 +324,7 @@ export function NativeChatModelPicker({
                   chip
                     ? cn(
                         'h-6 max-w-full shrink self-center rounded-md border border-border bg-transparent px-2',
-                        'font-mono text-[11px] text-muted-foreground',
+                        'font-sans text-[12px] text-muted-foreground',
                         'hover:bg-accent/50 hover:text-foreground',
                         'data-[state=open]:bg-accent',
                         NATIVE_CHAT_MODEL_CHIP_MAX_WIDTH_CLASS,
@@ -349,10 +348,11 @@ export function NativeChatModelPicker({
           </TooltipTrigger>
           <TooltipContent side="top" data-testid="native-chat-model-tooltip">
             <div>{tooltipTitle}</div>
-            <div className="font-mono text-[11px]" data-testid="native-chat-model-tooltip-id">{tooltipId}</div>
+            {showRawId ? (
+              <div className="font-mono text-[11px]" data-testid="native-chat-model-tooltip-id">{rawId}</div>
+            ) : null}
           </TooltipContent>
         </Tooltip>
-        </TooltipProvider>
         <DropdownMenuContent
           side={chip ? menuSide : 'bottom'}
           align="start"

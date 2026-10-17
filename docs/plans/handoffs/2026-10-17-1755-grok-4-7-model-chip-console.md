@@ -19,7 +19,7 @@ commits: 4e7773ee
 
 ## Hold follow-up
 
-The chip shows the model display name and truncates with CSS. The tooltip is `Provider · Model` plus the raw id in mono. The accessible name starts with the visible text. A bridge that connects and then drops stops after five drops. #218 had not merged, so the Settings engine wiring stays until that rebase.
+The chip shows the model display name and truncates with CSS at 12rem. The tooltip is `Provider · Model`, plus the raw id in mono when it differs from the display name. The accessible name starts with the visible text. Opened sockets that die stop after five drops; a retry that never connects does not count, a minute up resets the count, and focus, visibility, or online wakes a given-up socket. #218 had not merged, so the Settings engine wiring stays until that rebase.
 
 ## Not in this change
 

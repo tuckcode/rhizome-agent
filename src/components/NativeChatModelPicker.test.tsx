@@ -1,4 +1,6 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react'
+import type { ReactElement } from 'react'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AiModelProvider } from '../lib/aiTargets'
 import { NATIVE_CHAT_MODEL_CHIP_MAX_WIDTH_CLASS } from '../lib/composerMenuSide'
@@ -8,6 +10,10 @@ import { resetListProviderModelsCache } from '../lib/listProviderModels'
 import { SETTINGS_MENU_Z_CLASS } from '../lib/settingsMenuLayer'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { NativeChatModelPicker } from './NativeChatModelPicker'
+
+function render(ui: ReactElement) {
+  return rtlRender(<TooltipProvider>{ui}</TooltipProvider>)
+}
 
 const invoked = vi.hoisted(() => ({
   calls: [] as Array<{ cmd: string; args?: Record<string, unknown> }>,
@@ -249,6 +255,8 @@ describe('NativeChatModelPicker', () => {
     expect(tooltipId).toHaveClass('font-mono')
     expect(chip).toHaveClass('rounded-md')
     expect(chip).toHaveClass('h-6')
+    expect(chip).toHaveClass('font-sans')
+    expect(chip).toHaveClass('text-[12px]')
     expect(chip).toHaveClass('self-center')
     expect(chip).toHaveClass('bg-transparent')
     expect(chip).toHaveClass('hover:bg-accent/50')

@@ -24,8 +24,12 @@ const WS_UI_URL = 'ws://localhost:9711'
 const HIGHLIGHT_DURATION_MS = 800
 const RECONNECT_BASE_MS = 3000
 const RECONNECT_MAX_MS = 30_000
-/** A bridge that connects and then dies does not reconnect forever. */
-const MAX_DROPS_AFTER_OPEN = 5
+/** Opened sockets that then die. A retry that never connects does not count. */
+const MAX_OPENED_DROPS = 5
+/** A minute up clears the drop count, so later blips get a fresh budget. */
+const HEALTHY_RESET_MS = 60_000
+const WS_CONNECTING = 0
+const WS_OPEN = 1
 
 function reconnectDelay(attempt: number): number {
   return Math.min(RECONNECT_MAX_MS, RECONNECT_BASE_MS * 2 ** attempt)
@@ -163,12 +167,18 @@ function useUiActionSocket(handleMessage: (event: MessageEvent) => void, clearHi
     let ws: WebSocket | null = null
     let mounted = true
     let attempt = 0
-    let opened = false
-    let dropsAfterOpen = 0
+    let openedDrops = 0
+    let gaveUp = false
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+    let healthyTimer: ReturnType<typeof setTimeout> | null = null
+
+    function clearHealthyTimer() {
+      if (healthyTimer) clearTimeout(healthyTimer)
+      healthyTimer = null
+    }
 
     function scheduleReconnect() {
-      if (!mounted || reconnectTimer) return
+      if (!mounted || gaveUp || reconnectTimer) return
       const delay = reconnectDelay(attempt)
       attempt += 1
       reconnectTimer = setTimeout(() => {
@@ -178,25 +188,38 @@ function useUiActionSocket(handleMessage: (event: MessageEvent) => void, clearHi
     }
 
     function connect() {
-      if (!mounted) return
+      if (!mounted || gaveUp) return
+      if (ws && (ws.readyState === WS_CONNECTING || ws.readyState === WS_OPEN)) return
       try {
-        ws = new WebSocket(WS_UI_URL)
-        ws.onmessage = handleMessage
-        ws.onopen = () => {
-          opened = true
+        const socket = new WebSocket(WS_UI_URL)
+        ws = socket
+        let thisOpened = false
+        socket.onmessage = handleMessage
+        socket.onopen = () => {
+          thisOpened = true
           attempt = 0
+          clearHealthyTimer()
+          healthyTimer = setTimeout(() => {
+            openedDrops = 0
+          }, HEALTHY_RESET_MS)
         }
-        ws.onclose = () => {
-          if (opened) {
-            dropsAfterOpen += 1
-            if (dropsAfterOpen >= MAX_DROPS_AFTER_OPEN) {
+        socket.onclose = () => {
+          if (ws === socket) ws = null
+          clearHealthyTimer()
+          if (!mounted) return
+          // Only a socket that reached open spends the drop budget.
+          // A refused retry during a restart does not.
+          if (thisOpened) {
+            openedDrops += 1
+            if (openedDrops >= MAX_OPENED_DROPS) {
+              gaveUp = true
               console.debug('[ai-activity] UI bridge dropped; stopped reconnecting')
               return
             }
           }
           scheduleReconnect()
         }
-        ws.onerror = () => {
+        socket.onerror = () => {
           console.debug('[ai-activity] UI bridge socket failed')
         }
       } catch (error) {
@@ -205,12 +228,33 @@ function useUiActionSocket(handleMessage: (event: MessageEvent) => void, clearHi
       }
     }
 
+    function wake() {
+      if (!mounted || document.visibilityState === 'hidden') return
+      gaveUp = false
+      openedDrops = 0
+      attempt = 0
+      if (reconnectTimer) clearTimeout(reconnectTimer)
+      reconnectTimer = null
+      connect()
+    }
+
+    function onVisible() {
+      if (document.visibilityState === 'visible') wake()
+    }
+
+    window.addEventListener('focus', wake)
+    window.addEventListener('online', wake)
+    document.addEventListener('visibilitychange', onVisible)
     connect()
 
     return () => {
       mounted = false
+      window.removeEventListener('focus', wake)
+      window.removeEventListener('online', wake)
+      document.removeEventListener('visibilitychange', onVisible)
       ws?.close()
       clearHighlightTimer()
+      clearHealthyTimer()
       if (reconnectTimer) clearTimeout(reconnectTimer)
     }
   }, [clearHighlightTimer, handleMessage])

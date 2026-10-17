@@ -16,6 +16,7 @@ class MockWebSocket {
   onclose: (() => void) | null = null
   onopen: (() => void) | null = null
   close = vi.fn()
+  readyState = 0
   url: string
 
   constructor(url: string) {
@@ -79,20 +80,54 @@ describe('useAiActivity', () => {
     debug.mockRestore()
   })
 
-  it('stops reconnecting after the bridge accepts and then keeps dropping', () => {
+  it('keeps retrying through a slow restart when those tries never connect', () => {
     const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
     renderHook(() => useAiActivity())
     act(() => { lastWsInstance?.onopen?.() })
+    act(() => { lastWsInstance?.onclose?.() })
+    for (let retry = 0; retry < 8; retry += 1) {
+      act(() => { vi.advanceTimersByTime(30_000) })
+      const failed = lastWsInstance
+      act(() => { failed?.onclose?.() })
+      expect(debug).not.toHaveBeenCalledWith('[ai-activity] UI bridge dropped; stopped reconnecting')
+    }
+    act(() => { vi.advanceTimersByTime(30_000) })
+    expect(lastWsInstance).not.toBeNull()
+    debug.mockRestore()
+  })
+
+  it('resets the drop count after a minute of healthy connection', () => {
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
+    renderHook(() => useAiActivity())
+    for (let drop = 0; drop < 4; drop += 1) {
+      act(() => { lastWsInstance?.onopen?.() })
+      act(() => { lastWsInstance?.onclose?.() })
+      act(() => { vi.advanceTimersByTime(30_000) })
+    }
+    act(() => { lastWsInstance?.onopen?.() })
+    act(() => { vi.advanceTimersByTime(60_000) })
     for (let drop = 0; drop < 4; drop += 1) {
       const current = lastWsInstance
       act(() => { current?.onclose?.() })
       act(() => { vi.advanceTimersByTime(30_000) })
       expect(lastWsInstance).not.toBe(current)
     }
-    const last = lastWsInstance
-    act(() => { last?.onclose?.() })
-    act(() => { vi.advanceTimersByTime(30_000) })
-    expect(lastWsInstance).toBe(last)
+    expect(debug).not.toHaveBeenCalledWith('[ai-activity] UI bridge dropped; stopped reconnecting')
+    debug.mockRestore()
+  })
+
+  it('reconnects on window focus after giving up', () => {
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
+    renderHook(() => useAiActivity())
+    for (let drop = 0; drop < 5; drop += 1) {
+      act(() => { lastWsInstance?.onopen?.() })
+      const current = lastWsInstance
+      act(() => { current?.onclose?.() })
+      act(() => { vi.advanceTimersByTime(30_000) })
+    }
+    const givenUp = lastWsInstance
+    act(() => { window.dispatchEvent(new Event('focus')) })
+    expect(lastWsInstance).not.toBe(givenUp)
     expect(debug).toHaveBeenCalledWith('[ai-activity] UI bridge dropped; stopped reconnecting')
     debug.mockRestore()
   })

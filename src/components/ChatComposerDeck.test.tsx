@@ -1,4 +1,6 @@
-import { render, screen } from '@testing-library/react'
+import { render as rtlRender, screen } from '@testing-library/react'
+import type { ReactElement } from 'react'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { describe, expect, it, vi } from 'vitest'
 import { ChatComposerDeck } from './ChatComposerDeck'
 
@@ -9,6 +11,10 @@ vi.mock('../lib/productAnalytics', () => ({
   trackPrimeModelsFreeOnly: vi.fn(),
   trackRhizomeModelChanged: vi.fn(),
 }))
+
+function render(ui: ReactElement) {
+  return rtlRender(<TooltipProvider>{ui}</TooltipProvider>)
+}
 
 describe('ChatComposerDeck', () => {
   it('names the open note as context when Frame B has a split', () => {
