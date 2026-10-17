@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 
 use crate::ai_models::{normalize_ai_model_providers, AiModelProvider};
 
@@ -559,6 +561,33 @@ fn leftover_chat_engine_on_disk(raw: &str) -> bool {
     }
 }
 
+fn leftover_chat_engine_writeback_claimed(path: &Path) -> bool {
+    static WRITTEN: OnceLock<Mutex<HashSet<PathBuf>>> = OnceLock::new();
+    let Ok(mut written) = WRITTEN
+        .get_or_init(|| Mutex::new(HashSet::new()))
+        .lock()
+    else {
+        return false;
+    };
+    written.insert(path.to_path_buf())
+}
+
+fn persist_leftover_chat_engine_migration(
+    path: &PathBuf,
+    settings: &Settings,
+    persist: impl FnOnce(&Path, Settings) -> Result<(), String>,
+) {
+    if !leftover_chat_engine_writeback_claimed(path) {
+        return;
+    }
+    if let Err(error) = persist(path, settings.clone()) {
+        log::warn!(
+            "Leftover chat_engine migration was not written to {}: {error}",
+            path.display()
+        );
+    }
+}
+
 fn normalize_native_chat_target(value: Option<String>) -> Option<String> {
     let target = value
         .as_deref()
@@ -613,6 +642,13 @@ fn settings_path() -> Result<PathBuf, String> {
 }
 
 fn get_settings_at(path: &PathBuf) -> Result<Settings, String> {
+    get_settings_at_with_persist(path, save_settings_at)
+}
+
+fn get_settings_at_with_persist(
+    path: &PathBuf,
+    persist: impl FnOnce(&Path, Settings) -> Result<(), String>,
+) -> Result<Settings, String> {
     if !path.exists() {
         return Ok(Settings::default());
     }
@@ -622,7 +658,7 @@ fn get_settings_at(path: &PathBuf) -> Result<Settings, String> {
         serde_json::from_str(&content).map_err(|e| format!("Failed to parse settings: {}", e))?;
     let normalized = normalize_settings(settings);
     if leftover_chat_engine_on_disk(&content) {
-        save_settings_at(path, normalized.clone())?;
+        persist_leftover_chat_engine_migration(path, &normalized, persist);
     }
     Ok(normalized)
 }
@@ -852,6 +888,68 @@ mod tests {
         let disk: serde_json::Value =
             serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(disk["chat_engine"], "native");
+    }
+
+    #[test]
+    fn leftover_chat_engine_write_failure_still_returns_normalized_settings() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("settings.json");
+        let leftover = Settings {
+            chat_engine: Some("Prime".into()),
+            ..Settings::default()
+        };
+        fs::write(&path, serde_json::to_string(&leftover).unwrap()).unwrap();
+
+        let loaded = get_settings_at_with_persist(&path, |_, _| {
+            Err("antivirus lock on rename".into())
+        })
+        .unwrap();
+        assert_eq!(loaded.chat_engine.as_deref(), Some("native"));
+        let disk: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(disk["chat_engine"], "Prime");
+
+        get_settings_at_with_persist(&path, |_, _| {
+            panic!("leftover chat_engine write-back must happen at most once");
+        })
+        .unwrap();
+        let disk_again: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(disk_again["chat_engine"], "Prime");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn leftover_chat_engine_readonly_dir_still_returns_ok() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("settings.json");
+        let leftover = Settings {
+            chat_engine: Some("Prime".into()),
+            ..Settings::default()
+        };
+        fs::write(&path, serde_json::to_string(&leftover).unwrap()).unwrap();
+
+        struct RestorePermissions {
+            path: PathBuf,
+            original: std::fs::Permissions,
+        }
+        impl Drop for RestorePermissions {
+            fn drop(&mut self) {
+                let _ = std::fs::set_permissions(&self.path, self.original.clone());
+            }
+        }
+
+        let original = std::fs::metadata(dir.path()).unwrap().permissions();
+        let _restore = RestorePermissions {
+            path: dir.path().to_path_buf(),
+            original,
+        };
+        std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o555)).unwrap();
+
+        let loaded = get_settings_at(&path).unwrap();
+        assert_eq!(loaded.chat_engine.as_deref(), Some("native"));
     }
 
     #[test]

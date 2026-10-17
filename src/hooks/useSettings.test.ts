@@ -211,6 +211,22 @@ describe('useSettings', () => {
     })
   })
 
+  it('leaves a persisted Rhizome target on disk', async () => {
+    mockSettingsStore = {
+      ...savedSettings,
+      chat_engine: 'native',
+      default_ai_agent: 'prime',
+      default_ai_target: 'agent:prime',
+    }
+    const { result } = renderHook(() => useSettings())
+    await waitFor(() => {
+      expect(result.current.loaded).toBe(true)
+    })
+    expect(result.current.settings.default_ai_agent).toBe('prime')
+    expect(result.current.settings.default_ai_target).toBe('agent:prime')
+    expect(mockInvokeFn).not.toHaveBeenCalledWith('save_settings', expect.anything())
+  })
+
   it('leaves default_ai_agent prime on disk', async () => {
     mockSettingsStore = {
       ...savedSettings,

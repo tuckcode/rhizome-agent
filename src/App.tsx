@@ -137,6 +137,7 @@ import { redactCredentialTokens } from './lib/sensitiveTextRedaction'
 import { areAutomaticUpdateChecksEnabled } from './lib/automaticUpdateChecks'
 import { composerAgentLabel, DEFAULT_AI_AGENT, getAiAgentDefinition } from './lib/aiAgents'
 import { agentTargets, type AiTarget } from './lib/aiTargets'
+import { settingsAfterUseRhizome } from './lib/settingsAfterUseRhizome'
 import { chatEngineFromSettings } from './lib/chatEngine'
 import { chatEngineForResolvedTarget, quickPromptTargetIsReady } from './lib/chatTargetRouting'
 import { areGitFeaturesEnabled } from './lib/gitSettings'
@@ -357,6 +358,21 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const handleActiveAiWorkspaceTargetChange = useCallback((target: AiTarget) => {
     setLastAiWorkspaceTarget((current) => (current?.id === target.id ? current : target))
   }, [setLastAiWorkspaceTarget])
+  const handleUseRhizomeFromPalette = useCallback(() => {
+    const rhizome = agentTargets()[0]
+    if (!rhizome) {
+      dialogs.closeCommandPalette()
+      return
+    }
+    setLastAiWorkspaceTarget(rhizome)
+    void saveSettings(settingsAfterUseRhizome(settings, rhizome.id, lastAiWorkspaceConversationId))
+    dialogs.closeCommandPalette()
+  }, [
+    dialogs,
+    lastAiWorkspaceConversationId,
+    saveSettings,
+    settings,
+  ])
   const {
     folderVaults,
     graphDefaultWorkspacePath,
@@ -2603,13 +2619,10 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               : undefined
           }
           aiPromptTargetId={quickPromptTarget.id}
+          aiRhizomeTargetId={agentTargets()[0]?.id}
           locale={appLocale}
           onClose={dialogs.closeCommandPalette}
-          onUseRhizome={() => {
-            const rhizome = agentTargets()[0]
-            if (rhizome) setLastAiWorkspaceTarget(rhizome)
-            dialogs.closeCommandPalette()
-          }}
+          onUseRhizome={handleUseRhizomeFromPalette}
         />
         <KeyboardShortcutsDialog
           open={dialogs.showKeyboardShortcuts}

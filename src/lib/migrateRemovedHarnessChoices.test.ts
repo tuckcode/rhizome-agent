@@ -135,7 +135,9 @@ describe('migrateRemovedHarnessSettings', () => {
     expect(migrateStoredAiAgent('pi')).toBe('prime')
     expect(migrateStoredAiAgent('gemini')).toBe('prime')
     expect(migrateStoredAiAgent('bogus')).toBeNull()
-    expect(migrateStoredAiTarget('agent:prime')).toBeNull()
+    expect(migrateStoredAiTarget('agent:prime')).toBe('agent:prime')
+    expect(migrateStoredAiTarget('prime')).toBe('agent:prime')
+    expect(migrateStoredAiTarget('agent:hermes')).toBe('agent:hermes')
     expect(migrateStoredAiTarget('agent:codex')).toBe('agent:codex')
     expect(migrateStoredAiTarget('model:openai/gpt-4.1')).toBe('model:openai/gpt-4.1')
   })
@@ -155,13 +157,30 @@ describe('migrateRemovedHarnessSettings', () => {
     expect(once.chat_engine).toBe('native')
     expect(once.default_ai_agent).toBe('hermes')
     expect(once.default_ai_target).toBeNull()
-    expect(once.ai_workspace_conversations?.[0]?.target_id).toBeNull()
+    expect(once.ai_workspace_conversations?.[0]?.target_id).toBe('agent:prime')
     expect(once.ai_workspace_conversations?.[1]?.target_id).toBe('agent:codex')
     expect(removedHarnessSettingsNeedPersist(raw, once)).toBe(true)
 
     const twice = migrateRemovedHarnessSettings(once)
     expect(twice).toEqual(once)
     expect(removedHarnessSettingsNeedPersist(once, twice)).toBe(false)
+  })
+
+  it('keeps a persisted Rhizome target through a later settings save', () => {
+    const raw: Settings = {
+      ...emptySettings,
+      chat_engine: 'native',
+      default_ai_agent: 'prime',
+      default_ai_target: 'agent:prime',
+      ai_workspace_conversations: [
+        { id: 'c1', title: 'Rhizome chat', target_id: 'agent:prime', archived: false },
+      ],
+    }
+    const migrated = migrateRemovedHarnessSettings(raw)
+    expect(migrated.default_ai_agent).toBe('prime')
+    expect(migrated.default_ai_target).toBe('agent:prime')
+    expect(migrated.ai_workspace_conversations?.[0]?.target_id).toBe('agent:prime')
+    expect(removedHarnessSettingsNeedPersist(raw, migrated)).toBe(false)
   })
 
   it('does not persist an already-native install', () => {

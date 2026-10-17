@@ -173,6 +173,28 @@ function conversationsToSettings(conversations: AiConversation[]): AiWorkspaceCo
   }))
 }
 
+function applyStoredConversationTargets(
+  current: AiConversation[],
+  settings: AiWorkspaceConversationSetting[] | null | undefined,
+): AiConversation[] {
+  if (!settings || settings.length === 0) return current
+
+  let changed = false
+  const next = current.map((conversation) => {
+    const stored = settings.find((item) => item.id === conversation.id)
+    if (!stored) return conversation
+    const storedTarget = stored.target_id?.trim() || null
+    const usesDefaultTarget = !storedTarget
+    const targetId = storedTarget ?? conversation.targetId
+    if (conversation.targetId === targetId && conversation.usesDefaultTarget === usesDefaultTarget) {
+      return conversation
+    }
+    changed = true
+    return { ...conversation, targetId, usesDefaultTarget }
+  })
+  return changed ? next : current
+}
+
 export function activeConversationForState(
   conversations: AiConversation[],
   activeId: ConversationId,
@@ -338,9 +360,15 @@ function useConversationSettingsPersistence({
     onSettingsChangeRef.current = onSettingsChange
   }, [onSettingsChange])
 
+  const lastSerializedRef = useRef<string | null>(null)
+
   useEffect(() => {
     if (!settingsReady) return
-    onSettingsChangeRef.current?.(conversationsToSettings(conversations))
+    const next = conversationsToSettings(conversations)
+    const serialized = JSON.stringify(next)
+    if (lastSerializedRef.current === serialized) return
+    lastSerializedRef.current = serialized
+    onSettingsChangeRef.current?.(next)
   }, [conversations, settingsReady])
 }
 
@@ -372,6 +400,24 @@ export function useConversations({
   ))
   const [activeId, setActiveId] = useState(() => initialActiveId(conversations, initialActiveConversationId))
   const [showArchived, setShowArchived] = useState(false)
+  const [hydratedFromSettings, setHydratedFromSettings] = useState(settingsReady)
+  const storedTargetKey = (settings ?? [])
+    .map((item) => `${item.id}:${item.target_id ?? ''}`)
+    .join('|')
+  const [appliedTargetKey, setAppliedTargetKey] = useState<string | null>(
+    settingsReady ? storedTargetKey : null,
+  )
+
+  if (settingsReady && appliedTargetKey === null) {
+    const stored = conversationsFromSettings(settings, fallbackTarget, locale)
+    setConversations(stored)
+    setActiveId(initialActiveId(stored, initialActiveConversationId))
+    setHydratedFromSettings(true)
+    setAppliedTargetKey(storedTargetKey)
+  } else if (settingsReady && appliedTargetKey !== storedTargetKey) {
+    setAppliedTargetKey(storedTargetKey)
+    setConversations((current) => applyStoredConversationTargets(current, settings))
+  }
 
   const addConversation = useCallback((target: AiTarget) => {
     const next = appendConversationState(conversations, locale, target)
@@ -424,7 +470,11 @@ export function useConversations({
 
   const titleConversationFromAnswer = useTitleConversationFromAnswer(setConversations)
   const updateDefaultConversationTargets = useUpdateDefaultConversationTargets(setConversations)
-  useConversationSettingsPersistence({ conversations, onSettingsChange, settingsReady })
+  useConversationSettingsPersistence({
+    conversations,
+    onSettingsChange,
+    settingsReady: settingsReady && hydratedFromSettings,
+  })
 
   return {
     activeId, addConversation, archiveConversation, closeConversation, conversations, forkConversation,

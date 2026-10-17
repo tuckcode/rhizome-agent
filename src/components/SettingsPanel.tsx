@@ -3,9 +3,9 @@ import {
   createMissingAiAgentsStatus,
   getAiAgentAvailability,
   getAiAgentDefinition,
-  type AiAgentId,
   type AiAgentsStatus,
 } from '../lib/aiAgents'
+import { KEPT_EXTERNAL_AGENT_IDS } from '../lib/migrateRemovedHarnessChoices'
 import { AiAgentIcon } from './AiAgentIcon'
 import {
   normalizeAiModelProviders,
@@ -1628,7 +1628,7 @@ function SecretFilesSettingRow({
   )
 }
 
-const SETTINGS_CLI_STATUS_AGENT_IDS: readonly AiAgentId[] = ['claude_code', 'codex']
+const SETTINGS_CLI_STATUS_AGENT_IDS = KEPT_EXTERNAL_AGENT_IDS
 
 function AiAgentsInstalledSection({
   t,

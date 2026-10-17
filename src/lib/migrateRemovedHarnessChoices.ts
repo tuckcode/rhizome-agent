@@ -69,6 +69,11 @@ export function migrateStoredAiTarget(value: unknown): string | null {
   const token = asToken(value)
   if (!token) return null
   if (token.toLowerCase().startsWith('model:')) return token
+  const agentId = agentIdFromToken(token)
+  // Prime/Hermes are native harness targets. Keep them so "Use Rhizome instead"
+  // can persist `agent:prime` without the next save wiping it. Distill still
+  // reads `default_ai_agent`, not this field.
+  if (agentId === 'prime' || agentId === 'hermes') return `agent:${agentId}`
   const migrated = migrateRemovedHarnessChoice(token)
   if (migrated === 'native') return null
   return migrated

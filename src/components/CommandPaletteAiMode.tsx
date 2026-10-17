@@ -1,7 +1,9 @@
+import { useLayoutEffect, useRef } from 'react'
 import { Sparkle } from '@phosphor-icons/react'
 import type { VaultEntry } from '../types'
 import type { NoteReference } from '../utils/ai-context'
 import { createTranslator } from '../lib/i18n'
+import { openExternalUrl } from '../utils/url'
 import { InlineWikilinkInput } from './InlineWikilinkInput'
 import { Button } from './ui/button'
 
@@ -33,6 +35,13 @@ export function CommandPaletteAiMode({
   onUseRhizome,
 }: CommandPaletteAiModeProps) {
   const t = createTranslator()
+  const useRhizomeRef = useRef<HTMLButtonElement>(null)
+
+  useLayoutEffect(() => {
+    if (aiAgentReady || !onUseRhizome) return
+    useRhizomeRef.current?.focus()
+  }, [aiAgentReady, onUseRhizome])
+
   return (
     <InlineWikilinkInput
       entries={entries}
@@ -58,19 +67,19 @@ export function CommandPaletteAiMode({
               <div>{aiAgentLabel} is not available on this machine.</div>
               <div className="flex flex-wrap items-center justify-center gap-2">
                 {aiAgentInstallUrl ? (
-                  <Button asChild size="sm" variant="outline">
-                    <a
-                      href={aiAgentInstallUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      data-testid="command-palette-install-agent"
-                    >
-                      Install {aiAgentLabel}
-                    </a>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    data-testid="command-palette-install-agent"
+                    onClick={() => { void openExternalUrl(aiAgentInstallUrl) }}
+                  >
+                    Install {aiAgentLabel}
                   </Button>
                 ) : null}
                 {onUseRhizome ? (
                   <Button
+                    ref={useRhizomeRef}
                     type="button"
                     size="sm"
                     onClick={onUseRhizome}

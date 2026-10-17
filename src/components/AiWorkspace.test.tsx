@@ -722,6 +722,68 @@ describe('AiWorkspace', () => {
     ])
   })
 
+  it('reports a persisted Rhizome target when reopened after settings change', () => {
+    const onActiveTargetChange = vi.fn()
+    const statuses = installedStatuses()
+    statuses.codex = createAiAgentAvailability('missing', null)
+    const conversation = {
+      id: 'codex-chat',
+      title: 'Codex notes',
+      target_id: 'agent:codex',
+      archived: false,
+    }
+
+    const { rerender } = render(
+      <AiWorkspace
+        open
+        mode="side"
+        aiAgentsStatus={statuses}
+        aiModelProviders={providers}
+        conversationSettings={[conversation]}
+        conversationSettingsReady
+        vaultPath="/tmp/vault"
+        onActiveTargetChange={onActiveTargetChange}
+        onClose={vi.fn()}
+      />,
+    )
+    expect(onActiveTargetChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      id: 'agent:codex',
+      agent: 'codex',
+    }))
+
+    rerender(
+      <AiWorkspace
+        open={false}
+        mode="side"
+        aiAgentsStatus={statuses}
+        aiModelProviders={providers}
+        conversationSettings={[{ ...conversation, target_id: 'agent:prime' }]}
+        conversationSettingsReady
+        vaultPath="/tmp/vault"
+        onActiveTargetChange={onActiveTargetChange}
+        onClose={vi.fn()}
+      />,
+    )
+    onActiveTargetChange.mockClear()
+    rerender(
+      <AiWorkspace
+        open
+        mode="side"
+        aiAgentsStatus={statuses}
+        aiModelProviders={providers}
+        conversationSettings={[{ ...conversation, target_id: 'agent:prime' }]}
+        conversationSettingsReady
+        vaultPath="/tmp/vault"
+        onActiveTargetChange={onActiveTargetChange}
+        onClose={vi.fn()}
+      />,
+    )
+    expect(onActiveTargetChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      id: 'agent:prime',
+      agent: 'prime',
+    }))
+  })
+
   it('routes only Prime conversations through the Chat engine', () => {
     const statuses = installedStatuses()
     statuses.codex = createAiAgentAvailability('missing', null)

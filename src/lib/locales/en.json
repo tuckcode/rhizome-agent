@@ -443,7 +443,7 @@
   "ai.panel.empty.withContextTitle": "Ask {agent} about this note",
   "ai.panel.empty.noContextTitle": "Ask {agent}",
   "ai.panel.empty.withContextDescription": "Research, search your vault, or draft something worth saving.",
-  "ai.panel.empty.noContextDescription": "Chat works without a note. Open one to give Prime something to work from.",
+  "ai.panel.empty.noContextDescription": "Chat works without a note. Open one to give Rhizome something to work from.",
   "ai.panel.placeholder.checking": "Checking…",
   "ai.panel.placeholder.missing": "{agent} is not installed. Install it, then retry.",
   "ai.panel.placeholder.ready": "Ask {agent}",

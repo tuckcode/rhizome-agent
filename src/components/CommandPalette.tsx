@@ -24,6 +24,7 @@ interface CommandPaletteProps {
   aiAgentInstallUrl?: string
   aiModeEnabled?: boolean
   aiPromptTargetId?: string
+  aiRhizomeTargetId?: string
   locale?: AppLocale
   onClose: () => void
   onUseRhizome?: () => void
@@ -291,6 +292,7 @@ function OpenCommandPalette({
   aiAgentInstallUrl,
   aiModeEnabled = true,
   aiPromptTargetId,
+  aiRhizomeTargetId,
   locale = 'en',
   onClose,
   onUseRhizome,
@@ -314,6 +316,7 @@ function OpenCommandPalette({
   }
 
   useLayoutEffect(() => {
+    if (aiMode && !aiAgentReady) return
     const target = aiMode ? aiInputRef.current : inputRef.current
     if (!target) return
 
@@ -324,7 +327,7 @@ function OpenCommandPalette({
       focusPaletteTarget(target)
     })
     return () => window.cancelAnimationFrame(focusRetry)
-  }, [aiMode])
+  }, [aiAgentReady, aiMode])
 
   useEffect(() => {
     void selectedIndex
@@ -423,6 +426,17 @@ function OpenCommandPalette({
     onClose()
   }
 
+  const handleUseRhizome = () => {
+    onUseRhizome?.()
+    const prompt = aiValue.startsWith(' ') ? aiValue.slice(1).trim() : aiValue.trim()
+    if (prompt) {
+      if (aiRhizomeTargetId) queueAiPrompt(prompt, [], aiRhizomeTargetId)
+      else queueAiPrompt(prompt, [])
+      requestOpenAiChat()
+    }
+    onClose()
+  }
+
   return (
     <div
       ref={rootRef}
@@ -451,7 +465,7 @@ function OpenCommandPalette({
             inputRef={aiInputRef}
             onChange={handleAiValueChange}
             onSubmit={handleSubmitAiPrompt}
-            onUseRhizome={onUseRhizome}
+            onUseRhizome={onUseRhizome ? handleUseRhizome : undefined}
           />
         ) : (
           <>

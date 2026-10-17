@@ -267,6 +267,9 @@ describe('SettingsPanel', () => {
     expect(screen.getByText('Recognized local agents')).toBeInTheDocument()
     expect(screen.getByTestId('settings-cli-agent-status')).toHaveTextContent('Claude Code')
     expect(screen.getByTestId('settings-cli-agent-status')).toHaveTextContent('Codex')
+    expect(screen.getByTestId('settings-cli-agent-status')).toHaveTextContent('OpenCode')
+    expect(screen.getByTestId('settings-cli-agent-status')).toHaveTextContent('Antigravity')
+    expect(screen.getByTestId('settings-cli-agent-status')).toHaveTextContent('Kiro')
     expect(screen.queryByText('Prime Agent')).not.toBeInTheDocument()
     expect(screen.queryByText('Hermes Agent')).not.toBeInTheDocument()
     // Claude Code also remains import-source copy in SessionImportSettingsSection.
@@ -994,10 +997,13 @@ describe('SettingsPanel', () => {
     const status = screen.getByTestId('settings-cli-agent-status')
     expect(within(status).getByText('Claude Code')).toBeInTheDocument()
     expect(within(status).getByText('Codex')).toBeInTheDocument()
+    expect(within(status).getByText('OpenCode')).toBeInTheDocument()
+    expect(within(status).getByText('Antigravity CLI')).toBeInTheDocument()
+    expect(within(status).getByText('Kiro')).toBeInTheDocument()
     expect(within(status).queryByText('Prime Agent')).not.toBeInTheDocument()
     expect(within(status).queryByText('Hermes Agent')).not.toBeInTheDocument()
     expect(within(status).getByText('installed')).toBeInTheDocument()
-    expect(within(status).getByText('missing')).toBeInTheDocument()
+    expect(within(status).getAllByText('missing').length).toBeGreaterThan(0)
   })
 
   it('hides secret files by default, warns when off, and reloads the saved value', () => {

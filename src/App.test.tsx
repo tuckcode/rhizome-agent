@@ -535,6 +535,7 @@ import { isTauri, mockInvoke } from './mock-tauri'
 import { resetPrimeHostStatus } from './hooks/usePrimeHostStatus'
 import { streamAiAgent } from './utils/streamAiAgent'
 import { streamNativeChat } from './utils/streamNativeChat'
+import { takeQueuedAiPrompt } from './utils/aiPromptBridge'
 import { panePresetStorageKey } from './lib/panePresetStorage'
 import { notesPanelModeStorageKey } from './lib/notesPanelMode'
 
@@ -1199,6 +1200,107 @@ describe('App', () => {
       expect(streamNativeChat).toHaveBeenCalled()
     })
     expect(streamAiAgent).not.toHaveBeenCalled()
+  })
+
+  it('persists Use Rhizome instead across workspace close and a settings reload', async () => {
+    // Classic shell mounts the AI workspace inside Editor. The chat-centered
+    // graph overlay path hits a Radix ScrollArea update loop in jsdom.
+    localStorage.setItem('ff_shell_command_rail', 'false')
+    let settingsStore = createSettings({
+      auto_advance_inbox_after_organize: null,
+      default_ai_agent: 'prime',
+      default_ai_target: null,
+      chat_engine: 'native',
+      ai_workspace_conversations: [
+        { id: 'codex-chat', title: 'Codex notes', target_id: 'agent:codex', archived: false },
+      ],
+    })
+    mockCommandResults.get_settings = () => settingsStore
+    mockCommandResults.save_settings = (args: unknown) => {
+      const payload = args as { settings?: Settings }
+      if (payload?.settings) settingsStore = payload.settings
+      return null
+    }
+    mockCommandResults.get_ai_agents_status = {
+      prime: { installed: true, version: 'mock' },
+      claude_code: { installed: true, version: '2.1.90' },
+      codex: { installed: false, version: null },
+      opencode: { installed: false, version: null },
+      antigravity: { installed: false, version: null },
+      kiro: { installed: false, version: null },
+      hermes: { installed: false, version: null },
+    }
+
+    const { unmount } = render(<App />)
+    await screen.findByText('All Notes')
+    await waitFor(() => {
+      expect(typeof window.__rhizomeTest?.dispatchBrowserMenuCommand).toBe('function')
+    })
+    blurTypingSurface()
+    fireEvent.keyDown(window, { key: 'l', code: 'KeyL', metaKey: true, shiftKey: true })
+    await screen.findByTestId('ai-workspace', {}, { timeout: 5000 })
+    await waitFor(() => {
+      expect(screen.getByText('Codex notes')).toBeInTheDocument()
+    })
+
+    blurTypingSurface()
+    act(() => {
+      window.__rhizomeTest?.dispatchBrowserMenuCommand?.('view-command-palette')
+    })
+    fireEvent.change(await screen.findByPlaceholderText('Type a command...'), { target: { value: ' ' } })
+    expect(screen.getByText('Codex is not available on this machine.')).toBeInTheDocument()
+
+    const editor = screen.getByTestId('command-palette-ai-input')
+    editor.textContent = ' summarize the vault'
+    fireEvent.input(editor)
+    fireEvent.click(screen.getByTestId('command-palette-use-rhizome'))
+
+    await waitFor(() => {
+      expect(settingsStore.default_ai_target).toBe('agent:prime')
+    })
+    expect(settingsStore.default_ai_agent).toBe('prime')
+    expect(settingsStore.ai_workspace_conversations?.find((conversation) => conversation.id === 'codex-chat')?.target_id)
+      .toBe('agent:prime')
+
+    const queued = takeQueuedAiPrompt()
+    const composerText = screen.queryByTestId('agent-input')?.textContent ?? ''
+    const streamed = vi.mocked(streamNativeChat).mock.calls[0]?.[0] as { message?: string } | undefined
+    expect(`${queued?.text ?? ''} ${composerText} ${streamed?.message ?? ''}`).toMatch(/summarize the vault/)
+
+    blurTypingSurface()
+    fireEvent.keyDown(window, { key: 'l', code: 'KeyL', metaKey: true, shiftKey: true })
+    await waitFor(() => {
+      expect(screen.queryByTestId('ai-workspace')).not.toBeInTheDocument()
+    })
+    fireEvent.keyDown(window, { key: 'l', code: 'KeyL', metaKey: true, shiftKey: true })
+    await screen.findByTestId('ai-workspace')
+
+    blurTypingSurface()
+    act(() => {
+      window.__rhizomeTest?.dispatchBrowserMenuCommand?.('view-command-palette')
+    })
+    fireEvent.change(await screen.findByPlaceholderText('Type a command...'), { target: { value: ' ' } })
+    expect(screen.getAllByText('Ask Rhizome').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Codex is not available on this machine.')).not.toBeInTheDocument()
+
+    unmount()
+    localStorage.setItem('ff_shell_command_rail', 'false')
+    sessionStorage.setItem(AGENT_CHAT_OPENED_SESSION_KEY, '1')
+    render(<App />)
+    await screen.findByText('All Notes')
+    await waitFor(() => {
+      expect(typeof window.__rhizomeTest?.dispatchBrowserMenuCommand).toBe('function')
+    })
+    blurTypingSurface()
+    fireEvent.keyDown(window, { key: 'l', code: 'KeyL', metaKey: true, shiftKey: true })
+    await screen.findByTestId('ai-workspace', {}, { timeout: 5000 })
+    blurTypingSurface()
+    act(() => {
+      window.__rhizomeTest?.dispatchBrowserMenuCommand?.('view-command-palette')
+    })
+    fireEvent.change(await screen.findByPlaceholderText('Type a command...'), { target: { value: ' ' } })
+    expect(screen.getAllByText('Ask Rhizome').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Codex is not available on this machine.')).not.toBeInTheDocument()
   })
 
   it('waits for saved AI agent settings before sending right-panel messages', async () => {
