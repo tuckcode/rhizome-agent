@@ -58,8 +58,12 @@ pub fn allowed_roots(vault_path: Option<&str>, vault_paths: &[String]) -> Result
         if trimmed.is_empty() {
             continue;
         }
-        let Ok(canonical) = canonicalize_root(trimmed) else {
-            continue;
+        let canonical = match canonicalize_root(trimmed) {
+            Ok(canonical) => canonical,
+            Err(error) => {
+                log::warn!("Skipping a vault root that could not be resolved: {error}");
+                continue;
+            }
         };
         if all.iter().any(|root| root == &canonical) {
             continue;
@@ -480,6 +484,20 @@ mod tests {
         )
         .unwrap();
         assert_eq!(resolved, requested);
+    }
+
+    #[test]
+    fn an_extra_root_that_cannot_be_resolved_is_skipped() {
+        let (_a, root_a) = vault();
+        let file = PathBuf::from(&root_a).join("inside.md");
+        let missing = root_a.clone() + "-missing-vault-root";
+        let roots = allowed_roots(
+            Some(&root_a),
+            &[file.to_string_lossy().into_owned(), missing],
+        )
+        .unwrap();
+        assert_eq!(roots.all.len(), 1);
+        assert_eq!(roots.all[0], PathBuf::from(&root_a));
     }
 
     #[cfg(unix)]

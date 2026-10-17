@@ -12,6 +12,7 @@ import {
   normalizeAiModelProviders,
   type AiModelProvider,
 } from '../lib/aiTargets'
+import { chatEngineForSave, readChatEngine } from '../lib/chatEngine'
 import { ChatEngineSettings } from './ChatEngineSettings'
 import { NativeChatModelPicker } from './NativeChatModelPicker'
 import { resetListProviderModelsCache } from '../lib/listProviderModels'
@@ -309,7 +310,7 @@ function createSettingsDraft(
     celebrationsEnabled: readCelebrationsEnabled(settings.celebrations_enabled),
     keepInTaskbarOnClose: settings.keep_in_taskbar_on_close === true,
     agentProfile: settings.agent_profile?.trim() ?? '',
-    chatEngine: settings.chat_engine === 'native' ? 'native' : 'prime',
+    chatEngine: readChatEngine(settings.chat_engine),
     nativeChatTarget: settings.native_chat_target ?? null,
     aiModelProviders: normalizeAiModelProviders(settings.ai_model_providers),
     releaseChannel: normalizeReleaseChannel(settings.release_channel),
@@ -394,7 +395,7 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     celebrations_enabled: draft.celebrationsEnabled,
     keep_in_taskbar_on_close: draft.keepInTaskbarOnClose ? true : null,
     agent_profile: draft.agentProfile.trim() || null,
-    chat_engine: draft.chatEngine === 'native' ? 'native' : null,
+    chat_engine: chatEngineForSave(draft.chatEngine),
     native_chat_target: draft.nativeChatTarget,
     default_ai_agent: DEFAULT_AI_AGENT,
     default_ai_target: agentTargetId(DEFAULT_AI_AGENT),

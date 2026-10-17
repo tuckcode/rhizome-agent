@@ -30,6 +30,8 @@ pub use fake_model::{FakeModel, ScriptPart};
 pub use model::Model;
 pub use policy::{approval_options, ApprovalOption};
 #[cfg(test)]
+pub(crate) use tools::command_from_args;
+#[cfg(test)]
 pub(crate) use tools::override_secret_block;
 pub use tools::resolve_for_write;
 pub(crate) use tools::write_atomic;

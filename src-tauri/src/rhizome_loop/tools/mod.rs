@@ -32,6 +32,8 @@ pub(crate) use atomic::write_atomic;
 pub(crate) use sandbox::override_secret_block;
 pub use sandbox::resolve_for_write;
 pub(crate) use sandbox::{write_target_is_secret, BLOCKED_SECRET};
+#[cfg(test)]
+pub(crate) use shell::command_from_args;
 pub(crate) use shell::{approval_stamp as bash_stamp, command_from_args as bash_command};
 #[cfg(test)]
 pub use text::CHANGED_SINCE_APPROVAL;

@@ -964,14 +964,14 @@ describe('SettingsPanel', () => {
     })
   })
 
-  it('keeps Prime as the Chat engine until the Settings toggle is on', () => {
+  it('uses the native Chat engine when no engine is saved', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
 
     expect(screen.getByTestId('settings-chat-engine')).toHaveTextContent('Chat engine')
-    expect(screen.getByRole('switch', { name: 'Chat engine' })).toHaveAttribute('aria-checked', 'false')
-    expect(screen.getByTestId('settings-prime-chat-engine')).toHaveTextContent('Prime Agent')
+    expect(screen.getByRole('switch', { name: 'Chat engine' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.queryByTestId('settings-prime-chat-engine')).not.toBeInTheDocument()
     expect(screen.getByTestId('native-chat-model-picker')).toBeInTheDocument()
     expect(screen.queryByTestId('settings-default-ai-agent')).not.toBeInTheDocument()
   })
@@ -1036,7 +1036,7 @@ describe('SettingsPanel', () => {
     render(
       <SettingsPanel
         open={true}
-        settings={emptySettings}
+        settings={{ ...emptySettings, chat_engine: 'prime' }}
         onSave={onSave}
         onClose={onClose}
         aiAgentsStatus={status}
@@ -1150,14 +1150,30 @@ describe('SettingsPanel', () => {
     const { rerender } = render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
-    fireEvent.click(screen.getByRole('switch', { name: 'Chat engine' }))
+    expect(screen.getByRole('switch', { name: 'Chat engine' })).toHaveAttribute('aria-checked', 'true')
     fireEvent.click(screen.getByTestId('settings-save'))
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ chat_engine: 'native' }))
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ chat_engine: null }))
     const saved = onSave.mock.calls.at(-1)?.[0]
     rerender(
       <SettingsPanel open={true} settings={saved} onSave={onSave} onClose={onClose} />
     )
     expect(screen.getByRole('switch', { name: 'Chat engine' })).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('persists Prime when the Chat engine switch is turned off', () => {
+    const { rerender } = render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+    fireEvent.click(screen.getByRole('switch', { name: 'Chat engine' }))
+    expect(screen.getByRole('switch', { name: 'Chat engine' })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByTestId('settings-prime-chat-engine')).toHaveTextContent('Prime Agent')
+    fireEvent.click(screen.getByTestId('settings-save'))
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ chat_engine: 'prime' }))
+    const saved = onSave.mock.calls.at(-1)?.[0]
+    rerender(
+      <SettingsPanel open={true} settings={saved} onSave={onSave} onClose={onClose} />
+    )
+    expect(screen.getByRole('switch', { name: 'Chat engine' })).toHaveAttribute('aria-checked', 'false')
   })
 
   it('explains that Chat models are selected inside Prime', () => {
@@ -1205,7 +1221,7 @@ describe('SettingsPanel', () => {
       />,
     )
 
-    expect(screen.getByTestId('settings-prime-chat-engine')).toHaveTextContent('Prime Agent')
+    expect(screen.getByRole('switch', { name: 'Chat engine' })).toHaveAttribute('aria-checked', 'true')
     expect(screen.queryByText(/My Anthropic.*Claude Sonnet/)).not.toBeInTheDocument()
     fireEvent.click(screen.getByTestId('settings-save'))
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
