@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import { AiPanel } from './AiPanel'
 import { CHAT_TOP_BAR_BAND_CLASS, PrimeSessionSubhead } from './PrimeSessionSubhead'
 import { overlayTitleBarBandStyle } from '../utils/trafficLights'
+import { SHEET_OFFSET_BAND_ATTR } from '../hooks/useNotesSheetOffset'
 import { AgentActivityBand } from './AgentActivityBand'
 import { RlmFamilyBand } from './RlmFamilyBand'
 import { ChatComposerDeck } from './ChatComposerDeck'
@@ -240,6 +241,7 @@ export default function ChatHome({
           className={CHAT_TOP_BAR_BAND_CLASS}
           data-chat-top-bar="placeholder"
           data-testid="chat-top-bar"
+          {...{ [SHEET_OFFSET_BAND_ATTR]: 'content' }}
           style={overlayTitleBarBandStyle(railLayoutWidth)}
         >
           <span className="h-[13px] w-24 max-w-[40%] rounded-sm bg-muted-foreground/20" />

@@ -2,11 +2,12 @@ import { CirclesThree, MagnifyingGlass, Plus } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../hooks/appCommandCatalog'
-import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
+import { type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react'
 import { cn } from '@/lib/utils'
 import { useDragRegion } from '../hooks/useDragRegion'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import type { PrimeConnectionProblem } from '../hooks/usePrimeHostStatus'
+import { SHEET_OFFSET_BAND_ATTR } from '../hooks/useNotesSheetOffset'
 import { hasNativeMacosTrafficLights, overlayTitleBarBandStyle } from '../utils/trafficLights'
 import {
   primeSessionUptime,
@@ -150,6 +151,7 @@ export function PrimeSessionSubhead({
       style={titleBarBand}
       data-testid="prime-session-subhead"
       data-chat-top-bar="ready"
+      {...{ [SHEET_OFFSET_BAND_ATTR]: 'content' }}
       onMouseDown={onDragRegionMouseDown}
     >
       <span

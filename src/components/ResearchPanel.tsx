@@ -33,17 +33,9 @@ import {
 } from '@phosphor-icons/react'
 import { PeerToolExitButton } from './PeerToolExitButton'
 import { PEER_TOOL_EXIT_CHAT } from '../lib/peerToolExit'
+import { parseLibraryScan, type LibraryScanItem } from './researchLibraryScan'
 
-interface LibraryItem {
-  id: string
-  title: string
-  description: string
-  type: 'wiki' | 'source' | 'card'
-  tag?: string
-  date: string
-  dateEpoch: number
-  path: string
-}
+type LibraryItem = LibraryScanItem
 
 interface AskResult {
   key: string
@@ -264,22 +256,9 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
         name: 'rhizome_scan_library',
         args: { vaultPath: destinationVaultPath }
       }) as string
-      const items = JSON.parse(result) as Array<{
-        id: string; path: string; title: string; description: string;
-        type: string; tag: string; date: number
-      }>
-      const mapped = items.map(item => ({
-        id: item.id,
-        title: item.title,
-        description: item.description || '(no description)',
-        type: item.type as 'wiki' | 'source' | 'card',
-        tag: item.tag,
-        date: item.date > 0 ? new Date(item.date * 1000).toLocaleDateString() : 'unknown',
-        dateEpoch: item.date,
-        path: item.path,
-      }))
+      const mapped = parseLibraryScan(result)
       setLibrary(mapped)
-      addEvent(t('research.event.libraryLoaded', { count: items.length }))
+      addEvent(t('research.event.libraryLoaded', { count: mapped.length }))
       return mapped
     } catch (err) {
       addEvent(t('research.event.libraryScanError', { error: String(err) }))

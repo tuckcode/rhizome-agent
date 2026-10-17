@@ -1,8 +1,8 @@
 import { useEffect, useMemo } from 'react'
-import type { InboxPeriod, SidebarSelection, VaultEntry, ViewFile } from '../types'
+import type { SidebarSelection, VaultEntry, ViewFile } from '../types'
 import type { Tab } from './useTabManagement'
 import type { NoteListItem } from '../utils/ai-context'
-import { filterEntries, filterInboxEntries } from '../utils/noteListHelpers'
+import { filterEntries } from '../utils/noteListHelpers'
 import type { AllNotesFileVisibility } from '../utils/allNotesFileVisibility'
 import { publishAiWorkspaceWindowSharedContext } from '../lib/aiWorkspaceWindowSharedContext'
 import type { AiWorkspaceWindowContext } from '../utils/openAiWorkspaceWindow'
@@ -13,7 +13,8 @@ interface UseAiWorkspacePublishedContextParams {
   context: AiWorkspaceWindowContext
   effectiveSelection: SidebarSelection
   entries: VaultEntry[]
-  inboxPeriod: InboxPeriod
+  /** Rows the Inbox list renders. The badge is this array's length. */
+  inboxEntries: readonly VaultEntry[]
   tabs: Tab[]
   views: ViewFile[]
 }
@@ -45,21 +46,21 @@ function usePublishedNoteList({
   allNotesFileVisibility,
   effectiveSelection,
   entries,
-  inboxPeriod,
+  inboxEntries,
   views,
 }: Pick<
   UseAiWorkspacePublishedContextParams,
-  'allNotesFileVisibility' | 'effectiveSelection' | 'entries' | 'inboxPeriod' | 'views'
+  'allNotesFileVisibility' | 'effectiveSelection' | 'entries' | 'inboxEntries' | 'views'
 >): NoteListItem[] {
   return useMemo<NoteListItem[]>(() => {
     const filtered = isInboxSelection(effectiveSelection)
-      ? filterInboxEntries(entries, inboxPeriod)
+      ? inboxEntries
       : filterEntries(entries, effectiveSelection, {
         views,
         allNotesFileVisibility,
       })
-    return noteListItemsFromEntries(filtered)
-  }, [allNotesFileVisibility, effectiveSelection, entries, inboxPeriod, views])
+    return noteListItemsFromEntries([...filtered])
+  }, [allNotesFileVisibility, effectiveSelection, entries, inboxEntries, views])
 }
 
 export function useAiWorkspacePublishedContext({
@@ -68,17 +69,17 @@ export function useAiWorkspacePublishedContext({
   context,
   effectiveSelection,
   entries,
-  inboxPeriod,
+  inboxEntries,
   tabs,
   views,
 }: UseAiWorkspacePublishedContextParams) {
-  const inboxCount = useMemo(() => filterInboxEntries(entries, inboxPeriod).length, [entries, inboxPeriod])
+  const inboxCount = inboxEntries.length
 
   const noteList = usePublishedNoteList({
     allNotesFileVisibility,
     effectiveSelection,
     entries,
-    inboxPeriod,
+    inboxEntries,
     views,
   })
 

@@ -9,8 +9,18 @@ const sidecarStarts: Array<Record<string, unknown> | undefined> = []
 vi.mock('../mock-tauri', () => ({
   isTauri: () => false,
   mockInvoke: async (cmd: string, args?: Record<string, unknown>) => {
-    if (cmd === 'list_prime_sessions') {
-      return [{ name: 'sess-a.jsonl', path: '/tmp/sess-a.jsonl' }]
+    if (cmd === 'list_prime_session_summaries') {
+      return [
+        { id: 'aaaaaaaaaaaa', path: '/tmp/sess-a.jsonl', title: 'Watcher debounce' },
+        {
+          id: 'bbbbbbbbbbbb',
+          path: '/tmp/sess-b.jsonl',
+          title: '<conversation_history>\n[user]: hi\n[assistant]: Hello.\n[user]: later\n</conversation_history>',
+        },
+        { id: 'cccccccccccc', path: '/tmp/sess-c.jsonl', mtimeMs: Date.now() - 2 * 60 * 60 * 1000 },
+        { id: 'dddddddddddd', path: '/tmp/sess-d.jsonl', title: 'Draft the release notes', mtimeMs: Date.now() - 5 * 60 * 60 * 1000 },
+        { id: 'eeeeeeeeeeee', path: '/tmp/sess-e.jsonl', title: 'Draft the release notes' },
+      ]
     }
     if (cmd === 'start_mindwalk_sidecar') {
       sidecarStarts.push(args)
@@ -30,6 +40,16 @@ describe('MyceliumView', () => {
     render(<MyceliumView />)
     expect(screen.getByTestId('mycelium-view')).toBeInTheDocument()
     expect(screen.getByText('Mycelium')).toBeInTheDocument()
+    expect(screen.getByText('Footprints across Prime sessions')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getAllByTestId('mycelium-session-row')).toHaveLength(5)
+    })
+    expect(screen.getByText('Watcher debounce')).toBeInTheDocument()
+    expect(screen.getByText('hi')).toBeInTheDocument()
+    expect(screen.getByText('Untitled session')).toBeInTheDocument()
+    expect(screen.getByText('Draft the release notes · 5h ago')).toBeInTheDocument()
+    expect(screen.getByText('Draft the release notes · undated')).toBeInTheDocument()
+    expect(screen.queryByText(/conversation_history/)).not.toBeInTheDocument()
     expect(screen.getByTestId('mycelium-overview-list')).toBeInTheDocument()
     await waitFor(() => {
       expect(screen.getByTestId('mycelium-embed')).toHaveAttribute('src', 'http://127.0.0.1:18765')
@@ -62,8 +82,16 @@ describe('MyceliumView', () => {
     expect(screen.queryByTestId('mycelium-overview-list')).not.toBeInTheDocument()
     expect(screen.queryByTestId('mycelium-sessions-resize')).not.toBeInTheDocument()
     await waitFor(() => {
-      expect(screen.getByTestId('mycelium-session-scope')).toBeInTheDocument()
+      expect(screen.getByTestId('mycelium-session-scope')).toHaveTextContent('Showing Watcher debounce only. Not the session list.')
     })
+  })
+
+  it('names a focused session that is not in the list by its filename', async () => {
+    render(<MyceliumView focusSessionPath="/tmp/notes/missing-session.jsonl" />)
+    await waitFor(() => {
+      expect(screen.getByTestId('mycelium-session-scope')).toHaveTextContent('missing-session.jsonl')
+    })
+    expect(screen.queryByText(/Untitled session/)).not.toBeInTheDocument()
   })
 
   it('widens when its right edge is dragged right, and remembers it', async () => {
