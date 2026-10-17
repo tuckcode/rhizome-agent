@@ -418,6 +418,10 @@ vi.mock('./utils/streamAiAgent', () => ({
   streamAiAgent: vi.fn(async () => {}),
 }))
 
+vi.mock('./utils/streamNativeChat', () => ({
+  streamNativeChat: vi.fn(async () => undefined),
+}))
+
 vi.mock('./hooks/useUpdater', async () => {
   const actual = await vi.importActual<typeof import('./hooks/useUpdater')>('./hooks/useUpdater')
 
@@ -530,6 +534,7 @@ import { useUpdater } from './hooks/useUpdater'
 import { isTauri, mockInvoke } from './mock-tauri'
 import { resetPrimeHostStatus } from './hooks/usePrimeHostStatus'
 import { streamAiAgent } from './utils/streamAiAgent'
+import { streamNativeChat } from './utils/streamNativeChat'
 import { panePresetStorageKey } from './lib/panePresetStorage'
 import { notesPanelModeStorageKey } from './lib/notesPanelMode'
 
@@ -761,7 +766,7 @@ describe('App', () => {
     expect(screen.getByTestId('chat-center')).toHaveStyle({ display: 'none' })
   })
 
-  it('opens the session-footprint chip into Connections, not the full-page Mycelium destination', async () => {
+  it('does not keep a Prime session footprint after leftover prime engine migrates', async () => {
     localStorage.setItem('rhizome:command-rail-expanded', '1')
     mockCommandResults.get_prime_session_host_status = {
       installed: true,
@@ -779,11 +784,8 @@ describe('App', () => {
     mockCommandResults.read_prime_session_transcript = []
     mockCommandResults.get_settings = createSettings({ chat_engine: 'prime' })
     render(<App />)
-    fireEvent.click(await screen.findByTestId('prime-session-footprint'))
-    expect(await screen.findByTestId('connections-panel')).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Mycelium', selected: true })).toBeInTheDocument()
-    expect(screen.queryByText('No saved sessions')).not.toBeInTheDocument()
-    expect(await screen.findByLabelText('Activity session')).toHaveValue('/prime/sessions/session-1.jsonl')
+    expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(screen.queryByTestId('prime-session-footprint')).not.toBeInTheDocument()
   })
 
   it('keeps Graph and Mycelium out of the Notes column until an icon opens them', async () => {
@@ -831,7 +833,7 @@ describe('App', () => {
     expect(pane).toHaveTextContent('Test Project')
   })
 
-  it('opens Notes and Mycelium from the session-footprint chip when Notes is closed', async () => {
+  it('does not open Notes from a Prime session footprint when leftover prime migrates', async () => {
     setPanePreset('chat')
     localStorage.setItem('rhizome:command-rail-expanded', '1')
     mockCommandResults.get_prime_session_host_status = {
@@ -852,10 +854,7 @@ describe('App', () => {
     render(<App />)
     expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
-    fireEvent.click(await screen.findByTestId('prime-session-footprint'))
-    expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
-    expect(await screen.findByTestId('connections-panel')).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Mycelium', selected: true })).toBeInTheDocument()
+    expect(screen.queryByTestId('prime-session-footprint')).not.toBeInTheDocument()
   })
 
   it('starts with Chat and the restore strip when no view preference is stored', async () => {
@@ -1142,7 +1141,7 @@ describe('App', () => {
 
     const input = await screen.findByTestId('agent-input')
     await waitFor(() => {
-      expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime')
+      expect(input).toHaveAttribute('aria-placeholder', 'Ask Rhizome')
     })
     await waitFor(() => {
       expect(screen.getByTestId('native-chat-model-picker')).toBeInTheDocument()
@@ -1153,13 +1152,12 @@ describe('App', () => {
     fireEvent.click(screen.getByTestId('agent-send'))
 
     await waitFor(() => {
-      expect(streamAiAgent).toHaveBeenCalledWith(expect.objectContaining({
-        agent: 'prime',
-      }))
+      expect(streamNativeChat).toHaveBeenCalled()
     })
+    expect(streamAiAgent).not.toHaveBeenCalled()
   })
 
-  it('still sends Prime-targeted messages through Prime when the host is installed but not running', async () => {
+  it('still sends leftover Prime-targeted messages through native when the host is installed but not running', async () => {
     mockCommandResults.get_prime_session_host_status = {
       installed: true,
       version: 'mock',
@@ -1191,17 +1189,16 @@ describe('App', () => {
 
     const input = await screen.findByTestId('agent-input')
     await waitFor(() => {
-      expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime')
+      expect(input).toHaveAttribute('aria-placeholder', 'Ask Rhizome')
     })
     input.textContent = 'Summarize the active vault'
     fireEvent.input(input)
     fireEvent.click(screen.getByTestId('agent-send'))
 
     await waitFor(() => {
-      expect(streamAiAgent).toHaveBeenCalledWith(expect.objectContaining({
-        agent: 'prime',
-      }))
+      expect(streamNativeChat).toHaveBeenCalled()
     })
+    expect(streamAiAgent).not.toHaveBeenCalled()
   })
 
   it('waits for saved AI agent settings before sending right-panel messages', async () => {
@@ -1250,7 +1247,7 @@ describe('App', () => {
     })
 
     await waitFor(() => {
-      expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime')
+      expect(input).toHaveAttribute('aria-placeholder', 'Ask Rhizome')
     })
     await waitFor(() => {
       expect(screen.getByTestId('native-chat-model-picker')).toBeInTheDocument()
@@ -1261,10 +1258,9 @@ describe('App', () => {
     fireEvent.click(screen.getByTestId('agent-send'))
 
     await waitFor(() => {
-      expect(streamAiAgent).toHaveBeenCalledWith(expect.objectContaining({
-        agent: 'prime',
-      }))
+      expect(streamNativeChat).toHaveBeenCalled()
     })
+    expect(streamAiAgent).not.toHaveBeenCalled()
   })
 
   it('shows onboarding after telemetry consent when no active vault is configured', async () => {
