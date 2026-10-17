@@ -1,15 +1,18 @@
 import { test, expect, type Page } from '@playwright/test'
 import { executeCommand, openCommandPalette, sendShortcut } from './helpers'
-import { pinNotesShellLaunch } from '../helpers/fixtureVault'
+import {
+  createFixtureVaultCopy,
+  openAllNotesList,
+  openFixtureVaultDesktopHarness,
+  removeFixtureVaultCopy,
+} from '../helpers/fixtureVault'
 
 const RAW_EDITOR = '.cm-content'
 
 type MockHandler = (args?: Record<string, unknown>) => unknown
 
 async function openFirstNote(page: Page) {
-  await page.waitForSelector('[data-testid="sidebar-top-nav"]', { timeout: 10_000 })
-  const noteList = page.locator('[data-testid="note-list-container"]')
-  await noteList.waitFor({ timeout: 5_000 })
+  const noteList = await openAllNotesList(page)
   await noteList.locator('.cursor-pointer').first().click()
   await expect(page.locator('.bn-editor')).toBeVisible({ timeout: 5_000 })
 }
@@ -34,6 +37,10 @@ async function openRawMode(page: Page) {
   await expect(page.locator(RAW_EDITOR)).toBeVisible({ timeout: 5_000 })
 }
 
+/**
+ * The fixture vault re-applies its handlers on every read of
+ * window.__mockHandlers, so pin the patched object in place.
+ */
 async function installFailOnceSaveMock(page: Page) {
   await page.waitForFunction(() => Boolean(window.__mockHandlers?.save_note_content))
   await page.evaluate(() => {
@@ -52,19 +59,24 @@ async function installFailOnceSaveMock(page: Page) {
       }
       return originalSaveNoteContent?.(args)
     }
+    Object.defineProperty(window, '__mockHandlers', { configurable: true, value: handlers, writable: true })
   })
 }
 
+let tempVaultDir: string | null = null
+
+test.afterEach(() => {
+  removeFixtureVaultCopy(tempVaultDir)
+  tempVaultDir = null
+})
+
+// The fixture vault, not the bare mock: every mock note sits outside the
+// mock's active vault, so the editor drops edits to them before saving.
 test('failed Windows path saves show a recoverable toast and retry the draft', async ({ page }) => {
   const pageErrors: string[] = []
   page.on('pageerror', (err) => { pageErrors.push(err.message) })
-  await page.route('**/api/vault/ping', async (route) => {
-    await route.fulfill({ status: 404, body: '' })
-  })
-
-  await pinNotesShellLaunch(page)
-
-  await page.goto('/')
+  tempVaultDir = createFixtureVaultCopy()
+  await openFixtureVaultDesktopHarness(page, tempVaultDir)
   await openFirstNote(page)
   await installFailOnceSaveMock(page)
 

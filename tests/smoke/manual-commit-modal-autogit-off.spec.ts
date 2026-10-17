@@ -100,7 +100,12 @@ function installCommitFlowMocks() {
   })
 }
 
+/** The classic shell opens Notes from the View command, as the View menu does. */
 async function openFirstNote(page: Page) {
+  await page.waitForFunction(() => window.__rhizomeFrontendReady === true)
+  await page.evaluate(() => {
+    window.dispatchEvent(new CustomEvent('laputa:dispatch-command', { detail: 'view-editor-list' }))
+  })
   const noteList = page.locator('[data-testid="note-list-container"]')
   await noteList.waitFor({ timeout: 5_000 })
   await noteList.locator('.cursor-pointer').first().click()
@@ -157,6 +162,9 @@ async function expectPushCount(page: Page, expectedCount: number) {
 
 test('@smoke commit entry opens the manual modal when AutoGit is off and switches back immediately when enabled', async ({ page }) => {
   await page.addInitScript(installCommitFlowMocks)
+  // The busy and keyboard states under test belong to the classic status-bar
+  // Commit button. The command-rail shell folds Commit into the vault pill.
+  await page.addInitScript(() => localStorage.setItem('ff_shell_command_rail', 'false'))
   await pinNotesShellLaunch(page)
   await page.goto('/')
   await page.waitForLoadState('networkidle')

@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { executeCommand, openCommandPalette } from './helpers'
+import { openAllNotesList } from '../helpers/fixtureVault'
 
 interface MockEntry {
   path: string
@@ -195,12 +196,14 @@ async function switchToPersonalVault(page: Page): Promise<void> {
 test('switching vaults clears stale pending editor saves @smoke', async ({ page }) => {
   const data = await installVaultSwitchMocks(page)
   await page.goto('/', { waitUntil: 'domcontentloaded' })
+  await openAllNotesList(page)
 
   await openNote(page, 'Work Home')
   await openRawMode(page)
   await setRawEditorContent(page, '# Work Home\n\nUnsaved draft before vault switch')
 
   await switchToPersonalVault(page)
+  await openAllNotesList(page)
   await expect(page.getByTestId('note-list-container').getByText('Personal Home', { exact: true })).toBeVisible()
   expect(await readSaveProbe(page)).not.toEqual(expect.arrayContaining([
     expect.objectContaining({

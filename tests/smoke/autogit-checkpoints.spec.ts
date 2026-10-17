@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 import { executeCommand, openCommandPalette } from './helpers'
 import { seedAutoGitSavedChange } from './testBridge'
-import { pinNotesShellLaunch } from '../helpers/fixtureVault'
+import { openAllNotesList, pinNotesShellLaunch } from '../helpers/fixtureVault'
 
 type MockHandler = (args?: Record<string, unknown>) => unknown
 
@@ -114,8 +114,7 @@ function installAutoGitMocks() {
 }
 
 async function openFirstNote(page: Page) {
-  const noteList = page.locator('[data-testid="note-list-container"]')
-  await noteList.waitFor({ timeout: 5_000 })
+  const noteList = await openAllNotesList(page)
   await noteList.locator('.cursor-pointer').first().click()
   await expect(page.locator('.bn-editor')).toBeVisible({ timeout: 5_000 })
 }
@@ -195,8 +194,10 @@ async function setMockGitCommitFailure(page: Page, message: string | null) {
   }, message)
 }
 
+/** The command-rail shell folds Commit into the vault·git pill menu. */
 async function triggerQuickCommit(page: Page) {
-  const commitButton = page.getByTestId('status-commit-push')
+  await page.getByTestId('status-vault-trigger').click()
+  const commitButton = page.getByTestId('vault-menu-commit')
   await expect(commitButton).toBeEnabled({ timeout: 5_000 })
   await commitButton.click()
 }

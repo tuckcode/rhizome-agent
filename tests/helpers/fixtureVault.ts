@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
@@ -574,6 +574,43 @@ export async function openNotesPanelFromClosedShell(
   await page.waitForFunction(dockedVaultPanelIsOpen, undefined, { timeout })
 }
 
+/**
+ * Show the full note list and return it. A fresh launch is Chat (ADR-0173),
+ * so this opens Notes from the rail when the list is not already visible
+ * (a stored editor-list still wins), expands Browse, and selects All Notes.
+ * The product default is Inbox when explicit organization is on. Tests use
+ * the full seed set. Do not wait on one title: the virtualized list may keep
+ * that row off-DOM.
+ */
+export async function openAllNotesList(
+  page: Page,
+  timeout = FIXTURE_VAULT_READY_TIMEOUT,
+): Promise<Locator> {
+  const noteList = page.locator('[data-testid="note-list-container"]')
+  // The classic shell (`ff_shell_command_rail=false`) already shows the list.
+  if (!(await noteList.isVisible().catch(() => false))) {
+    try {
+      await page.waitForFunction(dockedVaultPanelIsOpen, undefined, { timeout: 5_000 })
+    } catch {
+      await openNotesPanelFromClosedShell(page, timeout)
+    }
+  }
+  await noteList.waitFor({ timeout })
+
+  // All Notes lives in Browse on the command-rail shell. Expand it when C72
+  // left it collapsed. The classic sidebar shows All Notes directly.
+  const allNotes = page.getByTestId('sidebar-top-nav').getByText('All Notes', { exact: true })
+  const browseToggle = page.getByTestId('vault-panel-browse-toggle')
+  await expect(allNotes.or(browseToggle).first()).toBeVisible({ timeout })
+  if (!(await allNotes.isVisible())) {
+    await browseToggle.click()
+    await expect(allNotes).toBeVisible({ timeout })
+  }
+  await allNotes.click()
+  await expect(noteList.getByRole('option').first()).toBeVisible({ timeout })
+  return noteList
+}
+
 async function waitForFixtureVaultReady({
   page,
   initialPanel,
@@ -582,32 +619,8 @@ async function waitForFixtureVaultReady({
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   await page.waitForFunction(() => Boolean(window.__mockHandlers?.list_vault))
 
-  // Fresh launch is Chat (ADR-0173). Open Notes from the rail when the list
-  // is not already visible (stored editor-list still wins when one exists).
-  try {
-    await page.waitForFunction(dockedVaultPanelIsOpen, undefined, { timeout: 5_000 })
-  } catch {
-    await openNotesPanelFromClosedShell(page)
-  }
-
-  const noteList = page.locator('[data-testid="note-list-container"]')
-  await noteList.waitFor({ timeout: FIXTURE_VAULT_READY_TIMEOUT })
-
-  // Product default is Inbox when explicit organization is enabled. Fixture
-  // tests use the full seed set, so normalize to All Notes. All Notes lives in
-  // Browse — expand it when C72 left Browse collapsed. Do not wait on one
-  // title: the virtualized list may legitimately keep that row off-DOM.
+  await openAllNotesList(page)
   const browseNav = page.getByTestId('vault-panel-navigation')
-  if ((await browseNav.count()) === 0) {
-    const browseToggle = page.getByTestId('vault-panel-browse-toggle')
-    await expect(browseToggle).toBeVisible({ timeout: FIXTURE_VAULT_READY_TIMEOUT })
-    await browseToggle.click()
-    await expect(browseNav).toBeVisible({ timeout: FIXTURE_VAULT_READY_TIMEOUT })
-  }
-  await page.getByTestId('sidebar-top-nav').getByText('All Notes', { exact: true }).click()
-  await expect(noteList.getByRole('option').first()).toBeVisible({
-    timeout: FIXTURE_VAULT_READY_TIMEOUT,
-  })
 
   if (initialPanel === 'inbox') {
     if ((await browseNav.count()) > 0) {
