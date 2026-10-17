@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render as rtlRender, screen, fireEvent, act, within } from '@testing-library/react'
+import { render as rtlRender, screen, fireEvent, act, within, waitFor } from '@testing-library/react'
 import { DynamicRelationshipsPanel, BacklinksPanel, ReferencedByPanel, GitHistoryPanel, InstancesPanel } from './InspectorPanels'
 import { TooltipProvider } from './ui/tooltip'
 import type { ReferencedByItem } from './InspectorPanels'
@@ -780,6 +780,68 @@ describe('GitHistoryPanel', () => {
     render(<GitHistoryPanel commits={commits} onViewCommitDiff={onViewCommitDiff} />)
     fireEvent.click(screen.getByText('abc1234'))
     expect(onViewCommitDiff).toHaveBeenCalledWith('abc1234567890')
+  })
+
+  it('exposes a truncated commit subject on hover without hiding view-diff', async () => {
+    const longSubject = 'Update project notes and add a very long experiment title that must stay readable'
+    const commits: GitCommit[] = [
+      {
+        hash: 'abc1234567890',
+        shortHash: 'abc1234',
+        message: `${longSubject}\n\nBody that belongs below the subject.`,
+        author: 'luca',
+        date: Math.floor(Date.now() / 1000) - 3600,
+      },
+    ]
+
+    render(<GitHistoryPanel commits={commits} onViewCommitDiff={onViewCommitDiff} />)
+
+    const row = screen.getByRole('button', { name: `abc1234 · ${longSubject}. View diff` })
+    expect(row).toHaveClass('truncate')
+    expect(row).toHaveAccessibleName(`abc1234 · ${longSubject}. View diff`)
+    expect(row).not.toHaveAttribute('title', 'View diff for abc1234')
+    expect(row.className).toContain('-mx-1')
+    expect(row.className).toContain('px-1')
+    expect(row.className).toContain('rounded-sm')
+    expect(row.className).toContain('focus-visible:ring-2')
+    expect(row.className).toContain('focus-visible:ring-inset')
+    expect(row.className).toContain('focus-visible:ring-[var(--state-focus-ring)]')
+
+    fireEvent.focus(row)
+    const focusedTip = await screen.findByRole('tooltip')
+    const bubble = document.querySelector('[data-slot="tooltip-content"]')
+    expect(focusedTip).toHaveTextContent(longSubject)
+    expect(bubble).toHaveAttribute('data-side', 'bottom')
+    expect(bubble).toHaveClass('break-words')
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => {
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    })
+
+    fireEvent.blur(row)
+    fireEvent.pointerMove(row)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(longSubject)
+  })
+
+  it('skips the tooltip when the commit subject is blank', () => {
+    const commits: GitCommit[] = [
+      {
+        hash: 'abc1234567890',
+        shortHash: 'abc1234',
+        message: '\n   \r',
+        author: 'luca',
+        date: Math.floor(Date.now() / 1000),
+      },
+    ]
+
+    render(<GitHistoryPanel commits={commits} onViewCommitDiff={onViewCommitDiff} />)
+
+    const row = screen.getByRole('button', { name: 'abc1234. View diff' })
+    expect(row).toHaveAccessibleName('abc1234. View diff')
+    expect(row).toHaveTextContent('abc1234')
+    expect(row.textContent?.trim().startsWith('. ')).toBe(false)
+    fireEvent.focus(row)
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
   })
 
   it('displays relative dates correctly', () => {

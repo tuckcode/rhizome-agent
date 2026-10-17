@@ -1,5 +1,7 @@
 import { ArrowCounterClockwise } from '@phosphor-icons/react'
 import type { GitCommit } from '../../types'
+import { CommitSubjectTooltip } from '../CommitSubjectTooltip'
+import { commitSubject } from '../../utils/commitSubject'
 
 function formatRelativeDate(timestamp: number): string {
   const now = Math.floor(Date.now() / 1000)
@@ -9,6 +11,13 @@ function formatRelativeDate(timestamp: number): string {
   if (days < 30) return `${days}d ago`
   const months = Math.floor(days / 30)
   return months === 1 ? '1mo ago' : `${months}mo ago`
+}
+
+const INSPECTOR_ROW_FOCUS_CLASS_NAME = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--state-focus-ring)] focus-visible:ring-inset'
+
+function commitRowName(shortHash: string, subject: string): string {
+  const visible = subject ? `${shortHash} · ${subject}` : shortHash
+  return `${visible}. View diff`
 }
 
 export function GitHistoryPanel({ commits, onViewCommitDiff }: { commits: GitCommit[]; onViewCommitDiff?: (commitHash: string) => void }) {
@@ -21,22 +30,26 @@ export function GitHistoryPanel({ commits, onViewCommitDiff }: { commits: GitCom
         History
       </h4>
       <div className="flex flex-col gap-2.5">
-        {commits.map((c) => (
-          <div key={c.hash} style={{ borderLeft: '2px solid var(--border)', paddingLeft: 10 }}>
-            <button type="button"
-              className="mb-0.5 w-full cursor-pointer truncate border-none bg-transparent p-0 text-left text-xs text-primary hover:underline"
-              onClick={() => onViewCommitDiff?.(c.hash)}
-              title={`View diff for ${c.shortHash}`}
-            >
-              <span className="font-mono" style={{ fontSize: 11 }}>{c.shortHash}</span>
-              {' · '}
-              {c.message}
-            </button>
-            <div className="text-muted-foreground" style={{ fontSize: 10 }}>
-              {formatRelativeDate(c.date)}
+        {commits.map((c) => {
+          const subject = commitSubject(c.message)
+          return (
+            <div key={c.hash} style={{ borderLeft: '2px solid var(--border)', paddingLeft: 10 }}>
+              <CommitSubjectTooltip subject={subject} side="bottom" sideOffset={20}>
+                <button type="button"
+                  className={`-mx-1 mb-0.5 w-full cursor-pointer truncate rounded-sm border-none bg-transparent px-1 py-0 text-left text-xs text-primary hover:underline ${INSPECTOR_ROW_FOCUS_CLASS_NAME}`}
+                  onClick={() => onViewCommitDiff?.(c.hash)}
+                  aria-label={commitRowName(c.shortHash, subject)}
+                >
+                  <span className="font-mono" style={{ fontSize: 11 }}>{c.shortHash}</span>
+                  {subject ? ` · ${subject}` : null}
+                </button>
+              </CommitSubjectTooltip>
+              <div className="text-muted-foreground" style={{ fontSize: 10 }}>
+                {formatRelativeDate(c.date)}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )
