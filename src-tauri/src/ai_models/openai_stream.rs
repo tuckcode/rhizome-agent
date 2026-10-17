@@ -15,7 +15,7 @@
 //!   It is not a model event, so it cannot reach the native session log.
 
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::sync::{Mutex, OnceLock};
 
 use serde_json::Value;
@@ -55,15 +55,30 @@ impl Drop for ReasoningReplayGuard {
     }
 }
 
+/// One captured assistant step. Oldest turns are dropped first.
+struct ReplayTurn {
+    reasoning: String,
+    call_ids: Vec<String>,
+    /// Set only when the step called no tools. Matched in capture order.
+    text: Option<String>,
+}
+
 /// Remembers `reasoning_content` for one in-memory session.
 ///
-/// The map lives for the process. It is not written to disk or to the
-/// native session log. A reopened chat has a new session and misses.
+/// The map is not written to disk or to the native session log. Dropping
+/// the provider model removes the session. A full session drops the oldest
+/// turns until it is within the turn count and the byte cap. A reopened
+/// chat has a new session and misses.
 #[derive(Default)]
 struct ReplayBucket {
-    by_call: HashMap<String, String>,
-    by_text: HashMap<String, String>,
+    turns: VecDeque<ReplayTurn>,
+    bytes: usize,
 }
+
+/// Most recent steps kept for one chat. Older steps replay as `""`.
+const MAX_SESSION_TURNS: usize = 32;
+/// About 1 MB of reasoning, call ids, and text-only answers per chat.
+const MAX_SESSION_BYTES: usize = 1024 * 1024;
 
 fn reasoning_replay() -> &'static Mutex<HashMap<String, ReplayBucket>> {
     static REPLAY: OnceLock<Mutex<HashMap<String, ReplayBucket>>> = OnceLock::new();
@@ -89,47 +104,143 @@ fn current_replay_session() -> Option<String> {
 
 /// Stores reasoning captured for `session`. Empty reasoning is not stored.
 pub(crate) fn note_reasoning(session: &str, call_ids: &[String], text: &str, reasoning: &str) {
+    note_reasoning_limited(
+        session,
+        call_ids,
+        text,
+        reasoning,
+        MAX_SESSION_TURNS,
+        MAX_SESSION_BYTES,
+    );
+}
+
+fn note_reasoning_limited(
+    session: &str,
+    call_ids: &[String],
+    text: &str,
+    reasoning: &str,
+    max_turns: usize,
+    max_bytes: usize,
+) {
     if session.is_empty() || reasoning.is_empty() {
         return;
     }
-    if call_ids.is_empty() && text.is_empty() {
+    let call_ids: Vec<String> = call_ids
+        .iter()
+        .filter(|id| !id.is_empty())
+        .cloned()
+        .collect();
+    let text = if call_ids.is_empty() && !text.is_empty() {
+        Some(text.to_string())
+    } else {
+        None
+    };
+    if call_ids.is_empty() && text.is_none() {
+        return;
+    }
+    let turn = ReplayTurn {
+        reasoning: reasoning.to_string(),
+        call_ids,
+        text,
+    };
+    let mut sessions = reasoning_replay()
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+    let bucket = sessions.entry(session.to_string()).or_default();
+    bucket.bytes = bucket.bytes.saturating_add(turn_bytes(&turn));
+    bucket.turns.push_back(turn);
+    evict_oldest(bucket, max_turns, max_bytes);
+}
+
+/// Drops one chat's captured reasoning. Safe to call twice.
+pub(crate) fn clear_reasoning_session(session: &str) {
+    if session.is_empty() {
         return;
     }
     let mut sessions = reasoning_replay()
         .lock()
         .unwrap_or_else(|error| error.into_inner());
-    let bucket = sessions.entry(session.to_string()).or_default();
-    for id in call_ids {
-        if !id.is_empty() {
-            bucket.by_call.insert(id.clone(), reasoning.to_string());
-        }
-    }
-    if !text.is_empty() {
-        bucket
-            .by_text
-            .insert(text.to_string(), reasoning.to_string());
+    sessions.remove(session);
+}
+
+fn turn_bytes(turn: &ReplayTurn) -> usize {
+    turn.reasoning.len()
+        + turn.call_ids.iter().map(String::len).sum::<usize>()
+        + turn.text.as_ref().map(String::len).unwrap_or(0)
+}
+
+/// Drops the oldest turns until the session fits. The newest turn stays
+/// even when it alone is over the byte cap.
+fn evict_oldest(bucket: &mut ReplayBucket, max_turns: usize, max_bytes: usize) {
+    let max_turns = max_turns.max(1);
+    while bucket.turns.len() > max_turns || (bucket.bytes > max_bytes && bucket.turns.len() > 1) {
+        let Some(old) = bucket.turns.pop_front() else {
+            break;
+        };
+        bucket.bytes = bucket.bytes.saturating_sub(turn_bytes(&old));
     }
 }
 
-/// Reasoning captured for this session, if this step produced any.
-///
-/// Tool-call ids win. `text` is the fallback for a step with no calls.
-/// A miss means the turn was reopened or came from another provider.
-pub(crate) fn recall_reasoning(session: &str, call_ids: &[String], text: &str) -> Option<String> {
-    if session.is_empty() {
+/// Reasoning for a tool step, matched by call id. A miss is an evicted,
+/// reopened, or foreign turn.
+pub(crate) fn recall_call_reasoning(session: &str, call_ids: &[String]) -> Option<String> {
+    if session.is_empty() || call_ids.is_empty() {
         return None;
     }
     let sessions = reasoning_replay()
         .lock()
         .unwrap_or_else(|error| error.into_inner());
     let bucket = sessions.get(session)?;
-    if let Some(found) = call_ids.iter().find_map(|id| bucket.by_call.get(id)) {
-        return Some(found.clone());
+    bucket
+        .turns
+        .iter()
+        .rev()
+        .find(|turn| {
+            call_ids
+                .iter()
+                .any(|id| turn.call_ids.iter().any(|stored| stored == id))
+        })
+        .map(|turn| turn.reasoning.clone())
+}
+
+/// Reasoning for text-only assistant steps, in history order.
+///
+/// The kept turns are the newest ones, so they line up with the end of
+/// `texts`. An older step that was dropped, or a step this session never
+/// captured, is `None`. Identical answers stay in capture order.
+pub(crate) fn recall_text_reasoning(session: &str, texts: &[&str]) -> Vec<Option<String>> {
+    if session.is_empty() {
+        return vec![None; texts.len()];
     }
-    if text.is_empty() {
-        return None;
-    }
-    bucket.by_text.get(text).cloned()
+    let stored = {
+        let sessions = reasoning_replay()
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let Some(bucket) = sessions.get(session) else {
+            return vec![None; texts.len()];
+        };
+        bucket
+            .turns
+            .iter()
+            .filter_map(|turn| {
+                turn.text
+                    .as_ref()
+                    .map(|text| (text.clone(), turn.reasoning.clone()))
+            })
+            .collect::<Vec<_>>()
+    };
+    let start = texts.len().saturating_sub(stored.len());
+    texts
+        .iter()
+        .enumerate()
+        .map(|(index, text)| {
+            if index < start {
+                return None;
+            }
+            let (stored_text, reasoning) = &stored[index - start];
+            (*text == stored_text).then(|| reasoning.clone())
+        })
+        .collect()
 }
 
 fn store_current_reasoning(call_ids: &[String], text: &str, reasoning: &str) {
@@ -727,15 +838,16 @@ mod tests {
             ]
         );
         assert_eq!(
-            recall_reasoning("parser-session", &["call_b".into()], ""),
+            recall_call_reasoning("parser-session", &["call_b".into()]),
             Some("need the tool".into())
         );
         assert_eq!(
-            recall_reasoning("parser-session", &[], "Looking."),
-            Some("need the tool".into())
+            recall_text_reasoning("parser-session", &["Looking."]),
+            vec![None],
+            "a tool step is not stored under its visible text"
         );
         assert_eq!(
-            recall_reasoning("other-session", &["call_a".into()], "Looking."),
+            recall_call_reasoning("other-session", &["call_a".into()]),
             None
         );
     }
@@ -757,9 +869,86 @@ mod tests {
 
         assert_eq!(events, vec![text("Done."), finish(FinishReason::Stop)]);
         assert_eq!(
-            recall_reasoning("completion-session", &[], "Done."),
-            Some("checked the tool".into())
+            recall_text_reasoning("completion-session", &["Done."]),
+            vec![Some("checked the tool".into())]
         );
+    }
+
+    #[test]
+    fn identical_text_only_answers_keep_their_own_reasoning_in_order() {
+        note_reasoning_limited("order-session", &[], "Done.", "first thought", 8, 1_000_000);
+        note_reasoning_limited(
+            "order-session",
+            &[],
+            "Done.",
+            "second thought",
+            8,
+            1_000_000,
+        );
+
+        assert_eq!(
+            recall_text_reasoning("order-session", &["Done.", "Done."]),
+            vec![Some("first thought".into()), Some("second thought".into())]
+        );
+        clear_reasoning_session("order-session");
+    }
+
+    #[test]
+    fn the_session_cap_drops_the_oldest_turns_first() {
+        note_reasoning_limited("cap-session", &["c1".into()], "", "one", 2, 1_000_000);
+        note_reasoning_limited("cap-session", &["c2".into()], "", "two", 2, 1_000_000);
+        note_reasoning_limited("cap-session", &["c3".into()], "", "three", 2, 1_000_000);
+
+        assert_eq!(recall_call_reasoning("cap-session", &["c1".into()]), None);
+        assert_eq!(
+            recall_call_reasoning("cap-session", &["c2".into()]),
+            Some("two".into())
+        );
+        assert_eq!(
+            recall_call_reasoning("cap-session", &["c3".into()]),
+            Some("three".into())
+        );
+
+        note_reasoning_limited("text-cap", &[], "Done.", "old", 2, 1_000_000);
+        note_reasoning_limited("text-cap", &[], "Done.", "mid", 2, 1_000_000);
+        note_reasoning_limited("text-cap", &[], "Done.", "new", 2, 1_000_000);
+        assert_eq!(
+            recall_text_reasoning("text-cap", &["Done.", "Done.", "Done."]),
+            vec![None, Some("mid".into()), Some("new".into())]
+        );
+        clear_reasoning_session("cap-session");
+        clear_reasoning_session("text-cap");
+    }
+
+    #[test]
+    fn the_byte_cap_drops_the_oldest_turn_and_keeps_the_newest() {
+        let fat = "x".repeat(20);
+        note_reasoning_limited("byte-cap", &[], "a", &fat, 10, 30);
+        note_reasoning_limited("byte-cap", &[], "b", &fat, 10, 30);
+
+        assert_eq!(
+            recall_text_reasoning("byte-cap", &["a", "b"]),
+            vec![None, Some(fat)]
+        );
+        clear_reasoning_session("byte-cap");
+    }
+
+    #[test]
+    fn clearing_one_session_leaves_the_other() {
+        note_reasoning("keep-session", &["keep".into()], "", "stay");
+        note_reasoning("drop-session", &["gone".into()], "", "leave");
+        clear_reasoning_session("drop-session");
+
+        assert_eq!(
+            recall_call_reasoning("keep-session", &["keep".into()]),
+            Some("stay".into())
+        );
+        assert_eq!(
+            recall_call_reasoning("drop-session", &["gone".into()]),
+            None
+        );
+        clear_reasoning_session("keep-session");
+        clear_reasoning_session("drop-session");
     }
 
     #[test]

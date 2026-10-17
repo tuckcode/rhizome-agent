@@ -18,8 +18,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use serde_json::{json, Map, Value};
 
 use crate::ai_models::{
-    enter_reasoning_replay_session, recall_reasoning, stream_chat_events_with_params,
-    AiModelStreamRequest, HttpLimits,
+    clear_reasoning_session, enter_reasoning_replay_session, recall_call_reasoning,
+    recall_text_reasoning, stream_chat_events_with_params, AiModelStreamRequest, HttpLimits,
 };
 use crate::model_events::ModelEvent;
 use crate::rhizome_loop::{HistoryItem, Model, ModelView};
@@ -99,6 +99,12 @@ impl Model for ProviderModel {
     }
 }
 
+impl Drop for ProviderModel {
+    fn drop(&mut self) {
+        clear_reasoning_session(&self.replay_session);
+    }
+}
+
 /// OpenAI chat messages for one step, in order: history before
 /// `turn_start`, the admitted user message, then this turn's items.
 ///
@@ -136,12 +142,17 @@ fn next_replay_session() -> String {
 /// Gemini 3 and 4 reject a tool step that has no thought signature.
 /// The leading number is the generation: `gemini-2.5` is 2, `gemini-3.8` is 3.
 fn needs_gemini_thought_placeholder(model_id: &str) -> bool {
-    let name = model_id
-        .trim()
+    let mut name = model_id.trim().to_ascii_lowercase();
+    // OpenRouter tags the free pool as `:free`. That is a suffix, not the
+    // model name. A vendor prefix still splits on `/` or `:`.
+    if let Some(stripped) = name.strip_suffix(":free") {
+        name = stripped.to_string();
+    }
+    let name = name
         .rsplit(['/', ':'])
         .next()
-        .unwrap_or(model_id)
-        .to_ascii_lowercase();
+        .unwrap_or(name.as_str())
+        .to_string();
     let Some(rest) = name.strip_prefix("gemini-") else {
         return false;
     };
@@ -168,10 +179,26 @@ fn openai_messages_for(view: &ModelView, turn_start: usize, wire: &OutboundWire<
     let admitted = HistoryItem::User {
         text: view.admitted.clone(),
     };
-    let items = view.history[..split]
+    let items: Vec<&HistoryItem> = view.history[..split]
         .iter()
         .chain(std::iter::once(&admitted))
-        .chain(view.history[split..].iter());
+        .chain(view.history[split..].iter())
+        .collect();
+    let text_only: Vec<&str> = items
+        .iter()
+        .filter_map(|item| match item {
+            HistoryItem::Assistant { text, tool_calls } if tool_calls.is_empty() => {
+                Some(text.as_str())
+            }
+            _ => None,
+        })
+        .collect();
+    let text_reasoning = if deepseek {
+        recall_text_reasoning(wire.replay_session, &text_only)
+    } else {
+        Vec::new()
+    };
+    let mut text_cursor = 0usize;
 
     let mut messages = Vec::new();
     let mut unanswered: Vec<String> = Vec::new();
@@ -193,20 +220,15 @@ fn openai_messages_for(view: &ModelView, turn_start: usize, wire: &OutboundWire<
                     "content": if text.is_empty() { Value::Null } else { json!(text) },
                 });
                 if deepseek {
-                    let ids: Vec<String> = if tool_calls.is_empty() {
-                        Vec::new()
+                    let captured = if tool_calls.is_empty() {
+                        let found = text_reasoning.get(text_cursor).cloned().unwrap_or(None);
+                        text_cursor += 1;
+                        found
                     } else {
-                        tool_calls.iter().map(|call| call.id.clone()).collect()
+                        let ids: Vec<String> =
+                            tool_calls.iter().map(|call| call.id.clone()).collect();
+                        recall_call_reasoning(wire.replay_session, &ids)
                     };
-                    let captured = recall_reasoning(
-                        wire.replay_session,
-                        &ids,
-                        if tool_calls.is_empty() {
-                            text.as_str()
-                        } else {
-                            ""
-                        },
-                    );
                     message["reasoning_content"] = Value::String(captured.unwrap_or_default());
                 }
                 if !tool_calls.is_empty() {
@@ -294,6 +316,7 @@ fn tool_definitions(names: &[String]) -> Vec<Value> {
 mod tests {
     use super::*;
     use crate::ai_models::test_server::{serve, sse, TEST_LIMITS};
+    use crate::ai_models::{clear_reasoning_session, recall_call_reasoning};
     use crate::rhizome_loop::{AgentLoop, DurableEvent, ToolCall};
     use serde_json::json;
 
@@ -739,6 +762,8 @@ mod tests {
             "GEMINI-4-flash",
             "models/gemini-4.1-pro",
             "google/gemini-3.8-flash",
+            "google/gemini-3.8-flash:free",
+            "gemini-3.8-flash:free",
         ] {
             let messages = openai_messages_for(&view, 0, &wire(model_id, "gemini", None, ""));
             assert_eq!(
@@ -859,6 +884,55 @@ mod tests {
         assert!(messages[3]["tool_calls"][0].get("extra_content").is_none());
         assert_eq!(messages[0].get("reasoning_content"), None);
         assert_eq!(messages[4].get("reasoning_content"), None);
+    }
+
+    #[test]
+    fn identical_text_only_turns_replay_in_capture_order() {
+        crate::ai_models::note_reasoning("deepseek-order", &[], "Done.", "first thought");
+        crate::ai_models::note_reasoning("deepseek-order", &[], "Done.", "second thought");
+        let history = vec![
+            HistoryItem::Assistant {
+                text: "Done.".into(),
+                tool_calls: vec![],
+            },
+            HistoryItem::User {
+                text: "again".into(),
+            },
+            HistoryItem::Assistant {
+                text: "Done.".into(),
+                tool_calls: vec![],
+            },
+        ];
+        let target = wire("deepseek-flash", "deepseek", None, "deepseek-order");
+
+        let messages = openai_messages_for(&view("go", history), 3, &target);
+
+        assert_eq!(messages[0]["reasoning_content"], "first thought");
+        assert_eq!(messages[2]["reasoning_content"], "second thought");
+        clear_reasoning_session("deepseek-order");
+    }
+
+    #[test]
+    fn dropping_the_provider_model_clears_its_reasoning_session() {
+        let kept = ProviderModel::new(request("http://127.0.0.1:9"), TEST_LIMITS);
+        let dropped = ProviderModel::new(request("http://127.0.0.1:9"), TEST_LIMITS);
+        let kept_session = kept.replay_session.clone();
+        let dropped_session = dropped.replay_session.clone();
+        crate::ai_models::note_reasoning(&kept_session, &["keep".into()], "", "stay");
+        crate::ai_models::note_reasoning(&dropped_session, &["gone".into()], "", "leave");
+
+        drop(dropped);
+
+        assert_eq!(
+            recall_call_reasoning(&kept_session, &["keep".into()]),
+            Some("stay".into())
+        );
+        assert_eq!(
+            recall_call_reasoning(&dropped_session, &["gone".into()]),
+            None
+        );
+        drop(kept);
+        assert_eq!(recall_call_reasoning(&kept_session, &["keep".into()]), None);
     }
 
     #[test]
