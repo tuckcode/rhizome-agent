@@ -1,4 +1,4 @@
-import type { AiAgentId } from './aiAgents'
+import { normalizeStoredAiAgent, type AiAgentId } from './aiAgents'
 import type { Settings } from '../types'
 
 /** CLI targets that are not chat engines. Leave them on disk. */
@@ -58,11 +58,11 @@ export function migrateStoredChatEngine(value: unknown): 'native' {
   return 'native'
 }
 
+/** Strip `agent:` and return a real agent id. Does not wipe Prime/Hermes. */
 export function migrateStoredAiAgent(value: unknown): AiAgentId | null {
-  const migrated = migrateRemovedHarnessChoice(value)
-  if (migrated === 'native') return null
-  if (isKeptExternalAgentId(migrated)) return migrated
-  return null
+  const token = asToken(value)
+  if (!token) return null
+  return normalizeStoredAiAgent(agentIdFromToken(token))
 }
 
 export function migrateStoredAiTarget(value: unknown): string | null {
@@ -83,7 +83,6 @@ export function migrateRemovedHarnessSettings(settings: Settings): Settings {
   return {
     ...settings,
     chat_engine: migrateStoredChatEngine(settings.chat_engine),
-    default_ai_agent: migrateStoredAiAgent(settings.default_ai_agent),
     default_ai_target: migrateStoredAiTarget(settings.default_ai_target),
     ai_workspace_conversations: conversations.length > 0
       ? conversations
@@ -98,7 +97,6 @@ function diskChatEngineIsAlreadyNative(value: Settings['chat_engine']): boolean 
 
 export function removedHarnessSettingsNeedPersist(raw: Settings, migrated: Settings): boolean {
   if (!diskChatEngineIsAlreadyNative(raw.chat_engine) && migrated.chat_engine === 'native') return true
-  if ((raw.default_ai_agent ?? null) !== (migrated.default_ai_agent ?? null)) return true
   if ((raw.default_ai_target ?? null) !== (migrated.default_ai_target ?? null)) return true
 
   const rawConversations = raw.ai_workspace_conversations ?? []

@@ -264,10 +264,12 @@ describe('SettingsPanel', () => {
       />
     )
 
-    expect(screen.queryByText('Recognized local agents')).not.toBeInTheDocument()
+    expect(screen.getByText('Recognized local agents')).toBeInTheDocument()
+    expect(screen.getByTestId('settings-cli-agent-status')).toHaveTextContent('Claude Code')
+    expect(screen.getByTestId('settings-cli-agent-status')).toHaveTextContent('Codex')
     expect(screen.queryByText('Prime Agent')).not.toBeInTheDocument()
-    // Claude Code is import-source copy (SessionImportSettingsSection), not a
-    // listed local agent. Probe status must still stay off the agents list.
+    expect(screen.queryByText('Hermes Agent')).not.toBeInTheDocument()
+    // Claude Code also remains import-source copy in SessionImportSettingsSection.
     expect(screen.getByText(/Bring Claude Code sessions into this vault/)).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Local model' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'API model' })).toBeInTheDocument()
@@ -963,6 +965,39 @@ describe('SettingsPanel', () => {
     expect(screen.queryByTestId('settings-prime-chat-engine')).not.toBeInTheDocument()
     expect(screen.getByTestId('native-chat-model-picker')).toBeInTheDocument()
     expect(screen.queryByTestId('settings-default-ai-agent')).not.toBeInTheDocument()
+  })
+
+  it('puts Chat model at the top of AI Agents and shows Codex and Claude Code install status', () => {
+    const aiAgentsStatus: AiAgentsStatus = createMissingAiAgentsStatus()
+    aiAgentsStatus.claude_code = createAiAgentAvailability('installed', '2.1.90')
+    aiAgentsStatus.codex = createAiAgentAvailability('missing', null)
+    render(
+      <SettingsPanel
+        open={true}
+        settings={emptySettings}
+        aiAgentsStatus={aiAgentsStatus}
+        onSave={onSave}
+        onClose={onClose}
+      />,
+    )
+
+    const chatModel = screen.getByTestId('settings-chat-model')
+    expect(chatModel).toHaveTextContent('Chat model')
+    expect(chatModel).toHaveTextContent(
+      'New chats start with this model. You can change it per chat in the composer.',
+    )
+    expect(within(chatModel).getByTestId('native-chat-model-picker')).toBeInTheDocument()
+
+    const section = chatModel.parentElement
+    expect(section?.firstElementChild).toBe(chatModel)
+
+    const status = screen.getByTestId('settings-cli-agent-status')
+    expect(within(status).getByText('Claude Code')).toBeInTheDocument()
+    expect(within(status).getByText('Codex')).toBeInTheDocument()
+    expect(within(status).queryByText('Prime Agent')).not.toBeInTheDocument()
+    expect(within(status).queryByText('Hermes Agent')).not.toBeInTheDocument()
+    expect(within(status).getByText('installed')).toBeInTheDocument()
+    expect(within(status).getByText('missing')).toBeInTheDocument()
   })
 
   it('hides secret files by default, warns when off, and reloads the saved value', () => {

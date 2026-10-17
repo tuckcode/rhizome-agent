@@ -539,8 +539,23 @@ fn normalize_settings(settings: Settings) -> Settings {
 fn normalize_chat_engine(value: Option<String>) -> Option<String> {
     match value.as_deref().map(str::trim) {
         None | Some("") => None,
-        Some("native") => Some("native".into()),
+        Some(engine) if engine.eq_ignore_ascii_case("native") => Some("native".into()),
         _ => Some("native".into()),
+    }
+}
+
+fn leftover_chat_engine_on_disk(raw: &str) -> bool {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(raw) else {
+        return false;
+    };
+    match value
+        .get("chat_engine")
+        .and_then(|engine| engine.as_str())
+        .map(str::trim)
+    {
+        None | Some("") => false,
+        Some(engine) if engine.eq_ignore_ascii_case("native") => false,
+        Some(_) => true,
     }
 }
 
@@ -605,7 +620,11 @@ fn get_settings_at(path: &PathBuf) -> Result<Settings, String> {
         fs::read_to_string(path).map_err(|e| format!("Failed to read settings: {}", e))?;
     let settings =
         serde_json::from_str(&content).map_err(|e| format!("Failed to parse settings: {}", e))?;
-    Ok(normalize_settings(settings))
+    let normalized = normalize_settings(settings);
+    if leftover_chat_engine_on_disk(&content) {
+        save_settings_at(path, normalized.clone())?;
+    }
+    Ok(normalized)
 }
 
 fn save_settings_at(path: &Path, settings: Settings) -> Result<(), String> {
@@ -804,6 +823,53 @@ mod tests {
             ..Settings::default()
         });
         assert_eq!(migrated_bogus.chat_engine.as_deref(), Some("native"));
+
+        for leftover in ["Prime", "HERMES", "agent:prime", "agent:hermes"] {
+            let migrated = save_and_reload(Settings {
+                chat_engine: Some(leftover.into()),
+                ..Settings::default()
+            });
+            assert_eq!(
+                migrated.chat_engine.as_deref(),
+                Some("native"),
+                "{leftover} should become native"
+            );
+        }
+    }
+
+    #[test]
+    fn leftover_chat_engine_is_written_back_on_load() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("settings.json");
+        // Write leftover casing without save_settings_at, which would normalize first.
+        let leftover = Settings {
+            chat_engine: Some("Prime".into()),
+            ..Settings::default()
+        };
+        fs::write(&path, serde_json::to_string(&leftover).unwrap()).unwrap();
+        let loaded = get_settings_at(&path).unwrap();
+        assert_eq!(loaded.chat_engine.as_deref(), Some("native"));
+        let disk: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(disk["chat_engine"], "native");
+    }
+
+    #[test]
+    fn default_ai_agent_prime_stays_prime_until_distill_moves_to_native() {
+        // Distill, inbox, and jobs still read this field. Map prime → none
+        // only when those callers move to native in a later PR.
+        assert_eq!(
+            normalize_default_ai_agent(Some("prime")).as_deref(),
+            Some("prime")
+        );
+        assert_eq!(
+            normalize_default_ai_agent(Some("Prime")).as_deref(),
+            Some("prime")
+        );
+        assert_eq!(
+            normalize_default_ai_agent(Some("claude_code")).as_deref(),
+            Some("claude_code")
+        );
     }
 
     #[test]

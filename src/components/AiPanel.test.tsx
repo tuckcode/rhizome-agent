@@ -466,7 +466,7 @@ describe('AiPanel', () => {
     expect(screen.getByText('Prime is not available on this machine')).toBeTruthy()
     expect(screen.getByTestId('agent-input')).toHaveAttribute(
       'aria-placeholder',
-      'Prime is not installed. Install prime-agent and log in once.',
+      'Prime is not installed. Install it, then retry.',
     )
 
     const input = screen.getByTestId('agent-input')

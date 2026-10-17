@@ -21,10 +21,12 @@ interface CommandPaletteProps {
   entries?: VaultEntry[]
   aiAgentReady?: boolean
   aiAgentLabel?: string
+  aiAgentInstallUrl?: string
   aiModeEnabled?: boolean
   aiPromptTargetId?: string
   locale?: AppLocale
   onClose: () => void
+  onUseRhizome?: () => void
 }
 
 interface ScoredCommand {
@@ -286,10 +288,12 @@ function OpenCommandPalette({
   entries = [],
   aiAgentReady = true,
   aiAgentLabel = 'Claude Code',
+  aiAgentInstallUrl,
   aiModeEnabled = true,
   aiPromptTargetId,
   locale = 'en',
   onClose,
+  onUseRhizome,
 }: Omit<CommandPaletteProps, 'open'>) {
   const [query, setQuery] = useState('')
   const [aiValue, setAiValue] = useState('')
@@ -443,9 +447,11 @@ function OpenCommandPalette({
             value={aiValue}
             aiAgentReady={aiAgentReady}
             aiAgentLabel={aiAgentLabel}
+            aiAgentInstallUrl={aiAgentInstallUrl}
             inputRef={aiInputRef}
             onChange={handleAiValueChange}
             onSubmit={handleSubmitAiPrompt}
+            onUseRhizome={onUseRhizome}
           />
         ) : (
           <>

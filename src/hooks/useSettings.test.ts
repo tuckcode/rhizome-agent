@@ -200,15 +200,29 @@ describe('useSettings', () => {
       expect(result.current.loaded).toBe(true)
     })
     expect(result.current.settings.chat_engine).toBe('native')
-    expect(result.current.settings.default_ai_agent).toBeNull()
+    expect(result.current.settings.default_ai_agent).toBe('hermes')
     expect(result.current.settings.default_ai_target).toBeNull()
     expect(mockInvokeFn).toHaveBeenCalledWith('save_settings', {
       settings: expect.objectContaining({
         chat_engine: 'native',
-        default_ai_agent: null,
+        default_ai_agent: 'hermes',
         default_ai_target: null,
       }),
     })
+  })
+
+  it('leaves default_ai_agent prime on disk', async () => {
+    mockSettingsStore = {
+      ...savedSettings,
+      chat_engine: 'native',
+      default_ai_agent: 'prime',
+    }
+    const { result } = renderHook(() => useSettings())
+    await waitFor(() => {
+      expect(result.current.loaded).toBe(true)
+    })
+    expect(result.current.settings.default_ai_agent).toBe('prime')
+    expect(mockInvokeFn).not.toHaveBeenCalledWith('save_settings', expect.anything())
   })
 
   it('loads settings from backend on mount', async () => {

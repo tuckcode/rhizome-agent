@@ -114,6 +114,7 @@ interface AiWorkspaceProps {
 
 function agentReadinessForTarget(target: AiTarget, statuses: AiAgentsStatus): AiAgentReadiness {
   if (target.kind === 'api_model') return 'ready'
+  if (target.kind === 'agent' && (target.agent === 'prime' || target.agent === 'hermes')) return 'ready'
   const status = getAiAgentAvailability(statuses, target.agent).status
   if (status === 'checking') return 'checking'
   return status === 'installed' ? 'ready' : 'missing'

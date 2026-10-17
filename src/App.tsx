@@ -135,8 +135,8 @@ import { trackEvent } from './lib/telemetry'
 import { trackFocusedPaneSwitched, trackNotesFocusToggled, trackVaultCredentialsHandled } from './lib/productAnalytics'
 import { redactCredentialTokens } from './lib/sensitiveTextRedaction'
 import { areAutomaticUpdateChecksEnabled } from './lib/automaticUpdateChecks'
-import { composerAgentLabel, DEFAULT_AI_AGENT } from './lib/aiAgents'
-import { type AiTarget } from './lib/aiTargets'
+import { composerAgentLabel, DEFAULT_AI_AGENT, getAiAgentDefinition } from './lib/aiAgents'
+import { agentTargets, type AiTarget } from './lib/aiTargets'
 import { chatEngineFromSettings } from './lib/chatEngine'
 import { chatEngineForResolvedTarget, quickPromptTargetIsReady } from './lib/chatTargetRouting'
 import { areGitFeaturesEnabled } from './lib/gitSettings'
@@ -356,7 +356,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const [lastAiWorkspaceTarget, setLastAiWorkspaceTarget] = useState<AiTarget | null>(null)
   const handleActiveAiWorkspaceTargetChange = useCallback((target: AiTarget) => {
     setLastAiWorkspaceTarget((current) => (current?.id === target.id ? current : target))
-  }, [])
+  }, [setLastAiWorkspaceTarget])
   const {
     folderVaults,
     graphDefaultWorkspacePath,
@@ -2597,9 +2597,19 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
             agent: quickPromptTarget.kind === 'agent' ? quickPromptTarget.agent : DEFAULT_AI_AGENT,
             targetLabel: quickPromptTarget.label,
           })}
+          aiAgentInstallUrl={
+            quickPromptTarget.kind === 'agent' && quickPromptTarget.agent !== 'prime' && quickPromptTarget.agent !== 'hermes'
+              ? getAiAgentDefinition(quickPromptTarget.agent).installUrl
+              : undefined
+          }
           aiPromptTargetId={quickPromptTarget.id}
           locale={appLocale}
           onClose={dialogs.closeCommandPalette}
+          onUseRhizome={() => {
+            const rhizome = agentTargets()[0]
+            if (rhizome) setLastAiWorkspaceTarget(rhizome)
+            dialogs.closeCommandPalette()
+          }}
         />
         <KeyboardShortcutsDialog
           open={dialogs.showKeyboardShortcuts}

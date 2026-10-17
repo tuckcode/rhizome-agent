@@ -546,7 +546,7 @@ describe('aiAgentSession', () => {
     expect(session.getMessages()[0]?.response).toContain('Codex is not available')
   })
 
-  it('streams the selected agent when the chat engine is omitted', async () => {
+  it('streams native when a Prime agent has no engine loaded yet', async () => {
     nextMessageIdMock.mockReturnValue('msg-prime')
     const session = createRuntime()
     await sendAgentMessage({
@@ -559,7 +559,31 @@ describe('aiAgentSession', () => {
       },
       prompt: { text: 'Hello' },
     })
-    expect(streamAiAgentMock).toHaveBeenCalled()
+    expect(streamNativeChatMock).toHaveBeenCalled()
+    expect(streamAiAgentMock).not.toHaveBeenCalled()
+  })
+
+  it('streams Codex when the chat engine is omitted', async () => {
+    nextMessageIdMock.mockReturnValue('msg-codex-omitted')
+    const session = createRuntime()
+    await sendAgentMessage({
+      runtime: session.runtime,
+      context: {
+        agent: 'codex',
+        target: {
+          kind: 'agent',
+          agent: 'codex',
+          id: 'agent:codex',
+          label: 'Codex',
+          shortLabel: 'Codex',
+        },
+        ready: true,
+        vaultPath: '/vault',
+        permissionMode: 'power_user',
+      },
+      prompt: { text: 'Hello' },
+    })
+    expect(streamAiAgentMock).toHaveBeenCalledWith(expect.objectContaining({ agent: 'codex' }))
     expect(streamNativeChatMock).not.toHaveBeenCalled()
   })
 
@@ -588,7 +612,7 @@ describe('aiAgentSession', () => {
     )
   })
 
-  it('still blocks a Prime-targeted chat when Prime is not installed', async () => {
+  it('streams native for leftover Prime engine even when Prime is not installed', async () => {
     nextMessageIdMock.mockReturnValue('msg-prime-missing')
     const session = createRuntime()
     await sendAgentMessage({
@@ -602,9 +626,8 @@ describe('aiAgentSession', () => {
       },
       prompt: { text: 'Hello' },
     })
-    expect(streamNativeChatMock).not.toHaveBeenCalled()
+    expect(streamNativeChatMock).toHaveBeenCalled()
     expect(streamAiAgentMock).not.toHaveBeenCalled()
-    expect(session.getMessages()[0]?.response).toContain('Install it with `npm i -g prime-agent`')
   })
 
   it('chat_toggle_native_uses_rhizome_loop', async () => {

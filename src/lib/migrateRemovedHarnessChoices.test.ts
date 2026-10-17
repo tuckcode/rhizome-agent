@@ -116,14 +116,25 @@ describe('migrateRemovedHarnessSettings', () => {
     expect(migrateStoredChatEngine('native')).toBe('native')
   })
 
-  it('clears Prime/Hermes agent choices and keeps Codex', () => {
-    expect(migrateStoredAiAgent('prime')).toBeNull()
-    expect(migrateStoredAiAgent('hermes')).toBeNull()
-    expect(migrateStoredAiAgent('pi')).toBeNull()
-    expect(migrateStoredAiAgent('gemini')).toBeNull()
-    expect(migrateStoredAiAgent('bogus')).toBeNull()
+  it('leaves default_ai_agent prime unchanged', () => {
+    const raw: Settings = {
+      ...emptySettings,
+      chat_engine: 'native',
+      default_ai_agent: 'prime',
+    }
+    const migrated = migrateRemovedHarnessSettings(raw)
+    expect(migrated.default_ai_agent).toBe('prime')
+    expect(removedHarnessSettingsNeedPersist(raw, migrated)).toBe(false)
+  })
+
+  it('returns a valid agent id for agent:codex', () => {
+    expect(migrateStoredAiAgent('agent:codex')).toBe('codex')
     expect(migrateStoredAiAgent('codex')).toBe('codex')
-    expect(migrateStoredAiAgent('claude_code')).toBe('claude_code')
+    expect(migrateStoredAiAgent('prime')).toBe('prime')
+    expect(migrateStoredAiAgent('hermes')).toBe('hermes')
+    expect(migrateStoredAiAgent('pi')).toBe('prime')
+    expect(migrateStoredAiAgent('gemini')).toBe('prime')
+    expect(migrateStoredAiAgent('bogus')).toBeNull()
     expect(migrateStoredAiTarget('agent:prime')).toBeNull()
     expect(migrateStoredAiTarget('agent:codex')).toBe('agent:codex')
     expect(migrateStoredAiTarget('model:openai/gpt-4.1')).toBe('model:openai/gpt-4.1')
@@ -142,7 +153,7 @@ describe('migrateRemovedHarnessSettings', () => {
     }
     const once = migrateRemovedHarnessSettings(raw)
     expect(once.chat_engine).toBe('native')
-    expect(once.default_ai_agent).toBeNull()
+    expect(once.default_ai_agent).toBe('hermes')
     expect(once.default_ai_target).toBeNull()
     expect(once.ai_workspace_conversations?.[0]?.target_id).toBeNull()
     expect(once.ai_workspace_conversations?.[1]?.target_id).toBe('agent:codex')

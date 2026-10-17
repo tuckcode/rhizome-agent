@@ -1,8 +1,12 @@
 import { Copy, Cube, Info, Monitor, Moon, Stack, Sun, X } from '@phosphor-icons/react'
 import {
   createMissingAiAgentsStatus,
+  getAiAgentAvailability,
+  getAiAgentDefinition,
+  type AiAgentId,
   type AiAgentsStatus,
 } from '../lib/aiAgents'
+import { AiAgentIcon } from './AiAgentIcon'
 import {
   normalizeAiModelProviders,
   type AiModelProvider,
@@ -1495,6 +1499,20 @@ function AiAgentSettingsSection({
       />
 
       <SettingsGroup>
+        <SettingsRow
+          label="Chat model"
+          description="New chats start with this model. You can change it per chat in the composer."
+          controlWidth="auto"
+          testId="settings-chat-model"
+        >
+          <NativeChatModelPicker
+            locale={locale}
+            value={nativeChatTarget}
+            onChange={setNativeChatTarget}
+            providers={aiModelProviders}
+            showLabel={false}
+          />
+        </SettingsRow>
         <AutoSaveSettingRow
           label={t('settings.aiAgents.sessionAutoDistill')}
           checked={sessionAutoDistillEnabled}
@@ -1507,15 +1525,6 @@ function AiAgentSettingsSection({
           checked={celebrationsEnabled}
           onChange={setCelebrationsEnabled}
           testId="settings-celebrations-enabled"
-        />
-      </SettingsGroup>
-
-      <SettingsGroup>
-        <NativeChatModelPicker
-          locale={locale}
-          value={nativeChatTarget}
-          onChange={setNativeChatTarget}
-          providers={aiModelProviders}
         />
       </SettingsGroup>
 
@@ -1619,8 +1628,49 @@ function SecretFilesSettingRow({
   )
 }
 
+const SETTINGS_CLI_STATUS_AGENT_IDS: readonly AiAgentId[] = ['claude_code', 'codex']
+
+function AiAgentsInstalledSection({
+  t,
+  aiAgentsStatus,
+}: {
+  t: Translate
+  aiAgentsStatus: AiAgentsStatus
+}) {
+  return (
+    <div className="rounded-md border border-border bg-card p-3" data-testid="settings-cli-agent-status">
+      <div className="text-sm font-medium text-foreground">{t('settings.aiAgents.installedTitle')}</div>
+      <div className="mt-1 text-xs leading-5 text-muted-foreground">{t('settings.aiAgents.installedDescription')}</div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {SETTINGS_CLI_STATUS_AGENT_IDS.map((id) => {
+          const definition = getAiAgentDefinition(id)
+          const status = getAiAgentAvailability(aiAgentsStatus, definition.id)
+          const installed = status.status === 'installed'
+          return (
+            <div key={definition.id} className="rounded-md border border-border bg-background px-3 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <AiAgentIcon agent={definition.id} size={16} />
+                  <div className="truncate text-sm font-medium text-foreground">{definition.label}</div>
+                </div>
+                <div className={installed ? 'text-xs text-feedback-success-text' : 'text-xs text-muted-foreground'}>
+                  {installed ? t('settings.aiAgents.installed') : t('settings.aiAgents.missing')}
+                </div>
+              </div>
+              <div className="mt-1 truncate text-xs text-muted-foreground">
+                {status.version || t('settings.aiAgents.noVersion')}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function AiTargetManagementTabs({
   t,
+  aiAgentsStatus,
   aiModelProviders,
   setAiModelProviders,
   onCopyMcpConfig,
@@ -1640,6 +1690,7 @@ function AiTargetManagementTabs({
         <TabsTrigger value="api">{t('settings.aiAgents.apiGroup')}</TabsTrigger>
       </TabsList>
       <TabsContent value="agents" className="space-y-3">
+        <AiAgentsInstalledSection t={t} aiAgentsStatus={aiAgentsStatus} />
         {onCopyMcpConfig ? (
           <SettingsGroup>
             <SettingsGroupItem>

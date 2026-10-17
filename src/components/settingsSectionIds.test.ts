@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   SETTINGS_SECTION_IDS,
   resolveSettingsSectionId,
-  shouldOpenAdvancedPrimeEngine,
 } from './settingsSectionIds'
 
 describe('legacy Packages Settings deep links', () => {
@@ -24,10 +23,4 @@ describe('legacy Packages Settings deep links', () => {
     expect(resolveSettingsSectionId(null)).toBeNull()
   })
 
-  it('never opens Advanced Prime engine; that Settings page is gone', () => {
-    expect(shouldOpenAdvancedPrimeEngine('packages')).toBe(false)
-    expect(shouldOpenAdvancedPrimeEngine(SETTINGS_SECTION_IDS.extensions)).toBe(false)
-    expect(shouldOpenAdvancedPrimeEngine(SETTINGS_SECTION_IDS.primeEngine)).toBe(false)
-    expect(shouldOpenAdvancedPrimeEngine(SETTINGS_SECTION_IDS.ai)).toBe(false)
-  })
 })

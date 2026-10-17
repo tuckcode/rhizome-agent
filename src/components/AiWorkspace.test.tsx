@@ -776,8 +776,8 @@ describe('AiWorkspace', () => {
         engine: 'prime' as const,
         nativeTarget: 'open_ai/gpt-4o',
         agent: 'prime',
-        expectEngine: 'prime',
-        expectNativeTarget: undefined,
+        expectEngine: 'native',
+        expectNativeTarget: 'open_ai/gpt-4o',
       },
     ]
 

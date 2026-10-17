@@ -3,15 +3,18 @@ import type { VaultEntry } from '../types'
 import type { NoteReference } from '../utils/ai-context'
 import { createTranslator } from '../lib/i18n'
 import { InlineWikilinkInput } from './InlineWikilinkInput'
+import { Button } from './ui/button'
 
 interface CommandPaletteAiModeProps {
   entries: VaultEntry[]
   value: string
   aiAgentReady?: boolean
   aiAgentLabel?: string
+  aiAgentInstallUrl?: string
   inputRef?: React.RefObject<HTMLDivElement | null>
   onChange: (value: string) => void
   onSubmit: (text: string, references: NoteReference[]) => void
+  onUseRhizome?: () => void
 }
 
 function stripLeadingSpace(value: string): string {
@@ -23,9 +26,11 @@ export function CommandPaletteAiMode({
   value,
   aiAgentReady = true,
   aiAgentLabel = 'Claude Code',
+  aiAgentInstallUrl,
   inputRef,
   onChange,
   onSubmit,
+  onUseRhizome,
 }: CommandPaletteAiModeProps) {
   const t = createTranslator()
   return (
@@ -49,7 +54,33 @@ export function CommandPaletteAiMode({
       paletteEmptyState={(
         <div className="px-4 py-6 text-center text-[13px] text-muted-foreground">
           {!aiAgentReady ? (
-            `${aiAgentLabel} is not available on this machine.`
+            <div className="space-y-3">
+              <div>{aiAgentLabel} is not available on this machine.</div>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {aiAgentInstallUrl ? (
+                  <Button asChild size="sm" variant="outline">
+                    <a
+                      href={aiAgentInstallUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      data-testid="command-palette-install-agent"
+                    >
+                      Install {aiAgentLabel}
+                    </a>
+                  </Button>
+                ) : null}
+                {onUseRhizome ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={onUseRhizome}
+                    data-testid="command-palette-use-rhizome"
+                  >
+                    Use Rhizome instead
+                  </Button>
+                ) : null}
+              </div>
+            </div>
           ) : (
             <>
               <div className="mb-1 font-medium text-foreground">Ask {aiAgentLabel}</div>
@@ -65,7 +96,7 @@ export function CommandPaletteAiMode({
       paletteFooter={(
         <div className="flex items-center gap-4 border-t border-border px-4 py-1.5 text-[11px] text-muted-foreground">
           <span>{aiAgentLabel} mode</span>
-          <span>↵ send</span>
+          {aiAgentReady ? <span data-testid="command-palette-ai-send-hint">↵ send</span> : null}
           <span>esc close</span>
         </div>
       )}

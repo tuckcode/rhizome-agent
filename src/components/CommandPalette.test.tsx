@@ -538,6 +538,7 @@ describe('CommandPalette', () => {
     )
     fireEvent.change(screen.getByPlaceholderText('Type a command...'), { target: { value: ' ' } })
     expect(screen.getByTestId('command-palette-ai-input')).toHaveAttribute('aria-placeholder', 'Ask Rhizome')
+    expect(screen.getByTestId('command-palette-ai-send-hint')).toBeInTheDocument()
   })
 
   it('queues AI prompts with the selected workspace target id', () => {
@@ -559,6 +560,37 @@ describe('CommandPalette', () => {
     expect(screen.getAllByText('Ask Codex').length).toBeGreaterThan(0)
     expect(queueAiPrompt).toHaveBeenCalledWith('ask the selected agent', [], 'agent:codex')
     expect(requestOpenAiChat).toHaveBeenCalledOnce()
+  })
+
+  it('offers install and Rhizome when the selected agent is missing', () => {
+    const onUseRhizome = vi.fn()
+    render(
+      <CommandPalette
+        open={true}
+        commands={commands}
+        aiAgentReady={false}
+        aiAgentLabel="Codex"
+        aiAgentInstallUrl="https://developers.openai.com/codex/cli"
+        onClose={onClose}
+        onUseRhizome={onUseRhizome}
+      />,
+    )
+
+    fireEvent.change(screen.getByPlaceholderText('Type a command...'), { target: { value: ' ' } })
+    expect(screen.getByText('Codex is not available on this machine.')).toBeInTheDocument()
+    expect(screen.queryByTestId('command-palette-ai-send-hint')).not.toBeInTheDocument()
+    expect(screen.queryByText('↵ send')).not.toBeInTheDocument()
+
+    const install = screen.getByTestId('command-palette-install-agent')
+    expect(install).toHaveAttribute('href', 'https://developers.openai.com/codex/cli')
+    fireEvent.click(screen.getByTestId('command-palette-use-rhizome'))
+    expect(onUseRhizome).toHaveBeenCalledOnce()
+
+    const editor = screen.getByTestId('command-palette-ai-input')
+    editor.textContent = ' still blocked'
+    fireEvent.input(editor)
+    fireEvent.keyDown(editor, { key: 'Enter' })
+    expect(queueAiPrompt).not.toHaveBeenCalled()
   })
 
   it('closes without queueing when AI mode only contains the trigger space', () => {
