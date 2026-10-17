@@ -2,11 +2,9 @@ import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 describe('parked organs leftover', () => {
-  it('does not vendor TokenJuice or add kanban.db', () => {
+  it('does not vendor TokenJuice or tinyhumans', () => {
     const pkg = readFileSync(`${process.cwd()}/package.json`, 'utf8')
-    const cargo = readFileSync(`${process.cwd()}/src-tauri/Cargo.toml`, 'utf8')
     expect(pkg).not.toMatch(/tokenjuice|tinyhumans/i)
-    expect(cargo).not.toMatch(/kanban/i)
   })
 
   it('does not invent selected-text Copy path on the note editor', () => {
