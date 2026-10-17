@@ -945,20 +945,28 @@ mod tests {
         key
     }
 
+    fn sample_aiza() -> String {
+        // Built in pieces so the source has no contiguous Google key.
+        let body = format!("{}{}", "SyABCDEFGHIJKLMNOP", "QRSTUVWXYZ1234567");
+        let key = format!("AIza{body}");
+        assert_eq!(key.len(), 39);
+        key
+    }
+
     #[test]
     fn scrub_secrets_redacts_env_assignments_and_provider_prefixes() {
         let mistral = bare_mistral_sample();
+        let aiza = sample_aiza();
         let mistral_assigned = format!("MISTRAL_API_KEY={mistral}");
         let mistral_bare = format!("mistral key {mistral}");
+        let gemini_assigned = format!("GEMINI_API_KEY={aiza}");
         let cases = [
             (
                 "NVIDIA_API_KEY=nvapi-abcdefghijklmnopqrstuvwxyz012345",
                 "nvapi-abcdefghijklmnopqrstuvwxyz012345",
             ),
-            (
-                "GEMINI_API_KEY=AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ1234567",
-                "AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ1234567",
-            ),
+            (gemini_assigned.as_str(), aiza.as_str()),
+            (aiza.as_str(), aiza.as_str()),
             (
                 "OPENAI_API_KEY=sk-proj-abcdefghijklmnopqrstuvwxyz",
                 "sk-proj-abcdefghijklmnopqrstuvwxyz",
@@ -976,8 +984,8 @@ mod tests {
         ];
         for (input, secret) in cases {
             let scrubbed = scrub_secrets(input);
-            assert!(!scrubbed.contains(secret), "{input} -> {scrubbed}");
-            assert!(scrubbed.contains("[redacted]"), "{input} -> {scrubbed}");
+            assert!(!scrubbed.contains(secret), "secret must be removed");
+            assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
         }
     }
 
@@ -1033,8 +1041,8 @@ mod tests {
 
     #[test]
     fn scrub_secrets_redacts_aiza_after_a_boundary_only() {
-        let key = "AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ1234567";
-        assert_redacted(&format!("?key={key}"), key);
+        let key = sample_aiza();
+        assert_redacted(&format!("?key={key}"), &key);
         let glued = format!("thin{key}");
         assert_eq!(scrub_secrets(&glued), glued);
     }
@@ -1053,8 +1061,8 @@ mod tests {
 
     fn assert_redacted(input: &str, secret: &str) {
         let scrubbed = scrub_secrets(input);
-        assert!(!scrubbed.contains(secret), "{input} -> {scrubbed}");
-        assert!(scrubbed.contains("[redacted]"), "{input} -> {scrubbed}");
+        assert!(!scrubbed.contains(secret), "secret must be removed");
+        assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
     }
 
     #[test]
@@ -1078,28 +1086,20 @@ mod tests {
         let far_scrubbed = scrub_secrets(&far);
         assert!(
             far_scrubbed.contains(&mistral),
-            "a bare key far from the word mistral must stay: {far_scrubbed}"
+            "a bare key far from the word mistral must stay"
         );
 
+        let aiza = sample_aiza();
         let dotenv = format!(
-            "# local secrets\nOPENAI_API_KEY=sk-proj-abcdefghijklmnopqrstuvwxyz\nNVIDIA_API_KEY=nvapi-abcdefghijklmnopqrstuvwxyz012345\nGEMINI_API_KEY=\"AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ1234567\"\nMISTRAL_API_KEY={mistral}\nPATH=/usr/bin\n"
+            "# local secrets\nOPENAI_API_KEY=sk-proj-abcdefghijklmnopqrstuvwxyz\nNVIDIA_API_KEY=nvapi-abcdefghijklmnopqrstuvwxyz012345\nGEMINI_API_KEY=\"{aiza}\"\nMISTRAL_API_KEY={mistral}\nPATH=/usr/bin\n"
         );
         let scrubbed = scrub_secrets(&dotenv);
-        assert!(scrubbed.contains("PATH=/usr/bin"), "{scrubbed}");
-        assert!(scrubbed.contains("# local secrets"), "{scrubbed}");
-        assert!(
-            !scrubbed.contains("sk-proj-abcdefghijklmnopqrstuvwxyz"),
-            "{scrubbed}"
-        );
-        assert!(
-            !scrubbed.contains("nvapi-abcdefghijklmnopqrstuvwxyz012345"),
-            "{scrubbed}"
-        );
-        assert!(
-            !scrubbed.contains("AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ1234567"),
-            "{scrubbed}"
-        );
-        assert!(!scrubbed.contains(&mistral), "{scrubbed}");
+        assert!(scrubbed.contains("PATH=/usr/bin"));
+        assert!(scrubbed.contains("# local secrets"));
+        assert!(!scrubbed.contains("sk-proj-abcdefghijklmnopqrstuvwxyz"));
+        assert!(!scrubbed.contains("nvapi-abcdefghijklmnopqrstuvwxyz012345"));
+        assert!(!scrubbed.contains(&aiza));
+        assert!(!scrubbed.contains(&mistral));
     }
 
     #[test]
