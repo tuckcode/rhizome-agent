@@ -1,6 +1,6 @@
 # Public preview
 
-A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own. You can switch Chat to [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent). Prime is the current Chat default.
+A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own. Chat runs on Rhizome's own engine (ADR-0187). Prime and Hermes are being removed as chat engines.
 
 This page is the install and recovery guide. Developer commands live in [`GETTING-STARTED.md`](GETTING-STARTED.md).
 
@@ -10,10 +10,10 @@ This page is the install and recovery guide. Developer commands live in [`GETTIN
 |---|---|---|
 | Platform | macOS, from source or from an app you already built | A signed download. Windows as a daily driver. A verified Linux install for a stranger. |
 | Language | English | Other languages |
-| Chat | Rhizome's own engine. Prime if you switch to it. Native chat works without Prime. | Prime or Node bundled inside the app. Hermes as a usable engine. Agent search of the vault or old Mycelium sessions. |
+| Chat | Rhizome's own engine only (ADR-0187). Native chat works without Prime. Native tools can read, search, and edit the open vault. | Prime or Node bundled inside the app. Hermes as a usable engine. Search of old Mycelium sessions. |
 | Notes | Open a local vault, save a note, reopen the same file, read and diff notes | A remote starter vault |
 | Layout | Chat opens on launch. Left rail: sessions, Views (Research, Graph, Mycelium, History), Settings. Notes and Changes sit in the sidebar. Show Notes, the View menu, or Cmd+2 still open Notes. Views use Ctrl+Cmd+1–4 on Mac and Ctrl+Shift+1–4 on Windows. | Portfolio, Today, kanban, or extra destinations |
-| Theme | Earth dark (default), Earth light, Loam, and Match system | |
+| Theme | Graphite (default). Dark is Graphite, Light is Earth light, System follows the OS. Earth dark, Loam, and Mycelium are color skins. | |
 | Models | **Taproot** (free automatic router), plus catalog providers you add a key for | |
 | Keys | System keychain (macOS Keychain, Windows Credential Manager, or Secret Service) | A JSON key file you edit by hand |
 | Updates | Check for updates in the app. Install applies from a signed release on the alpha or stable feed. | An update while the updater public key is still the placeholder, or from an unsigned build |
@@ -29,7 +29,7 @@ These tools have to be on the machine before the app will build:
 3. pnpm.
 4. Rust `1.77.2` or newer.
 5. git.
-6. Prime Agent on `PATH` only if you keep the default Prime Chat engine. Native chat does not need it.
+6. Prime Agent on `PATH` is not required for Chat. Native chat does not need it.
 
 ```bash
 git clone https://github.com/tuckcode/rhizome-agent.git
@@ -38,7 +38,7 @@ cd rhizome-agent
 pnpm tauri dev
 ```
 
-`./install.sh` installs this repo and fetches Prime Agent when that program is not already on the machine. Settings still starts Chat on Prime until you switch **Chat engine**. The script downloads the command-line tool Prime publishes.
+`./install.sh` installs this repo and may fetch Prime Agent when that program is not already on the machine. Chat runs on Rhizome's own engine. The script may still download the Prime command-line tool for legacy optional-engine support.
 
 `prime-agent` on macOS stops when that terminal closes. To leave the daemon running:
 
@@ -68,8 +68,8 @@ Open http://localhost:5202. The dev server does not use port 5173.
 
 | What you see | What to do |
 |---|---|
-| Prime is missing | Switch **Chat engine** to Rhizome's engine, or install Prime, run `prime-agent` once, start the daemon, then reopen Chat. |
-| Prime is installed and Chat still says it is missing | Wait a few seconds. The status check repeats. Or switch to Rhizome's engine. |
+| Prime is missing | Applies only to an open Prime-locked chat. Install Prime, run `prime-agent` once, start the daemon, then reopen that chat. New chats use Rhizome's engine. |
+| Prime is installed and Chat still says it is missing | Applies only to Prime-locked chats. Wait a few seconds. The status check repeats. |
 | Provider or login failure | Settings → AI Agents. Native keys go in the system keychain. Prime owns Prime login. |
 | macOS blocks the vault folder | Grant access to Documents, Desktop, or Downloads, or move the vault. |
 | No network, or no model | Notes on disk still open. Chat cannot answer. |
@@ -87,7 +87,7 @@ The macOS app asks for:
 
 It does not ask for the microphone, the camera, or accessibility.
 
-Prime tools and packages you install can use the machine. A vault is not a sandbox for those tools. Settings → AI Agents → Advanced Prime engine says that those packages have full system access.
+A vault is not a sandbox for shell commands the native engine runs after you approve them. There is no in-app Packages marketplace. **Copy MCP config** (`ai.panel.copyMcpConfig`) is on Settings → AI Agents for wiring external MCP clients.
 
 ## Telemetry
 

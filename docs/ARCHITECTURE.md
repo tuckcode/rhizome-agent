@@ -497,14 +497,15 @@ worker expires after Prime's reconnect grace. Active close asks, with
 `promote_owned_session`. The daemon may stay available; that is not the same
 as an agent still working. ADR-0180 is the identity: Rhizome owns the loop.
 `src-tauri/src/engines/` holds the Phase 5 trait and the native / Prime /
-Hermes wrappers. Settings `chat_engine` chooses Prime or the native engine.
-Absent means Prime, so Chat stays on Prime until that switch is on.
-A native-engine chat can send when Prime is not installed. A Prime-targeted
-chat still shows the install-Prime guidance until Prime is present.
-Cmd+K uses the same native-or-ready gate. Native mode does not poll Prime
-or show Prime chrome. Native no-key errors point at Settings → AI Agents
-→ API models.
-`commands/native_chat.rs` is the backend for that toggle: start / send /
+Hermes wrappers. ADR-0187: native is the only chat engine; the picker is
+gone (#218). `readChatEngine` in `src/lib/chatEngine.ts` always returns
+`native`. Settings may still load a stored `chat_engine` value for
+compatibility; nothing writes a Prime choice for new chats. New chats call
+native paths only. An open Prime-locked chat keeps that lock until closed.
+Native chat can send when Prime is not installed. Cmd+K uses the same
+native-or-ready gate. Native mode does not poll Prime or show Prime chrome.
+Native no-key errors point at Settings → AI Agents → API models.
+`commands/native_chat.rs` is the backend for native chat: start / send /
 cancel / approval_reply / end / list / open / delete, events on
 `native-chat:<session_id>`. Native `Error` events carry `fatal`: log-save
 failures and the 100 MiB rollover notice are non-fatal; missing keys,
@@ -517,8 +518,8 @@ every line, 100 MiB / 1 MiB caps, owner-only file, known-credential
 scrub, reopen as cancelled with no restored grants. The id is a UUID.
 An OS file lock covers a second process and dies with it. Both windows
 may display a chat; only one turn runs. Damage and a full log keep the
-original and continue in a new session. With the Settings switch on,
-new chats call `native_chat_start` and pick a catalog model or Taproot.
+original and continue in a new session. New native chats call
+`native_chat_start` and pick a catalog model or Taproot.
 `rhizome_provider_model.rs` is the native loop's OpenAI-compatible `Model`.
 The loop registry (`rhizome_loop/tools`) offers `echo`, read-only file tools
 (`read_file`, `list_dir`, `grep`, `glob`), mutate file tools (`edit_file`,
@@ -652,8 +653,8 @@ Each answers "nothing", which is true of a host with no session.
   client `chatBusy` flag is only a hint), a stale offer, or a
   missing binary. It runs `prime-agent update` (one `--force` retry when
   the CLI says it is already latest), then reloads the attached session.
-  It does not create a session. User-facing copy says Chat engine, not
-  Prime as a second product.
+  It does not create a session. User-facing Prime-update copy names the
+  engine, not Prime as a second product.
   The skill bakes `find_node()`'s absolute binary plus a GUI-safe `PATH`
   (`$HOME/.local/bin`, Homebrew, `/usr/local/bin`) and short chat manners
   (answer first, CLI not IPython, stop after one environment error).
@@ -744,11 +745,10 @@ fire both mechanisms on the same turn.
 
 #### The chat model menu
 
-The composer chip is `NativeChatModelPicker`. On the native engine it lists
-the Rhizome catalog from Settings, including live `list_ai_model_provider_models`
-rows. On a Prime chat it lists Prime's own catalog (`get_available_prime_models`)
-and does not fetch provider models live. Prime remains an optional engine for
-legacy sessions; new chats default to Rhizome's harness (#218). Providers without
+The composer chip is `NativeChatModelPicker`. New chats list the Rhizome
+catalog from Settings, including live `list_ai_model_provider_models` rows.
+An open legacy Prime-locked chat may still list Prime's catalog
+(`get_available_prime_models`) until that chat closes. Providers without
 a key stay out of the native list except the current pick, and the footer
 links to Settings.
 
@@ -778,11 +778,10 @@ itself: an empty allow-list means *never curated* (normalized to `None` in
 Rust), and a list matching no live model shows everything. `activeModelKey`
 keeps whatever is running listed, since the picker only ever receives a label.
 
-#### Advanced Prime engine
-
-Settings → AI Agents → **Advanced Prime engine** holds Prime install status
-and Copy MCP config. An old Packages section id (`packages`,
-`settings-section-extensions`) still opens that disclosure.
+Legacy Settings deep links (`packages`, `settings-section-extensions`,
+`settings-section-prime-engine`) resolve to Settings → AI Agents
+(`resolveSettingsSectionId`). **Copy MCP config** is on that page
+(`ai.panel.copyMcpConfig`).
 
 The allow-list is Rhizome's view of Prime's catalog, in the same sense as
 archiving below: Prime's CLI and every other client still see all 501.
@@ -849,10 +848,9 @@ accepts an API-key override for Settings tests.
 Catalog defaults keep kind-keyed ids (`open_ai/…`, `open_router/…`).
 Configured providers key on the provider id (`work-openai/gpt-4o`) so
 two accounts of the same kind stay distinct. An old kind-keyed
-selection still resolves when it uniquely matches. Prime’s
-`models.json` is only the Prime engine’s list. Native fallback is only
-for Prime-targeted chats, and only after a real host status says Prime
-is not installed; an open chat stays on the engine it started on.
+selection still resolves when it uniquely matches. Prime’s `models.json`
+applies only while a legacy Prime-locked chat stays open. New chats use
+the Rhizome catalog from Settings (`ai_models.rs` and provider rows).
 
 Native hide/reopen live-check is still **NOT RUN**. Do not mass-kill
 Prime-spawned `mcp-server/index.js` (ADR-0163). Do not recode hide to

@@ -5,7 +5,7 @@ description: Fix "Prime is missing" when Prime Agent is installed but Rhizome ca
 
 Rhizome runs Prime Agent as a separate program. It can only use Prime when Prime is installed and Rhizome can find it.
 
-You don't need Prime if you use Rhizome's own engine. Turn on **Chat engine** in Settings → AI Agents.
+You don't need Prime for new chats. Chat runs on Rhizome's own engine (ADR-0187).
 
 ## Symptoms
 

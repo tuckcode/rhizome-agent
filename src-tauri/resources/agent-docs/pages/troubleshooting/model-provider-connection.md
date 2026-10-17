@@ -33,4 +33,4 @@ If no free provider has a key, Settings says "Add a key to at least one provider
 
 ## No file tools
 
-Rhizome's engine can create notes, but it can't read, search or edit files yet. If you need an agent that edits files, use Prime as the engine. See [Agents, engines and models](../concepts/ai.md).
+Rhizome's engine can read, search, edit, and create notes in the open vault. See [Agents, engines and models](../concepts/ai.md).
