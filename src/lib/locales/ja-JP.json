@@ -348,7 +348,7 @@
   "settings.privacy.analytics": "利用状況分析",
   "settings.privacy.analyticsDescription": "匿名の使用パターンを共有する",
   "settings.about.legalNotice": "Rhizome is free software under the GNU AGPL v3.0 or later, with no warranty.",
-  "settings.about.tolariaCredit": "A modified version of Tolaria by Luca Rossi (AGPL-3.0).",
+  "settings.about.tolariaCredit": "Tolaria (AGPL-3.0) に感謝します。Rhizome はそのエディターコードを改変して取り入れました。",
   "settings.about.sourceLink": "Source",
   "settings.about.licenseLink": "License",
   "settings.about.tolariaLink": "Tolaria",

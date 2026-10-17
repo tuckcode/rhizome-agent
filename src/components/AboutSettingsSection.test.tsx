@@ -58,7 +58,7 @@ describe('AboutSettingsSection', () => {
       'Rhizome is free software under the GNU AGPL v3.0 or later, with no warranty.',
     )
     expect(legal).toHaveTextContent(
-      'A modified version of Tolaria by Luca Rossi (AGPL-3.0).',
+      'Thanks to Tolaria (AGPL-3.0), whose editor code Rhizome adapted.',
     )
 
     fireEvent.click(screen.getByRole('button', { name: 'Source' }))

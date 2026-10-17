@@ -8,7 +8,7 @@ paths and pins is `docs/vendored-sources.md`.
 ## Tolaria
 
 - Source: https://github.com/refactoringhq/tolaria
-- Author: Luca Rossi
+- Copyright: Luca Rossi
 - License: AGPL-3.0. The license text is in `LICENSE`.
 - Rhizome is a modified version of Tolaria (the vault, editor and note
   model); modified since 2026-08-09

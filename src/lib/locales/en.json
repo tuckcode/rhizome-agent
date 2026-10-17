@@ -388,7 +388,7 @@
   "settings.about.contributeDescription": "Send feedback, ideas, or a bug report.",
   "settings.about.docsDescription": "Open Rhizome’s documentation.",
   "settings.about.legalNotice": "Rhizome is free software under the GNU AGPL v3.0 or later, with no warranty.",
-  "settings.about.tolariaCredit": "A modified version of Tolaria by Luca Rossi (AGPL-3.0).",
+  "settings.about.tolariaCredit": "Thanks to Tolaria (AGPL-3.0), whose editor code Rhizome adapted.",
   "settings.about.sourceLink": "Source",
   "settings.about.licenseLink": "License",
   "settings.about.tolariaLink": "Tolaria",
