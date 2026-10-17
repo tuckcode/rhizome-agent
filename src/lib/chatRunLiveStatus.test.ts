@@ -32,6 +32,15 @@ describe('nextChatRunAnnouncement', () => {
     expect(nextChatRunAnnouncement(previous, next)).toBe('Running get_note')
   })
 
+  it('announces a mutate tool that needs approval', () => {
+    const previous = snap({ isActive: true })
+    const next = snap({
+      isActive: true,
+      tools: [{ id: 't1', name: 'edit_file', status: 'pending', needsApproval: true }],
+    })
+    expect(nextChatRunAnnouncement(previous, next)).toBe('Needs approval for edit_file')
+  })
+
   it('announces a finished tool', () => {
     const previous = snap({
       isActive: true,
@@ -83,7 +92,7 @@ describe('chatRunSnapshotFromMessages', () => {
     expect(snapshot).toEqual({
       isActive: true,
       hasResponse: true,
-      tools: [{ id: 't1', name: 'get_note', status: 'done' }],
+      tools: [{ id: 't1', name: 'get_note', status: 'done', needsApproval: false }],
       notice: undefined,
       noticeId: undefined,
     })

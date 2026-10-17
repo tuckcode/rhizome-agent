@@ -315,8 +315,8 @@ const EARTH_LIGHT = {
   '--syntax-highlight-comment': '#5D6556',
   '--syntax-highlight-number': '#2C6977',
   '--syntax-highlight-type': '#90511E',
-  '--diff-added-text': '#296E46',
-  '--diff-removed-text': '#AD3B31',
+  '--diff-added-text': '#1E5536',
+  '--diff-removed-text': '#8F2C24',
 } as const
 
 const LOAM = {

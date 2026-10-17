@@ -521,15 +521,24 @@ original and continue in a new session. With the Settings switch on,
 new chats call `native_chat_start` and pick a catalog model or Free tier (auto).
 `rhizome_provider_model.rs` is the native loop's OpenAI-compatible `Model`.
 The loop registry (`rhizome_loop/tools`) offers `echo`, read-only file tools
-(`read_file`, `list_dir`, `grep`, `glob`), `create_note`, and Power User `bash`.
+(`read_file`, `list_dir`, `grep`, `glob`), mutate file tools (`edit_file`,
+`write_file`), `create_note`, and Power User `bash`.
 Read-only tools stay inside canonical vault and workspace roots and auto-run;
-they do not open an approval card.
+they do not open an approval card. `edit_file` and `write_file` use the same
+roots, write through a temp file then rename (Unix xattrs copied onto
+the temp file first; ADR-0186), and ask in both permission modes unless
+a session grant already covers that tool and path. `edit_file` refuses
+files over 2 MiB rather than loading them whole. The Chat approval card
+shows the path and a unified-style preview computed once with `similar`
+(250ms deadline, 40/40 cap, leftover notes). A symlink target is labelled
+`real.md via link.md`.
 Secret-path blocking (`.env*` except `.env.example`, `.git/`, `*.pem` /
 `*.key` / `*.p12` / `*.pfx`, known private-key basenames and their
 backups) is a safety net, not a wall. It covers the native file tools
 only. A future shell tool will not be covered. Settings → AI Agents →
 Safety has a toggle (on by default) that disables the denylist for
-**reads** only; write tools always apply it via `sandbox::resolve_for_write`.
+**reads** only (`sandbox::resolve_for_read`); write tools always apply
+it via `sandbox::resolve_for_write`.
 Root sandboxing still applies. When the toggle is off, `.git/config` is
 readable and can hold tokens in remote URLs.
 `rhizome_routing/` wraps it with free-tier fallback over a pinned OmniRoute

@@ -41,6 +41,8 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 futures-util = "0.3"
 base64 = "0.22"
 regex = "1"
+# Timed Myers diffs for mutate-tool approval previews (Apache-2.0 OR MIT).
+similar = "2.7"
 # gitignore-aware walks and glob matching for native read tools.
 # MIT/Unlicense; already common in the Rust search stack (ripgrep).
 ignore = "0.4"
@@ -87,5 +89,11 @@ objc2-web-kit = { version = "0.3.2", features = ["WKWebView", "objc2-app-kit"] }
 # Provider keys use the Secret Service on Linux (ADR-0185).
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { version = "3.6.3", features = ["sync-secret-service", "crypto-rust"] }
+
+# access(W_OK) for 0464-style files, and xattr copy before atomic rename
+# (Finder tags / quarantine on macOS). MIT OR Apache-2.0.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+xattr = "1"
 
 [dev-dependencies]

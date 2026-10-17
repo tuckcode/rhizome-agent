@@ -50,6 +50,16 @@ export interface NativeEngineEvent {
   args?: string
   output?: string
   fatal?: boolean
+  prompt_id?: string
+  tool?: string
+  options?: Array<{ id: string; label: string }>
+  path?: string
+  preview?: string
+  notes?: string[]
+  capped?: boolean
+  created?: boolean
+  overwrite?: boolean
+  reason?: string
 }
 
 export function applyNativeEvent(event: NativeEngineEvent, callbacks: AgentStreamCallbacks): boolean {
@@ -62,6 +72,27 @@ export function applyNativeEvent(event: NativeEngineEvent, callbacks: AgentStrea
       return false
     case 'tool_result':
       callbacks.onToolDone(event.id ?? '', event.output)
+      return false
+    case 'tool_denied':
+      callbacks.onToolDenied?.(event.id ?? '', event.reason ?? 'denied')
+      return false
+    case 'approval_requested':
+      callbacks.onApprovalRequested?.({
+        promptId: event.prompt_id ?? '',
+        tool: event.tool ?? event.name ?? 'tool',
+        args: event.args ?? '',
+        options: event.options ?? [],
+        path: event.path,
+        preview: event.preview,
+        notes: event.notes,
+        capped: event.capped,
+        created: event.created,
+        overwrite: event.overwrite,
+        reply: () => {},
+      })
+      return false
+    case 'approval_dismissed':
+      callbacks.onApprovalDismissed?.(event.prompt_id ?? '')
       return false
     case 'error': {
       const message = nativeChatUserError(event.message ?? 'Native chat failed')
@@ -134,9 +165,24 @@ export async function streamNativeChat(request: StreamNativeChatRequest): Promis
         onAbort()
         return
       }
+      const callbacks: AgentStreamCallbacks = {
+        ...request.callbacks,
+        onApprovalRequested: (prompt) => {
+          request.callbacks.onApprovalRequested?.({
+            ...prompt,
+            reply: (choice) => {
+              void invoke('native_chat_approval_reply', {
+                sessionId,
+                promptId: prompt.promptId,
+                reply: choice,
+              }).catch(() => {})
+            },
+          })
+        },
+      }
       void listen<NativeEngineEvent>(`native-chat:${sessionId}`, (event) => {
         if (settled) return
-        if (applyNativeEvent(event.payload, request.callbacks)) finish()
+        if (applyNativeEvent(event.payload, callbacks)) finish()
       }).then((stop) => {
         unlisten = stop
         if (settled) cleanupTauriEventListener(stop)

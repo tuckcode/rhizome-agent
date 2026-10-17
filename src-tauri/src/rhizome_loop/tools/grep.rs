@@ -207,7 +207,11 @@ fn search_starts(
     roots: &Roots,
 ) -> Result<Vec<PathBuf>, String> {
     match search_path {
-        Some(requested) => Ok(vec![sandbox::resolve(requested, vault_path, vault_paths)?]),
+        Some(requested) => Ok(vec![sandbox::resolve_for_read(
+            requested,
+            vault_path,
+            vault_paths,
+        )?]),
         None => Ok(roots.all.clone()),
     }
 }
@@ -368,6 +372,22 @@ mod tests {
         assert!(out.contains("a.md:1:alpha"), "{out}");
         assert!(out.contains("b.md:1:alphabet"), "{out}");
         assert!(!out.contains("beta"), "{out}");
+    }
+
+    #[test]
+    fn rhz_tmp_leftovers_are_skipped() {
+        let (_dir, root) = vault();
+        let root_path = Path::new(&root);
+        fs::write(root_path.join("open.md"), "needle\n").unwrap();
+        fs::write(root_path.join(".rhz1a2bcafebabe.tmp"), "needle\n").unwrap();
+        let out = run(
+            &json!({ "pattern": "needle" }).to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap();
+        assert!(out.contains("open.md"), "{out}");
+        assert!(!out.contains(".rhz"), "{out}");
     }
 
     #[test]

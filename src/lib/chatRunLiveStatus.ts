@@ -4,6 +4,7 @@ export interface ChatRunTool {
   id: string
   name: string
   status: ChatRunToolStatus
+  needsApproval?: boolean
 }
 
 export interface ChatRunSnapshot {
@@ -16,7 +17,7 @@ export interface ChatRunSnapshot {
 
 interface ChatRunMessage {
   id?: string
-  actions?: Array<{ tool: string; toolId?: string; status: string }>
+  actions?: Array<{ tool: string; toolId?: string; status: string; approval?: unknown }>
   response?: string
   localMarker?: string
   localMarkerTone?: 'warning'
@@ -71,6 +72,13 @@ export function nextChatRunAnnouncement(
 
   for (const tool of next.tools) {
     const before = previous.tools.find((item) => item.id === tool.id)
+    if (!before && tool.status === 'pending' && tool.needsApproval) {
+      return `Needs approval for ${tool.name}`
+    }
+  }
+
+  for (const tool of next.tools) {
+    const before = previous.tools.find((item) => item.id === tool.id)
     if (!before && tool.status === 'pending') {
       return `Running ${tool.name}`
     }
@@ -95,6 +103,7 @@ export function chatRunSnapshotFromMessages(
       id: action.toolId || action.tool,
       name: action.tool,
       status: action.status as ChatRunToolStatus,
+      needsApproval: Boolean(action.approval),
     })),
     notice: warning?.localMarker,
     noticeId: warning?.id,

@@ -4,13 +4,14 @@
 //! vault root. `..` and symlinks are followed first. Anything outside
 //! those roots is refused with a message the model can read.
 //!
-//! Read tools use [`resolve`], which honours `block_secret_files`.
+//! Read tools use [`resolve_for_read`], which honours `block_secret_files`.
 //! Write tools must use [`resolve_for_write`]: that path always applies
 //! the secret denylist and always refuses any `.git` component, even
-//! when the setting is off.
+//! when the setting is off. Callers pick read or write at compile time.
 
 use std::cell::Cell;
 use std::ffi::OsString;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 pub const OUTSIDE_ROOTS: &str = "Path is outside the allowed vault and workspace roots.";
@@ -75,24 +76,22 @@ pub fn allowed_roots(vault_path: Option<&str>, vault_paths: &[String]) -> Result
 
 /// Resolve `requested` against the current workspace, follow `..` and
 /// symlinks, and refuse a result outside the allowed roots.
-pub fn resolve(
+///
+/// Honours `block_secret_files`. Write tools must not call this.
+pub fn resolve_for_read(
     requested: &str,
     vault_path: Option<&str>,
     vault_paths: &[String],
 ) -> Result<PathBuf, String> {
     let roots = allowed_roots(vault_path, vault_paths)?;
-    resolve_in(requested, &roots)
-}
-
-pub fn resolve_in(requested: &str, roots: &Roots) -> Result<PathBuf, String> {
-    resolve_in_with(requested, roots, false)
+    resolve_in_with(requested, &roots, false)
 }
 
 /// Resolve a path for a write tool.
 ///
 /// Always applies the full secret denylist, including any `.git` path
 /// component, even when `block_secret_files` is off. Read tools must
-/// keep using [`resolve`]. Future edit tools (#196) call this.
+/// keep using [`resolve_for_read`]. `edit_file` and `write_file` call this.
 pub fn resolve_for_write(
     requested: &str,
     vault_path: Option<&str>,
@@ -171,14 +170,22 @@ pub fn resolve_file(
     vault_path: Option<&str>,
     vault_paths: &[String],
 ) -> Result<PathBuf, String> {
-    let path = resolve(requested, vault_path, vault_paths)?;
-    if path.is_dir() {
-        return Err(format!("Not a file: {}", requested.trim()));
-    }
-    if !path.is_file() {
-        return Err(format!("File not found: {}", requested.trim()));
-    }
-    Ok(path)
+    require_existing_file(
+        resolve_for_read(requested, vault_path, vault_paths)?,
+        requested,
+    )
+}
+
+/// Existing file for a write tool. Always applies the denylist.
+pub fn resolve_file_for_write(
+    requested: &str,
+    vault_path: Option<&str>,
+    vault_paths: &[String],
+) -> Result<PathBuf, String> {
+    require_existing_file(
+        resolve_for_write(requested, vault_path, vault_paths)?,
+        requested,
+    )
 }
 
 pub fn resolve_dir(
@@ -186,9 +193,19 @@ pub fn resolve_dir(
     vault_path: Option<&str>,
     vault_paths: &[String],
 ) -> Result<PathBuf, String> {
-    let path = resolve(requested, vault_path, vault_paths)?;
+    let path = resolve_for_read(requested, vault_path, vault_paths)?;
     if !path.is_dir() {
         return Err(format!("Not a directory: {}", requested.trim()));
+    }
+    Ok(path)
+}
+
+fn require_existing_file(path: PathBuf, requested: &str) -> Result<PathBuf, String> {
+    if path.is_dir() {
+        return Err(format!("Not a file: {}", requested.trim()));
+    }
+    if !path.is_file() {
+        return Err(format!("File not found: {}", requested.trim()));
     }
     Ok(path)
 }
@@ -277,6 +294,29 @@ fn component_is_git(component: std::path::Component<'_>) -> bool {
     }
 }
 
+/// Canonical relative path, plus `via <requested>` when that path is a symlink.
+pub fn display_path(requested: &str, canonical: &Path, roots: &Roots) -> String {
+    let target = relative_to_root(canonical, roots);
+    let trimmed = requested.trim();
+    let raw = PathBuf::from(trimmed);
+    let candidate = if raw.is_absolute() {
+        raw
+    } else {
+        roots
+            .current
+            .clone()
+            .or_else(|| roots.all.first().cloned())
+            .map(|base| base.join(&raw))
+            .unwrap_or(raw)
+    };
+    match fs::symlink_metadata(&candidate) {
+        Ok(meta) if meta.file_type().is_symlink() => {
+            format!("{target} via {}", trimmed.replace('\\', "/"))
+        }
+        _ => target,
+    }
+}
+
 /// Path relative to the longest matching allowed root, with `/`.
 pub fn relative_to_root(path: &Path, roots: &Roots) -> String {
     let root = roots
@@ -319,6 +359,14 @@ fn canonicalize_missing(path: &Path) -> Result<PathBuf, String> {
     let mut current = path.to_path_buf();
     let mut tail: Vec<OsString> = Vec::new();
     loop {
+        if let Ok(meta) = fs::symlink_metadata(&current) {
+            if meta.file_type().is_symlink() && current.canonicalize().is_err() {
+                return Err(format!(
+                    "Dangling symlink in path: {}",
+                    path.to_string_lossy()
+                ));
+            }
+        }
         if current.exists() {
             let mut resolved = current
                 .canonicalize()
@@ -361,7 +409,7 @@ mod tests {
     #[test]
     fn relative_path_inside_the_current_workspace_resolves() {
         let (_dir, root) = vault();
-        let resolved = resolve("inside.md", Some(&root), &[]).unwrap();
+        let resolved = resolve_for_read("inside.md", Some(&root), &[]).unwrap();
         assert_eq!(resolved, PathBuf::from(&root).join("inside.md"));
     }
 
@@ -372,7 +420,8 @@ mod tests {
         fs::create_dir(&vault).unwrap();
         fs::write(parent.path().join("secret.md"), "no\n").unwrap();
         let root = vault.canonicalize().unwrap();
-        let error = resolve("../secret.md", Some(root.to_str().unwrap()), &[]).unwrap_err();
+        let error =
+            resolve_for_read("../secret.md", Some(root.to_str().unwrap()), &[]).unwrap_err();
         assert!(
             error.contains(OUTSIDE_ROOTS),
             "traversal must name the outside-roots error: {error}"
@@ -386,7 +435,7 @@ mod tests {
         let outside = tempfile::tempdir().unwrap();
         let file = outside.path().join("passwd");
         fs::write(&file, "no\n").unwrap();
-        let error = resolve(file.to_str().unwrap(), Some(&root), &[]).unwrap_err();
+        let error = resolve_for_read(file.to_str().unwrap(), Some(&root), &[]).unwrap_err();
         assert!(error.contains(OUTSIDE_ROOTS), "{error}");
     }
 
@@ -397,7 +446,7 @@ mod tests {
         let root_b = b.path().canonicalize().unwrap();
         fs::write(root_b.join("other.md"), "two\n").unwrap();
         let requested = root_b.join("other.md");
-        let resolved = resolve(
+        let resolved = resolve_for_read(
             requested.to_str().unwrap(),
             Some(&root_a),
             &[root_b.to_string_lossy().into_owned()],
@@ -415,7 +464,7 @@ mod tests {
         fs::write(&target, "no\n").unwrap();
         let link = PathBuf::from(&root).join("out.link");
         std::os::unix::fs::symlink(&target, &link).unwrap();
-        let error = resolve("out.link", Some(&root), &[]).unwrap_err();
+        let error = resolve_for_read("out.link", Some(&root), &[]).unwrap_err();
         assert!(
             error.contains(OUTSIDE_ROOTS),
             "symlink-out must refuse: {error}"
@@ -424,7 +473,7 @@ mod tests {
 
     #[test]
     fn missing_roots_return_a_clear_error() {
-        let error = resolve("a.md", None, &[]).unwrap_err();
+        let error = resolve_for_read("a.md", None, &[]).unwrap_err();
         assert_eq!(error, NO_ROOTS);
     }
 
@@ -438,7 +487,7 @@ mod tests {
         fs::write(evil.join("secret.md"), "no\n").unwrap();
         let root = vault.canonicalize().unwrap();
         let requested = evil.join("secret.md");
-        let error = resolve(
+        let error = resolve_for_read(
             requested.to_str().unwrap(),
             Some(root.to_str().unwrap()),
             &[],
@@ -457,7 +506,8 @@ mod tests {
         let vault = parent.path().join("vault");
         fs::create_dir(&vault).unwrap();
         let root = vault.canonicalize().unwrap();
-        let error = resolve("../no-such.md", Some(root.to_str().unwrap()), &[]).unwrap_err();
+        let error =
+            resolve_for_read("../no-such.md", Some(root.to_str().unwrap()), &[]).unwrap_err();
         assert!(
             error.contains(OUTSIDE_ROOTS),
             "missing .. path must name the outside-roots error, not file-not-found: {error}"
@@ -475,7 +525,7 @@ mod tests {
     }
 
     fn assert_blocked(root: &str, requested: &str) {
-        let error = resolve(requested, Some(root), &[]).unwrap_err();
+        let error = resolve_for_read(requested, Some(root), &[]).unwrap_err();
         assert!(
             error.contains(BLOCKED_SECRET),
             "expected {BLOCKED_SECRET} for {requested}: {error}"
@@ -560,10 +610,10 @@ mod tests {
         plant(root_path, "id_ed25519.pub");
         plant(root_path, "id_card.md");
         plant(root_path, "notes/id_rsa.pub");
-        resolve("id_rsa.pub", Some(&root), &[]).unwrap();
-        resolve("id_ed25519.pub", Some(&root), &[]).unwrap();
-        resolve("id_card.md", Some(&root), &[]).unwrap();
-        resolve("notes/id_rsa.pub", Some(&root), &[]).unwrap();
+        resolve_for_read("id_rsa.pub", Some(&root), &[]).unwrap();
+        resolve_for_read("id_ed25519.pub", Some(&root), &[]).unwrap();
+        resolve_for_read("id_card.md", Some(&root), &[]).unwrap();
+        resolve_for_read("notes/id_rsa.pub", Some(&root), &[]).unwrap();
         assert!(!is_secret(&root_path.join("id_rsa.pub")));
         assert!(!is_secret(&root_path.join("id_ed25519.pub")));
         assert!(!is_secret(&root_path.join("id_card.md")));
@@ -590,8 +640,8 @@ mod tests {
         plant(root_path, ".env.example");
         plant(root_path, ".env.local");
         plant(root_path, "nested/.env.example");
-        resolve(".env.example", Some(&root), &[]).unwrap();
-        resolve("nested/.env.example", Some(&root), &[]).unwrap();
+        resolve_for_read(".env.example", Some(&root), &[]).unwrap();
+        resolve_for_read("nested/.env.example", Some(&root), &[]).unwrap();
         assert!(!is_secret(&root_path.join(".env.example")));
         assert_blocked(&root, ".env.local");
         assert!(is_secret(&root_path.join(".env.local")));
@@ -619,8 +669,8 @@ mod tests {
         assert_blocked(&root, "CERT.PFX");
         assert_blocked(&root, "ID_ED25519");
         assert_blocked(&root, "nested/.GIT/config");
-        resolve(".ENV.EXAMPLE", Some(&root), &[]).unwrap();
-        resolve("ID_RSA.PUB", Some(&root), &[]).unwrap();
+        resolve_for_read(".ENV.EXAMPLE", Some(&root), &[]).unwrap();
+        resolve_for_read("ID_RSA.PUB", Some(&root), &[]).unwrap();
     }
 
     #[test]
@@ -631,9 +681,9 @@ mod tests {
         plant(root_path, ".env.local");
         plant(root_path, "server.key");
         let _guard = override_secret_block(false);
-        resolve("id_rsa", Some(&root), &[]).unwrap();
-        resolve(".env.local", Some(&root), &[]).unwrap();
-        resolve("server.key", Some(&root), &[]).unwrap();
+        resolve_for_read("id_rsa", Some(&root), &[]).unwrap();
+        resolve_for_read(".env.local", Some(&root), &[]).unwrap();
+        resolve_for_read("server.key", Some(&root), &[]).unwrap();
         assert!(is_secret(&root_path.join("id_rsa")));
         assert!(!is_blocked_secret(&root_path.join("id_rsa")));
     }
@@ -646,7 +696,7 @@ mod tests {
         fs::write(parent.path().join("id_rsa"), "no\n").unwrap();
         let root = vault.canonicalize().unwrap();
         let _guard = override_secret_block(false);
-        let error = resolve("../id_rsa", Some(root.to_str().unwrap()), &[]).unwrap_err();
+        let error = resolve_for_read("../id_rsa", Some(root.to_str().unwrap()), &[]).unwrap_err();
         assert!(
             error.contains(OUTSIDE_ROOTS),
             "override must not weaken root sandboxing: {error}"
@@ -677,11 +727,11 @@ mod tests {
         plant(root_path, "pem.txt");
         plant(root_path, "gitconfig.md");
         plant(root_path, "id_card.md");
-        resolve("env.md", Some(&root), &[]).unwrap();
-        resolve("identity.md", Some(&root), &[]).unwrap();
-        resolve("pem.txt", Some(&root), &[]).unwrap();
-        resolve("gitconfig.md", Some(&root), &[]).unwrap();
-        resolve("id_card.md", Some(&root), &[]).unwrap();
+        resolve_for_read("env.md", Some(&root), &[]).unwrap();
+        resolve_for_read("identity.md", Some(&root), &[]).unwrap();
+        resolve_for_read("pem.txt", Some(&root), &[]).unwrap();
+        resolve_for_read("gitconfig.md", Some(&root), &[]).unwrap();
+        resolve_for_read("id_card.md", Some(&root), &[]).unwrap();
         assert!(!is_secret(&root_path.join("env.md")));
         assert!(!is_secret(&root_path.join("identity.md")));
         assert!(!is_secret(&root_path.join("id_card.md")));
@@ -710,7 +760,7 @@ mod tests {
             assert!(is_secret(&root_path.join(name)), "{name}");
         }
         plant(root_path, "id_rsa-cert.pub");
-        resolve("id_rsa-cert.pub", Some(&root), &[]).unwrap();
+        resolve_for_read("id_rsa-cert.pub", Some(&root), &[]).unwrap();
         assert!(!is_secret(&root_path.join("id_rsa-cert.pub")));
         assert!(!is_secret(&root_path.join("id_card.md")));
     }
@@ -735,8 +785,8 @@ mod tests {
         }
         plant(root_path, "notes.key.md");
         plant(root_path, "my.keyring");
-        resolve("notes.key.md", Some(&root), &[]).unwrap();
-        resolve("my.keyring", Some(&root), &[]).unwrap();
+        resolve_for_read("notes.key.md", Some(&root), &[]).unwrap();
+        resolve_for_read("my.keyring", Some(&root), &[]).unwrap();
     }
 
     #[cfg(unix)]
@@ -762,8 +812,8 @@ mod tests {
         plant(root_path, ".env");
         plant(root_path, "id_rsa");
         let _guard = override_secret_block(false);
-        resolve(".env", Some(&root), &[]).unwrap();
-        resolve("id_rsa", Some(&root), &[]).unwrap();
+        resolve_for_read(".env", Some(&root), &[]).unwrap();
+        resolve_for_read("id_rsa", Some(&root), &[]).unwrap();
         for requested in [".git/hooks/pre-commit", ".git/config", ".env", "id_rsa"] {
             let error = resolve_for_write(requested, Some(&root), &[]).unwrap_err();
             assert!(
@@ -771,5 +821,16 @@ mod tests {
                 "write must keep blocking {requested} with the setting off: {error}"
             );
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn dangling_symlink_mid_path_is_a_clear_error() {
+        let (_dir, root) = vault();
+        let link = PathBuf::from(&root).join("gone");
+        std::os::unix::fs::symlink(PathBuf::from(&root).join("missing-dir"), &link).unwrap();
+        let error = resolve_for_read("gone/note.md", Some(&root), &[]).unwrap_err();
+        assert!(error.to_lowercase().contains("dangling"), "{error}");
+        assert!(!error.contains("os error 17"), "{error}");
     }
 }

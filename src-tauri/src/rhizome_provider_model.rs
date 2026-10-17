@@ -463,6 +463,21 @@ mod tests {
     }
 
     #[test]
+    fn mutate_file_tools_carry_their_registry_schemas() {
+        let definitions = tool_definitions(&["edit_file".into(), "write_file".into()]);
+        assert_eq!(definitions[0]["function"]["name"], "edit_file");
+        assert_eq!(
+            definitions[0]["function"]["parameters"]["required"],
+            json!(["path", "old_string", "new_string"])
+        );
+        assert_eq!(definitions[1]["function"]["name"], "write_file");
+        assert_eq!(
+            definitions[1]["function"]["parameters"]["required"],
+            json!(["path", "content"])
+        );
+    }
+
+    #[test]
     fn retarget_sends_later_steps_to_the_new_target_with_tool_params() {
         let first = serve(vec![sse(&[
             r#"{"choices":[{"delta":{"content":"a"},"finish_reason":"stop"}]}"#,

@@ -107,6 +107,33 @@ describe('native stream events', () => {
     expect(applyNativeEvent({ kind: 'text_delta', text: 'hi' }, next)).toBe(false)
     expect(next.onText).toHaveBeenCalledWith('hi')
   })
+
+  it('surfaces an approval card payload without ending the stream', () => {
+    const next = callbacks()
+    next.onApprovalRequested = vi.fn()
+    expect(applyNativeEvent({
+      kind: 'approval_requested',
+      prompt_id: 'prompt_1',
+      tool: 'write_file',
+      args: '{"path":"fresh.md","content":"hello\\n"}',
+      path: 'fresh.md',
+      preview: '--- /dev/null\n+++ fresh.md\n+hello\n',
+      created: true,
+      overwrite: false,
+      options: [
+        { id: 'allow_once', label: 'Allow once' },
+        { id: 'allow_session', label: 'Allow for session' },
+        { id: 'deny', label: 'Deny' },
+      ],
+    }, next)).toBe(false)
+    expect(next.onApprovalRequested).toHaveBeenCalledWith(expect.objectContaining({
+      promptId: 'prompt_1',
+      tool: 'write_file',
+      path: 'fresh.md',
+      created: true,
+      overwrite: false,
+    }))
+  })
 })
 
 describe('native stream listen', () => {

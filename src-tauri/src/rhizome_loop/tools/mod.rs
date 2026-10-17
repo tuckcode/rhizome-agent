@@ -4,21 +4,30 @@
 //! `bash` is not a process. Limited tools never call it.
 //! `create_note` writes through `ai_model_tools::run_create_note_tool`.
 //! Read-only file tools stay inside canonical vault and workspace roots
-//! and auto-run in both permission modes. Secret-path blocking on those
-//! tools is a safety net, not a wall: a future shell tool will not be
-//! covered. Write tools must call `sandbox::resolve_for_write`, which
-//! always applies the denylist.
+//! and auto-run in both permission modes. `edit_file` and `write_file`
+//! use the same roots and ask before they write. Secret-path blocking
+//! on those tools is a safety net, not a wall: a future shell tool will
+//! not be covered. Write tools must call `sandbox::resolve_for_write`
+//! (or `resolve_file_for_write` when the path must already be a file),
+//! which always applies the denylist. Reads use `resolve_for_read`.
 
 mod args;
+mod atomic;
+mod edit_file;
 mod glob;
 mod grep;
 mod list_dir;
+mod preview;
 mod read_file;
 mod sandbox;
 mod scan;
+mod text;
 mod walk;
+mod write_file;
 
 pub use sandbox::resolve_for_write;
+#[cfg(test)]
+pub use text::CHANGED_SINCE_APPROVAL;
 
 use crate::ai_agents::AiAgentPermissionMode;
 use crate::ai_model_tools::{run_create_note_tool, CREATE_NOTE_TOOL_JSON, CREATE_NOTE_TOOL_NAME};
@@ -35,6 +44,9 @@ pub enum ToolPolicy {
     Bash,
     /// Offered in both modes. Auto-runs. No approval card.
     ReadOnly,
+    /// Offered in both modes. Asks every call unless a session grant
+    /// already covers this tool and path.
+    Mutate,
 }
 
 type ToolRun = fn(&str, Option<&str>, &[String]) -> Result<String, String>;
@@ -50,7 +62,10 @@ impl Tool {
     pub fn offered_in(&self, mode: AiAgentPermissionMode) -> bool {
         match self.policy {
             ToolPolicy::Bash => mode == AiAgentPermissionMode::PowerUser,
-            ToolPolicy::Echo | ToolPolicy::CreateNote | ToolPolicy::ReadOnly => true,
+            ToolPolicy::Echo
+            | ToolPolicy::CreateNote
+            | ToolPolicy::ReadOnly
+            | ToolPolicy::Mutate => true,
         }
     }
 }
@@ -105,6 +120,18 @@ const TOOLS: &[Tool] = &[
         schema: glob::SCHEMA,
     },
     Tool {
+        name: "edit_file",
+        policy: ToolPolicy::Mutate,
+        run: edit_file::run,
+        schema: edit_file::SCHEMA,
+    },
+    Tool {
+        name: "write_file",
+        policy: ToolPolicy::Mutate,
+        run: write_file::run,
+        schema: write_file::SCHEMA,
+    },
+    Tool {
         name: "bash",
         policy: ToolPolicy::Bash,
         run: echo_args,
@@ -118,8 +145,8 @@ const TOOLS: &[Tool] = &[
     },
 ];
 
-/// Registered tools in offer order: echo, read-only file tools, bash,
-/// create_note.
+/// Registered tools in offer order: echo, read-only file tools,
+/// mutate file tools, bash, create_note.
 pub fn registered() -> &'static [Tool] {
     TOOLS
 }
@@ -128,15 +155,30 @@ pub fn lookup(name: &str) -> Option<&'static Tool> {
     TOOLS.iter().find(|tool| tool.name == name)
 }
 
+#[cfg(test)]
 pub fn execute_allowed(
     name: &str,
     args: &str,
     vault_path: Option<&str>,
     vault_paths: &[String],
 ) -> Result<String, String> {
-    match lookup(name) {
-        Some(tool) => (tool.run)(args, vault_path, vault_paths),
-        None => Err(format!("unknown tool: {name}")),
+    execute_stamped(name, args, vault_path, vault_paths, None)
+}
+
+pub fn execute_stamped(
+    name: &str,
+    args: &str,
+    vault_path: Option<&str>,
+    vault_paths: &[String],
+    expected_hash: Option<&str>,
+) -> Result<String, String> {
+    match name {
+        "edit_file" => edit_file::run_stamped(args, vault_path, vault_paths, expected_hash),
+        "write_file" => write_file::run_stamped(args, vault_path, vault_paths, expected_hash),
+        _ => match lookup(name) {
+            Some(tool) => (tool.run)(args, vault_path, vault_paths),
+            None => Err(format!("unknown tool: {name}")),
+        },
     }
 }
 
@@ -145,6 +187,121 @@ pub fn openai_tool_definition(name: &str) -> Option<serde_json::Value> {
     lookup(name).map(|tool| {
         serde_json::from_str(tool.schema).expect("registered tool schema must be valid JSON")
     })
+}
+
+/// Path and unified-style diff for an approval card. `None` when the
+/// tool is not a file mutation. Errors mean the call must fail
+/// before an approval card is shown.
+#[cfg(test)]
+pub fn approval_preview(
+    name: &str,
+    args: &str,
+    vault_path: Option<&str>,
+    vault_paths: &[String],
+) -> Option<Result<ApprovalPreview, String>> {
+    match name {
+        "edit_file" | "write_file" => Some(mutate_prepare(name, args, vault_path, vault_paths)),
+        _ => None,
+    }
+}
+
+pub fn mutate_prepare(
+    name: &str,
+    args: &str,
+    vault_path: Option<&str>,
+    vault_paths: &[String],
+) -> Result<ApprovalPreview, String> {
+    match name {
+        "edit_file" => {
+            let plan = edit_file::plan(args, vault_path, vault_paths)?;
+            let built = preview::build(
+                &plan.display_path,
+                &plan.before,
+                &plan.after,
+                preview::PREVIEW_TIMEOUT,
+            );
+            Ok(ApprovalPreview {
+                path: plan.display_path.clone(),
+                diff: built.text,
+                notes: built.notes,
+                capped: built.capped,
+                created: false,
+                overwrite: false,
+                content_hash: plan.content_hash,
+            })
+        }
+        "write_file" => {
+            let plan = write_file::plan(args, vault_path, vault_paths)?;
+            let built = preview::build(
+                &plan.display_path,
+                &plan.before,
+                &plan.after,
+                preview::PREVIEW_TIMEOUT,
+            );
+            Ok(ApprovalPreview {
+                path: plan.display_path.clone(),
+                diff: built.text,
+                notes: built.notes,
+                capped: built.capped,
+                created: plan.created,
+                overwrite: !plan.created,
+                content_hash: plan.content_hash,
+            })
+        }
+        _ => Err(format!("not a mutate tool: {name}")),
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ApprovalPreview {
+    pub path: String,
+    pub diff: String,
+    pub notes: Vec<String>,
+    pub capped: bool,
+    pub created: bool,
+    pub overwrite: bool,
+    pub content_hash: String,
+}
+
+/// Mutate tools must never show Allow with no path and no diff.
+pub fn require_mutate_card(
+    name: &str,
+    prepared: Option<Result<ApprovalPreview, String>>,
+) -> Result<ApprovalPreview, String> {
+    match prepared {
+        Some(Ok(card)) if mutate_card_is_showable(&card) => Ok(card),
+        Some(Err(error)) => Err(error),
+        Some(Ok(_)) | None if matches!(name, "edit_file" | "write_file") => {
+            Err("approval preview is unavailable".into())
+        }
+        _ => Err("approval preview is unavailable".into()),
+    }
+}
+
+fn mutate_card_is_showable(card: &ApprovalPreview) -> bool {
+    !card.path.is_empty() && (!card.diff.is_empty() || !card.notes.is_empty())
+}
+
+/// Session grants for mutate tools cover later calls of the same
+/// tool against the same canonical path, not every file in the vault.
+pub fn mutate_session_matches(
+    granted_args: &str,
+    call_args: &str,
+    vault_path: Option<&str>,
+    vault_paths: &[String],
+) -> bool {
+    match (args::json_path(granted_args), args::json_path(call_args)) {
+        (Some(granted), Some(call)) => {
+            match (
+                sandbox::resolve_for_read(&granted, vault_path, vault_paths),
+                sandbox::resolve_for_read(&call, vault_path, vault_paths),
+            ) {
+                (Ok(left), Ok(right)) => left == right,
+                _ => granted == call,
+            }
+        }
+        _ => false,
+    }
 }
 
 fn echo_args(
@@ -188,5 +345,112 @@ mod tests {
             assert!(names.contains(&name), "{names:?} should include {name}");
             assert_eq!(lookup(name).unwrap().policy, ToolPolicy::ReadOnly);
         }
+    }
+
+    #[test]
+    fn registry_exposes_edit_file_and_write_file_as_mutate() {
+        let names: Vec<&str> = registered().iter().map(|tool| tool.name).collect();
+        for name in ["edit_file", "write_file"] {
+            assert!(names.contains(&name), "{names:?} should include {name}");
+            assert_eq!(lookup(name).unwrap().policy, ToolPolicy::Mutate);
+        }
+    }
+
+    #[test]
+    fn approval_preview_carries_the_canonical_target_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().canonicalize().unwrap();
+        let preview = super::approval_preview(
+            "write_file",
+            &serde_json::json!({ "path": "fresh.md", "content": "hello\n" }).to_string(),
+            Some(root.to_str().unwrap()),
+            &[],
+        )
+        .expect("write_file must produce a preview")
+        .unwrap();
+        assert_eq!(preview.path, "fresh.md");
+        assert!(preview.created);
+        assert!(!preview.overwrite);
+        assert_eq!(preview.content_hash, super::text::ABSENT_HASH);
+    }
+
+    #[test]
+    fn approval_preview_fails_before_a_card_for_a_missing_old_string() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().canonicalize().unwrap();
+        std::fs::write(root.join("note.md"), "only this\n").unwrap();
+        let preview = super::approval_preview(
+            "edit_file",
+            &serde_json::json!({
+                "path": "note.md",
+                "old_string": "missing",
+                "new_string": "x"
+            })
+            .to_string(),
+            Some(root.to_str().unwrap()),
+            &[],
+        );
+        let error = preview
+            .expect("edit_file must produce a preview result")
+            .unwrap_err();
+        assert!(error.contains("not found"), "{error}");
+    }
+
+    #[test]
+    fn approval_preview_fails_before_a_card_for_a_secret_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().canonicalize().unwrap();
+        std::fs::write(root.join(".env"), "SECRET=keep\n").unwrap();
+        let preview = super::approval_preview(
+            "write_file",
+            &serde_json::json!({ "path": ".env", "content": "SECRET=no\n" }).to_string(),
+            Some(root.to_str().unwrap()),
+            &[],
+        );
+        let error = preview
+            .expect("write_file must produce a preview result")
+            .unwrap_err();
+        assert!(error.contains(super::sandbox::BLOCKED_SECRET), "{error}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn session_grant_matches_a_symlink_to_the_same_canonical_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().canonicalize().unwrap();
+        std::fs::write(root.join("a.md"), "one\n").unwrap();
+        std::os::unix::fs::symlink(root.join("a.md"), root.join("alias.md")).unwrap();
+        let granted = r#"{"path":"a.md","content":"one"}"#;
+        let via_link = r#"{"path":"alias.md","content":"two"}"#;
+        assert!(super::mutate_session_matches(
+            granted,
+            via_link,
+            Some(root.to_str().unwrap()),
+            &[],
+        ));
+    }
+
+    #[test]
+    fn mutate_card_with_a_preview_error_is_refused() {
+        let error =
+            super::require_mutate_card("edit_file", Some(Err("old_string was not found".into())))
+                .unwrap_err();
+        assert!(error.contains("not found"), "{error}");
+        let missing = super::require_mutate_card("write_file", None).unwrap_err();
+        assert!(missing.contains("unavailable"), "{missing}");
+        let empty = super::require_mutate_card(
+            "write_file",
+            Some(Ok(super::ApprovalPreview {
+                path: String::new(),
+                diff: String::new(),
+                notes: Vec::new(),
+                capped: false,
+                created: false,
+                overwrite: false,
+                content_hash: super::text::ABSENT_HASH.to_string(),
+            })),
+        )
+        .unwrap_err();
+        assert!(empty.contains("unavailable"), "{empty}");
     }
 }

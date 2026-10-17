@@ -858,4 +858,43 @@ describe('aiAgentStreamCallbacks', () => {
     })
     expect(messages.getMessages()[0].response).toBe('first-turn-done')
   })
+
+  it('attaches an approval card to a pending mutate tool', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'edit it',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const callbacks = createStreamCallbacks({
+      agent: 'prime',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: createStatusStore().setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef: { current: '' },
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+    const reply = vi.fn()
+    callbacks.onToolStart('edit_file', 'call_1', '{"path":"notes/a.md","old_string":"x","new_string":"y"}')
+    callbacks.onApprovalRequested?.({
+      promptId: 'prompt_1',
+      tool: 'edit_file',
+      args: '{"path":"notes/a.md","old_string":"x","new_string":"y"}',
+      options: [{ id: 'allow_once', label: 'Allow once' }],
+      path: 'notes/a.md',
+      preview: '-x\n+y\n',
+      reply,
+    })
+    const action = messages.getMessages()[0]?.actions[0]
+    expect(action?.approval?.promptId).toBe('prompt_1')
+    expect(action?.approval?.path).toBe('notes/a.md')
+    action?.approval?.onReply?.('allow_once')
+    expect(reply).toHaveBeenCalledWith('allow_once')
+    expect(messages.getMessages()[0]?.actions[0]?.approval?.busy).toBe(true)
+  })
 })

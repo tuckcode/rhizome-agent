@@ -16,6 +16,8 @@ import { Button } from '@/components/ui/button'
 import { ActionTooltip } from '@/components/ui/action-tooltip'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AiActionCard, type AiActionStatus } from './AiActionCard'
+import { ToolApprovalCard } from './ToolApprovalCard'
+import type { NativeApprovalChoice, NativeApprovalOption } from '../lib/nativeToolApproval'
 import { MarkdownContent } from './MarkdownContent'
 import { ReplySelectionPill } from './ReplySelectionPill'
 import { translate, type AppLocale } from '../lib/i18n'
@@ -35,6 +37,19 @@ import { presentWorkerStartFailure } from '../lib/primeWorkerStartError'
 import { toggleReadAloud, useReadAloud } from '../lib/readAloudPlayer'
 import { TranscriptHitAnchor } from './TranscriptHitAnchor'
 
+export interface AiActionApproval {
+  promptId: string
+  options: NativeApprovalOption[]
+  preview?: string
+  notes?: string[]
+  capped?: boolean
+  path?: string
+  created?: boolean
+  overwrite?: boolean
+  busy?: boolean
+  onReply?: (choice: NativeApprovalChoice) => void
+}
+
 export interface AiAction {
   tool: string
   toolId: string
@@ -45,6 +60,7 @@ export interface AiAction {
   output?: string
   /** Assistant text that was logged immediately before this tool round. */
   beforeText?: string
+  approval?: AiActionApproval
 }
 
 export interface AiMessageProps {
@@ -294,18 +310,34 @@ function ActionCardsList({ actions, onOpenNote, expandedIds, onToggleExpand }: {
   return (
     <div className="flex flex-col gap-1" style={{ marginBottom: 8 }}>
       {groupConsecutiveToolActions(actions).map((action) => (
-        <AiActionCard
-          key={action.toolId}
-          tool={action.tool}
-          label={action.label}
-          path={action.path}
-          status={action.status}
-          input={action.input}
-          output={action.output}
-          expanded={expandedIds.has(action.toolId)}
-          onToggle={() => onToggleExpand(action.toolId)}
-          onOpenNote={onOpenNote}
-        />
+        action.approval && action.status === 'pending' ? (
+          <ToolApprovalCard
+            key={action.toolId}
+            tool={action.tool}
+            path={action.approval.path ?? action.path}
+            preview={action.approval.preview}
+            notes={action.approval.notes}
+            capped={action.approval.capped}
+            created={action.approval.created}
+            overwrite={action.approval.overwrite}
+            options={action.approval.options}
+            busy={action.approval.busy}
+            onReply={(choice) => action.approval?.onReply?.(choice)}
+          />
+        ) : (
+          <AiActionCard
+            key={action.toolId}
+            tool={action.tool}
+            label={action.label}
+            path={action.path}
+            status={action.status}
+            input={action.input}
+            output={action.output}
+            expanded={expandedIds.has(action.toolId)}
+            onToggle={() => onToggleExpand(action.toolId)}
+            onOpenNote={onOpenNote}
+          />
+        )
       ))}
     </div>
   )
