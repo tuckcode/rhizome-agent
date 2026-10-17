@@ -595,31 +595,38 @@ mod tests {
                 ),
             )
             .expect("write old index");
-            let mut perms = fs::metadata(&path).expect("metadata").permissions();
-            perms.set_readonly(true);
-            fs::set_permissions(&path, perms).expect("readonly");
-            struct MakeWritable(PathBuf);
-            impl Drop for MakeWritable {
+            // A hard link makes the atomic writer refuse the file. That
+            // failure happens for root too. Windows has no nlink check, so
+            // the read-only bit is the stand-in there.
+            struct RestoreReadonly(PathBuf);
+            impl Drop for RestoreReadonly {
                 fn drop(&mut self) {
-                    #[cfg(unix)]
-                    {
-                        use std::os::unix::fs::PermissionsExt;
-                        let _ = fs::set_permissions(&self.0, fs::Permissions::from_mode(0o644));
-                    }
                     #[cfg(not(unix))]
                     clear_readonly(&self.0);
+                    #[cfg(unix)]
+                    let _ = &self.0;
                 }
             }
-            let _restore = MakeWritable(path.clone());
+            let _restore = RestoreReadonly(path.clone());
+            #[cfg(unix)]
+            {
+                let link = dir.join("v1-hardlink.json");
+                fs::hard_link(&path, &link).expect("hard link");
+            }
+            #[cfg(not(unix))]
+            {
+                let mut perms = fs::metadata(&path).expect("metadata").permissions();
+                perms.set_readonly(true);
+                fs::set_permissions(&path, perms).expect("readonly");
+            }
 
             let loaded = load().expect("load returns the scrubbed copy");
             assert!(
                 !loaded.sessions[0].turns[0].text.contains(key),
-                "{}",
-                loaded.sessions[0].turns[0].text
+                "secret must be removed"
             );
             let raw = fs::read_to_string(&path).expect("read unchanged index");
-            assert!(raw.contains(key), "{raw}");
+            assert!(raw.contains(key), "the file on disk stays unchanged");
         });
     }
 
