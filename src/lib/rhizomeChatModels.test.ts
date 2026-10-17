@@ -75,7 +75,7 @@ describe('seedRhizomeChatModels', () => {
     expect(listed.some((model) => model.id.startsWith('anthropic/'))).toBe(false)
     expect(listed.at(-1)?.id).toBe('free_tier_auto')
     expect(listed.find((model) => model.id === 'work-openai/gpt-4o')?.displayName).toBe('GPT-4o')
-    expect(rhizomeModelVisibleName(listed.at(-1)!)).toBe('Free tier (auto)')
+    expect(rhizomeModelVisibleName(listed.at(-1)!)).toBe('Taproot')
   })
 
   it('prefixes the provider when two display names collide', () => {

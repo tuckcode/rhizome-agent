@@ -1143,7 +1143,7 @@ describe('SettingsPanel', () => {
     await act(async () => {
       fireEvent.click(option)
     })
-    expect(trigger).toHaveTextContent('Free tier (auto)')
+    expect(trigger).toHaveTextContent('Taproot')
   })
 
   it('persists the native Chat engine across a settings save and reload', () => {

@@ -7,14 +7,14 @@ import {
 } from './rhizomeChatModels'
 
 export const FREE_TIER_AUTO_TARGET = 'free_tier_auto'
-export const FREE_TIER_AUTO_LABEL = 'Free tier (auto)'
+export const FREE_TIER_AUTO_LABEL = 'Taproot'
 
 export interface NativeChatTargetOption {
   id: string
   label: string
 }
 
-/** Catalog models plus configured models plus Free tier (auto). Anthropic stays hidden until 6a. */
+/** Catalog models plus configured models plus Taproot. Anthropic stays hidden until 6a. */
 export function nativeChatTargetOptions(
   providers?: AiModelProvider[] | null,
 ): NativeChatTargetOption[] {

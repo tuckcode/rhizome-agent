@@ -164,7 +164,7 @@ describe('FreeTierSettings', () => {
   it('says when nothing can route yet', async () => {
     await renderLoaded(overview({ usable: false, routeOrder: [] }))
 
-    expect(screen.getByText('Add a key to at least one provider to use Free tier (auto).')).toBeInTheDocument()
+    expect(screen.getByText('Add a key to at least one provider to use Taproot.')).toBeInTheDocument()
   })
 
   it('picks the own endpoint from a dropdown of saved providers', async () => {

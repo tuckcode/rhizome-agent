@@ -160,7 +160,7 @@ describe('NativeChatModelPicker', () => {
     })
     expect(screen.getByTestId('native-chat-model-work-openai/gpt-4o')).toHaveTextContent('GPT-4o')
     expect(screen.getByTestId('native-chat-model-work-openai/gpt-4o')).not.toHaveTextContent('Work OpenAI ·')
-    expect(screen.getByTestId('native-chat-model-free_tier_auto')).toHaveTextContent('Free tier (auto)')
+    expect(screen.getByTestId('native-chat-model-free_tier_auto')).toHaveTextContent('Taproot')
     expect(screen.getByTestId('native-chat-model-free_tier_auto')).not.toHaveTextContent('free_tier_auto')
   })
 

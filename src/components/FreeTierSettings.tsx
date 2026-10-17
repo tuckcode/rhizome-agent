@@ -25,9 +25,10 @@ import {
 import { Input } from './ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select'
 import { Switch } from './ui/switch'
+import { FREE_TIER_AUTO_LABEL } from '../lib/nativeChatTargets'
 
 /**
- * Free-tier providers for "Free tier (auto)" (step 3b, ADR-0182).
+ * Free-tier providers for Taproot (step 3b, ADR-0182).
  *
  * Keys go to the OS keychain through the same command as every other
  * provider key. The fallback order is fixed by ADR-0182 decision 5, so it
@@ -42,7 +43,7 @@ export function FreeTierSettings() {
   return (
     <div data-testid="free-tier-settings" className="flex flex-col gap-3 rounded-md border border-border bg-card p-3">
       <div>
-        <div className="text-sm font-medium text-foreground">Free tier (auto)</div>
+        <div className="text-sm font-medium text-foreground">{FREE_TIER_AUTO_LABEL}</div>
         <div className="mt-1 text-xs leading-5 text-muted-foreground">
           Native Chat can try these free providers in order and move to the next one when a provider fails
           or runs out of free use. Each needs its own key. Keys are kept in this computer's keychain.
@@ -70,7 +71,7 @@ export function FreeTierSettings() {
       <FallbackOrder overview={overview} />
       {overview.usable ? null : (
         <div className="text-xs text-muted-foreground">
-          Add a key to at least one provider to use Free tier (auto).
+          Add a key to at least one provider to use {FREE_TIER_AUTO_LABEL}.
         </div>
       )}
       {error ? <ErrorLine error={error} /> : null}
