@@ -285,3 +285,59 @@ jobs:
 
       - name: Clippy
         run: cargo clippy --manifest-path=src-tauri/Cargo.toml --all-targets -- -D warnings
+
+  # Windows lane for the Rust backend. The real `bash` tool spawns processes
+  # with Windows-only code (Job Object, CREATE_SUSPENDED, `cmd /S /C` via
+  # raw_arg) that neither the macOS nor the Linux lane compiles. This runs
+  # `cargo test --lib` on Windows so that code is built and tested in CI.
+  # Cost gating: Windows minutes bill at 2x Linux, so the expensive steps run
+  # only when src-tauri/**, Cargo files or this workflow change (always on
+  # workflow_dispatch). The job itself always starts and reports success on
+  # unrelated PRs, so it can be a required check without ever hanging.
+  rust-windows-tests:
+    name: Rust Tests (Windows)
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for the rust-changes diff below
+
+      - name: Check whether Rust tests are needed
+        id: rust-changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_SHA="${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ -z "$BASE_SHA" ] || [[ "$BASE_SHA" =~ ^0+$ ]]; then
+            echo "should-test=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$BASE_SHA" HEAD | grep -qE '^(src-tauri/|Cargo\.(toml|lock)$|\.github/workflows/ci\.yml$)'; then
+            echo "should-test=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should-test=false" >> "$GITHUB_OUTPUT"
+            echo "No Rust or CI changes; skipping Windows cargo test."
+          fi
+
+      - name: Setup Rust
+        if: steps.rust-changes.outputs.should-test == 'true'
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8
+
+      - name: Cache Rust dependencies
+        if: steps.rust-changes.outputs.should-test == 'true'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-test-${{ env.RUST_TARGET_CACHE_VERSION }}-${{ hashFiles('src-tauri/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-test-${{ env.RUST_TARGET_CACHE_VERSION }}-
+
+      # build.rs creates the resources/mcp-server placeholder itself, and
+      # agent-docs is checked in, so no frontend or bundle pre-steps are needed.
+      - name: Rust unit tests (cargo test --lib)
+        if: steps.rust-changes.outputs.should-test == 'true'
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib
