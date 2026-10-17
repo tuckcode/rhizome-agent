@@ -35,6 +35,7 @@ const SUPPORTED_COLOR_THEMES: &[&str] = &[
     "catppuccin-mocha",
     "catppuccin-latte",
     "tokyo-night",
+    "ozzs-blizzard",
     "one-dark",
     "rose-pine",
     "github-light",

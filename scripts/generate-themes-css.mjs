@@ -139,6 +139,7 @@ const THEMES = [
       '--syntax-highlight-comment': '#86917A',
     },
   },
+  { slug: 'ozzs-blizzard', name: "Ozz's Blizzard", dark: true, bg: '#0A0F1A', panel: '#0F1626', fg: '#BFD3EA', heading: '#E6F1FF', muted: '#6F809A', border: '#1E2A3F', accent: '#4CC9F0', onAccent: '#0A0F1A', green: '#2A9D8F', yellow: '#FFCF24', red: '#E76F6F', purple: '#A78BFA' },
   { slug: 'dracula', name: 'Dracula', dark: true, bg: '#282A36', panel: '#21222C', fg: '#F8F8F2', heading: '#F8F8F2', muted: '#6272A4', border: '#44475A', accent: '#BD93F9', onAccent: '#282A36', green: '#50FA7B', yellow: '#F1FA8C', red: '#FF5555', purple: '#FF79C6' },
   { slug: 'nord', name: 'Nord', dark: true, bg: '#2E3440', panel: '#3B4252', fg: '#D8DEE9', heading: '#ECEFF4', muted: '#7B88A1', border: '#434C5E', accent: '#88C0D0', onAccent: '#2E3440', green: '#A3BE8C', yellow: '#EBCB8B', red: '#BF616A', purple: '#B48EAD' },
   { slug: 'gruvbox-dark', name: 'Gruvbox Dark', dark: true, bg: '#282828', panel: '#32302F', fg: '#EBDBB2', heading: '#FBF1C7', muted: '#928374', border: '#504945', accent: '#FE8019', onAccent: '#282828', green: '#B8BB26', yellow: '#FABD2F', red: '#FB4934', purple: '#D3869B' },
