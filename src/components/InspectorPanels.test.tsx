@@ -796,21 +796,48 @@ describe('GitHistoryPanel', () => {
 
     render(<GitHistoryPanel commits={commits} onViewCommitDiff={onViewCommitDiff} />)
 
-    const row = screen.getByRole('button', { name: `${longSubject}. View diff for abc1234` })
+    const row = screen.getByRole('button', { name: `abc1234 · ${longSubject}. View diff` })
     expect(row).toHaveClass('truncate')
-    expect(row).toHaveAccessibleName(`${longSubject}. View diff for abc1234`)
+    expect(row).toHaveAccessibleName(`abc1234 · ${longSubject}. View diff`)
     expect(row).not.toHaveAttribute('title', 'View diff for abc1234')
+    expect(row.className).toContain('focus-visible:ring-2')
+    expect(row.className).toContain('focus-visible:ring-[var(--state-focus-ring)]')
 
     fireEvent.focus(row)
-    expect(await screen.findByRole('tooltip')).toHaveTextContent(longSubject)
-
-    fireEvent.blur(row)
+    const focusedTip = await screen.findByRole('tooltip')
+    const bubble = document.querySelector('[data-slot="tooltip-content"]')
+    expect(focusedTip).toHaveTextContent(longSubject)
+    expect(bubble).toHaveAttribute('data-side', 'bottom')
+    expect(bubble).toHaveClass('break-words')
+    fireEvent.keyDown(document, { key: 'Escape' })
     await waitFor(() => {
       expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
     })
 
+    fireEvent.blur(row)
     fireEvent.pointerMove(row)
     expect(await screen.findByRole('tooltip')).toHaveTextContent(longSubject)
+  })
+
+  it('skips the tooltip when the commit subject is blank', () => {
+    const commits: GitCommit[] = [
+      {
+        hash: 'abc1234567890',
+        shortHash: 'abc1234',
+        message: '\n   \r',
+        author: 'luca',
+        date: Math.floor(Date.now() / 1000),
+      },
+    ]
+
+    render(<GitHistoryPanel commits={commits} onViewCommitDiff={onViewCommitDiff} />)
+
+    const row = screen.getByRole('button', { name: 'abc1234. View diff' })
+    expect(row).toHaveAccessibleName('abc1234. View diff')
+    expect(row).toHaveTextContent('abc1234')
+    expect(row.textContent?.trim().startsWith('. ')).toBe(false)
+    fireEvent.focus(row)
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
   })
 
   it('displays relative dates correctly', () => {

@@ -86,8 +86,7 @@ const STATUS_COLOR = {
   deleted: 'var(--destructive)',
 } as const
 
-const PULSE_ROW_FOCUS_CLASS_NAME = 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring/70 focus-visible:ring-inset'
-const PULSE_EDGE_TO_EDGE_ROW_CLASS_NAME = '-mx-4 rounded-none px-4'
+const PULSE_ROW_FOCUS_CLASS_NAME = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--state-focus-ring)] focus-visible:ring-inset'
 
 function SummaryBadges({ added, modified, deleted }: { added: number; modified: number; deleted: number }) {
   return (
@@ -159,21 +158,19 @@ function CommitCard({
   const subject = commitSubject(commit.message)
 
   return (
-    <div className="border-b border-border px-4 py-2">
-      <div className="flex items-start" style={{ gap: 8 }}>
+    <div className={cn('border-b border-border', expanded ? 'bg-accent/40' : 'hover:bg-accent/40 focus-within:bg-accent/40')}>
+      <div className="flex items-start px-4 py-2" style={{ gap: 8 }}>
         <CommitSubjectTooltip subject={subject}>
           <button
             type="button"
             className={cn(
               'flex min-w-0 flex-1 items-start justify-between border-none bg-transparent py-2 text-left transition-colors',
               PULSE_ROW_FOCUS_CLASS_NAME,
-              PULSE_EDGE_TO_EDGE_ROW_CLASS_NAME,
-              expanded ? 'bg-accent/40' : 'hover:bg-accent/40 focus-visible:bg-accent/40',
             )}
             style={{ gap: 8 }}
             onClick={toggleExpanded}
             onKeyDown={(event) => handleActivationKey(event, toggleExpanded)}
-            aria-label={subject}
+            aria-expanded={expanded}
           >
             <div className="min-w-0 flex-1">
               <div className="flex items-center" style={{ gap: 6, marginBottom: 2 }}>
@@ -207,10 +204,11 @@ function CommitCard({
         )}
         <button
           type="button"
+          tabIndex={-1}
+          aria-hidden="true"
           className="mt-2 flex shrink-0 cursor-pointer items-center justify-center rounded border-none bg-transparent p-0 text-muted-foreground hover:text-foreground"
           style={{ width: 20, height: 20 }}
           onClick={toggleExpanded}
-          aria-label={translate(locale, expanded ? 'pulse.collapseFiles' : 'pulse.expandFiles')}
         >
           <Chevron size={12} />
         </button>

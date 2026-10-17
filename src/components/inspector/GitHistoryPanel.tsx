@@ -13,6 +13,13 @@ function formatRelativeDate(timestamp: number): string {
   return months === 1 ? '1mo ago' : `${months}mo ago`
 }
 
+const INSPECTOR_ROW_FOCUS_CLASS_NAME = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--state-focus-ring)] focus-visible:ring-inset'
+
+function commitRowName(shortHash: string, subject: string): string {
+  const visible = subject ? `${shortHash} · ${subject}` : shortHash
+  return `${visible}. View diff`
+}
+
 export function GitHistoryPanel({ commits, onViewCommitDiff }: { commits: GitCommit[]; onViewCommitDiff?: (commitHash: string) => void }) {
   if (commits.length === 0) return null
 
@@ -27,15 +34,14 @@ export function GitHistoryPanel({ commits, onViewCommitDiff }: { commits: GitCom
           const subject = commitSubject(c.message)
           return (
             <div key={c.hash} style={{ borderLeft: '2px solid var(--border)', paddingLeft: 10 }}>
-              <CommitSubjectTooltip subject={subject}>
+              <CommitSubjectTooltip subject={subject} side="bottom">
                 <button type="button"
-                  className="mb-0.5 w-full cursor-pointer truncate border-none bg-transparent p-0 text-left text-xs text-primary hover:underline"
+                  className={`mb-0.5 w-full cursor-pointer truncate border-none bg-transparent p-0 text-left text-xs text-primary hover:underline ${INSPECTOR_ROW_FOCUS_CLASS_NAME}`}
                   onClick={() => onViewCommitDiff?.(c.hash)}
-                  aria-label={`${subject}. View diff for ${c.shortHash}`}
+                  aria-label={commitRowName(c.shortHash, subject)}
                 >
                   <span className="font-mono" style={{ fontSize: 11 }}>{c.shortHash}</span>
-                  {' · '}
-                  {subject}
+                  {subject ? ` · ${subject}` : null}
                 </button>
               </CommitSubjectTooltip>
               <div className="text-muted-foreground" style={{ fontSize: 10 }}>

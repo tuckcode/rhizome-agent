@@ -7,20 +7,23 @@ const outDir = process.argv[3] ?? 'docs/review-shots/history-commit-title'
 mkdirSync(outDir, { recursive: true })
 
 const shots = [
-  ['before-history-hover', 'history', 'hover'],
-  ['after-history-hover', 'history', 'hover'],
-  ['after-history-focus', 'history', 'focus'],
-  ['after-inspector-hover', 'inspector', 'hover'],
+  ['before-history-hover', 'graphite', 'history', 'hover'],
+  ['after-history-hover', 'graphite', 'history', 'hover'],
+  ['after-history-focus', 'graphite', 'history', 'focus'],
+  ['after-inspector-hover', 'graphite', 'inspector', 'hover'],
+  ['earth-after-history-hover', 'earth', 'history', 'hover'],
+  ['earth-after-history-focus', 'earth', 'history', 'focus'],
+  ['earth-after-inspector-hover', 'earth', 'inspector', 'hover'],
 ]
 
 const browser = await chromium.launch()
 const page = await browser.newPage({ viewport: { width: 720, height: 560 } })
 
-for (const [name, surface, interaction] of shots) {
-  if (name.startsWith('before-') && process.env.SHOT_PHASE === 'after') continue
-  if (name.startsWith('after-') && process.env.SHOT_PHASE === 'before') continue
+for (const [name, theme, surface, interaction] of shots) {
+  if (name.includes('before-') && process.env.SHOT_PHASE === 'after') continue
+  if (!name.includes('before-') && process.env.SHOT_PHASE === 'before') continue
 
-  await page.goto(`${base}?theme=graphite&surface=${surface}`, { waitUntil: 'networkidle' })
+  await page.goto(`${base}?theme=${theme}&surface=${surface}`, { waitUntil: 'networkidle' })
   await page.evaluate(() => document.fonts.ready)
   await page.getByText('Update project notes').first().waitFor()
 

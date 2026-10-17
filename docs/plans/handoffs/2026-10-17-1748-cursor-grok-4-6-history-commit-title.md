@@ -15,12 +15,19 @@ with no hover or focus path to the rest of the line. The inspector
 message. Both surfaces now wrap the row in `CommitSubjectTooltip` and
 label the first line of the message.
 
+Review follow-up: the inspector accessible name starts with the visible
+`hash · subject`, empty subjects render no tooltip, the History chevron
+is not a second tab stop, and the focus ring uses `--state-focus-ring`.
+
 Review shots in `docs/review-shots/history-commit-title/`:
 
 - `before-history-hover.png`
 - `after-history-hover.png`
 - `after-history-focus.png`
 - `after-inspector-hover.png`
+- `earth-after-history-hover.png`
+- `earth-after-history-focus.png`
+- `earth-after-inspector-hover.png`
 
 Regenerate after shots with `pnpm dev` and
 `SHOT_PHASE=after node scripts/capture-history-commit-title.mjs`.
