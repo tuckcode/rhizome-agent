@@ -28,6 +28,12 @@ Review shots in `docs/review-shots/history-commit-title/`:
 - `earth-after-history-hover.png`
 - `earth-after-history-focus.png`
 - `earth-after-inspector-hover.png`
+- `after-inspector-focus.png`
+- `earth-after-inspector-focus.png`
+
+The History and inspector focus rings are inset with horizontal padding
+so the ring does not cover the icon or the time. The inspector tooltip
+uses a larger side offset so it clears the relative date.
 
 Regenerate after shots with `pnpm dev` and
 `SHOT_PHASE=after node scripts/capture-history-commit-title.mjs`.

@@ -11,9 +11,11 @@ const shots = [
   ['after-history-hover', 'graphite', 'history', 'hover'],
   ['after-history-focus', 'graphite', 'history', 'focus'],
   ['after-inspector-hover', 'graphite', 'inspector', 'hover'],
+  ['after-inspector-focus', 'graphite', 'inspector', 'focus'],
   ['earth-after-history-hover', 'earth', 'history', 'hover'],
   ['earth-after-history-focus', 'earth', 'history', 'focus'],
   ['earth-after-inspector-hover', 'earth', 'inspector', 'hover'],
+  ['earth-after-inspector-focus', 'earth', 'inspector', 'focus'],
 ]
 
 const browser = await chromium.launch()

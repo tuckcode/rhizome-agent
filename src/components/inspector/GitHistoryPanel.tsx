@@ -34,9 +34,9 @@ export function GitHistoryPanel({ commits, onViewCommitDiff }: { commits: GitCom
           const subject = commitSubject(c.message)
           return (
             <div key={c.hash} style={{ borderLeft: '2px solid var(--border)', paddingLeft: 10 }}>
-              <CommitSubjectTooltip subject={subject} side="bottom">
+              <CommitSubjectTooltip subject={subject} side="bottom" sideOffset={20}>
                 <button type="button"
-                  className={`mb-0.5 w-full cursor-pointer truncate border-none bg-transparent p-0 text-left text-xs text-primary hover:underline ${INSPECTOR_ROW_FOCUS_CLASS_NAME}`}
+                  className={`-mx-1 mb-0.5 w-full cursor-pointer truncate rounded-sm border-none bg-transparent px-1 py-0 text-left text-xs text-primary hover:underline ${INSPECTOR_ROW_FOCUS_CLASS_NAME}`}
                   onClick={() => onViewCommitDiff?.(c.hash)}
                   aria-label={commitRowName(c.shortHash, subject)}
                 >

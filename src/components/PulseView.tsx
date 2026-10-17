@@ -164,7 +164,7 @@ function CommitCard({
           <button
             type="button"
             className={cn(
-              'flex min-w-0 flex-1 items-start justify-between border-none bg-transparent py-2 text-left transition-colors',
+              '-mx-1.5 flex min-w-0 flex-1 items-start justify-between rounded-sm border-none bg-transparent px-1.5 py-2 text-left transition-colors',
               PULSE_ROW_FOCUS_CLASS_NAME,
             )}
             style={{ gap: 8 }}
@@ -208,6 +208,7 @@ function CommitCard({
           aria-hidden="true"
           className="mt-2 flex shrink-0 cursor-pointer items-center justify-center rounded border-none bg-transparent p-0 text-muted-foreground hover:text-foreground"
           style={{ width: 20, height: 20 }}
+          onMouseDown={(event) => event.preventDefault()}
           onClick={toggleExpanded}
         >
           <Chevron size={12} />

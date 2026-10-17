@@ -800,7 +800,11 @@ describe('GitHistoryPanel', () => {
     expect(row).toHaveClass('truncate')
     expect(row).toHaveAccessibleName(`abc1234 · ${longSubject}. View diff`)
     expect(row).not.toHaveAttribute('title', 'View diff for abc1234')
+    expect(row.className).toContain('-mx-1')
+    expect(row.className).toContain('px-1')
+    expect(row.className).toContain('rounded-sm')
     expect(row.className).toContain('focus-visible:ring-2')
+    expect(row.className).toContain('focus-visible:ring-inset')
     expect(row.className).toContain('focus-visible:ring-[var(--state-focus-ring)]')
 
     fireEvent.focus(row)
