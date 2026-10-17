@@ -79,17 +79,16 @@ export function pathFromToolArgs(args?: string): string | undefined {
 }
 
 /**
- * Command shown on the bash approval card. #202 sends tool-call JSON in
- * ApprovalRequested.args (`{"command":"..."}`); a non-JSON string is shown
- * as-is.
+ * ApprovalRequested.args for bash is the literal command (`shown_args` at
+ * driver.rs:664-669). Never JSON-parse it.
  */
 export function bashApprovalCommand(args?: string): string | undefined {
-  return commandFromToolCallInput(args)
+  return args
 }
 
 /**
- * Tool-call input and ApprovalRequested.args may be JSON
- * `{command, timeout_secs}`. Read .command only from that object.
+ * Tool-call input may be JSON `{command, timeout_secs}`. Read .command only
+ * from that object. Do not use this on approval.args.
  */
 export function commandFromToolCallInput(args?: string): string | undefined {
   if (args === undefined) return undefined

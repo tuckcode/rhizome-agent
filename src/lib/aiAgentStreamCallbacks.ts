@@ -4,7 +4,6 @@ import { detectFileOperation, type AgentFileCallbacks } from './aiAgentFileOpera
 import type { NativeApprovalPrompt } from './nativeToolApproval'
 import {
   approvalCallId,
-  commandFromToolCallInput,
   isBashTool,
   matchPendingApprovalAction,
   pathFromToolArgs,
@@ -385,9 +384,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
             prompt.reply(choice)
           },
         }
-        const command = isBashTool(prompt.tool)
-          ? commandFromToolCallInput(prompt.args)
-          : undefined
+        const command = isBashTool(prompt.tool) ? prompt.args : undefined
         if (!match) {
           const settled = callId
             ? message.actions.map((action) => (

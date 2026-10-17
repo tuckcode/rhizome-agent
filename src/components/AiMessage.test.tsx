@@ -579,7 +579,7 @@ describe('AiMessage', () => {
           approval: {
             promptId: 'p1',
             callId: 't1',
-            args: '{"command":"  ls notes  ","timeout_secs":30}',
+            args: '  ls notes  ',
             options: [
               { id: 'allow_once', label: 'Allow once' },
               { id: 'deny', label: 'Deny' },
@@ -594,9 +594,9 @@ describe('AiMessage', () => {
     expect(writeClipboardText).toHaveBeenCalledWith('  ls notes  ')
   })
 
-  it('shows the command field from #202 JSON ApprovalRequested.args', () => {
+  it('shows JSON-looking approval args literally when call_id is present', () => {
     writeClipboardText.mockResolvedValue(undefined)
-    const args = '{"command":"ls"}'
+    const raw = '{"command":"ls"}'
     render(
       <AiMessage
         userMessage="list files"
@@ -605,25 +605,25 @@ describe('AiMessage', () => {
           toolId: 't1',
           label: 'ls',
           status: 'pending',
-          input: args,
+          input: '{"command":"echo hi"}',
           approval: {
             promptId: 'p1',
             callId: 't1',
-            args,
+            args: raw,
             options: [{ id: 'allow_once', label: 'Allow once' }, { id: 'deny', label: 'Deny' }],
           },
         }]}
       />,
     )
     fireEvent.click(screen.getByTestId('tool-use-toggle'))
-    expect(screen.getByTestId('approval-command').textContent).toBe('ls')
+    expect(screen.getByTestId('approval-command').textContent).toBe(raw)
     fireEvent.click(screen.getByRole('button', { name: 'Copy command' }))
-    expect(writeClipboardText).toHaveBeenCalledWith('ls')
+    expect(writeClipboardText).toHaveBeenCalledWith(raw)
   })
 
-  it('shows the runner command field, not extra JSON keys, for #202 args', () => {
+  it('shows the full pwned command instead of the inner echo hi', () => {
     writeClipboardText.mockResolvedValue(undefined)
-    const args = '{"command":"echo hi","x":"$(touch /tmp/pwned)"}'
+    const raw = '{"command":"echo hi","x":"$(touch /tmp/pwned)"}'
     render(
       <AiMessage
         userMessage="run"
@@ -632,22 +632,67 @@ describe('AiMessage', () => {
           toolId: 'call_1',
           label: 'bash',
           status: 'pending',
-          input: args,
-          command: 'echo hi',
+          input: raw,
+          command: raw,
           approval: {
             promptId: 'p1',
             callId: 'call_1',
-            args,
+            args: raw,
             options: [{ id: 'allow_once', label: 'Allow once' }, { id: 'deny', label: 'Deny' }],
           },
         }]}
       />,
     )
     fireEvent.click(screen.getByTestId('tool-use-toggle'))
-    expect(screen.getByTestId('approval-command').textContent).toBe('echo hi')
-    expect(screen.getByTestId('approval-command').textContent).not.toContain('pwned')
+    expect(screen.getByTestId('approval-command').textContent).toBe(raw)
+    expect(screen.getByTestId('approval-command').textContent).toContain('pwned')
     fireEvent.click(screen.getByRole('button', { name: 'Copy command' }))
-    expect(writeClipboardText).toHaveBeenCalledWith('echo hi')
+    expect(writeClipboardText).toHaveBeenCalledWith(raw)
+  })
+
+  it('shows driver.rs:669 shown_args unchanged through VisibleCommand', () => {
+    writeClipboardText.mockResolvedValue(undefined)
+    // Exact `shown_args = command` payload from driver.rs:664-669.
+    const shownArgs = [
+      '{"command":"echo hi","x":"$(touch /tmp/pwned)"}',
+      '{"command":"echo safe","command":"rm -rf ~"}',
+      'echo \u202Esecret',
+    ]
+    for (const raw of shownArgs) {
+      const { unmount } = render(
+        <AiMessage
+          userMessage="run"
+          actions={[{
+            tool: 'bash',
+            toolId: 'call_1',
+            label: 'bash',
+            status: 'pending',
+            input: '{"command":"ls"}',
+            command: raw,
+            approval: {
+              promptId: 'p1',
+              callId: 'call_1',
+              args: raw,
+              options: [{ id: 'allow_once', label: 'Allow once' }, { id: 'deny', label: 'Deny' }],
+            },
+          }]}
+        />,
+      )
+      fireEvent.click(screen.getByTestId('tool-use-toggle'))
+      const card = screen.getByTestId('approval-command')
+      if (raw.includes('\u202E')) {
+        expect(card).toHaveTextContent('echo')
+        expect(card).toHaveTextContent('\\u{202E}')
+        expect(card).toHaveTextContent('secret')
+        expect(screen.getByTestId('command-hidden')).toHaveTextContent('\\u{202E}')
+      } else {
+        expect(card.textContent).toBe(raw)
+      }
+      fireEvent.click(screen.getByRole('button', { name: 'Copy command' }))
+      expect(writeClipboardText).toHaveBeenCalledWith(raw)
+      writeClipboardText.mockClear()
+      unmount()
+    }
   })
 
   it('reads the result command from JSON tool-call input without trimming', () => {

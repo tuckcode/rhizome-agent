@@ -1010,7 +1010,7 @@ describe('aiAgentStreamCallbacks', () => {
     expect(actions[0]?.superseded).toBe(true)
     expect(actions[0]?.approval).toBeUndefined()
     expect(actions[1]?.toolId).toBe('call_missing')
-    expect(actions[1]?.command).toBe('echo hi')
+    expect(actions[1]?.command).toBe('{"command":"echo hi","x":"$(touch /tmp/pwned)"}')
     expect(actions[1]?.input).toBe('{"command":"echo hi","x":"$(touch /tmp/pwned)"}')
     expect(actions[1]?.approval?.args).toBe('{"command":"echo hi","x":"$(touch /tmp/pwned)"}')
   })

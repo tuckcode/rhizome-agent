@@ -83,12 +83,14 @@ describe('native tool approval helpers', () => {
     expect(bashApprovalCommand()).toBeUndefined()
   })
 
-  it('reads the command field from #202 JSON ApprovalRequested.args', () => {
-    expect(bashApprovalCommand('{"command":"ls"}')).toBe('ls')
-    expect(bashApprovalCommand('{"command":"  ls notes  ","timeout_secs":30}')).toBe('  ls notes  ')
+  it('does not JSON-parse approval.args when call_id is present', () => {
+    expect(bashApprovalCommand('{"command":"ls"}')).toBe('{"command":"ls"}')
     expect(bashApprovalCommand(
       '{"command":"echo hi","x":"$(touch /tmp/pwned)"}',
-    )).toBe('echo hi')
+    )).toBe('{"command":"echo hi","x":"$(touch /tmp/pwned)"}')
+    expect(bashApprovalCommand(
+      '{"command":"echo safe","command":"rm -rf ~"}',
+    )).toBe('{"command":"echo safe","command":"rm -rf ~"}')
   })
 
   it('detects a new-file preview', () => {

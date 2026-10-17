@@ -13,8 +13,8 @@ Merged `origin/main` at `c210019` into `cursor/run-command-bash-ui-cc62`.
 Rebase would have replayed 11 UI commits onto the same four files, so
 this is a merge. Conflicts: ARCHITECTURE (main runner text plus #200
 Chat card), AiMessage (keep `callId` from the event), both test files
-(keep both sides; JSON args now yield the `command` field). Timeout
-comment cites `c210019`.
+(keep both sides). `ApprovalRequested.args` is the literal command from
+driver.rs:669, not ToolCall JSON. Timeout comment cites `c210019`.
 
 Localization: none — English only (C18).
 PostHog: no event needed because this is the same result row.

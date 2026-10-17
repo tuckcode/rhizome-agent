@@ -566,10 +566,12 @@ the process group. On Unix the command is its own process group
 assigned, then resumed, with `KILL_ON_JOB_CLOSE`.
 The Chat card title is Run command. The body is the command, shown through
 VisibleCommand (`\u{XXXX}` badges for hidden characters), not a diff.
-Allow once and Deny are offered; Allow for session is hidden. The card
-matches a pending call on `ApprovalRequested.call_id`. After the tool
-finishes, Chat shows one row per call with the command and exit status,
-expandable to stdout and stderr. There is no live streaming in this view.
+`ApprovalRequested.args` is that literal command (`shown_args` at
+driver.rs:664-669) and must never be JSON-parsed. Allow once and Deny are
+offered; Allow for session is hidden. The card matches a pending call on
+`ApprovalRequested.call_id`. After the tool finishes, Chat shows one row
+per call with the command and exit status, expandable to stdout and
+stderr. There is no live streaming in this view.
 Secret-path blocking (`.env*` except `.env.example`, `.git/`, `*.pem` /
 `*.key` / `*.p12` / `*.pfx`, known private-key basenames and their
 backups) is a safety net, not a wall. It covers the native file tools
