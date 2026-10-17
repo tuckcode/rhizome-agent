@@ -33,7 +33,7 @@ for (const [theme, state] of shots) {
   if (state === 'approval-allow-focus') {
     await page.locator('[data-testid="approval-allow_once"]').waitFor()
     await page.locator('[data-testid="approval-allow_once"]').focus()
-    await page.waitForTimeout(80)
+    await page.waitForTimeout(200)
   }
   await page.waitForTimeout(200)
   const file = path.join(outDir, `${theme}-${state}.png`)
