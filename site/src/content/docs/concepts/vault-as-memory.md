@@ -16,7 +16,7 @@ The agent's long-term memory is your vault: a folder of Markdown files you can r
 
 1. **Chat.** You and the agent work on something. Chat transcripts are working memory. They live with the session, not in the vault.
 2. **Save.** Under a reply worth keeping, click **Save to vault**. Rhizome writes a Markdown note.
-3. **Recall.** With Prime as the engine, the agent can search and open vault notes in later chats. An answer built on a note shows it came from your vault. Rhizome's own engine can't read or search the vault yet.
+3. **Recall.** The native engine can search and open vault notes in later chats with `grep`, `read_file`, `list_dir`, and `glob`.
 4. **Review.** Open, edit or delete the note like any other. With Git, look at its history and revert a change.
 
 ## Save to vault

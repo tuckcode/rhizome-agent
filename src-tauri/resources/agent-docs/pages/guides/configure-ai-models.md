@@ -5,12 +5,9 @@ URL: /guides/configure-ai-models
 
 Choose which models Chat can use, store their API keys safely, and check that they answer. Keys are kept in your operating system's keychain, never in the vault.
 
-## Choose an engine first
+## Engine
 
-**Chat engine** in Settings → AI Agents decides who runs Chat:
-
-- **Off (default):** Prime handles its own provider login. Sign in from Settings → AI Agents → Local agent, or run `prime-agent` in a terminal and use `/login`.
-- **On:** Rhizome's own engine runs new chats with the models you set up below. It doesn't need Prime.
+New chats use Rhizome's own engine (ADR-0187). Set up the models below in Settings → AI Agents.
 
 ## Add a provider
 
@@ -22,7 +19,7 @@ Settings → AI Agents has three tabs. **Local model** is for models on your com
 | Local | Ollama, LM Studio | Base URL, model ID, usually no key |
 | Your own | Any OpenAI-compatible server | Base URL, model ID, optional key and headers |
 
-Anthropic models aren't offered by Rhizome's own Chat engine yet.
+Anthropic models are not offered by Rhizome's own engine yet.
 
 ## Store the key
 

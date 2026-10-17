@@ -17,11 +17,11 @@ cd rhizome-agent
 pnpm tauri dev
 ```
 
-`./install.sh` installs this repo and fetches Prime Agent when that program is not already on the machine. Settings still starts Chat on Prime until you switch **Chat engine** to Rhizome's own engine. Native chat does not need Prime. The script still downloads the Prime command-line tool because that default is Prime.
+`./install.sh` installs this repo and may fetch Prime Agent when that program is not already on the machine. Chat runs on Rhizome's own engine (ADR-0187). Native chat does not need Prime. The script may still download the Prime command-line tool for legacy optional-engine support.
 
 The first launch of `prime-agent` asks you to run `/login` and choose a provider. Skip that if you use Rhizome's engine and add a provider key in Settings. Keys live in the system keychain.
 
-`prime-agent` stops when that terminal closes. To leave it running (only if you use the Prime engine):
+`prime-agent` stops when that terminal closes. To leave it running for CLI use outside Rhizome Chat:
 
 ```bash
 (prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status
@@ -39,7 +39,7 @@ To look at the interface without a live engine: `pnpm dev`, then http://localhos
 4. Send one message. On Rhizome's engine you should get an answer, a notice if a non-fatal error occurred, or a clear failure (no provider key, for example). Prime-targeted chats still need Prime installed.
 5. Show Notes (View menu, or Cmd+2). Save a note, quit, and reopen the same file.
 
-Notes live in the vault folder you opened. You can read and diff them in the app. The agent cannot search the vault or old Mycelium sessions yet. Mycelium replays builds.
+Notes live in the vault folder you opened. You can read and diff them in the app. The native engine can search that vault with `grep` / `read_file` / `list_dir` / `glob`. It cannot search old Mycelium sessions. Mycelium replays builds.
 
 Native chat logs live in the app config folder (`com.rhizome.app/native-sessions`). Prime transcripts live under `~/.prime/agent/sessions/` when you use that engine.
 

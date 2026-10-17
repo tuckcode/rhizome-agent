@@ -16,6 +16,7 @@ interface UseStartupScreenStateArgs {
   isNoteWindow: boolean
   onboardingState: StartupOnboardingState
   runtimeMissingVaultPath: string | null
+  loadError: string | null
   selectedVaultPath: string | null
   settingsLoaded: boolean
   showMcpSetupDialog: boolean
@@ -36,6 +37,7 @@ interface ShouldShowStartupScreenArgs {
   isNoteWindow: boolean
   isStartupLoading: boolean
   onboardingState: StartupOnboardingState
+  loadError: string | null
   runtimeMissingVaultPath: string | null
   settingsLoaded: boolean
   shouldResumeFreshStartOnboarding: boolean
@@ -64,9 +66,10 @@ function shouldResumeFreshStart(
 function needsTelemetryConsent(
   isStartupLoading: boolean,
   settingsLoaded: boolean,
+  loadError: string | null,
   telemetryConsent: boolean | null,
 ): boolean {
-  return !isStartupLoading && settingsLoaded && telemetryConsent === null
+  return !isStartupLoading && settingsLoaded && loadError == null && telemetryConsent === null
 }
 
 function needsAiAgentsOnboarding(
@@ -82,6 +85,7 @@ function shouldShowStartupScreenForState({
   isNoteWindow,
   isStartupLoading,
   onboardingState,
+  loadError,
   runtimeMissingVaultPath,
   settingsLoaded,
   shouldResumeFreshStartOnboarding,
@@ -91,7 +95,7 @@ function shouldShowStartupScreenForState({
   if (isNoteWindow) return false
 
   const startupReasons = [
-    needsTelemetryConsent(isStartupLoading, settingsLoaded, telemetryConsent),
+    needsTelemetryConsent(isStartupLoading, settingsLoaded, loadError, telemetryConsent),
     Boolean(runtimeMissingVaultPath),
     onboardingState.status === 'welcome',
     onboardingState.status === 'vault-missing',
@@ -115,6 +119,7 @@ export function useStartupScreenState({
   aiAgentsPromptVisible,
   isNoteWindow,
   onboardingState,
+  loadError,
   runtimeMissingVaultPath,
   selectedVaultPath,
   settingsLoaded,
@@ -134,6 +139,7 @@ export function useStartupScreenState({
     isNoteWindow,
     isStartupLoading,
     onboardingState,
+    loadError,
     runtimeMissingVaultPath,
     settingsLoaded,
     shouldResumeFreshStartOnboarding,

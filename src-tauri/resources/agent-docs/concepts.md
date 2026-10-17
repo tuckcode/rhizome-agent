@@ -3,38 +3,37 @@
 Source: concepts/ai.md
 URL: /concepts/ai
 
-Rhizome lets you choose what runs Chat: Prime Agent or Rhizome's own engine. Whichever you use, the vault, the permissions and the saved memory stay the same.
+Chat runs on Rhizome's own engine (ADR-0187). Prime and Hermes are being removed as chat engines. Open Prime-locked chats keep that lock until closed. The vault, permissions, and saved memory stay the same.
 
 ## Terms on this page
 
 - **Agent loop:** the cycle that sends your message to a model, runs the tools the model asks for, and repeats until the answer is done.
 - **Engine:** what runs that loop for Chat.
 - **Model:** the language model the engine talks to, hosted or running locally.
-- **Tool:** an action the agent can take, such as creating a note or running a command.
+- **Tool:** an action the agent can take, such as reading a note or running a command.
 
-## Engines for Chat
+## Engine for Chat
 
-| Engine | What it is | Good for |
-|---|---|---|
-| **Prime Agent** (default) | A separate harness Rhizome connects to. It runs sessions, tools, skills and provider login | Real agent work today: reading, searching and editing files, long runs, Prime packages |
-| **Rhizome's engine** | Rhizome's own loop, built into the app. It doesn't need Prime | Choosing your own providers, including free models. Early: it can create notes, but can't read, search or edit files yet |
-
-Switch with **Chat engine** in Settings → AI Agents. When it's on, new chats use Rhizome's engine and never call Prime, even if Prime isn't installed. The switch is only in Settings, not in the message box.
+New chats use **Rhizome's engine**: the loop built into the app. It does not need Prime. You pick catalog providers or **Taproot**, and the vault tools below run against the open vault.
 
 ### Rhizome's engine
 
 - **Models:** pick a catalog model, or **Taproot**. See [Free models and routing](free-models-and-routing.md). Anthropic models aren't offered here yet.
-- **Tools:** `echo` and `create_note`. Power User adds `bash`. Rhizome asks you to approve each `bash` call, but `bash` doesn't run a shell yet. There are no tools to read, search or edit files, and the agent can't search the vault or old sessions.
+- **Tools:** see the table below. Read and search tools run without asking. Edits and shell commands ask first.
 - **Saved chats:** each chat is saved as it goes and can be reopened after you quit. Chats get a title automatically from the first exchange.
 - **Errors:** a problem that doesn't stop the turn shows as a notice in the chat. A problem that does stop it, such as a missing key, ends the turn with a message that says what to fix.
 
-### Prime Agent
+| Tool | What it does | When it runs |
+|---|---|---|
+| `read_file`, `list_dir`, `grep`, `glob` | Read and search files in the open vault and workspace | Auto in both permission modes. Paths outside those roots are refused |
+| `edit_file`, `write_file` | Change or create a file in those same roots | Asks every time unless you already allowed that tool and path for the session |
+| `create_note` | Create a new Markdown note without overwriting | Asks in Limited tools. Auto in Power User |
+| `bash` | Run one shell command with the vault as the working directory | Power User only. Asks every time. There is no session grant |
+| `echo` | Return its arguments | Auto |
 
-Prime runs as a background service (a daemon) that Rhizome connects to. Prime owns its sessions (`~/.prime/agent/sessions/`) and its packages (Settings → Packages). Packages can use the whole machine; a vault isn't a sandbox for them.
+`bash` really runs the command (`sh -c` on macOS and Linux, `cmd /S /C` on Windows). Default timeout is 60 seconds, capped at 300. The working directory cannot be chosen by the model. stdin is closed. Output is capped. See the Chat **Run command** card for the full command, then stdout and stderr after it finishes.
 
-Prime handles its own provider login. Sign in from Settings → AI Agents → Local agent, where each provider card (Anthropic, OpenAI Codex, xAI, DeepSeek and others) has a **Sign in** or **Reconnect** button. Or run `prime-agent` in a terminal and use `/login`. Prime's model list includes Anthropic models.
-
-The same tab lists **Recognized local agents**, Prime's default model, and which models Prime may use.
+Secret files (`.env*` except `.env.example`, `.git/`, key material) are blocked on the file tools. That denylist does not cover `bash`. Settings → AI Agents → Safety can turn the denylist off for **reads** only.
 
 ## Permission modes
 
@@ -42,20 +41,18 @@ A **permission mode** decides what the agent may do without asking. It's set per
 
 | Mode | Rhizome's engine |
 |---|---|
-| **Limited tools** | `echo` and `create_note`. Asks before each note it creates |
-| **Power User** | Creates notes without asking. Adds `bash`, which asks every time and doesn't run a shell yet |
-
-Prime has no sandbox, so Prime chats always run as Power User. While Prime is the default AI target, chats on Rhizome's engine also run as Power User.
+| **Limited tools** | Read and search auto-run. `create_note` asks. Edits ask. No `bash` |
+| **Power User** | Read, search, and `create_note` auto-run. Edits still ask unless a session grant covers that path. `bash` is offered and asks every time |
 
 ## Plugins
 
-Rhizome will have its own plugin system: add a tool, hook into a turn, or block a tool call. It's planned, not shipped. Today, Prime packages extend Prime, and MCP lets other apps use your vault.
+Rhizome will have its own plugin system: add a tool, hook into a turn, or block a tool call. It's planned, not shipped. Today, MCP lets other apps use your vault.
 
 ## Let other apps use your vault (MCP)
 
 **MCP** (Model Context Protocol) lets other AI apps call Rhizome's tools. With it, an MCP client such as Claude Code or Cursor can read and write your vault.
 
-Run **Set Up External AI Tools…** from the command palette (⌘K). Rhizome shows which config files it will change (for example `~/.claude.json` and `~/.cursor/mcp.json`) and writes nothing until you confirm. It needs Node.js 18 or newer, or Bun, on your `PATH`. To paste the entry yourself, use **Copy MCP config** in Settings → AI Agents → Local agent.
+Run **Set Up External AI Tools…** from the command palette (⌘K). Rhizome shows which config files it will change (for example `~/.claude.json` and `~/.cursor/mcp.json`) and writes nothing until you confirm. It needs Node.js 18 or newer, or Bun, on your `PATH`. To paste the entry yourself, use **Copy MCP config** on Settings → AI Agents (`ai.panel.copyMcpConfig`).
 
 ## Review what the agent changed
 
@@ -191,7 +188,7 @@ Each step has a 45-second budget for retries. Your own endpoint is still tried a
 - Free tiers change. A provider's limits, terms and models are set by that provider, not by Rhizome.
 - Some free tiers are for prototyping and evaluation only.
 - Settings doesn't show each provider's terms or training policy. Models that train on prompts are left out automatically, but check a provider's terms yourself before using it for real work.
-- Anthropic models aren't offered by Rhizome's own engine yet. To use Claude, use Prime and sign in on the Anthropic card in Settings → AI Agents → Local agent. See [Agents, engines and models](ai.md).
+- Anthropic models are not offered by Rhizome's own engine yet. See [Agents, engines and models](ai.md).
 
 ## Credits
 
@@ -663,7 +660,7 @@ The agent's long-term memory is your vault: a folder of Markdown files you can r
 
 1. **Chat.** You and the agent work on something. Chat transcripts are working memory. They live with the session, not in the vault.
 2. **Save.** Under a reply worth keeping, click **Save to vault**. Rhizome writes a Markdown note.
-3. **Recall.** With Prime as the engine, the agent can search and open vault notes in later chats. An answer built on a note shows it came from your vault. Rhizome's own engine can't read or search the vault yet.
+3. **Recall.** The native engine can search and open vault notes in later chats with `grep`, `read_file`, `list_dir`, and `glob`.
 4. **Review.** Open, edit or delete the note like any other. With Git, look at its history and revert a change.
 
 ## Save to vault
@@ -763,7 +760,7 @@ Vault-level information should travel with the vault. Machine-specific preferenc
 | Saved views | Window size |
 | Pinned properties | Recent vault list |
 | Relationship conventions | Local cache |
-| Vault AI guidance files (`AGENTS.md`, `CLAUDE.md`) | AI target and Chat engine |
+| Vault AI guidance files (`AGENTS.md`, `CLAUDE.md`) | AI model target |
 | Permission mode | Provider keys (in the system keychain) |
 | Auto-save chat knowledge setting | Chat logs from Rhizome's engine (`native-sessions/`) |
 

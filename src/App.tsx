@@ -256,7 +256,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     void openExternalUrl(RHIZOME_DOCS_URL)
   }, [])
   const networkStatus = useNetworkStatus()
-  const { settings, loaded: settingsLoaded, saveSettings } = useSettings()
+  const { settings, loaded: settingsLoaded, loadError, saveSettings, saveSettingsPatch, saveNativeChatTarget } = useSettings()
   const primeActiveClose = usePrimeActiveClose()
 
   // onSwitch closure captures `notes` declared below — safe because it's only
@@ -1863,6 +1863,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     aiAgentsPromptVisible: aiAgentsOnboarding.showPrompt,
     isNoteWindow: Boolean(noteWindowParams),
     onboardingState: onboarding.state,
+    loadError,
     runtimeMissingVaultPath,
     selectedVaultPath,
     settingsLoaded,
@@ -2090,7 +2091,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       chatEngine={settingsLoaded ? chatEngine : undefined}
       nativeTarget={settingsLoaded ? settings.native_chat_target ?? undefined : undefined}
       conversationSettings={settings.ai_workspace_conversations ?? null}
-      conversationSettingsReady={settingsLoaded}
+      conversationSettingsReady={settingsLoaded && loadError == null}
       defaultAiAgent={aiAgentPreferences.defaultAiAgent}
       defaultAiTarget={aiAgentPreferences.defaultAiTarget}
       defaultAiAgentReadiness={aiAgentPreferences.defaultAiAgentReadiness}
@@ -2132,8 +2133,10 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         locale={appLocale}
         noteWindowParams={noteWindowParams}
         onboarding={onboarding}
+        loadError={loadError}
         runtimeMissingVaultPath={runtimeMissingVaultPath}
         saveSettings={saveSettings}
+        saveSettingsPatch={saveSettingsPatch}
         settings={settings}
         settingsLoaded={settingsLoaded}
         shouldResumeFreshStartOnboarding={shouldResumeFreshStartOnboarding}
@@ -2264,7 +2267,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         chatEngine={chatEngine}
         chatEngineSettled={settingsLoaded}
         nativeTarget={settings.native_chat_target}
-        onNativeTargetChange={(target) => saveSettings({ ...settings, native_chat_target: target })}
+        onNativeTargetChange={(target) => { void saveNativeChatTarget(target) }}
         aiModelProviders={settings.ai_model_providers}
         onExit={() => handleSetViewModeWithNotes(chatCentered ? 'all' : 'editor-list')}
         vaultPath={activeEditorVaultPath}
@@ -2724,7 +2727,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           onCommit={conflictResolver.commitResolution}
           onClose={conflictFlow.handleCloseConflictResolver}
         />
-        <SettingsPanel open={dialogs.showSettings} initialSectionId={settingsInitialSectionId} settings={settings} aiAgentsStatus={aiAgentsStatus} locale={appLocale} systemLocale={systemLocale} vaults={vaultSwitcher.allVaults} activeVaultPath={resolvedPath} defaultWorkspacePath={vaultSwitcher.defaultWorkspacePath} onSetDefaultWorkspace={vaultSwitcher.setDefaultWorkspace} onRemoveVault={vaultSwitcher.removeVault} onReorderVaults={vaultSwitcher.reorderVaults} onUpdateWorkspaceIdentity={vaultSwitcher.updateWorkspaceIdentity} isGitVault={gitRepoState !== 'missing'} onSave={saveSettings} onCopyMcpConfig={mcpSetupDialog.copyManualConfig} explicitOrganizationEnabled={explicitOrganizationEnabled} onSaveExplicitOrganization={handleSaveExplicitOrganization} inboxAutomationEnabled={isInboxAutomationEnabled(vaultConfig.inbox_automation_enabled)} onSaveInboxAutomation={(enabled) => updateConfig('inbox_automation_enabled', enabled)} onAdoptPortentTypes={() => { void handleAdoptPortentTypes() }} onOpenFeedback={openFeedback} onOpenDocs={openDocs} onClose={dialogs.closeSettings} />
+        <SettingsPanel open={dialogs.showSettings} initialSectionId={settingsInitialSectionId} settings={settings} aiAgentsStatus={aiAgentsStatus} locale={appLocale} systemLocale={systemLocale} vaults={vaultSwitcher.allVaults} activeVaultPath={resolvedPath} defaultWorkspacePath={vaultSwitcher.defaultWorkspacePath} onSetDefaultWorkspace={vaultSwitcher.setDefaultWorkspace} onRemoveVault={vaultSwitcher.removeVault} onReorderVaults={vaultSwitcher.reorderVaults} onUpdateWorkspaceIdentity={vaultSwitcher.updateWorkspaceIdentity} isGitVault={gitRepoState !== 'missing'} onSave={saveSettings} onSavePatch={saveSettingsPatch} loadError={loadError} onCopyMcpConfig={mcpSetupDialog.copyManualConfig} explicitOrganizationEnabled={explicitOrganizationEnabled} onSaveExplicitOrganization={handleSaveExplicitOrganization} inboxAutomationEnabled={isInboxAutomationEnabled(vaultConfig.inbox_automation_enabled)} onSaveInboxAutomation={(enabled) => updateConfig('inbox_automation_enabled', enabled)} onAdoptPortentTypes={() => { void handleAdoptPortentTypes() }} onOpenFeedback={openFeedback} onOpenDocs={openDocs} onClose={dialogs.closeSettings} />
         <PrimeActiveCloseDialog
           open={primeActiveClose.open}
           locale={appLocale}

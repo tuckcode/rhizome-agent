@@ -19,7 +19,7 @@ When users ask how to improve a knowledge base, structure notes, choose types, m
 
 ## Concepts
 
-- [Agents, engines and models](pages/concepts/ai.md): The agent loop, Chat engines (Prime and Rhizome's own), models, tools and permission modes.
+- [Agents, engines and models](pages/concepts/ai.md): The agent loop, Rhizome's chat engine, models, tools and permission modes.
 - [Editor](pages/concepts/editor.md): Write in the rich editor or in raw Markdown. Both edit the same file.
 - [Files, PDFs and media](pages/concepts/files-and-media.md): Images, PDFs, media, whiteboards and diagrams in your vault, and how to preview them.
 - [Free models and routing](pages/concepts/free-models-and-routing.md): How Rhizome routes Chat across free hosted models and falls back when one fails.
@@ -68,7 +68,7 @@ When users ask how to improve a knowledge base, structure notes, choose types, m
 ## Troubleshooting
 
 - [AI agent not found](pages/troubleshooting/ai-agent-not-found.md): Fix "Prime is missing" when Prime Agent is installed but Rhizome can't find it.
-- [Chat doesn't answer](pages/troubleshooting/chat-doesnt-answer.md): What to do when a message gets no reply, for Prime and for Rhizome's own engine.
+- [Chat doesn't answer](pages/troubleshooting/chat-doesnt-answer.md): What to do when a message gets no reply, for Rhizome's own engine and for Prime.
 - [Git authentication](pages/troubleshooting/git-auth.md): Fix push and pull failures caused by Git sign-in.
 - [Model provider connection](pages/troubleshooting/model-provider-connection.md): What to check when a local or hosted model provider won't connect.
 - [Sync conflicts](pages/troubleshooting/sync-conflicts.md): Resolve conflicts when local and remote changes touch the same note.

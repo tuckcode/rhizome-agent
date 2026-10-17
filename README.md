@@ -5,7 +5,7 @@
 
 A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own.
 
-This is a developer preview. There is no signed download. Prime is an optional engine and the current Chat default. Hermes is a planned adapter, not a usable engine in the app today. You read and diff notes in the app. The agent cannot search the vault or old Mycelium sessions yet.
+This is a developer preview. There is no signed download. Chat runs on Rhizome's own engine (ADR-0187). Prime and Hermes are being removed. Hermes is not a usable engine in the app today. You read and diff notes in the app. The native engine can read, search, and edit vault files. It cannot search old Mycelium sessions.
 
 | | |
 |---|---|
@@ -21,11 +21,11 @@ cd rhizome-agent
 pnpm tauri dev
 ```
 
-`./install.sh` installs this repo and fetches Prime Agent when that program is not already on the machine. Settings still starts Chat on Prime until you switch **Chat engine** to Rhizome's own engine. Native chat does not need Prime. The script still downloads the Prime command-line tool because that default is Prime.
+`./install.sh` installs this repo and may fetch Prime Agent when that program is not already on the machine. Chat runs on Rhizome's own engine (ADR-0187). Native chat does not need Prime. The script may still download the Prime command-line tool for legacy optional-engine support.
 
 The full list of tools, the first minute in the app, and what to do when it fails: [Getting started](docs/start/README.md).
 
-`prime-agent` stops when that terminal closes. To leave it running (only if you use the Prime engine):
+`prime-agent` stops when that terminal closes. To leave it running (legacy Prime-locked chats or CLI use only):
 
 ```bash
 (prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status
@@ -57,14 +57,14 @@ The copy-paste block, and a one-line version, live on their own page: [Agent ins
 
 The full rules for an agent that edits this tree are in [AGENTS.md](AGENTS.md).
 
-Rhizome owns the chat loop. Prime is an optional engine. Rhizome reaches the vault through MCP when a vault is attached and Prime is the engine. The native engine can create a note; it cannot search the vault yet.
+Rhizome owns the chat loop (ADR-0187). Rhizome reaches the vault through MCP when a vault is attached. The native engine can read, search, edit, and create notes in the open vault, and can run a Power User shell command after approval.
 
 | | |
 |---|---|
 | Product | Rhizome |
 | Bundle id | `ai.rhizome.agent` |
 | Package | `rhizome-agent` |
-| Chat | Rhizome's engine, or Prime if you switch to it |
+| Chat | Rhizome's engine only (ADR-0187) |
 | Notes | Plain Markdown, in a local vault you open |
 
 Names and remotes: [`docs/IDENTITY.md`](docs/IDENTITY.md).
