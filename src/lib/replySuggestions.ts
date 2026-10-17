@@ -54,13 +54,14 @@ const MAX_OPTION_LENGTH = 40
 export function suggestReply(agentMessage: string): ReplySuggestion | null {
   const trimmed = agentMessage.trim()
 
-  // A consent offer split across lines or bullets is not a closed choice.
-  // The ghost grammar also rejects that shape; do not turn it into pills.
+  // A newline or bullet inside the offer sentence is not a closed choice.
+  // A blank line before that sentence does not count.
+  const offerSentence = lastSentenceOf(trimmed)
   if (
-    /[\n\r]/.test(trimmed)
+    /[\n\r]/.test(offerSentence)
     && (
-      /\b(?:want me to|shall i|should i|would you like me to)\b/i.test(trimmed)
-      || /\bi can\b[\s\S]+?\bif you(?:'d| would) like/i.test(trimmed)
+      /\b(?:want me to|shall i|should i|would you like me to)\b/i.test(offerSentence)
+      || /\bi can\b[\s\S]+?\bif you(?:'d| would) like/i.test(offerSentence)
     )
   ) {
     return null

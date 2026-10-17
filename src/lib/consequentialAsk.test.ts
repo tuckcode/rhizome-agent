@@ -433,7 +433,7 @@ const STILL_GHOST: ReadonlyArray<readonly [string, string | null]> = [
   ['Want me to proofread the draft?', 'Yes — proofread the draft'],
   ['Want me to polish the intro?', 'Yes — polish the intro'],
   ['Want me to format the paragraph?', 'Yes — format the paragraph'],
-  ['Want me to format the list?', null],
+  ['Want me to format the list?', 'Yes — format the list'],
   ['Want me to translate it?', 'Yes — translate it'],
   ['Want me to write a poem?', 'Yes — write a poem'],
   ['Want me to add a TL;DR?', 'Yes — add a TL;DR'],

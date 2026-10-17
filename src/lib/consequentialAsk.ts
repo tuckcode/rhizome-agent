@@ -134,10 +134,10 @@ const GHOST_ADJECTIVES = new Set(['second', 'main', 'new', 'short', 'next', 'qui
 const IT_VERBS = new Set(['explain', 'summarize', 'summarise', 'translate'])
 const THIS_VERBS = new Set(['summarize', 'summarise', 'translate'])
 
-const SECRET_OBJECT = /\.env\b|\.pem\b|\bapi ?keys?\b|\bapikeys?\b|\bprivate ?keys?\b|\bprivatekeys?\b|\bpasswords?\b|\btokens?\b|\baccesstokens?\b|\bsecrets?\b|\bcredentials?\b|\bssh\b|\bid_rsa\b|\bkeychain\b/i
 const TAIL_STOP = new Set([
   'and', 'then', 'or', 'also', 'plus', 'but', 'so', 'to', 'by', 'before', 'after', 'while',
   'it', 'them', 'this', 'that', 'all', 'every', 'each', 'everything',
+  'purge', 'trash', 'erase', 'truncate', 'now', 'please', 'go', 'ahead', 'proceed', 'yes', 'do',
 ])
 const EXPLAIN_STOP = new Set([
   ...TAIL_STOP,
@@ -145,13 +145,22 @@ const EXPLAIN_STOP = new Set([
   'it', 'them', 'this', 'that', 'all', 'every', 'each', 'now',
 ])
 const DENY_WORD = /^(?:push|delete|remove|drop|deploy|ship|merge|pay|send|post|rm|run|migrate|apply|wipe|reset|force|publish|sync|overwrite|commit|rebase|revert|execute|approve|install|kill)\w*$/i
-const JOINED_SECRET = /^(?:apikey|apikeys|privatekey|privatekeys|accesstoken|accesstokens|password|passwords|secret|secrets|token|tokens|credentials|credential)$/i
 const LANGUAGES = new Set([
   'english', 'french', 'spanish', 'german', 'italian', 'portuguese', 'dutch',
   'japanese', 'chinese', 'korean', 'russian', 'arabic', 'hindi', 'polish', 'swedish',
 ])
-const SINGULAR_EDIT_OBJECTS = new Set(['note', 'section', 'intro', 'introduction', 'paragraph', 'typo'])
+const SINGULAR_EDIT_OBJECTS = new Set([
+  'note', 'section', 'intro', 'introduction', 'paragraph', 'typo',
+  'draft', 'outline', 'summary', 'conclusion', 'list', 'tldr',
+])
 const SINGULAR_EDIT_VERBS = new Set(['rewrite', 'edit', 'format', 'fix'])
+const WRITE_DETERMINER_VERBS = new Set([
+  ...SINGULAR_EDIT_VERBS,
+  'shorten', 'simplify', 'polish', 'rephrase', 'continue',
+  'elaborateon', 'expandon', 'translate', 'add', 'write', 'writeup', 'jotdown',
+])
+const EXPLAIN_TOOLS = new Set(['git', 'npm', 'pnpm', 'docker', 'rm', 'sudo', 'kubectl'])
+const EXPLAIN_APPROVAL = new Set(['go', 'ahead', 'please', 'proceed', 'yes', 'do', 'now'])
 const NO_THREAD_TEXT_NAME = new Set(['add', 'write', 'edit', 'writeup'])
 
 function visibleClause(raw: string): string | null {
@@ -177,7 +186,7 @@ function ghostHasStructuralBreak(text: string): boolean {
 
 function ghostTokens(display: string): string[] | null {
   if (ghostHasStructuralBreak(display)) return null
-  if (SECRET_OBJECT.test(display)) return null
+  if (looksSecret(display)) return null
   let text = display.toLowerCase()
   text = text.replace(/\bq&a\b/g, ' qa ')
   text = text.replace(/\bc\+\+/g, ' cplusplus ')
@@ -205,7 +214,8 @@ function ghostTokens(display: string): string[] | null {
   return text.split(' ')
 }
 
-function ghostGrammarAccepts(display: string): boolean {
+function ghostGrammarAccepts(display: string, fullMessage?: string): boolean {
+  if (isSensitiveNoteClause(display) && looksSecret(fullMessage ?? display)) return false
   const tokens = ghostTokens(display)
   if (!tokens || tokens.length === 0) return false
   const verb = tokens[0]
@@ -218,13 +228,12 @@ function ghostGrammarAccepts(display: string): boolean {
     if (tokens[index] !== 'thatmentions') return false
     index += 1
     const tail = tokens.slice(index)
-    if (tail.length < 1 || tail.length > 3) return false
+    if (tail.length < 1 || tail.length > 2) return false
+    if (looksSecret(tail.join(' '))) return false
     return tail.every((token) => (
       /^[a-z0-9]+$/.test(token)
       && !TAIL_STOP.has(token)
       && !DENY_WORD.test(token)
-      && !JOINED_SECRET.test(token)
-      && !SECRET_OBJECT.test(token)
     ))
   }
   if (!GHOST_VERBS.has(verb)) return false
@@ -252,8 +261,10 @@ function ghostGrammarAccepts(display: string): boolean {
   } else if (verb === 'fix' && !FIX_OBJECTS.has(object)) {
     return false
   }
+  if (WRITE_DETERMINER_VERBS.has(verb) && (determiner === 'my' || determiner === 'these' || determiner === 'those')) {
+    return false
+  }
   if (SINGULAR_EDIT_VERBS.has(verb)) {
-    if (determiner === 'my' || determiner === 'these' || determiner === 'those') return false
     if (!SINGULAR_EDIT_OBJECTS.has(object)) return false
   }
   if (NO_THREAD_TEXT_NAME.has(verb) && (object === 'thread' || object === 'text' || object === 'name' || object === 'names')) {
@@ -268,6 +279,51 @@ function ghostGrammarAccepts(display: string): boolean {
 
 function prepareText(text: string): string {
   return text.normalize('NFKC').replace(/\p{Cf}/gu, '').replace(/[’‘]/g, "'")
+}
+
+/**
+ * A secret, a raw credential, or inline code anywhere in the text.
+ * Boundaries are letters only, so API_KEY and access_token still match.
+ */
+export function looksSecret(text: string): boolean {
+  const prepared = prepareText(text)
+  if (/```/.test(prepared) || /`[^`\n]+`/.test(prepared)) return true
+  if (/[A-Za-z0-9_]+\s*=\s*\S/.test(prepared)) return true
+  if (/[A-Za-z0-9_-]{16,}/.test(prepared)) return true
+  if (/(?<![a-z0-9])sk-live-/i.test(prepared)) return true
+  if (/(?<![a-z0-9])sk-/i.test(prepared)) return true
+  if (/(?<![a-z0-9])(?:ghp_|gho_|github_pat_)/i.test(prepared)) return true
+  if (/(?<![a-z])akia/i.test(prepared)) return true
+  if (/(?<![a-z])bearer(?![a-z])/i.test(prepared)) return true
+  if (/(?<![a-z0-9])eyj/i.test(prepared)) return true
+  const lower = prepared.toLowerCase()
+  if (/(?<![a-z])p@sswords?(?![a-z])/.test(lower)) return true
+  if (/(?<![a-z])pass words?(?![a-z])/.test(lower)) return true
+  if (/(?<![a-z])api[_ ]?keys?(?![a-z])/.test(lower)) return true
+  if (/(?<![a-z])private[_ ]?keys?(?![a-z])/.test(lower)) return true
+  if (/(?<![a-z])passwords?(?![a-z])/.test(lower)) return true
+  if (/(?<![a-z])passphrases?(?![a-z])/.test(lower)) return true
+  if (/(?<![a-z])passwd(?![a-z])/.test(lower)) return true
+  if (/(?<![a-z])pwd(?![a-z])/.test(lower)) return true
+  if (/(?<![a-z])pins?(?![a-z])/.test(lower)) return true
+  if (/(?<![a-z])otp(?![a-z])/.test(lower)) return true
+  if (/(?<![a-z])recovery[_ ]codes?(?![a-z])/.test(lower)) return true
+  if (/(?<![a-z])seed[_ ]phrases?(?![a-z])/.test(lower)) return true
+  if (/(?<![a-z])mnemonics?(?![a-z])/.test(lower)) return true
+  if (/(?<![a-z])tokens?(?![a-z])/.test(lower)) return true
+  if (/(?<![a-z])secrets?(?![a-z])/.test(lower)) return true
+  if (/(?<![a-z])credentials?(?![a-z])/.test(lower)) return true
+  if (/(?<![a-z])keys?(?![a-z])/.test(lower)) return true
+  if (/(?<![a-z])ssh(?![a-z])/.test(lower)) return true
+  if (/(?<![a-z0-9])id_rsa(?![a-z0-9])/.test(lower)) return true
+  if (/(?<![a-z])keychain(?![a-z])/.test(lower)) return true
+  if (/\.env(?![a-z])/i.test(lower) || /\.pem(?![a-z])/i.test(lower)) return true
+  return false
+}
+
+function isSensitiveNoteClause(display: string): boolean {
+  const clause = display.toLowerCase().replace(/\s+/g, ' ')
+  return /\b(?:make a note|create a note|jot down|jot this down|jot that down|note this down|note that down|note down)\b/.test(clause)
 }
 
 function clauseWords(action: string): string[] {
@@ -417,28 +473,57 @@ export function captureActionClause(sentence: string): string | null {
  * the sentence is not an approval offer.
  */
 function explainTopicOk(topic: string): boolean {
-  const parts = topic.split(' ')
+  const parts = topic.split(' ').filter((word) => word.length > 0)
   if (parts.length < 1 || parts.length > 5) return false
-  if (parts.some((word) => EXPLAIN_STOP.has(word) || !/^[a-z0-9]+$/.test(word))) return false
+  if (parts.some((word) => EXPLAIN_STOP.has(word) || EXPLAIN_APPROVAL.has(word) || !/^[a-z0-9]+$/.test(word))) {
+    return false
+  }
   if (/\w+ing\b/.test(topic)) return false
-  if (SECRET_OBJECT.test(topic)) return false
+  if (looksSecret(topic)) return false
+  const denyAt = parts.flatMap((word, index) => DENY_WORD.test(word) ? [index] : [])
+  if (denyAt.length > 1) return false
+  if (denyAt.length === 1) {
+    const at = denyAt[0] ?? 0
+    const next = parts[at + 1]
+    if (next === 'the' || next === 'a' || next === 'an') return false
+    const previous = parts[at - 1]
+    const afterTool = previous !== undefined && EXPLAIN_TOOLS.has(previous)
+    const isTool = EXPLAIN_TOOLS.has(parts[at] ?? '')
+    const isLast = at === parts.length - 1
+    if (!isLast && !afterTool && !isTool) return false
+    if (!isLast) {
+      for (let index = at + 1; index < parts.length; index += 1) {
+        const word = parts[index] ?? ''
+        if (
+          DENY_WORD.test(word)
+          || EXPLAIN_APPROVAL.has(word)
+          || word === 'the'
+          || word === 'a'
+          || word === 'an'
+        ) {
+          return false
+        }
+      }
+    }
+  }
   return true
 }
 
 /** Narrow restores for clauses the closed grammar does not already accept. */
 function restoreGhostClause(display: string, fullMessage?: string): boolean {
-  if (ghostHasStructuralBreak(display) || SECRET_OBJECT.test(display)) return false
+  if (ghostHasStructuralBreak(display) || looksSecret(display)) return false
+  if (isSensitiveNoteClause(display) && looksSecret(fullMessage ?? display)) return false
   const clause = display.toLowerCase().replace(/\s+/g, ' ')
     .replace(/\bwrite-up\b/g, 'write up')
     .replace(/\bre-write\b/g, 'rewrite')
     .trim()
-  if (/^read the readme(?: md)?$/.test(clause)) return true
+  if (/^read the readme(?:\.md| md)?$/.test(clause)) return true
   const explained = clause.match(/^explain (?:how )?(.+?)(?: works)?$/)
   if (explained?.[1] && explainTopicOk(explained[1])) return true
   if (/^write up the (?:meeting |call |standup |interview |lecture )?(?:notes|summary)$/.test(clause)) return true
   if (/^(?:make a note of (?:this|that)|jot (?:this|that) down|note (?:this|that) down)$/.test(clause)) {
     const source = fullMessage ?? display
-    if (SECRET_OBJECT.test(source) || /```/.test(source)) return false
+    if (looksSecret(source)) return false
     return true
   }
   if (/^find (?:related|similar) notes$/.test(clause)) return true
@@ -467,7 +552,7 @@ function approvalCompletionText(sentence: string, fullMessage?: string): string 
   const clause = visibleClause(found.clause)
   if (!clause) return null
   const swapped = swapListenerPossessives(clause)
-  if (!ghostGrammarAccepts(swapped) && !restoreGhostClause(swapped, fullMessage)) return null
+  if (!ghostGrammarAccepts(swapped, fullMessage) && !restoreGhostClause(swapped, fullMessage)) return null
   return `Yes — ${swapped}`
 }
 
@@ -478,7 +563,7 @@ function nextStepCompletion(sentence: string, fullMessage?: string): string | nu
   if (!match?.[1]) return null
   const original = match[1].replace(/[.]+$/, '').trim()
   const echo = swapListenerPossessives(original)
-  if (!ghostGrammarAccepts(echo) && !restoreGhostClause(echo, fullMessage)) return null
+  if (!ghostGrammarAccepts(echo, fullMessage) && !restoreGhostClause(echo, fullMessage)) return null
   return echo.charAt(0).toUpperCase() + echo.slice(1)
 }
 

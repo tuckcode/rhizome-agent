@@ -333,6 +333,14 @@ describe('suggestReply', () => {
       expect(suggestReply('Want me to:\n- draft the note\n- push it?')).toBeNull()
       expect(suggestReply('Would you like me to draft the note\nand push it?')).toBeNull()
       expect(suggestReply('I can draft the note\nif you would like.')).toBeNull()
+      expect(suggestReply("Here's the plan.\n\nWant me to draft the note?")).toEqual({
+        kind: 'completion',
+        text: 'Yes — draft the note',
+      })
+      expect(suggestReply('I fixed the bug and wrote tests.\n\nShall I draft the summary?')).toEqual({
+        kind: 'completion',
+        text: 'Yes — draft the summary',
+      })
     })
 
     it('echoes_a_harmless_next_step', () => {
