@@ -42,3 +42,57 @@
 :root:not([data-theme='light']) {
   --sl-color-text-invert: #0f110c;
 }
+
+/*
+ * Selected sidebar item: a neutral fill and normal text, not a solid mint
+ * (dark) or forest (light) block. Optional 2px accent on the leading edge.
+ * Do not remap the --sl-color-* scale here.
+ */
+.sidebar-content a[aria-current='page'],
+.sidebar-content a[aria-current='page']:hover,
+.sidebar-content a[aria-current='page']:focus {
+  color: var(--sl-color-text);
+  background-color: var(--sl-color-gray-6);
+  box-shadow: inset 2px 0 0 var(--sl-color-accent);
+}
+
+/* Sidebar group labels and On this page: gray-2 is ≥4.5:1 in both themes. */
+.sidebar-content summary,
+.sidebar-content .group-label,
+.sidebar-content .group-label span {
+  color: var(--sl-color-gray-2);
+}
+
+.right-sidebar-panel a,
+starlight-toc a {
+  color: var(--sl-color-gray-2);
+}
+
+.right-sidebar-panel a[aria-current='true'],
+starlight-toc a[aria-current='true'] {
+  color: var(--sl-color-white);
+}
+
+/*
+ * Light: inline code chips and code-block frames need one step more fill
+ * than beige --sl-color-black (#f1ece2), and a border of ≥3:1 (#857b66).
+ */
+:root[data-theme='light'] {
+  --sl-color-bg-inline-code: #ddd4c0;
+}
+
+:root[data-theme='light'] .sl-markdown-content :not(pre) > code {
+  border: 1px solid #857b66;
+}
+
+:root[data-theme='light'] .expressive-code {
+  --ec-brdCol: #857b66;
+  --ec-frm-edBg: #e6decc;
+  --ec-frm-trmBg: #e6decc;
+}
+
+:root[data-theme='light'] .expressive-code .frame,
+:root[data-theme='light'] .expressive-code pre {
+  border-color: #857b66;
+  background-color: #e6decc;
+}
