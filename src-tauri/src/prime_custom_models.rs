@@ -32,14 +32,20 @@ pub fn models_json_path() -> Option<PathBuf> {
 
 /// One Nous `/v1/models` record, reduced to the fields Prime stores.
 ///
-/// `reasoning` on the wire is an object when the model can think, and absent
-/// when it cannot. Prime stores a boolean. `input` is only `text` and `image`.
+/// `reasoning` is tri-state. `supported_parameters` decides yes or no. The
+/// `reasoning` object only adds efforts and `mandatory`. A missing
+/// `supported_parameters` list is unknown (`None`), not false. Prime stores
+/// `true` or `false` and omits the field when the value is unknown. `input`
+/// is only `text` and `image`.
 /// Nous also sends video, file, and audio. Those tokens are dropped. Prime's
 /// schema rejects them, and a rejected file hides the whole provider.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NousCatalogModel {
     pub id: String,
-    pub reasoning: bool,
+    /// `Some(true)` when `supported_parameters` contains `"reasoning"`.
+    /// `Some(false)` when that list is present and does not. `None` when the
+    /// list is missing: unknown, not a negative.
+    pub reasoning: Option<bool>,
     pub input: Vec<String>,
     pub thinking_level_map: Option<Value>,
 }
@@ -77,18 +83,19 @@ fn catalog_model_from_record(entry: &Value) -> Option<NousCatalogModel> {
     })
 }
 
-fn record_supports_reasoning(entry: &Value) -> bool {
-    match entry.get("reasoning") {
-        Some(Value::Bool(value)) => *value,
-        Some(Value::Object(_)) => true,
-        _ => false,
-    }
+fn record_supports_reasoning(entry: &Value) -> Option<bool> {
+    crate::hermes_reasoning::parse_openrouter_reasoning_capabilities(entry)
+        .map(|caps| caps.supports_reasoning)
 }
 
 /// Map listed efforts to Prime levels. Hide all unlisted levels.
 /// Keep Prime defaults when no efforts are listed. Hide `off` if mandatory.
+/// No map unless `supported_parameters` says the model accepts reasoning.
 fn thinking_level_map(item: &Value) -> Option<Value> {
     const PRIME_EFFORT_LEVELS: [&str; 6] = ["minimal", "low", "medium", "high", "xhigh", "max"];
+    if record_supports_reasoning(item) != Some(true) {
+        return None;
+    }
     let reasoning = item.get("reasoning")?.as_object()?;
     let mut map = serde_json::Map::new();
     if reasoning.get("mandatory") == Some(&Value::Bool(true)) {
@@ -165,9 +172,11 @@ fn models_file_with_nous(mut root: Value, models: &[NousCatalogModel]) -> Value 
         .map(|model| {
             let mut entry = json!({
                 "id": model.id,
-                "reasoning": model.reasoning,
                 "input": model.input,
             });
+            if let Some(reasoning) = model.reasoning {
+                entry["reasoning"] = json!(reasoning);
+            }
             if let Some(map) = &model.thinking_level_map {
                 entry["thinkingLevelMap"] = map.clone();
             }
@@ -273,7 +282,7 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn row(id: &str, reasoning: bool, input: &[&str]) -> NousCatalogModel {
+    fn row(id: &str, reasoning: Option<bool>, input: &[&str]) -> NousCatalogModel {
         NousCatalogModel {
             id: id.to_string(),
             reasoning,
@@ -289,6 +298,7 @@ mod tests {
                 { "id": "  " },
                 {
                     "id": "z-ai/glm-5.3-flash",
+                    "supported_parameters": ["reasoning"],
                     "reasoning": { "mandatory": true, "supported_efforts": ["max", "high", "low"] },
                     "architecture": { "input_modalities": ["text", "image", "video"] }
                 },
@@ -312,17 +322,17 @@ mod tests {
         assert_eq!(
             nous_catalog_models(&body),
             vec![
-                row("acme/flag", false, &["text"]),
-                row("acme/pictor-1", true, &["image"]),
-                row("baai/bge-m3", false, &["text"]),
+                row("acme/flag", None, &["text"]),
+                row("acme/pictor-1", None, &["image"]),
+                row("baai/bge-m3", None, &["text"]),
                 NousCatalogModel {
                     thinking_level_map: Some(json!({
                         "off": null, "minimal": null, "low": "low", "medium": null,
                         "high": "high", "xhigh": null, "max": "max"
                     })),
-                    ..row("z-ai/glm-5.3-flash", true, &["text", "image"])
+                    ..row("z-ai/glm-5.3-flash", Some(true), &["text", "image"])
                 },
-                row("~anthropic/claude-opus-latest", false, &["text"]),
+                row("~anthropic/claude-opus-latest", None, &["text"]),
             ]
         );
     }
@@ -331,6 +341,7 @@ mod tests {
     fn image_input_and_mandatory_efforts_survive_the_file_write() {
         let models = nous_catalog_models(&json!({ "data": [{
             "id": "acme/vision",
+            "supported_parameters": ["reasoning"],
             "architecture": { "input_modalities": ["text", "image", "video"] },
             "reasoning": { "mandatory": true, "supported_efforts": ["high", "xhigh"] }
         }] }));
@@ -354,10 +365,11 @@ mod tests {
     fn maps_advertised_efforts_onto_prime_levels() {
         let model = catalog_model_from_record(&json!({
             "id": "deepseek/deepseek-v4-flash",
+            "supported_parameters": ["reasoning"],
             "reasoning": { "mandatory": false, "supported_efforts": ["xhigh", "high"] }
         }))
         .unwrap();
-        assert!(model.reasoning);
+        assert_eq!(model.reasoning, Some(true));
         assert_eq!(
             model.thinking_level_map,
             Some(json!({
@@ -370,7 +382,9 @@ mod tests {
     #[test]
     fn mandatory_reasoning_cannot_be_turned_off() {
         let model = catalog_model_from_record(&json!({
-            "id": "acme/mandatory", "reasoning": { "mandatory": true }
+            "id": "acme/mandatory",
+            "supported_parameters": ["reasoning"],
+            "reasoning": { "mandatory": true }
         }))
         .unwrap();
         assert_eq!(model.thinking_level_map, Some(json!({"off": null})));
@@ -383,10 +397,13 @@ mod tests {
             json!({"supported_efforts": []}),
             json!(true),
         ] {
-            let model =
-                catalog_model_from_record(&json!({"id": "acme/default", "reasoning": reasoning}))
-                    .unwrap();
-            assert!(model.reasoning);
+            let model = catalog_model_from_record(&json!({
+                "id": "acme/default",
+                "supported_parameters": ["reasoning"],
+                "reasoning": reasoning
+            }))
+            .unwrap();
+            assert_eq!(model.reasoning, Some(true));
             assert_eq!(model.thinking_level_map, None);
             let merged = merge_nous_portal(&Value::Null, &[model]).unwrap();
             assert!(merged["providers"]["nous-portal"]["models"][0]
@@ -396,7 +413,7 @@ mod tests {
     }
 
     #[test]
-    fn a_model_without_reasoning_stays_off() {
+    fn supported_parameters_decides_reasoning_and_a_missing_list_is_unknown() {
         for id in [
             "nousresearch/hermes-4-405b",
             "acme/reason-think",
@@ -406,13 +423,24 @@ mod tests {
                 &json!({"id": id, "supported_parameters": ["reasoning"]}),
             )
             .unwrap();
-            assert_eq!(model, row(id, false, &["text"]));
+            assert_eq!(model, row(id, Some(true), &["text"]));
         }
+        let object_without_param = catalog_model_from_record(&json!({
+            "id": "acme/object-only",
+            "supported_parameters": ["tools"],
+            "reasoning": { "mandatory": true, "supported_efforts": ["high"] }
+        }))
+        .unwrap();
+        assert_eq!(
+            object_without_param,
+            row("acme/object-only", Some(false), &["text"])
+        );
+        assert!(object_without_param.thinking_level_map.is_none());
         for reasoning in [json!(false), Value::Null, json!("true")] {
             let model =
                 catalog_model_from_record(&json!({"id": "acme/flag", "reasoning": reasoning}))
                     .unwrap();
-            assert_eq!(model, row("acme/flag", false, &["text"]));
+            assert_eq!(model, row("acme/flag", None, &["text"]));
         }
     }
 
@@ -420,7 +448,7 @@ mod tests {
     fn merge_writes_the_catalog_fields() {
         let merged = merge_nous_portal(
             &json!({}),
-            &[row("z-ai/glm-5.3-flash", true, &["text", "image"])],
+            &[row("z-ai/glm-5.3-flash", Some(true), &["text", "image"])],
         )
         .unwrap();
         let model = &merged["providers"]["nous-portal"]["models"][0];
@@ -442,8 +470,8 @@ mod tests {
         let merged = merge_nous_portal(
             &existing,
             &[
-                row("nousresearch/hermes-4-405b", true, &["text"]),
-                row("tencent/hy3", false, &["text"]),
+                row("nousresearch/hermes-4-405b", Some(true), &["text"]),
+                row("tencent/hy3", Some(false), &["text"]),
             ],
         )
         .unwrap();
@@ -470,7 +498,7 @@ mod tests {
     #[test]
     fn merge_starts_a_missing_file() {
         let merged =
-            merge_nous_portal(&Value::Null, &[row("tencent/hy3", false, &["text"])]).unwrap();
+            merge_nous_portal(&Value::Null, &[row("tencent/hy3", Some(false), &["text"])]).unwrap();
         assert_eq!(
             merged["providers"]["nous-portal"]["models"][0]["id"],
             "tencent/hy3"
@@ -488,8 +516,8 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("models.json");
         fs::write(&path, "{ not json }\n{ also not }\n").unwrap();
-        let error =
-            write_nous_portal_models(&path, &[row("tencent/hy3", false, &["text"])]).unwrap_err();
+        let error = write_nous_portal_models(&path, &[row("tencent/hy3", Some(false), &["text"])])
+            .unwrap_err();
         assert!(error.contains("not valid JSON"));
         let leftover = fs::read_to_string(&path).unwrap();
         assert!(leftover.contains("not json"));
@@ -505,7 +533,7 @@ mod tests {
         )
         .unwrap();
         let count =
-            write_nous_portal_models(&path, &[row("tencent/hy3", false, &["text"])]).unwrap();
+            write_nous_portal_models(&path, &[row("tencent/hy3", Some(false), &["text"])]).unwrap();
         assert_eq!(count, 1);
         let parsed: Value = serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
         assert_eq!(

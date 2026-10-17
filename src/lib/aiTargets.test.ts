@@ -39,7 +39,7 @@ function provider(kind: AiModelProvider['kind']): AiModelProvider {
         tools: false,
         vision: false,
         json_mode: true,
-        reasoning: false,
+        reasoning: { state: 'unknown' as const },
       },
     }],
   }

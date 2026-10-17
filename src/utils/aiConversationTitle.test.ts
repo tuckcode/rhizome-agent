@@ -87,7 +87,7 @@ describe('generateAiConversationTitle', () => {
     const model = {
       id: 'gpt-4.1',
       display_name: 'GPT-4.1',
-      capabilities: { streaming: true, tools: false, vision: false, json_mode: false, reasoning: false },
+      capabilities: { streaming: true, tools: false, vision: false, json_mode: false, reasoning: { state: 'unknown' as const } },
     }
     completeAiModelTextMock.mockResolvedValue('Review Sidebar Spacing')
 
@@ -126,7 +126,7 @@ describe('generateAiConversationTitle', () => {
         provider: { id: 'openai', name: 'OpenAI', kind: 'open_ai', models: [] },
         model: {
           id: 'gpt-4.1',
-          capabilities: { streaming: true, tools: false, vision: false, json_mode: false, reasoning: false },
+          capabilities: { streaming: true, tools: false, vision: false, json_mode: false, reasoning: { state: 'unknown' as const } },
         },
         id: 'model:openai/gpt-4.1',
         label: 'OpenAI · GPT-4.1',
