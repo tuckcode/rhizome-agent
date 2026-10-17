@@ -103,7 +103,7 @@ export function ToolApprovalCard({
             <DiffView collapsed={overflows} compact diff={preview ?? ''} />
           </div>
         </div>
-        {overflows && !expanded ? (
+        {overflows ? (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col justify-end">
             <div className="h-10 bg-gradient-to-t from-card to-transparent" data-testid="approval-diff-fade" />
             <div className="pointer-events-auto bg-card px-3 pb-2">
@@ -112,7 +112,9 @@ export function ToolApprovalCard({
                 type="button"
                 variant="ghost"
                 data-testid="approval-show-all"
-                onClick={() => setExpanded(true)}
+                onClick={() => {
+                  setExpanded(true)
+                }}
               >
                 Show all {lineCount} lines
               </Button>
@@ -131,7 +133,9 @@ export function ToolApprovalCard({
             variant={optionVariant(option.id)}
             className={option.id === 'deny' ? 'text-destructive hover:text-destructive' : undefined}
             data-testid={`approval-${option.id}`}
-            onClick={() => onReply(option.id as NativeApprovalChoice)}
+            onClick={() => {
+              onReply(option.id as NativeApprovalChoice)
+            }}
           >
             {option.label}
           </Button>
