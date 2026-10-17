@@ -6,6 +6,10 @@ import {
   type AppUpdateDownloadEvent,
   type AppUpdateMetadata,
 } from '../lib/appUpdater'
+import {
+  UPDATER_CHECK_FAILED_MESSAGE,
+  isAllowlistedUpdaterCheckError,
+} from '../lib/updaterUserMessages'
 import { formatCalendarVersionForDisplay } from '../utils/calendarVersion'
 import { openExternalUrl } from '../utils/url'
 
@@ -51,14 +55,23 @@ function createVersionInfo(version: string): UpdateVersionInfo {
   }
 }
 
+function updateCheckDetail(error: unknown): string {
+  if (error instanceof Error) return error.message.trim()
+  if (typeof error === 'string') return error.trim()
+  return ''
+}
+
 function buildUpdateCheckErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message.trim()) {
-    return `Could not check for updates: ${error.message}`
+  const detail = updateCheckDetail(error)
+  if (detail) {
+    console.warn('[updater] Failed to check for updates', detail)
+  } else {
+    console.warn('[updater] Failed to check for updates')
   }
-  if (typeof error === 'string' && error.trim()) {
-    return `Could not check for updates: ${error}`
-  }
-  return 'Could not check for updates'
+  // Only show copy Rust allowlists in updaterUserMessages.json. Everything else
+  // is logged and replaced with the shared check-failed sentence.
+  if (detail && isAllowlistedUpdaterCheckError(detail)) return detail
+  return UPDATER_CHECK_FAILED_MESSAGE
 }
 
 function toAvailableStatus(update: AppUpdateMetadata): UpdateStatus {
@@ -118,7 +131,6 @@ export function useUpdater(
       setStatus(toAvailableStatus(update))
       return { kind: 'available', ...versionInfo }
     } catch (error) {
-      console.warn('[updater] Failed to check for updates')
       setStatus({ state: 'error' })
       return { kind: 'error', message: buildUpdateCheckErrorMessage(error) }
     }

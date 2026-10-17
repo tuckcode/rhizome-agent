@@ -465,7 +465,7 @@ fn index_native_turn(
             text: assistant,
         },
     ];
-    let _ = match index_file {
+    let indexed = match index_file {
         Some(file) => session_transcript_index::append_native_turns_to(
             file,
             session_path,
@@ -480,6 +480,9 @@ fn index_native_turn(
             turns,
         ),
     };
+    if let Err(error) = indexed {
+        log::warn!("session transcript index update failed: {error}");
+    }
 }
 
 fn join_with_bound(worker: thread::JoinHandle<()>, bound: Duration) -> bool {
@@ -684,6 +687,7 @@ pub fn open_native_session_record(session_id: &str) -> Result<NativeChatOpenResu
 }
 
 pub fn delete_native_session(chats: &NativeChats, session_id: &str) -> Result<(), String> {
+    crate::engines::native_log::validate_session_id(session_id)?;
     let _ = chats.end(session_id);
     let path = format!("{NATIVE_SESSION_PREFIX}{session_id}");
     session_transcript_index::remove_session(&path)?;
@@ -2263,11 +2267,13 @@ mod tests {
 
     #[test]
     fn path_traversal_is_rejected() {
-        let open_error = super::open_native_session_record("../x").expect_err("open");
-        assert!(open_error.to_lowercase().contains("uuid"));
-        let delete_error =
-            super::delete_native_session(&NativeChats::new(), "../x").expect_err("delete");
-        assert!(delete_error.to_lowercase().contains("uuid"));
+        with_temp_home_and_cache(|_| {
+            let open_error = super::open_native_session_record("../x").expect_err("open");
+            assert!(open_error.to_lowercase().contains("uuid"));
+            let delete_error =
+                super::delete_native_session(&NativeChats::new(), "../x").expect_err("delete");
+            assert!(delete_error.to_lowercase().contains("uuid"));
+        });
     }
 
     #[test]

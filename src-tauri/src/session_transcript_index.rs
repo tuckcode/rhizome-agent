@@ -7,6 +7,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 #[cfg(test)]
 use std::cell::RefCell;
@@ -20,12 +21,31 @@ thread_local! {
 }
 
 const INDEX_VERSION: u32 = 1;
+/// Bump this when the scrubber changes, so an index written by an older
+/// scrubber is rewritten on the next load.
+const SCRUB_VERSION: u32 = 1;
 const INDEX_FILE_NAME: &str = "v1.json";
+
+/// One writer at a time. Append is read-modify-write, and two of those
+/// on the same file used to drop a turn.
+static INDEX_LOCK: Mutex<()> = Mutex::new(());
+
+fn with_index_lock<T>(body: impl FnOnce() -> T) -> T {
+    let _guard = INDEX_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    body()
+}
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionTranscriptIndexDocument {
     pub version: u32,
+    /// Scrubber generation stored in the file. Missing reads as 0, so an
+    /// index written before this field (including one marked only with
+    /// `secretsScrubbed`) is scrubbed again.
+    #[serde(default)]
+    pub scrub_version: u32,
     pub sessions: Vec<PersistedSessionRecord>,
 }
 
@@ -51,14 +71,24 @@ impl SessionTranscriptIndexDocument {
     fn empty() -> Self {
         Self {
             version: INDEX_VERSION,
+            scrub_version: SCRUB_VERSION,
             sessions: Vec::new(),
         }
     }
 }
 
 /// Load the persisted index. A missing file is an empty index, not an error.
+/// An index left by the old writer (mode 0644, or a `v1.json.tmp` copy) is
+/// locked down. A file whose `scrubVersion` is below the current scrubber
+/// is rewritten, including a file that is already mode 0600.
 pub fn load() -> Result<SessionTranscriptIndexDocument, String> {
-    load_from(index_path()?)
+    with_index_lock(load_locked)
+}
+
+fn load_locked() -> Result<SessionTranscriptIndexDocument, String> {
+    let path = index_path()?;
+    secure_existing_index(&path)?;
+    load_from(path)
 }
 
 /// Append user and assistant turns for a native session path.
@@ -79,7 +109,27 @@ pub(crate) fn append_native_turns_to(
     title: &str,
     new_turns: Vec<IndexedTranscriptTurn>,
 ) -> Result<(), String> {
+    with_index_lock(|| append_native_turns_locked(index_file, path, id, title, new_turns))
+}
+
+fn append_native_turns_locked(
+    index_file: &Path,
+    path: &str,
+    id: &str,
+    title: &str,
+    new_turns: Vec<IndexedTranscriptTurn>,
+) -> Result<(), String> {
+    secure_existing_index(index_file)?;
     let mut document = load_from(index_file.to_path_buf())?;
+    let scrub = crate::engines::native_log::SecretScrub::capture();
+    let title = scrub.apply(title);
+    let new_turns: Vec<IndexedTranscriptTurn> = new_turns
+        .into_iter()
+        .map(|mut turn| {
+            turn.text = scrub.apply(&turn.text);
+            turn
+        })
+        .collect();
     if let Some(session) = document
         .sessions
         .iter_mut()
@@ -117,9 +167,13 @@ pub(crate) fn append_native_turns_to(
 
 /// Remove a native session from the index. Missing is success.
 pub fn remove_session(path: &str) -> Result<(), String> {
-    let mut document = load()?;
-    document.sessions.retain(|session| session.path != path);
-    save(&document)
+    with_index_lock(|| {
+        let index = index_path()?;
+        secure_existing_index(&index)?;
+        let mut document = load_from(index.clone())?;
+        document.sessions.retain(|session| session.path != path);
+        save_to(index, &document)
+    })
 }
 
 /// Replace the persisted index with an atomic write.
@@ -130,7 +184,13 @@ pub fn save(document: &SessionTranscriptIndexDocument) -> Result<(), String> {
             document.version
         ));
     }
-    save_to(index_path()?, document)
+    with_index_lock(|| {
+        let index = index_path()?;
+        secure_existing_index(&index)?;
+        let mut document = scrub_document_once(document);
+        document.scrub_version = SCRUB_VERSION;
+        save_to(index, &document)
+    })
 }
 
 fn load_from(path: PathBuf) -> Result<SessionTranscriptIndexDocument, String> {
@@ -144,6 +204,14 @@ fn load_from(path: PathBuf) -> Result<SessionTranscriptIndexDocument, String> {
     if document.version != INDEX_VERSION {
         return Ok(SessionTranscriptIndexDocument::empty());
     }
+    if document.scrub_version >= SCRUB_VERSION {
+        return Ok(document);
+    }
+    let mut document = scrub_document_once(&document);
+    document.scrub_version = SCRUB_VERSION;
+    if let Err(error) = save_to(path, &document) {
+        log::warn!("session transcript index rewrite failed: {error}");
+    }
     Ok(document)
 }
 
@@ -155,22 +223,84 @@ fn save_to(path: PathBuf, document: &SessionTranscriptIndexDocument) -> Result<(
                 parent.display()
             )
         })?;
+        set_owner_only_dir(parent)?;
     }
     let data = serde_json::to_vec(document)
         .map_err(|error| format!("serialize session transcript index: {error}"))?;
-    let temp_path = path.with_extension("json.tmp");
-    fs::write(&temp_path, data).map_err(|error| {
-        format!(
-            "write session transcript index {}: {error}",
-            temp_path.display()
-        )
-    })?;
-    fs::rename(&temp_path, &path).map_err(|error| {
-        format!(
-            "replace session transcript index {}: {error}",
-            path.display()
-        )
-    })?;
+    crate::rhizome_loop::write_atomic(&path, &data)
+        .map_err(|error| format!("write session transcript index {}: {error}", path.display()))?;
+    set_owner_only_file(&path)?;
+    Ok(())
+}
+
+fn scrub_document_once(
+    document: &SessionTranscriptIndexDocument,
+) -> SessionTranscriptIndexDocument {
+    let scrub = crate::engines::native_log::SecretScrub::capture();
+    let mut document = document.clone();
+    for session in &mut document.sessions {
+        session.title = scrub.apply(&session.title);
+        for turn in &mut session.turns {
+            turn.text = scrub.apply(&turn.text);
+        }
+    }
+    document
+}
+
+/// Lock down an index written before the owner-only format. A leftover
+/// `v1.json.tmp` is deleted. Scrubbing is decided by `scrubVersion`, not by
+/// the file mode.
+fn secure_existing_index(path: &Path) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        if parent.exists() {
+            set_owner_only_dir(parent)?;
+        }
+    }
+    let stale_tmp = path.with_extension("json.tmp");
+    if stale_tmp.exists() {
+        fs::remove_file(&stale_tmp).map_err(|error| {
+            format!(
+                "remove stale session transcript index {}: {error}",
+                stale_tmp.display()
+            )
+        })?;
+    }
+    Ok(())
+}
+
+fn set_owner_only_dir(path: &Path) -> Result<(), String> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o700)).map_err(|error| {
+            format!(
+                "restrict session transcript index dir {}: {error}",
+                path.display()
+            )
+        })?;
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+    }
+    Ok(())
+}
+
+fn set_owner_only_file(path: &Path) -> Result<(), String> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600)).map_err(|error| {
+            format!(
+                "restrict session transcript index {}: {error}",
+                path.display()
+            )
+        })?;
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+    }
     Ok(())
 }
 
@@ -222,9 +352,20 @@ mod tests {
         }
     }
 
+    #[cfg(not(unix))]
+    #[allow(clippy::permissions_set_readonly_false)]
+    fn clear_readonly(path: &Path) {
+        if let Ok(meta) = fs::metadata(path) {
+            let mut perms = meta.permissions();
+            perms.set_readonly(false);
+            let _ = fs::set_permissions(path, perms);
+        }
+    }
+
     fn sample_document() -> SessionTranscriptIndexDocument {
         SessionTranscriptIndexDocument {
             version: INDEX_VERSION,
+            scrub_version: SCRUB_VERSION,
             sessions: vec![PersistedSessionRecord {
                 path: "/Users/mock/.prime/agent/sessions/daemon.jsonl".into(),
                 stamp: "10".into(),
@@ -296,6 +437,242 @@ mod tests {
             fs::write(&path, r#"{"version":9,"sessions":[]}"#).expect("write stale index");
             let loaded = load().expect("load stale index");
             assert_eq!(loaded, SessionTranscriptIndexDocument::empty());
+        });
+    }
+
+    #[test]
+    fn a_pasted_key_is_scrubbed_from_the_index() {
+        with_cache_dir(|_| {
+            let key = "sk-proj-abcdefghijklmnopqrstuvwxyz";
+            append_native_turns(
+                "rhizome-native:pasted",
+                "pasted",
+                &format!("title {key}"),
+                vec![
+                    IndexedTranscriptTurn {
+                        message_index: 0,
+                        role: "user".into(),
+                        text: format!("please look at {key}"),
+                    },
+                    IndexedTranscriptTurn {
+                        message_index: 1,
+                        role: "assistant".into(),
+                        text: format!("I saw {key}"),
+                    },
+                ],
+            )
+            .expect("append");
+            let path = index_path().expect("index path");
+            let raw = fs::read_to_string(&path).expect("read index");
+            assert!(!raw.contains(key), "{raw}");
+            let loaded = load().expect("load");
+            let session = loaded.sessions.first().expect("session");
+            assert!(!session.title.contains(key), "{}", session.title);
+            assert!(session.title.contains("[redacted]"), "{}", session.title);
+            assert_eq!(session.turns.len(), 2);
+            for turn in &session.turns {
+                assert!(!turn.text.contains(key), "{}", turn.text);
+                assert!(turn.text.contains("[redacted]"), "{}", turn.text);
+            }
+        });
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_index_file_is_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        with_cache_dir(|_| {
+            save(&sample_document()).expect("save index");
+            let path = index_path().expect("index path");
+            let file_mode = fs::metadata(&path)
+                .expect("file metadata")
+                .permissions()
+                .mode()
+                & 0o777;
+            let dir_mode = fs::metadata(path.parent().expect("index dir"))
+                .expect("dir metadata")
+                .permissions()
+                .mode()
+                & 0o777;
+            assert_eq!(file_mode, 0o600);
+            assert_eq!(dir_mode, 0o700);
+        });
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn load_locks_down_a_world_readable_index_and_drops_the_stale_tmp() {
+        use std::os::unix::fs::PermissionsExt;
+
+        with_cache_dir(|_| {
+            let key = "sk-proj-abcdefghijklmnopqrstuvwxyz";
+            let path = index_path().expect("index path");
+            let dir = path.parent().expect("index dir");
+            fs::create_dir_all(dir).expect("create dir");
+            fs::set_permissions(dir, fs::Permissions::from_mode(0o755)).expect("dir mode");
+            let body = format!(
+                r#"{{"version":1,"sessions":[{{"path":"rhizome-native:old","stamp":"1","id":"old","title":"title {key}","turns":[{{"messageIndex":0,"role":"assistant","text":"saw {key}"}}]}}]}}"#
+            );
+            fs::write(&path, body).expect("write old index");
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).expect("file mode");
+            let tmp = path.with_extension("json.tmp");
+            fs::write(&tmp, format!("stale copy {key}")).expect("write stale tmp");
+
+            let loaded = load().expect("load old index");
+
+            assert!(!tmp.exists(), "stale v1.json.tmp must be deleted");
+            let file_mode = fs::metadata(&path).expect("file").permissions().mode() & 0o777;
+            let dir_mode = fs::metadata(dir).expect("dir").permissions().mode() & 0o777;
+            assert_eq!(file_mode, 0o600);
+            assert_eq!(dir_mode, 0o700);
+            let raw = fs::read_to_string(&path).expect("read secured index");
+            assert!(!raw.contains(key), "{raw}");
+            assert!(!raw.contains("stale copy"), "{raw}");
+            let session = loaded.sessions.first().expect("session");
+            assert!(!session.title.contains(key), "{}", session.title);
+            assert!(
+                !session.turns[0].text.contains(key),
+                "{}",
+                session.turns[0].text
+            );
+        });
+    }
+
+    #[test]
+    fn load_rescrubs_when_scrub_version_is_behind() {
+        with_cache_dir(|_| {
+            let key = "sk-proj-abcdefghijklmnopqrstuvwxyz";
+            let path = index_path().expect("index path");
+            let dir = path.parent().expect("index dir");
+            fs::create_dir_all(dir).expect("create dir");
+            let session = format!(
+                r#"{{"path":"rhizome-native:old","stamp":"1","id":"old","title":"kept","turns":[{{"messageIndex":0,"role":"assistant","text":"saw {key}"}}]}}"#
+            );
+            fs::write(
+                &path,
+                format!(r#"{{"version":1,"secretsScrubbed":true,"sessions":[{session}]}}"#),
+            )
+            .expect("write leaky index");
+
+            let loaded = load().expect("load leaky index");
+            let raw = fs::read_to_string(&path).expect("read scrubbed index");
+            assert!(!raw.contains(key), "{raw}");
+            assert!(
+                raw.contains(&format!("\"scrubVersion\":{SCRUB_VERSION}")),
+                "{raw}"
+            );
+            assert!(
+                !loaded.sessions[0].turns[0].text.contains(key),
+                "{}",
+                loaded.sessions[0].turns[0].text
+            );
+
+            fs::write(
+                &path,
+                format!(r#"{{"version":1,"scrubVersion":{SCRUB_VERSION},"sessions":[{session}]}}"#),
+            )
+            .expect("write current index");
+            let again = load().expect("load current index");
+            assert!(
+                again.sessions[0].turns[0].text.contains(key),
+                "the current scrub version is left alone"
+            );
+        });
+    }
+
+    #[test]
+    fn load_returns_scrubbed_text_when_the_rewrite_cannot_be_saved() {
+        with_cache_dir(|_| {
+            let key = "sk-proj-abcdefghijklmnopqrstuvwxyz";
+            let path = index_path().expect("index path");
+            let dir = path.parent().expect("index dir");
+            fs::create_dir_all(dir).expect("create dir");
+            fs::write(
+                &path,
+                format!(
+                    r#"{{"version":1,"sessions":[{{"path":"rhizome-native:old","stamp":"1","id":"old","title":"kept","turns":[{{"messageIndex":0,"role":"assistant","text":"saw {key}"}}]}}]}}"#
+                ),
+            )
+            .expect("write old index");
+            // A hard link makes the atomic writer refuse the file. That
+            // failure happens for root too. Windows has no nlink check, so
+            // the read-only bit is the stand-in there.
+            struct RestoreReadonly(PathBuf);
+            impl Drop for RestoreReadonly {
+                fn drop(&mut self) {
+                    #[cfg(not(unix))]
+                    clear_readonly(&self.0);
+                    #[cfg(unix)]
+                    let _ = &self.0;
+                }
+            }
+            let _restore = RestoreReadonly(path.clone());
+            #[cfg(unix)]
+            {
+                let link = dir.join("v1-hardlink.json");
+                fs::hard_link(&path, &link).expect("hard link");
+            }
+            #[cfg(not(unix))]
+            {
+                let mut perms = fs::metadata(&path).expect("metadata").permissions();
+                perms.set_readonly(true);
+                fs::set_permissions(&path, perms).expect("readonly");
+            }
+
+            let loaded = load().expect("load returns the scrubbed copy");
+            assert!(
+                !loaded.sessions[0].turns[0].text.contains(key),
+                "secret must be removed"
+            );
+            let raw = fs::read_to_string(&path).expect("read unchanged index");
+            assert!(raw.contains(key), "the file on disk stays unchanged");
+        });
+    }
+
+    #[test]
+    fn concurrent_appends_keep_both_updates() {
+        use std::sync::{Arc, Barrier};
+        use std::thread;
+
+        with_cache_dir(|_| {
+            for round in 0..8 {
+                let barrier = Arc::new(Barrier::new(2));
+                let left_path = format!("rhizome-native:left-{round}");
+                let right_path = format!("rhizome-native:right-{round}");
+                let left_marker = format!("alpha-marker-{round}");
+                let right_marker = format!("beta-marker-{round}");
+                let spawn = |path: String, marker: String, barrier: Arc<Barrier>| {
+                    thread::spawn(move || {
+                        barrier.wait();
+                        append_native_turns(
+                            &path,
+                            &path,
+                            &marker,
+                            vec![IndexedTranscriptTurn {
+                                message_index: 0,
+                                role: "user".into(),
+                                text: marker.clone(),
+                            }],
+                        )
+                        .expect("append");
+                    })
+                };
+                let left = spawn(left_path, left_marker.clone(), Arc::clone(&barrier));
+                let right = spawn(right_path, right_marker.clone(), barrier);
+                left.join().expect("left thread");
+                right.join().expect("right thread");
+                let index = index_path().expect("index path");
+                let raw = fs::read_to_string(&index).expect("read index");
+                assert!(raw.contains(&left_marker), "round {round}: {raw}");
+                assert!(raw.contains(&right_marker), "round {round}: {raw}");
+                let stale_tmp = index.with_extension("json.tmp");
+                assert!(
+                    !stale_tmp.exists(),
+                    "round {round} left {}",
+                    stale_tmp.display()
+                );
+            }
         });
     }
 }

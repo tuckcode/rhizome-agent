@@ -256,16 +256,12 @@ describe('parked organs leftover', () => {
       `${process.cwd()}/src/components/SettingsPanel.tsx`,
       'utf8',
     )
-    const toggle = readFileSync(
-      `${process.cwd()}/src/components/ChatEngineSettings.tsx`,
-      'utf8',
-    )
     const composer = readFileSync(
       `${process.cwd()}/src/components/ChatComposerBar.tsx`,
       'utf8',
     )
-    expect(settings.match(/<ChatEngineSettings /g)?.length).toBe(1)
-    expect(toggle).toContain('settings-chat-engine')
+    expect(settings).not.toContain('ChatEngineSettings')
+    expect(settings).not.toContain('settings-chat-engine')
     expect(composer).not.toContain('settings-chat-engine')
     expect(composer).not.toContain('ChatEngineSettings')
   })
@@ -292,33 +288,19 @@ describe('parked organs leftover', () => {
     expect(history).toContain('ArrowUp → older, ArrowDown → newer')
   })
 
-  it('waits to load Settings catalogs until Agents or Advanced Prime is opened', () => {
+  it('does not offer a Chat engine picker or Prime engine settings', () => {
     const settings = readFileSync(
       `${process.cwd()}/src/components/SettingsPanel.tsx`,
       'utf8',
     )
-    expect(settings).toContain(
-      'props.initialSectionId === SETTINGS_SECTION_IDS.ai',
-    )
-    expect(settings).toContain(
-      'shouldOpenAdvancedPrimeEngine(props.initialSectionId)',
-    )
-    expect(settings).toContain(
-      "if (id === SETTINGS_SECTION_IDS.ai) setLoadModelCatalog(true)",
-    )
+    expect(settings).not.toContain('ChatEngineSettings')
+    expect(settings).not.toContain('settings-chat-engine')
+    expect(settings).not.toContain('AdvancedPrimeEngineSection')
+    expect(settings).not.toContain('PrimeDefaultModelSection')
+    expect(settings).not.toContain('PrimeModelAllowListSection')
+    expect(settings).not.toContain('PrimeProviderStatusSection')
     expect(settings).not.toContain('setLoadExtensionCatalog')
     expect(settings).not.toContain('Browse packages')
-    const toggle = readFileSync(
-      `${process.cwd()}/src/components/ChatEngineSettings.tsx`,
-      'utf8',
-    )
-    const en = readFileSync(`${process.cwd()}/src/lib/locales/en.json`, 'utf8')
-    expect(toggle).toContain("translate(locale, 'settings.chatEngine.description')")
-    expect(en).toContain("On: new chats use Rhizome's engine")
-    expect(en).toContain(
-      "Off: new chats use Prime, and they switch to Rhizome's engine if Prime isn't installed",
-    )
-    expect(en).toContain('Changes apply to new chats, and an open chat keeps the engine it started with')
   })
 
   it('mounts Graph and Mycelium only on Changes, not Inbox', () => {
@@ -953,8 +935,8 @@ describe('parked organs leftover', () => {
     expect(deck).toContain('min-w-0 truncate')
     expect(message).toContain('data-testid="ai-message-copy"')
     expect(message).toContain('<Copy size={14}')
-    expect(settings).toContain('skip provider IPC until then')
-    expect(settings).toContain('{loadModelCatalog ? <PrimeProviderStatusSection t={t} /> : null}')
+    expect(settings).not.toContain('PrimeProviderStatusSection')
+    expect(settings).not.toContain('loadModelCatalog')
   })
 
   it('still polls Prime with an empty vault and wires ChatHome to that host', () => {

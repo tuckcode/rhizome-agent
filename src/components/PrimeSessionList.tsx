@@ -914,7 +914,11 @@ export default function PrimeSessionList({
       ) : null}
 
       {sessions !== null && !error && ordered.length === 0 ? (
-        <p className="px-2.5 py-3 text-xs text-muted-foreground">{t('ai.sessions.empty')}</p>
+        <p className="px-2.5 py-3 text-xs text-muted-foreground">
+          {engine === 'native'
+            ? 'No Rhizome sessions yet. Start a conversation and it will appear here.'
+            : t('ai.sessions.empty')}
+        </p>
       ) : null}
 
       {noMatches ? (

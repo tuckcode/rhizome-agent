@@ -173,8 +173,12 @@ jobs:
           REPO_NAME="${REPO#*/}"
           PAGES_URL="https://${OWNER}.github.io/${REPO_NAME}/"
 
-          # .sig is optional — unsigned builds publish download URLs only.
-          # updater.endpoints is [] so nothing in-app consumes signatures.
+          # .sig is optional. When it exists, the signature field is the
+          # contents of the .sig file, JSON-escaped.
+          json_quote_file() {
+            python3 .github/scripts/json-quote-file.py "$1"
+          }
+
           find_first() {
             for pattern in "$@"; do
               # shellcheck disable=SC2086
@@ -210,8 +214,8 @@ jobs:
             sig_file=$(find_first "${tarball_file}.sig" || true)
             if [ -n "$sig_file" ] && [ -f "$sig_file" ]; then
               local sig
-              sig=$(cat "$sig_file")
-              printf '      "%s": {\n        "signature": "%s",\n        "url": "%s",\n        "dmg_url": "%s"\n      }' \
+              sig=$(json_quote_file "$sig_file")
+              printf '      "%s": {\n        "signature": %s,\n        "url": "%s",\n        "dmg_url": "%s"\n      }' \
                 "$key" "$sig" "$tarball_url" "$dmg_url"
             else
               echo "::warning::No .sig for ${key} — publishing dmg_url/url without updater signature." >&2
@@ -238,8 +242,8 @@ jobs:
               updater_base=$(basename "$updater_file")
               local updater_url="https://github.com/${REPO}/releases/download/${TAG}/${updater_base}"
               local sig
-              sig=$(cat "$sig_file")
-              printf '      "%s": {\n        "signature": "%s",\n        "url": "%s",\n        "download_url": "%s"\n      }' \
+              sig=$(json_quote_file "$sig_file")
+              printf '      "%s": {\n        "signature": %s,\n        "url": "%s",\n        "download_url": "%s"\n      }' \
                 "$key" "$sig" "$updater_url" "$download_url"
             else
               echo "::warning::No .sig for ${key} — publishing download_url only." >&2
@@ -338,6 +342,16 @@ jobs:
             windows-x86_64-bundles/*/*.zip
             windows-x86_64-bundles/*/*.zip.sig
             stable-latest.json
+
+      - name: Publish moving stable update feed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if jq -e '[.platforms[] | has("signature")] | all' stable-latest.json >/dev/null; then
+            bash .github/scripts/publish-update-feed.sh stable-latest stable-latest.json
+          else
+            echo "::warning::stable-latest.json has no updater signatures on every platform — leaving the stable-latest feed unchanged."
+          fi
 
   # ─────────────────────────────────────────────────────────────
   # Phase 4: Trigger the main-branch GitHub Pages deployment
