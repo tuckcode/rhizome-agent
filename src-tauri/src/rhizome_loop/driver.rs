@@ -735,6 +735,12 @@ impl AgentLoop {
         });
         let notify = Arc::clone(&self.cancel_notify);
         loop {
+            // Register the waiter before reading the cancel flag.
+            // `notify_waiters` misses a cancel that lands after the
+            // check and before `notified()` is created.
+            let notified = notify.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
             if self.is_cancelled() {
                 self.dismiss_live_prompt();
                 return ApprovalReply::Cancelled;
@@ -748,6 +754,9 @@ impl AgentLoop {
                                 self.lock().live_prompt = None;
                                 return reply;
                             }
+                            // The oneshot is finished. Polling it again
+                            // panics, and a newer prompt may own `live_prompt`.
+                            return ApprovalReply::Cancelled;
                         }
                         Err(_) => {
                             self.dismiss_live_prompt();
@@ -755,7 +764,7 @@ impl AgentLoop {
                         }
                     }
                 }
-                _ = notify.notified() => {}
+                _ = notified => {}
             }
         }
     }
@@ -926,4 +935,107 @@ fn offered_names(shared: &Shared) -> Vec<String> {
         }
     }
     names
+}
+
+#[cfg(test)]
+mod approval_wait_tests {
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    use std::time::{Duration, Instant};
+
+    use super::*;
+
+    fn runtime() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+    }
+
+    #[test]
+    fn cancel_while_the_waiter_is_blocked_returns_without_the_reply() {
+        let agent = AgentLoop::new();
+        agent.lock().step_active = true;
+        let entered = Arc::new(AtomicBool::new(false));
+        let entered_flag = Arc::clone(&entered);
+        agent.set_approval_waiter_preview(move |_, _, _, _| {
+            entered_flag.store(true, Ordering::SeqCst);
+            thread::sleep(Duration::from_secs(30));
+            ApprovalReply::AllowOnce
+        });
+        let runtime = runtime();
+        let waiting = agent.clone();
+        let cancelling = agent.clone();
+        let reply = runtime.block_on(async move {
+            let task = tokio::spawn(async move {
+                waiting
+                    .wait_for_approval("bash", "echo hi", None, "call-1")
+                    .await
+            });
+            let started = Instant::now();
+            while !entered.load(Ordering::SeqCst) {
+                assert!(
+                    started.elapsed() < Duration::from_secs(2),
+                    "waiter did not start"
+                );
+                tokio::task::yield_now().await;
+            }
+            cancelling.cancel("quit");
+            tokio::time::timeout(Duration::from_secs(2), task)
+                .await
+                .expect("cancel did not wake the approval wait")
+                .expect("task")
+        });
+        assert_eq!(reply, ApprovalReply::Cancelled);
+    }
+
+    #[test]
+    fn a_stale_approval_generation_returns_cancelled_without_panicking() {
+        let agent = AgentLoop::new();
+        agent.lock().step_active = true;
+        let release = Arc::new(AtomicBool::new(false));
+        let first_in = Arc::new(AtomicBool::new(false));
+        let release_flag = Arc::clone(&release);
+        let first_flag = Arc::clone(&first_in);
+        let calls = Arc::new(AtomicUsize::new(0));
+        let calls_flag = Arc::clone(&calls);
+        agent.set_approval_waiter_preview(move |_, _, _, _| {
+            if calls_flag.fetch_add(1, Ordering::SeqCst) == 0 {
+                first_flag.store(true, Ordering::SeqCst);
+                while !release_flag.load(Ordering::SeqCst) {
+                    thread::sleep(Duration::from_millis(5));
+                }
+                ApprovalReply::AllowOnce
+            } else {
+                ApprovalReply::Deny
+            }
+        });
+        let runtime = runtime();
+        let first_agent = agent.clone();
+        let second_agent = agent.clone();
+        let first_reply = runtime.block_on(async move {
+            let first = tokio::spawn(async move {
+                first_agent
+                    .wait_for_approval("edit", "one", None, "c1")
+                    .await
+            });
+            let started = Instant::now();
+            while !first_in.load(Ordering::SeqCst) {
+                assert!(started.elapsed() < Duration::from_secs(2));
+                tokio::task::yield_now().await;
+            }
+            let second = tokio::time::timeout(
+                Duration::from_secs(2),
+                second_agent.wait_for_approval("edit", "two", None, "c2"),
+            )
+            .await
+            .expect("second wait");
+            assert_eq!(second, ApprovalReply::Deny);
+            release.store(true, Ordering::SeqCst);
+            tokio::time::timeout(Duration::from_secs(2), first)
+                .await
+                .expect("stale wait")
+                .expect("task")
+        });
+        assert_eq!(first_reply, ApprovalReply::Cancelled);
+    }
 }

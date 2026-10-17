@@ -79,6 +79,7 @@ windows = { version = "0.61", features = [
     "Win32_Security",
     "Win32_System_Diagnostics_ToolHelp",
     "Win32_System_JobObjects",
+    "Win32_System_Pipes",
     "Win32_System_Threading",
 ] }
 windows-sys = { version = "0.61", features = [
@@ -105,8 +106,10 @@ keyring = { version = "3.6.3", features = ["sync-secret-service", "crypto-rust"]
 # (Finder tags / quarantine on macOS). MIT OR Apache-2.0.
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
-# Safe waitid / killpg. Apache-2.0 OR MIT. process-wrap already uses 0.30.
-nix = { version = "0.30", default-features = false, features = ["signal"] }
+# killpg is `signal`; wait status types used beside libc::waitid are `process`.
+# Apache-2.0 OR MIT. process-wrap already uses 0.30. Declare both features
+# here so this crate does not depend on process-wrap enabling them.
+nix = { version = "0.30", default-features = false, features = ["process", "signal"] }
 xattr = "1"
 
 [dev-dependencies]

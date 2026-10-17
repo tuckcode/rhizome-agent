@@ -13,6 +13,7 @@ use std::collections::VecDeque;
 use std::io::{ErrorKind, Read};
 use std::path::PathBuf;
 use std::process::{ExitStatus, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -155,10 +156,12 @@ pub(crate) fn run(input: &ShellInput<'_>) -> Result<String, String> {
     let outcome = running.wait_for(timeout, input.is_cancelled)?;
     let (stdout, stderr, detached) =
         finish_readers(stdout_reader, stderr_reader, input.is_cancelled);
-    let outcome = if detached && (input.is_cancelled)() {
-        Outcome::Cancelled
-    } else {
-        outcome
+    // Cancel during the reader grace, after a normal exit, keeps that
+    // exit code. Stop only replaces an outcome that did not already exit.
+    let outcome = match outcome {
+        Outcome::Exit(_) => outcome,
+        _ if detached && (input.is_cancelled)() => Outcome::Cancelled,
+        _ => outcome,
     };
     render_outcome(outcome, stdout, stderr, detached)
 }
@@ -174,6 +177,7 @@ fn timeout_from_args(raw_args: &str) -> Duration {
             Some(0) | None => DEFAULT_TIMEOUT,
             Some(secs) => Duration::from_secs(secs.min(MAX_TIMEOUT_SECS)),
         },
+        // Strings, including "7", are not whole numbers. The card agrees.
         _ => DEFAULT_TIMEOUT,
     }
 }
@@ -302,7 +306,8 @@ impl Running {
         if self.reaped {
             return Err("bash already reaped".into());
         }
-        if polite && !self.leader_finished()? {
+        // Windows has no SIGTERM for a job. TerminateJobObject runs below.
+        if polite && cfg!(unix) && !self.leader_finished()? {
             self.signal_term();
             let deadline = Instant::now() + TERM_GRACE;
             while Instant::now() < deadline {
@@ -374,66 +379,178 @@ fn leader_exited_unreaped(pid: u32) -> bool {
     if pid <= 0 {
         return false;
     }
-    // `waitpid` rejects `WNOWAIT` with EINVAL on Linux. `waitid` reports
-    // the zombie and leaves it unreaped, so the later `killpg` still
-    // names this process group.
-    use nix::sys::wait::{WaitPidFlag, WaitStatus};
-    use nix::unistd::Pid;
-    let pid = Pid::from_raw(pid);
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    let result = nix::sys::wait::waitid(
-        nix::sys::wait::Id::Pid(pid),
-        WaitPidFlag::WEXITED | WaitPidFlag::WNOHANG | WaitPidFlag::WNOWAIT,
-    );
-    #[cfg(not(any(target_os = "linux", target_os = "android")))]
-    let result = nix::sys::wait::waitpid(pid, Some(WaitPidFlag::WNOHANG | WaitPidFlag::WNOWAIT));
-    match result {
-        Ok(WaitStatus::StillAlive) => false,
-        Ok(status) => status.pid() == Some(pid),
-        Err(_) => false,
-    }
+    // macOS `waitpid` ignores `WNOWAIT` and reaps (xnu `wait4_nocancel`).
+    // `waitid` honors `WNOWAIT` on Linux and on xnu, so the zombie stays
+    // until the `wait` below. nix has no `waitid` on Apple.
+    let mut info = unsafe { std::mem::zeroed::<libc::siginfo_t>() };
+    // SAFETY: `info` is a zeroed `siginfo_t` this function owns. `P_PID`
+    // plus this pid names the leader. `WNOWAIT` reports the zombie without
+    // reaping it. `si_pid` reads the pid `waitid` stored; 0 means `WNOHANG`
+    // found no status. The later `child.wait` reaps exactly once.
+    let reported = unsafe {
+        let rc = libc::waitid(
+            libc::P_PID,
+            pid as libc::id_t,
+            &mut info,
+            libc::WEXITED | libc::WNOHANG | libc::WNOWAIT,
+        );
+        if rc != 0 {
+            return false;
+        }
+        info.si_pid()
+    };
+    reported == pid
 }
 
 struct PipeReader {
     capture: Arc<Mutex<StreamCapture>>,
+    stop: Arc<AtomicBool>,
     handle: Option<thread::JoinHandle<()>>,
 }
 
+enum ReadPoll {
+    Data(usize),
+    Pending,
+    Eof,
+}
+
+#[cfg(unix)]
 fn spawn_reader<R>(pipe: Option<R>) -> PipeReader
 where
-    R: Read + Send + 'static,
+    R: Read + std::os::fd::AsRawFd + Send + 'static,
+{
+    spawn_reader_with(pipe, |pipe| {
+        let fd = pipe.as_raw_fd();
+        // SAFETY: `fd` is the stdout or stderr pipe this thread owns.
+        // `F_GETFL` / `F_SETFL` only change that descriptor's status flags.
+        // `O_NONBLOCK` makes `read` return `WouldBlock` while a detached
+        // child still holds the write end, so the stop flag can end the thread.
+        unsafe {
+            let flags = libc::fcntl(fd, libc::F_GETFL);
+            if flags >= 0 {
+                let _ = libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK);
+            }
+        }
+    })
+}
+
+#[cfg(windows)]
+fn spawn_reader<R>(pipe: Option<R>) -> PipeReader
+where
+    R: Read + std::os::windows::io::AsRawHandle + Send + 'static,
+{
+    spawn_reader_with(pipe, |_| {})
+}
+
+#[cfg(unix)]
+trait ReaderPipe: Read {}
+#[cfg(unix)]
+impl<T: Read> ReaderPipe for T {}
+
+#[cfg(windows)]
+trait ReaderPipe: Read + std::os::windows::io::AsRawHandle {}
+#[cfg(windows)]
+impl<T: Read + std::os::windows::io::AsRawHandle> ReaderPipe for T {}
+
+fn spawn_reader_with<R>(
+    pipe: Option<R>,
+    prepare: impl FnOnce(&mut R) + Send + 'static,
+) -> PipeReader
+where
+    R: ReaderPipe + Send + 'static,
 {
     let capture = Arc::new(Mutex::new(StreamCapture::default()));
+    let stop = Arc::new(AtomicBool::new(false));
     let Some(mut pipe) = pipe else {
         return PipeReader {
             capture,
+            stop,
             handle: None,
         };
     };
     let slot = Arc::clone(&capture);
+    let flag = Arc::clone(&stop);
     let handle = thread::spawn(move || {
+        prepare(&mut pipe);
         let mut buf = [0u8; 8192];
         loop {
-            match pipe.read(&mut buf) {
-                Ok(0) => break,
-                Ok(n) => {
+            match poll_pipe(&mut pipe, &mut buf) {
+                ReadPoll::Data(n) => {
                     if let Ok(mut guard) = slot.lock() {
                         guard.push_bytes(&buf[..n]);
                     }
                 }
-                Err(error) if error.kind() == ErrorKind::Interrupted => continue,
-                Err(_) => break,
+                ReadPoll::Eof => break,
+                ReadPoll::Pending => {
+                    if flag.load(Ordering::Relaxed) {
+                        break;
+                    }
+                    thread::sleep(POLL);
+                }
             }
         }
     });
     PipeReader {
         capture,
+        stop,
         handle: Some(handle),
     }
 }
 
-/// One grace for both pipes. A detached child that still holds a write
-/// end would otherwise block the join forever.
+#[cfg(not(windows))]
+fn poll_pipe<R: Read>(pipe: &mut R, buf: &mut [u8]) -> ReadPoll {
+    poll_read(pipe, buf)
+}
+
+#[cfg(windows)]
+fn poll_pipe<R>(pipe: &mut R, buf: &mut [u8]) -> ReadPoll
+where
+    R: Read + std::os::windows::io::AsRawHandle,
+{
+    poll_pipe_windows(pipe, buf)
+}
+
+fn poll_read(pipe: &mut impl Read, buf: &mut [u8]) -> ReadPoll {
+    match pipe.read(buf) {
+        Ok(0) => ReadPoll::Eof,
+        Ok(n) => ReadPoll::Data(n),
+        Err(error) if error.kind() == ErrorKind::Interrupted => ReadPoll::Pending,
+        Err(error) if error.kind() == ErrorKind::WouldBlock => ReadPoll::Pending,
+        Err(_) => ReadPoll::Eof,
+    }
+}
+
+#[cfg(windows)]
+fn poll_pipe_windows<R>(pipe: &mut R, buf: &mut [u8]) -> ReadPoll
+where
+    R: Read + std::os::windows::io::AsRawHandle,
+{
+    use std::os::windows::io::AsRawHandle;
+    use windows::Win32::Foundation::HANDLE;
+    use windows::Win32::System::Pipes::PeekNamedPipe;
+
+    let handle = HANDLE(pipe.as_raw_handle() as _);
+    let mut available = 0u32;
+    // SAFETY: `handle` is the read end this thread owns. PeekNamedPipe
+    // does not consume bytes. A zero count means the pipe is empty, so
+    // this thread sleeps and can observe the stop flag. Failure means
+    // the write end is gone (ERROR_BROKEN_PIPE).
+    let peeked = unsafe { PeekNamedPipe(handle, None, 0, None, Some(&mut available), None) };
+    if peeked.is_err() {
+        return match pipe.read(buf) {
+            Ok(n) if n > 0 => ReadPoll::Data(n),
+            _ => ReadPoll::Eof,
+        };
+    }
+    if available == 0 {
+        return ReadPoll::Pending;
+    }
+    poll_read(pipe, buf)
+}
+
+/// One grace for both pipes. Readers poll instead of blocking in `read`,
+/// so setting the stop flag lets them exit and be joined. A detached
+/// child no longer leaves a thread behind.
 fn finish_readers(
     mut stdout: PipeReader,
     mut stderr: PipeReader,
@@ -447,8 +564,8 @@ fn finish_readers(
             break false;
         }
         if is_cancelled() || started.elapsed() >= READER_GRACE {
-            stdout.detach();
-            stderr.detach();
+            stdout.stop_and_join();
+            stderr.stop_and_join();
             break true;
         }
         thread::sleep(POLL);
@@ -470,10 +587,11 @@ impl PipeReader {
         true
     }
 
-    fn detach(&mut self) {
-        // Dropping the handle detaches the thread. It may stay blocked
-        // in `read` until the detached child exits.
-        self.handle.take();
+    fn stop_and_join(&mut self) {
+        self.stop.store(true, Ordering::Relaxed);
+        if let Some(handle) = self.handle.take() {
+            let _ = handle.join();
+        }
     }
 
     fn take(&self) -> StreamCapture {
@@ -704,7 +822,7 @@ fn pop_front_char(tail: &mut VecDeque<u8>) -> u64 {
 #[cfg(windows)]
 mod windows_job {
     use std::io::{Error, Result};
-    use std::os::windows::io::AsRawHandle;
+    use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
     use std::os::windows::process::CommandExt;
     use std::process::{Child, Command, ExitStatus};
 
@@ -746,8 +864,12 @@ mod windows_job {
                 }
             };
             if let Err(error) = resume_threads(handle) {
-                unsafe { TerminateJobObject(job, 1) }.ok();
-                unsafe { CloseHandle(job) }.ok();
+                let raw = sys_handle(&job);
+                // SAFETY: `raw` is the job just created, and the suspended
+                // process is assigned to it. TerminateJobObject kills that
+                // process. Dropping `job` then closes the handle.
+                unsafe { TerminateJobObject(raw, 1) }.ok();
+                drop(job);
                 kill_suspended(inner.as_ref());
                 return Err(error);
             }
@@ -755,14 +877,19 @@ mod windows_job {
         }
     }
 
+    /// `OwnedHandle` is `Send` and `Sync`. A raw `HANDLE` is neither, so
+    /// the job cannot live in the child wrapper as a bare pointer.
     struct JobChild {
         inner: Box<dyn StdChildWrapper>,
-        job: HANDLE,
+        job: OwnedHandle,
     }
 
-    impl Drop for JobChild {
-        fn drop(&mut self) {
-            unsafe { CloseHandle(self.job) }.ok();
+    impl std::fmt::Debug for JobChild {
+        fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter
+                .debug_struct("JobChild")
+                .field("id", &self.inner.id())
+                .finish_non_exhaustive()
         }
     }
 
@@ -774,13 +901,20 @@ mod windows_job {
             self.inner.inner_mut()
         }
         fn into_inner(self: Box<Self>) -> Child {
-            let this = std::mem::ManuallyDrop::new(*self);
-            let inner = unsafe { std::ptr::read(&this.inner) };
-            unsafe { CloseHandle(this.job) }.ok();
+            // The trait requires this. Closing the job would kill the
+            // child (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`). The shell
+            // never calls this, so the job handle is leaked and the
+            // child is left running.
+            let JobChild { inner, job } = *self;
+            std::mem::forget(job);
             inner.into_inner()
         }
         fn start_kill(&mut self) -> Result<()> {
-            unsafe { TerminateJobObject(self.job, 1) }.map_err(Error::other)
+            let job = sys_handle(&self.job);
+            // SAFETY: `job` is the Job Object this wrapper owns.
+            // TerminateJobObject ends every process assigned to it.
+            // The handle stays open until `OwnedHandle` drops.
+            unsafe { TerminateJobObject(job, 1) }.map_err(Error::other)
         }
         fn try_wait(&mut self) -> Result<Option<ExitStatus>> {
             self.inner.try_wait()
@@ -790,16 +924,33 @@ mod windows_job {
         }
     }
 
+    fn sys_handle(job: &OwnedHandle) -> HANDLE {
+        HANDLE(job.as_raw_handle() as _)
+    }
+
+    fn own_handle(handle: HANDLE) -> OwnedHandle {
+        // SAFETY: `handle` is an owned kernel object this process created
+        // or opened. `OwnedHandle` closes it exactly once on drop.
+        unsafe { OwnedHandle::from_raw_handle(handle.0 as *mut std::ffi::c_void) }
+    }
+
     fn kill_suspended(inner: &dyn StdChildWrapper) {
         use windows::Win32::System::Threading::TerminateProcess;
         let handle = HANDLE(inner.inner().as_raw_handle() as _);
+        // SAFETY: `handle` is the suspended child process. TerminateProcess
+        // ends it if job setup failed before the process was resumed.
         unsafe { TerminateProcess(handle, 1) }.ok();
     }
 
-    fn make_job(process: HANDLE) -> Result<HANDLE> {
+    fn make_job(process: HANDLE) -> Result<OwnedHandle> {
+        // SAFETY: CreateJobObjectW with a null name returns a new job
+        // this process owns. The handle is wrapped in `OwnedHandle` below.
         let job = unsafe { CreateJobObjectW(None, None) }.map_err(Error::other)?;
         let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
         info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        // SAFETY: `job` is the object just created. `info` is a valid
+        // extended-limit struct, and the length is its size. This sets
+        // kill-on-close and does not free the handle.
         unsafe {
             SetInformationJobObject(
                 job,
@@ -811,14 +962,22 @@ mod windows_job {
             )
         }
         .map_err(Error::other)?;
+        // SAFETY: `job` is that object and `process` is the suspended
+        // child. AssignProcessToJobObject puts the child in the job.
         if let Err(error) = unsafe { AssignProcessToJobObject(job, process) } {
+            // SAFETY: assignment failed, so the job has no processes.
+            // CloseHandle releases the object we created.
             unsafe { CloseHandle(job) }.ok();
             return Err(Error::other(error));
         }
-        Ok(job)
+        Ok(own_handle(job))
     }
 
     fn resume_threads(child_process: HANDLE) -> Result<()> {
+        // SAFETY: `snapshot` is a thread snapshot this function owns.
+        // Thread32First / Thread32Next walk it. OpenThread returns a
+        // thread handle that is closed before the next iteration.
+        // ResumeThread continues a thread created with CREATE_SUSPENDED.
         unsafe fn resume(pid: u32, snapshot: HANDLE) -> Result<()> {
             let mut entry = THREADENTRY32 {
                 dwSize: std::mem::size_of::<THREADENTRY32>() as u32,
@@ -840,9 +999,15 @@ mod windows_job {
             Ok(())
         }
 
+        // SAFETY: `child_process` is the suspended child. GetProcessId
+        // reads its pid and does not close the handle.
         let pid = unsafe { GetProcessId(child_process) };
+        // SAFETY: CreateToolhelp32Snapshot returns an owned snapshot.
+        // It is closed after the walk.
         let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0) }?;
         let resumed = unsafe { resume(pid, snapshot) };
+        // SAFETY: `snapshot` is the handle just created. CloseHandle
+        // releases it exactly once.
         unsafe { CloseHandle(snapshot) }.map_err(Error::other)?;
         resumed
     }
@@ -910,7 +1075,9 @@ mod tests {
         for raw in [
             r#"{"timeout_secs":0}"#,
             r#"{"timeout_secs":-3}"#,
+            r#"{"timeout_secs":"7"}"#,
             r#"{"timeout_secs":"abc"}"#,
+            r#"{"timeout_secs":"1.5"}"#,
             r#"{"timeout_secs":1.5}"#,
             r#"{"timeout_secs":true}"#,
         ] {
@@ -1203,16 +1370,22 @@ mod tests {
         text.trim().parse().expect("pid")
     }
 
+    /// `setsid` is not on the macOS CI image. `python3` `os.setsid` starts
+    /// the same new session and keeps the shell's stdout open.
+    #[cfg(unix)]
+    fn hold_stdout_in_new_session(pid_path: &std::path::Path, sleep_for: &str) -> String {
+        let pid = pid_path.display();
+        format!(
+            "if command -v setsid >/dev/null 2>&1; then setsid sh -c 'echo $$ > {pid}; exec sleep {sleep_for}' & else python3 -c 'import os,sys; os.setsid(); open(sys.argv[1],\"w\").write(str(os.getpid())); os.execvp(\"sleep\",[\"sleep\",sys.argv[2]])' '{pid}' '{sleep_for}' & fi; while ! test -s '{pid}'; do :; done"
+        )
+    }
+
     #[cfg(unix)]
     #[test]
     fn setsid_background_returns_without_waiting_for_the_child() {
         let (_dir, root) = root_dir();
         let pid_path = std::path::Path::new(&root).join("sleep.pid");
-        let command = format!(
-            "setsid sh -c 'echo $$ > \"{}\"; exec sleep 20' & while ! test -s \"{}\"; do :; done; echo done",
-            pid_path.display(),
-            pid_path.display()
-        );
+        let command = format!("{}; echo done", hold_stdout_in_new_session(&pid_path, "20"));
         let started = Instant::now();
         let output = run_approved(&command, &root, Some(Duration::from_secs(3))).unwrap();
         assert!(started.elapsed() < Duration::from_secs(5), "{output}");
@@ -1236,11 +1409,13 @@ mod tests {
     fn setsid_sleep_infinity_does_not_hang() {
         let (_dir, root) = root_dir();
         let pid_path = std::path::Path::new(&root).join("sleep.pid");
-        let command = format!(
-            "setsid sh -c 'echo $$ > \"{}\"; exec sleep infinity' & while ! test -s \"{}\"; do :; done",
-            pid_path.display(),
-            pid_path.display()
-        );
+        // GNU `sleep infinity` is Linux. A long sleep is the same hold on macOS.
+        let sleep_for = if cfg!(target_os = "linux") {
+            "infinity"
+        } else {
+            "600"
+        };
+        let command = hold_stdout_in_new_session(&pid_path, sleep_for);
         let started = Instant::now();
         let output = run_approved(&command, &root, Some(Duration::from_secs(3))).unwrap();
         assert!(started.elapsed() < Duration::from_secs(5), "{output}");
@@ -1251,6 +1426,91 @@ mod tests {
             "{output}"
         );
         kill_written_pid(&pid_path);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cancel_during_reader_grace_keeps_the_exit_code() {
+        let (_dir, root) = root_dir();
+        let pid_path = std::path::Path::new(&root).join("sleep.pid");
+        let command = format!("{}; echo done", hold_stdout_in_new_session(&pid_path, "30"));
+        let cancel = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&cancel);
+        let watch = pid_path.to_path_buf();
+        thread::spawn(move || {
+            for _ in 0..200 {
+                if watch.is_file() {
+                    if let Ok(text) = std::fs::read_to_string(&watch) {
+                        if !text.trim().is_empty() {
+                            thread::sleep(Duration::from_millis(200));
+                            flag.store(true, Ordering::SeqCst);
+                            return;
+                        }
+                    }
+                }
+                thread::sleep(Duration::from_millis(10));
+            }
+        });
+        let stamp = approval_stamp("call-1", &command);
+        let output = run_command(
+            &command,
+            Some(&root),
+            "call-1",
+            Some(&stamp),
+            &|| cancel.load(Ordering::SeqCst),
+            Some(Duration::from_secs(3)),
+        )
+        .unwrap();
+        let value = bash_json(&output);
+        assert_eq!(value["exit_code"], 0, "{output}");
+        assert_eq!(value["stopped"], false, "{output}");
+        assert_eq!(value["timed_out"], false, "{output}");
+        assert!(
+            value["stderr"].as_str().unwrap().contains(DETACHED_NOTE),
+            "{output}"
+        );
+        kill_written_pid(&pid_path);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn detached_calls_do_not_leak_reader_threads() {
+        let before = linux_thread_count();
+        let (_dir, root) = root_dir();
+        let mut pids = Vec::new();
+        for index in 0..20 {
+            let pid_path = std::path::Path::new(&root).join(format!("sleep-{index}.pid"));
+            let command = format!("{}; echo done", hold_stdout_in_new_session(&pid_path, "60"));
+            let output = run_approved(&command, &root, Some(Duration::from_secs(3))).unwrap();
+            assert!(
+                bash_json(&output)["stderr"]
+                    .as_str()
+                    .unwrap()
+                    .contains(DETACHED_NOTE),
+                "{output}"
+            );
+            pids.push(read_pid(&pid_path));
+        }
+        let after = linux_thread_count();
+        for pid in pids {
+            let _ = nix::sys::signal::kill(
+                nix::unistd::Pid::from_raw(pid),
+                nix::sys::signal::Signal::SIGKILL,
+            );
+        }
+        assert!(
+            after <= before.saturating_add(4),
+            "reader threads leaked: {before} -> {after}"
+        );
+    }
+
+    #[cfg(target_os = "linux")]
+    fn linux_thread_count() -> usize {
+        let text = std::fs::read_to_string("/proc/self/status").expect("status");
+        text.lines()
+            .find_map(|line| line.strip_prefix("Threads:"))
+            .and_then(|count| count.trim().parse().ok())
+            .expect("Threads")
     }
 
     #[cfg(unix)]

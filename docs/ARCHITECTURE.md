@@ -540,11 +540,15 @@ system variables such as `SystemRoot`, `COMSPEC`, and `PATHEXT`). `HOME`
 is passed through, so a command can still read `~/.ssh` and `~/.aws`.
 stdin is closed. A child that calls `setsid` or `nohup` leaves the
 process group. On Linux it can outlive the group. After the leader
-exits or is killed, readers wait 750ms and then detach; the result's
-stderr then contains `[background process still holds output; detached]`.
-Timeout and cancel send SIGTERM and wait about 2s before SIGKILL. An
-invalid `timeout_secs` (0, negative, a non-integer, or a non-number)
-uses the 60s default. stdout and stderr each keep the first 15360 bytes and a
+exits or is killed, readers poll for 750ms. They use non-blocking
+reads and a stop flag, then they are joined, so a detached child does
+not leave a thread behind. The result's stderr then contains
+`[background process still holds output; detached]`. On Unix, timeout
+and cancel send SIGTERM and wait about 2s before SIGKILL. Windows has
+no SIGTERM for a Job Object, so timeout and cancel terminate the job
+immediately. An invalid `timeout_secs` (0, negative, a float, a string
+including `"7"`, or any other non-whole-number) uses the 60s default.
+stdout and stderr each keep the first 15360 bytes and a
 rolling last 15360 bytes (30720 bytes per stream). A trimmed stream
 inserts one marker, `\n… [N lines hidden] …\n`, between those parts.
 `N` is the number of newline bytes that fell out of the tail. The
