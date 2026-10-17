@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import { normalizeStoredAiAgent } from '../lib/aiAgents'
@@ -136,13 +136,26 @@ function effectiveAccentColor(settings: Settings): string {
 export function useSettings() {
   const [settings, setSettings] = useState<Settings>(EMPTY_SETTINGS)
   const [loaded, setLoaded] = useState(false)
+  const [nativeChatTargetLoaded, setNativeChatTargetLoaded] = useState(false)
+  const settingsRef = useRef(settings)
+  const nativeChatTargetLoadedRef = useRef(false)
+  const loadEpoch = useRef(0)
 
-  const loadSettings = useCallback(async () => {
+  const loadSettings = useCallback(async (): Promise<Settings | null> => {
+    const epoch = loadEpoch.current
     try {
-      const s = await tauriCall<Settings>('get_settings', {})
-      setSettings(normalizeSettings(s))
+      const s = normalizeSettings(await tauriCall<Settings>('get_settings', {}))
+      if (epoch !== loadEpoch.current) {
+        return nativeChatTargetLoadedRef.current ? settingsRef.current : null
+      }
+      settingsRef.current = s
+      nativeChatTargetLoadedRef.current = true
+      setNativeChatTargetLoaded(true)
+      setSettings(s)
+      return s
     } catch (err) {
       console.warn('Failed to load settings:', err)
+      return null
     } finally {
       setLoaded(true)
     }
@@ -159,6 +172,7 @@ export function useSettings() {
     const previousAccentColor = effectiveAccentColor(settings)
     const normalizedSettings = normalizeSettings(newSettings)
     // Optimistic local state so theme/UI prefs flip immediately; disk write follows.
+    settingsRef.current = normalizedSettings
     setSettings(normalizedSettings)
     try {
       await tauriCall<null>('save_settings', { settings: normalizedSettings })
@@ -181,9 +195,38 @@ export function useSettings() {
     } catch (err) {
       console.error('Failed to save settings:', err)
       // Roll back in-memory settings if persist failed.
+      settingsRef.current = settings
       setSettings(settings)
     }
   }, [settings])
+
+  const reloadSettings = useCallback(async () => {
+    const loadedSettings = await loadSettings()
+    return loadedSettings != null
+  }, [loadSettings])
+
+  // A failed get_settings leaves EMPTY_SETTINGS in memory. Saving that
+  // object replaces the file. Skip while the load is still failing. A
+  // retry that succeeds merges this change into the settings just read.
+  const saveNativeChatTarget = useCallback(async (target: string) => {
+    if (!nativeChatTargetLoadedRef.current) {
+      await loadSettings()
+    }
+    if (!nativeChatTargetLoadedRef.current) return
+
+    loadEpoch.current += 1
+    const previous = settingsRef.current
+    const next = normalizeSettings({ ...previous, native_chat_target: target })
+    settingsRef.current = next
+    setSettings(next)
+    try {
+      await tauriCall<null>('save_settings', { settings: next })
+    } catch (err) {
+      console.error('Failed to save settings:', err)
+      settingsRef.current = previous
+      setSettings(previous)
+    }
+  }, [loadSettings])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -201,5 +244,12 @@ export function useSettings() {
     }
   }, [saveSettings, settings])
 
-  return { settings, loaded, saveSettings }
+  return {
+    settings,
+    loaded,
+    nativeChatTargetLoaded,
+    reloadSettings,
+    saveSettings,
+    saveNativeChatTarget,
+  }
 }

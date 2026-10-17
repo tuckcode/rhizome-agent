@@ -85,14 +85,29 @@ const savedSettings: Settings = {
 
 let mockSettingsStore: Settings = { ...defaultSettings }
 
-const mockInvokeFn = vi.fn((cmd: string, args?: Record<string, unknown>): Promise<unknown> => {
+function settingsInvoke(cmd: string, args?: Record<string, unknown>): Promise<unknown> {
   if (cmd === 'get_settings') return Promise.resolve({ ...mockSettingsStore })
   if (cmd === 'save_settings') {
     mockSettingsStore = { ...(args as { settings: Settings }).settings }
     return Promise.resolve(null)
   }
   return Promise.resolve(null)
-})
+}
+
+const mockInvokeFn = vi.fn(settingsInvoke)
+
+function savedChatTarget(): Settings {
+  return {
+    ...savedSettings,
+    theme_mode: 'dark',
+    chat_engine: 'prime',
+    native_chat_target: 'openai/gpt-4.1-mini',
+  }
+}
+
+function saveSettingsCalls() {
+  return mockInvokeFn.mock.calls.filter((call) => call[0] === 'save_settings')
+}
 
 const nativeInvoke = vi.mocked(invoke)
 
@@ -159,6 +174,8 @@ function changedSettings(): Settings {
 describe('useSettings', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockInvokeFn.mockReset()
+    mockInvokeFn.mockImplementation(settingsInvoke)
     trackEventMock.mockClear()
     mockSettingsStore = { ...defaultSettings }
     nativeInvoke.mockResolvedValue(undefined)
@@ -429,5 +446,87 @@ describe('useSettings', () => {
     await act(async () => {
       resolveSave?.(null)
     })
+  })
+
+  it('does not overwrite the stored chat target when settings failed to load', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mockSettingsStore = savedChatTarget()
+    mockInvokeFn.mockImplementation((cmd: string) => {
+      if (cmd === 'get_settings') return Promise.reject(new Error('disk'))
+      return Promise.resolve(null)
+    })
+
+    const { result } = renderHook(() => useSettings())
+    await waitFor(() => {
+      expect(result.current.loaded).toBe(true)
+    })
+    expect(result.current.nativeChatTargetLoaded).toBe(false)
+
+    await act(async () => {
+      await result.current.saveNativeChatTarget('free_tier_auto')
+    })
+
+    expect(saveSettingsCalls()).toHaveLength(0)
+    expect(mockSettingsStore.native_chat_target).toBe('openai/gpt-4.1-mini')
+    expect(mockSettingsStore.theme_mode).toBe('dark')
+    expect(mockSettingsStore.chat_engine).toBe('prime')
+    warnSpy.mockRestore()
+  })
+
+  it('saves a native chat target change after settings load', async () => {
+    mockSettingsStore = savedChatTarget()
+    const { result } = renderHook(() => useSettings())
+
+    await waitFor(() => {
+      expect(result.current.nativeChatTargetLoaded).toBe(true)
+    })
+
+    await act(async () => {
+      await result.current.saveNativeChatTarget('groq/llama-3.3-70b')
+    })
+
+    expect(mockSettingsStore.native_chat_target).toBe('groq/llama-3.3-70b')
+    expect(mockSettingsStore.theme_mode).toBe('dark')
+    expect(mockSettingsStore.chat_engine).toBe('prime')
+    expect(mockSettingsStore.auto_pull_interval_minutes).toBe(15)
+  })
+
+  it('saves a native chat target again after a failed load succeeds on retry', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mockSettingsStore = savedChatTarget()
+    let getSettingsFails = true
+    mockInvokeFn.mockImplementation((cmd: string, args?: Record<string, unknown>) => {
+      if (cmd === 'get_settings' && getSettingsFails) return Promise.reject(new Error('disk'))
+      return settingsInvoke(cmd, args)
+    })
+
+    const { result } = renderHook(() => useSettings())
+    await waitFor(() => {
+      expect(result.current.loaded).toBe(true)
+    })
+
+    await act(async () => {
+      await result.current.saveNativeChatTarget('free_tier_auto')
+    })
+    expect(saveSettingsCalls()).toHaveLength(0)
+    expect(mockSettingsStore.native_chat_target).toBe('openai/gpt-4.1-mini')
+
+    getSettingsFails = false
+    await act(async () => {
+      await expect(result.current.reloadSettings()).resolves.toBe(true)
+    })
+    expect(result.current.nativeChatTargetLoaded).toBe(true)
+    expect(result.current.settings.native_chat_target).toBe('openai/gpt-4.1-mini')
+    expect(result.current.settings.theme_mode).toBe('dark')
+
+    await act(async () => {
+      await result.current.saveNativeChatTarget('groq/llama-3.3-70b')
+    })
+
+    expect(mockSettingsStore.native_chat_target).toBe('groq/llama-3.3-70b')
+    expect(mockSettingsStore.theme_mode).toBe('dark')
+    expect(mockSettingsStore.chat_engine).toBe('prime')
+    expect(mockSettingsStore.auto_pull_interval_minutes).toBe(15)
+    warnSpy.mockRestore()
   })
 })

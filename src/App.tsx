@@ -249,7 +249,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     void openExternalUrl(RHIZOME_DOCS_URL)
   }, [])
   const networkStatus = useNetworkStatus()
-  const { settings, loaded: settingsLoaded, saveSettings } = useSettings()
+  const { settings, loaded: settingsLoaded, saveSettings, saveNativeChatTarget } = useSettings()
   const primeActiveClose = usePrimeActiveClose()
 
   // onSwitch closure captures `notes` declared below — safe because it's only
@@ -2213,7 +2213,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         chatEngine={chatEngine}
         chatEngineSettled={settingsLoaded}
         nativeTarget={settings.native_chat_target}
-        onNativeTargetChange={(target) => saveSettings({ ...settings, native_chat_target: target })}
+        onNativeTargetChange={(target) => { void saveNativeChatTarget(target) }}
         aiModelProviders={settings.ai_model_providers}
         onExit={() => handleSetViewModeWithNotes(chatCentered ? 'all' : 'editor-list')}
         vaultPath={activeEditorVaultPath}
