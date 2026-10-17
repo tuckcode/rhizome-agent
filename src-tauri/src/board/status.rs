@@ -42,6 +42,51 @@ pub fn set_status(content: &str, status: &str) -> Result<StatusEdit, String> {
     })
 }
 
+/// The note's top-level `Status` value, if it has one.
+pub fn read_status(content: &str) -> Option<String> {
+    let body = content.strip_prefix(BOM).unwrap_or(content);
+    let lines = split_lines(body);
+    let close = frontmatter_end(&lines).ok()??;
+    let span = status_spans(&lines[1..close]).into_iter().next()?;
+    let (start, end) = (span.start + 1, span.end + 1);
+    let key = parse_key_line(lines[start].text)?;
+    read_value(&lines[start..=end], &key)
+}
+
+/// The note with every top-level `Status` entry removed, for undoing a
+/// status write. A write may also have added a whole frontmatter block,
+/// so when the block is left empty the result also has a second form
+/// without it. `None` when the note has no `Status` entry.
+pub fn status_removed(content: &str) -> Option<Vec<String>> {
+    let (bom, body) = match content.strip_prefix(BOM) {
+        Some(rest) => ("\u{FEFF}", rest),
+        None => ("", content),
+    };
+    let lines = split_lines(body);
+    let close = frontmatter_end(&lines).ok()??;
+    let spans = status_spans(&lines[1..close]);
+    if spans.is_empty() {
+        return None;
+    }
+    let mut kept: Vec<Line<'_>> = Vec::with_capacity(lines.len());
+    let mut index = 0;
+    for span in &spans {
+        kept.extend_from_slice(&lines[index..span.start + 1]);
+        index = span.end + 2;
+    }
+    kept.extend_from_slice(&lines[index..]);
+    let mut out = String::from(bom);
+    push_lines(&mut out, &kept);
+    let mut forms = vec![out];
+    let new_close = close - (lines.len() - kept.len());
+    if new_close == 1 {
+        let mut without_block = String::from(bom);
+        push_lines(&mut without_block, &kept[2..]);
+        forms.push(without_block);
+    }
+    Some(forms)
+}
+
 fn validate_status(status: &str) -> Result<&str, String> {
     let trimmed = status.trim();
     if trimmed.is_empty() {

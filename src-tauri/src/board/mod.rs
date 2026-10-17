@@ -5,9 +5,10 @@
 //! into the view's `presentation.columns`. A move rewrites the `Status`
 //! line of one note and nothing else.
 //!
-//! No Tauri command calls this module yet. A live move needs the
-//! conflict-checked save first, or the editor's autosave would write
-//! the old status back over it.
+//! The live move is the `move_board_card` command. The editor's save
+//! runs the same content-hash check (`vault::save_note_content_expecting`),
+//! and [`splice_disk_status`] lets an autosave keep a status the board
+//! wrote. Listing boards has no command yet.
 #![cfg_attr(not(test), allow(dead_code))]
 
 mod status;
@@ -29,6 +30,7 @@ use crate::rhizome_loop::{
 use crate::vault::{evaluate_view, scan_vault_cached, scan_views, VaultEntry, ViewFile};
 
 pub use status::set_status;
+use status::{read_status, status_removed};
 
 /// Columns when a board view has no usable `presentation.columns`.
 /// Same list, same order, as `SUGGESTED_STATUSES` in
@@ -192,8 +194,7 @@ fn check_precondition(
     match expected {
         None => Ok(()),
         Some(Precondition::ContentHash(hash)) => {
-            let actual = format!("{:x}", Sha256::digest(before.as_bytes()));
-            if actual.eq_ignore_ascii_case(hash.trim()) {
+            if content_hash(before).eq_ignore_ascii_case(hash.trim()) {
                 Ok(())
             } else {
                 Err(format!(
@@ -202,6 +203,41 @@ fn check_precondition(
             }
         }
     }
+}
+
+/// SHA-256 of a note's bytes, lowercase hex. The editor's expected
+/// hash uses the same form.
+pub fn content_hash(text: &str) -> String {
+    content_hash_bytes(text.as_bytes())
+}
+
+pub fn content_hash_bytes(bytes: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(bytes))
+}
+
+/// When the only change on disk since `expected_hash` is the `Status`
+/// value, returns `buffer` with the on-disk status. Any other change
+/// returns `None`, which the caller treats as a real conflict.
+///
+/// The check undoes the status change on `disk` (back to the buffer's
+/// status, or no status) and compares that with `expected_hash`.
+pub fn splice_disk_status(disk: &str, buffer: &str, expected_hash: &str) -> Option<String> {
+    let disk_status = read_status(disk)?;
+    let expected = expected_hash.trim();
+    let undone: Vec<String> = match read_status(buffer) {
+        Some(buffer_status) if buffer_status == disk_status => return None,
+        Some(buffer_status) => vec![set_status(disk, &buffer_status).ok()?.content],
+        None => status_removed(disk)?,
+    };
+    if !undone
+        .iter()
+        .any(|text| content_hash(text).eq_ignore_ascii_case(expected))
+    {
+        return None;
+    }
+    set_status(buffer, &disk_status)
+        .ok()
+        .map(|edit| edit.content)
 }
 
 fn find_board_view(vault: &Path, filename: &str) -> Result<(ViewFile, BoardConfig), String> {

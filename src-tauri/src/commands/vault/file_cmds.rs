@@ -169,6 +169,58 @@ pub async fn save_note_content(
     .map_err(|e| format!("Task panicked: {e}"))?
 }
 
+/// `save_note_content` with a conflict check. See
+/// [`vault::save_note_content_expecting`].
+#[tauri::command]
+pub async fn save_note_content_checked(
+    path: PathBuf,
+    content: String,
+    vault_path: Option<PathBuf>,
+    expected_hash: Option<String>,
+) -> Result<vault::SaveOutcome, String> {
+    tokio::task::spawn_blocking(move || {
+        with_writable_note_path(path, vault_path, |validated_path, vault_root| {
+            let outcome = vault::save_note_content_expecting(
+                validated_path,
+                &content,
+                expected_hash.as_deref(),
+            )?;
+            let artifact_path = crate::rhizome_write_location::relative_to_vault(
+                vault_root,
+                Path::new(validated_path),
+            );
+            crate::rhizome_distill::append_vault_event_best_effort(
+                vault_root,
+                "edit",
+                None,
+                "manual_edit",
+                &artifact_path,
+            );
+            Ok(outcome)
+        })
+    })
+    .await
+    .map_err(|e| format!("Task panicked: {e}"))?
+}
+
+/// Move a board card: set one note's `Status`. With `expected_hash`,
+/// the move is refused when the note changed since the caller read it.
+#[tauri::command]
+pub fn move_board_card(
+    path: String,
+    status: String,
+    vault_path: Option<PathBuf>,
+    expected_hash: Option<String>,
+) -> Result<crate::board::CardMove, String> {
+    let raw_vault_path = vault_path.map(|value| value.to_string_lossy().into_owned());
+    with_boundary(raw_vault_path.as_deref(), |boundary| {
+        let expected = expected_hash
+            .filter(|hash| !hash.trim().is_empty())
+            .map(crate::board::Precondition::ContentHash);
+        crate::board::move_card(boundary.requested_root(), &path, &status, expected.as_ref())
+    })
+}
+
 #[tauri::command]
 pub fn create_note_content(
     path: PathBuf,

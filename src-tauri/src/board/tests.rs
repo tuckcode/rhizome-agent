@@ -4,7 +4,7 @@ use std::time::{Duration, UNIX_EPOCH};
 
 use tempfile::TempDir;
 
-use super::status::{StatusEdit, MAX_STATUS_CHARS};
+use super::status::{read_status, status_removed, StatusEdit, MAX_STATUS_CHARS};
 use super::*;
 use crate::rhizome_loop::BLOCKED_SECRET;
 
@@ -806,4 +806,67 @@ fn board_with_5000_notes_caps_output() {
         assert_eq!(column.total, 1_000);
         assert_eq!(column.cards.len(), DEFAULT_COLUMN_LIMIT);
     }
+}
+
+// ---- Status splice for the checked save ----
+
+#[test]
+fn read_status_returns_the_top_level_value() {
+    assert_eq!(
+        read_status("---\nStatus: 'Done'\n---\n").as_deref(),
+        Some("Done")
+    );
+    assert_eq!(
+        read_status("---\nstatus: Blocked\n---\n").as_deref(),
+        Some("Blocked")
+    );
+    assert_eq!(read_status("---\nnotes: |\n  Status: x\n---\n"), None);
+    assert_eq!(read_status("Status: Done\n"), None);
+}
+
+#[test]
+fn status_removed_undoes_a_status_write() {
+    for opened in [
+        "---\ntitle: A\n---\nbody\n",
+        "body\n",
+        "",
+        "\u{FEFF}body\r\n",
+    ] {
+        let moved = set_status(opened, "Done").unwrap().content;
+        let forms = status_removed(&moved).unwrap();
+        assert!(
+            forms.iter().any(|form| form == opened),
+            "{opened:?} -> {forms:?}"
+        );
+    }
+    assert_eq!(status_removed("---\ntitle: A\n---\n"), None);
+}
+
+#[test]
+fn splice_needs_the_status_to_be_the_only_change() {
+    let opened = "---\nStatus: Not started\n---\nbody\n";
+    let expected = content_hash(opened);
+    let disk = set_status(opened, "Done").unwrap().content;
+    let buffer = "---\nStatus: Not started\n---\nbody edited\n";
+    assert_eq!(
+        splice_disk_status(&disk, buffer, &expected).as_deref(),
+        Some("---\nStatus: Done\n---\nbody edited\n")
+    );
+    let other = disk.replace("body", "changed elsewhere");
+    assert_eq!(splice_disk_status(&other, buffer, &expected), None);
+    assert_eq!(
+        splice_disk_status(&disk, buffer, &content_hash("stale")),
+        None
+    );
+    assert_eq!(splice_disk_status(opened, buffer, &expected), None);
+}
+
+#[test]
+fn move_board_card_precondition_uses_the_same_hash() {
+    let dir = TempDir::new().unwrap();
+    let content = "---\nStatus: Done\n---\n";
+    write(dir.path(), "a.md", content);
+    let fresh = Precondition::ContentHash(content_hash(content));
+    move_card(dir.path(), "a.md", "Blocked", Some(&fresh)).unwrap();
+    assert!(move_card(dir.path(), "a.md", "Done", Some(&fresh)).is_err());
 }

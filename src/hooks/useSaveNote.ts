@@ -1,7 +1,15 @@
 import { useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke, updateMockContent } from '../mock-tauri'
+import { getCachedNoteContentEntry } from './noteContentCache'
 import { cacheNoteContent } from './useTabManagement'
+
+/** Result of `save_note_content_checked`. */
+export interface SaveOutcome {
+  contentHash: string
+  /** Set when the on-disk Status was spliced into the buffer. */
+  splicedContent: string | null
+}
 
 export async function persistContent(path: string, content: string): Promise<void> {
   if (isTauri()) {
@@ -11,6 +19,39 @@ export async function persistContent(path: string, content: string): Promise<voi
   }
 }
 
+/** SHA-256 of the text's UTF-8 bytes, lowercase hex. Null when Web Crypto is missing. */
+export async function contentHash(text: string): Promise<string | null> {
+  const subtle = globalThis.crypto?.subtle
+  if (!subtle) return null
+  const digest = await subtle.digest('SHA-256', new TextEncoder().encode(text))
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+/**
+ * Hash of the note as the editor last read or wrote it. The content cache
+ * holds that text: notes load into it, and saves and property edits update
+ * it. No cached text means no check, the same as before.
+ */
+async function expectedHashFor(path: string): Promise<string | null> {
+  const cached = getCachedNoteContentEntry(path)?.value
+  return cached == null ? null : contentHash(cached)
+}
+
+/**
+ * Save with the conflict check. Returns the text now on disk: the buffer,
+ * or the buffer with a Status a board move wrote. A real conflict throws
+ * an error that starts with "Save conflict:" and writes nothing.
+ */
+export async function persistContentChecked(path: string, content: string): Promise<string> {
+  if (!isTauri()) {
+    await mockInvoke('save_note_content', { path, content })
+    return content
+  }
+  const expectedHash = await expectedHashFor(path)
+  const outcome = await invoke<SaveOutcome | null>('save_note_content_checked', { path, content, expectedHash })
+  return outcome?.splicedContent ?? content
+}
+
 /**
  * Hook that provides an explicit save function for note content.
  * Called on Cmd+S — no debounce, no auto-save.
@@ -18,13 +59,14 @@ export async function persistContent(path: string, content: string): Promise<voi
  * @param updateContent - callback to also update in-memory state after save
  */
 export function useSaveNote(updateContent: (path: string, content: string) => void) {
-  const saveNote = useCallback(async (path: string, content: string) => {
-    await persistContent(path, content)
-    cacheNoteContent(path, content)
+  const saveNote = useCallback(async (path: string, content: string): Promise<string> => {
+    const saved = await persistContentChecked(path, content)
+    cacheNoteContent(path, saved)
     if (!isTauri()) {
-      updateMockContent(path, content)
+      updateMockContent(path, saved)
     }
-    updateContent(path, content)
+    updateContent(path, saved)
+    return saved
   }, [updateContent])
 
   return { saveNote }
