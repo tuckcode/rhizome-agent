@@ -9,6 +9,7 @@ import {
   trackTimezoneDisplayChanged,
 } from '../lib/productAnalytics'
 import { areGitFeaturesEnabled } from '../lib/gitSettings'
+import { shouldBlockSecretFiles } from '../lib/secretFiles'
 import { areAutomaticUpdateChecksEnabled } from '../lib/automaticUpdateChecks'
 import {
   DEFAULT_DATE_DISPLAY_FORMAT,
@@ -29,6 +30,7 @@ export interface SettingsPreferenceDraft {
   multiWorkspaceEnabled: boolean
   sidebarTypePluralizationEnabled: boolean
   keepInTaskbarOnClose: boolean
+  blockSecretFiles: boolean
 }
 
 function numericFlag(value: boolean): number {
@@ -101,5 +103,10 @@ export function trackSettingsPreferenceChanges(settings: Settings, draft: Settin
     settings.keep_in_taskbar_on_close === true,
     draft.keepInTaskbarOnClose,
     'keep_in_taskbar_on_close_changed',
+  )
+  trackEnabledPreferenceChange(
+    shouldBlockSecretFiles(settings),
+    draft.blockSecretFiles,
+    'secret_file_block_changed',
   )
 }

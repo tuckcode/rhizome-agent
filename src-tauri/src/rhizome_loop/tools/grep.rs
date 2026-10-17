@@ -14,6 +14,7 @@ use super::walk;
 
 pub const MAX_MATCHES: usize = 100;
 pub const MAX_MATCH_CHARS: usize = 500;
+pub const MAX_LINE_SCAN_BYTES: usize = MAX_MATCH_CHARS * 4;
 pub const MAX_OUTPUT_BYTES: usize = 100_000;
 pub const MAX_FILES: usize = 2_000;
 pub const MAX_DURATION: Duration = Duration::from_secs(2);
@@ -24,7 +25,7 @@ pub(crate) const SCHEMA: &str = r#"{
   "type": "function",
   "function": {
     "name": "grep",
-    "description": "Search text files inside the user's vault roots or current workspace. Uses a regex unless literal is true. Optional path limits the search; optional glob filters file names. Honours .gitignore. Secret paths (.env*, .git/, *.pem, id_*) are omitted. Each match is `path:line:text`. Matching text is clipped to 500 characters. Results stop at 100 matches, 100000 output bytes, 2000 files, or 2 seconds, with a truncation note. Paths outside the allowed roots are refused.",
+    "description": "Search text files inside the user's vault roots or current workspace. Uses a regex unless literal is true. Optional path limits the search; optional glob filters file names. Honours .gitignore. Secret paths (.env* except .env.example, .git/, *.pem/*.key/*.p12/*.pfx, and known private-key basenames) are omitted. Each match is `path:line:text`. Matching text is clipped to 500 characters. Lines are scanned to the first 2000 bytes. Results stop at 100 matches, 100000 output bytes, 2000 files, or 2 seconds, with a truncation note. Paths outside the allowed roots are refused.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -75,16 +76,18 @@ struct Budget<'a> {
     files: usize,
     output_bytes: usize,
     note: Option<String>,
+    block: bool,
 }
 
 impl<'a> Budget<'a> {
-    fn new(limits: &'a Limits) -> Self {
+    fn new(limits: &'a Limits, block: bool) -> Self {
         Self {
             limits,
             started: Instant::now(),
             files: 0,
             output_bytes: 0,
             note: None,
+            block,
         }
     }
 
@@ -158,7 +161,8 @@ fn run_with_limits(
     let roots = sandbox::allowed_roots(vault_path, vault_paths)?;
     let starts = search_starts(search_path, vault_path, vault_paths, &roots)?;
     let mut lines = Vec::new();
-    let mut budget = Budget::new(&limits);
+    let mut budget = Budget::new(&limits, sandbox::block_secret_files());
+    let mut line_scan_truncated = false;
     for start in starts {
         if grep_start(
             &start,
@@ -167,9 +171,15 @@ fn run_with_limits(
             glob_set.as_ref(),
             &mut budget,
             &mut lines,
+            &mut line_scan_truncated,
         ) {
             break;
         }
+    }
+    if line_scan_truncated {
+        lines.push(format!(
+            "[truncated: line scan cap is {MAX_LINE_SCAN_BYTES} bytes]"
+        ));
     }
     if let Some(reason) = budget.note {
         lines.push(format!("[truncated: {reason}]"));
@@ -210,18 +220,27 @@ fn grep_start(
     glob_set: Option<&globset::GlobSet>,
     budget: &mut Budget<'_>,
     lines: &mut Vec<String>,
+    line_scan_truncated: &mut bool,
 ) -> bool {
     if start.is_file() {
-        if sandbox::is_secret(start) {
+        if sandbox::is_blocked_secret_with(start, budget.block) {
             return false;
         }
-        return grep_file(start, roots, regex, glob_set, budget, lines);
+        return grep_file(
+            start,
+            roots,
+            regex,
+            glob_set,
+            budget,
+            lines,
+            line_scan_truncated,
+        );
     }
     if !start.is_dir() {
         return false;
     }
     let mut walked = 0usize;
-    for entry in walk::gitignore_walk(start).flatten() {
+    for entry in walk::gitignore_walk(start, budget.block).flatten() {
         walked += 1;
         if walked > walk::WALK_BUDGET {
             budget.note = Some(format!("walk cap is {} entries", walk::WALK_BUDGET));
@@ -234,13 +253,21 @@ fn grep_start(
             continue;
         }
         let path = entry.path();
-        if sandbox::is_secret(path) {
+        if sandbox::is_blocked_secret_with(path, budget.block) {
             continue;
         }
         if !roots.all.iter().any(|root| sandbox::is_within(path, root)) {
             continue;
         }
-        if grep_file(path, roots, regex, glob_set, budget, lines) {
+        if grep_file(
+            path,
+            roots,
+            regex,
+            glob_set,
+            budget,
+            lines,
+            line_scan_truncated,
+        ) {
             return true;
         }
     }
@@ -254,6 +281,7 @@ fn grep_file(
     glob_set: Option<&globset::GlobSet>,
     budget: &mut Budget<'_>,
     lines: &mut Vec<String>,
+    line_scan_truncated: &mut bool,
 ) -> bool {
     let relative = sandbox::relative_to_root(path, roots);
     if let Some(glob_set) = glob_set {
@@ -267,30 +295,43 @@ fn grep_file(
     if !budget.open_file() {
         return true;
     }
-    let max_line_bytes = MAX_MATCH_CHARS * 4;
-    let scanned = scan::for_each_line(path, max_line_bytes, 1, |number, text| {
-        if regex.is_match(text) {
-            let clipped = scan::clip_chars(text, MAX_MATCH_CHARS);
-            let line = format!("{relative}:{number}:{clipped}");
-            if budget.output_bytes + line.len() > budget.limits.output_bytes {
-                budget.note = Some(format!(
-                    "output cap is {} bytes",
-                    budget.limits.output_bytes
-                ));
+    let deadline = budget.started + budget.limits.duration;
+    let scanned = scan::for_each_line_ex(
+        path,
+        MAX_LINE_SCAN_BYTES,
+        1,
+        Some(deadline),
+        |number, text, truncated| {
+            let matched = regex.is_match(text);
+            if truncated && !matched {
+                *line_scan_truncated = true;
+            }
+            if matched {
+                let clipped = scan::clip_chars(text, MAX_MATCH_CHARS);
+                let line = format!("{relative}:{number}:{clipped}");
+                if budget.output_bytes + line.len() > budget.limits.output_bytes {
+                    budget.note = Some(format!(
+                        "output cap is {} bytes",
+                        budget.limits.output_bytes
+                    ));
+                    return Control::Stop;
+                }
+                budget.output_bytes += line.len() + 1;
+                lines.push(line);
+                if lines.len() >= budget.limits.matches {
+                    budget.note = Some(format!("result cap is {}", budget.limits.matches));
+                    return Control::Stop;
+                }
+            }
+            if budget.time_up() {
                 return Control::Stop;
             }
-            budget.output_bytes += line.len() + 1;
-            lines.push(line);
-            if lines.len() >= budget.limits.matches {
-                budget.note = Some(format!("result cap is {}", budget.limits.matches));
-                return Control::Stop;
-            }
-        }
-        if budget.time_up() {
-            return Control::Stop;
-        }
-        Control::Continue
-    });
+            Control::Continue
+        },
+    );
+    if matches!(scanned, Ok(Control::Stop)) && !budget.stopped() {
+        let _ = budget.time_up();
+    }
     budget.stopped() || matches!(scanned, Ok(Control::Stop))
 }
 
@@ -419,8 +460,30 @@ mod tests {
         )
         .unwrap();
         assert!(out.contains("huge.md:1:needle"), "{out}");
+        assert!(
+            !out.contains("[truncated: line scan cap is 2000 bytes]"),
+            "{out}"
+        );
         let text = out.lines().next().unwrap().splitn(3, ':').nth(2).unwrap();
         assert!(text.len() < 3_000, "{}", text.len());
+    }
+
+    #[test]
+    fn a_match_past_the_line_scan_cap_is_missed_with_a_note() {
+        let (_dir, root) = vault();
+        let body = "x".repeat(MAX_LINE_SCAN_BYTES + 1) + "needle";
+        fs::write(Path::new(&root).join("long.md"), &body).unwrap();
+        let out = run(
+            &json!({ "pattern": "needle" }).to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap();
+        assert!(!out.contains("long.md:1:"), "{out}");
+        assert!(
+            out.contains("[truncated: line scan cap is 2000 bytes]"),
+            "{out}"
+        );
     }
 
     #[test]
@@ -542,6 +605,12 @@ mod tests {
         plant(root_path, "nested/.git/config");
         plant(root_path, "key.pem");
         plant(root_path, "id_rsa");
+        plant(root_path, "server.key");
+        plant(root_path, "client.p12");
+        plant(root_path, "cert.pfx");
+        plant(root_path, ".env.example");
+        plant(root_path, "id_rsa.pub");
+        plant(root_path, "id_card.md");
         fs::write(root_path.join("open.md"), "needle\n").unwrap();
         let out = run(
             &json!({ "pattern": "needle" }).to_string(),
@@ -550,11 +619,31 @@ mod tests {
         )
         .unwrap();
         assert!(out.contains("open.md:1:needle"), "{out}");
+        assert!(out.contains(".env.example:1:needle"), "{out}");
+        assert!(out.contains("id_rsa.pub:1:needle"), "{out}");
+        assert!(out.contains("id_card.md:1:needle"), "{out}");
         assert!(!out.contains(sandbox::BLOCKED_SECRET), "{out}");
-        assert!(!out.contains(".env"), "{out}");
+        assert!(!out.contains(".env.local"), "{out}");
         assert!(!out.contains("config"), "{out}");
         assert!(!out.contains("key.pem"), "{out}");
-        assert!(!out.contains("id_rsa"), "{out}");
+        assert!(!out.contains("id_rsa:"), "{out}");
+        assert!(!out.contains("server.key"), "{out}");
+        assert!(!out.contains("client.p12"), "{out}");
+        assert!(!out.contains("cert.pfx"), "{out}");
+    }
+
+    #[test]
+    fn override_off_lets_grep_read_secret_names_inside_roots() {
+        let (_dir, root) = vault();
+        plant(Path::new(&root), "id_rsa");
+        let _guard = sandbox::override_secret_block(false);
+        let out = run(
+            &json!({ "pattern": "needle", "path": "id_rsa" }).to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap();
+        assert!(out.contains("id_rsa:1:needle"), "{out}");
     }
 
     #[test]

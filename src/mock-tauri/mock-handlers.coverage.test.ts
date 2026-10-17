@@ -186,6 +186,7 @@ describe('mockHandlers coverage', () => {
       ai_model_providers: null,
       ai_workspace_conversations: null,
       hide_gitignored_files: null,
+      block_secret_files: null,
       all_notes_show_pdfs: null,
       all_notes_show_images: null,
       all_notes_show_unsupported: null,

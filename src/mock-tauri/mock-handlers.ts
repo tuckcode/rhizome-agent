@@ -195,6 +195,7 @@ let mockSettings: Settings = {
   ai_model_providers: null,
   ai_workspace_conversations: null,
   hide_gitignored_files: null,
+  block_secret_files: null,
   all_notes_show_pdfs: null,
   all_notes_show_images: null,
   all_notes_show_unsupported: null,
@@ -629,6 +630,8 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   get_conflict_files: (): string[] => [],
   check_claude_cli: () => ({ installed: false, version: null }),
   get_ai_agents_status: () => ({
+    // Browser mock only. A native build reports the real Prime version.
+    // Settings hides this line when the version is the string `mock`.
     prime: { installed: true, version: 'mock' },
     claude_code: { installed: false, version: null },
     codex: { installed: false, version: null },
@@ -1135,6 +1138,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
       ai_model_providers: s.ai_model_providers ?? null,
       ai_workspace_conversations: s.ai_workspace_conversations ?? null,
       hide_gitignored_files: s.hide_gitignored_files ?? null,
+      block_secret_files: s.block_secret_files ?? null,
       all_notes_show_pdfs: s.all_notes_show_pdfs ?? null,
       all_notes_show_images: s.all_notes_show_images ?? null,
       all_notes_show_unsupported: s.all_notes_show_unsupported ?? null,

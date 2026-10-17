@@ -16,7 +16,7 @@ pub(crate) const SCHEMA: &str = r#"{
   "type": "function",
   "function": {
     "name": "read_file",
-    "description": "Read a text file inside the user's vault roots or current workspace. Paths are canonicalized; anything outside those roots is refused. Secret files (.env*, anything under .git/, *.pem, id_*) return a blocked error. Optional offset (1-based line) and limit select a line window. Offset skips earlier lines without loading them. Output longer than 100000 bytes is truncated with a note. Non-UTF-8 text is decoded lossily. Files with a NUL byte are refused as binary.",
+    "description": "Read a text file inside the user's vault roots or current workspace. Paths are canonicalized; anything outside those roots is refused. Secret files (.env* except .env.example, anything under .git/, *.pem/*.key/*.p12/*.pfx, and known private-key basenames) return a blocked error. Optional offset (1-based line) and limit select a line window. Offset skips earlier lines without loading them. Output longer than 100000 bytes is truncated with a note. Non-UTF-8 text is decoded lossily. Files with a NUL byte are refused as binary.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -122,7 +122,7 @@ fn read_window(
     }
     if truncated {
         out.push_str(&format!(
-            "\n[truncated: showing first {max_bytes} bytes of {file_len}]"
+            "\n[truncated: output capped at {max_bytes} bytes; file is {file_len} bytes]"
         ));
     }
     Ok(out)
@@ -184,8 +184,34 @@ mod tests {
         )
         .unwrap();
         assert!(out.starts_with("abcd"), "{out}");
-        assert!(out.contains("[truncated:"), "{out}");
-        assert!(out.contains("10"), "{out}");
+        assert!(
+            out.contains("[truncated: output capped at 4 bytes; file is 10 bytes]"),
+            "{out}"
+        );
+        assert!(!out.contains("showing first"), "{out}");
+    }
+
+    #[test]
+    fn size_cap_with_offset_does_not_claim_first_bytes() {
+        let (_dir, root) = vault();
+        fs::write(
+            std::path::Path::new(&root).join("lines.md"),
+            "aaaa\nbbbb\ncccc\n",
+        )
+        .unwrap();
+        let out = run_with_cap(
+            &json!({ "path": "lines.md", "offset": 2 }).to_string(),
+            Some(&root),
+            &[],
+            4,
+        )
+        .unwrap();
+        assert!(out.starts_with("bbbb") || out.contains("bbbb"), "{out}");
+        assert!(
+            out.contains("[truncated: output capped at 4 bytes; file is 15 bytes]"),
+            "{out}"
+        );
+        assert!(!out.contains("showing first"), "{out}");
     }
 
     #[test]
@@ -284,6 +310,18 @@ mod tests {
         plant(root_path, "nested/.git/config");
         plant(root_path, "key.pem");
         plant(root_path, "id_rsa");
+        plant(root_path, "id_dsa");
+        plant(root_path, "id_ecdsa");
+        plant(root_path, "id_ecdsa_sk");
+        plant(root_path, "id_ed25519");
+        plant(root_path, "id_ed25519_sk");
+        plant(root_path, "id_mldsa44_ed25519");
+        plant(root_path, "server.key");
+        plant(root_path, "client.p12");
+        plant(root_path, "cert.pfx");
+        plant(root_path, "id_rsa.pub");
+        plant(root_path, "id_card.md");
+        plant(root_path, ".env.example");
         fs::write(root_path.join("open.md"), "ok\n").unwrap();
         for requested in [
             ".env",
@@ -291,6 +329,15 @@ mod tests {
             "nested/.git/config",
             "key.pem",
             "id_rsa",
+            "id_dsa",
+            "id_ecdsa",
+            "id_ecdsa_sk",
+            "id_ed25519",
+            "id_ed25519_sk",
+            "id_mldsa44_ed25519",
+            "server.key",
+            "client.p12",
+            "cert.pfx",
         ] {
             let error =
                 run(&json!({ "path": requested }).to_string(), Some(&root), &[]).unwrap_err();
@@ -302,5 +349,18 @@ mod tests {
         }
         let open = run(&json!({ "path": "open.md" }).to_string(), Some(&root), &[]).unwrap();
         assert_eq!(open, "ok");
+        for allowed in ["id_rsa.pub", "id_card.md", ".env.example"] {
+            let text = run(&json!({ "path": allowed }).to_string(), Some(&root), &[]).unwrap();
+            assert_eq!(text, "secret-value", "{allowed}");
+        }
+    }
+
+    #[test]
+    fn override_off_allows_secret_names_inside_roots() {
+        let (_dir, root) = vault();
+        plant(std::path::Path::new(&root), "id_rsa");
+        let _guard = sandbox::override_secret_block(false);
+        let out = run(&json!({ "path": "id_rsa" }).to_string(), Some(&root), &[]).unwrap();
+        assert_eq!(out, "secret-value");
     }
 }
