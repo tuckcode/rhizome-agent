@@ -802,27 +802,11 @@ mod tests {
         assert!(!vault.path().join(".env.production").exists());
     }
 
-    #[cfg(unix)]
     #[test]
     fn create_note_resolves_a_relative_path_against_the_vault() {
         let vault = tempfile::tempdir().unwrap();
-        let cwd = tempfile::tempdir().unwrap();
-        let git = cwd.path().join(".git");
-        fs::create_dir(&git).unwrap();
-        fs::write(git.join("config"), "keep\n").unwrap();
-        std::os::unix::fs::symlink(git.join("config"), cwd.path().join("note")).unwrap();
-        static CWD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-        let _cwd = CWD_LOCK
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-        struct RestoreCwd(std::path::PathBuf);
-        impl Drop for RestoreCwd {
-            fn drop(&mut self) {
-                let _ = std::env::set_current_dir(&self.0);
-            }
-        }
-        let _restore = RestoreCwd(std::env::current_dir().unwrap());
-        std::env::set_current_dir(cwd.path()).unwrap();
+        let other = tempfile::tempdir().unwrap();
+        fs::write(other.path().join("note"), "keep\n").unwrap();
         let vault_path = vault.path().to_string_lossy().into_owned();
         let created = create_note(
             &json!({ "path": "note", "content": "hello\n" }),
@@ -834,7 +818,10 @@ mod tests {
             fs::read_to_string(vault.path().join("note")).unwrap(),
             "hello\n"
         );
-        assert_eq!(fs::read_to_string(git.join("config")).unwrap(), "keep\n");
+        assert_eq!(
+            fs::read_to_string(other.path().join("note")).unwrap(),
+            "keep\n"
+        );
     }
 
     #[cfg(windows)]

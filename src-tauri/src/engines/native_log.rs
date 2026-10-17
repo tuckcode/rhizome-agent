@@ -206,6 +206,7 @@ fn apply_scrub(text: &str, saved: &[String]) -> String {
     }
     let scrubbers = scrub_regexes();
     out = scrub_assignments(&out, scrubbers);
+    out = scrub_bearer(&out, scrubbers);
     for pattern in &scrubbers.patterns {
         out = pattern.replace_all(&out, "[redacted]").into_owned();
     }
@@ -218,6 +219,7 @@ struct ScrubRegexes {
     env_name: regex::Regex,
     quoted_env_name: regex::Regex,
     prefixed_key_name: regex::Regex,
+    bearer: regex::Regex,
     patterns: Vec<regex::Regex>,
     mistral_context: regex::Regex,
     mistral_key: regex::Regex,
@@ -233,8 +235,10 @@ fn scrub_regexes() -> &'static ScrubRegexes {
             r#"(?P<pre>(?:^|[^A-Za-z0-9_])(?:(?:export|set)[ \t]+)?)(?P<quote>["']?)(?P<name>[A-Za-z][A-Za-z0-9_]*)["']?[ \t]*(?P<sep>[=:])[ \t]*(?P<value>"[^"\r\n]*"|'[^'\r\n]*'|[^[:space:]#]+)"#,
         )
         .expect("assignment scrubber");
-        let api_key_name =
-            regex::Regex::new(r"(?i)^(?:[a-z][a-z0-9]*_?)?api_?key$").expect("api_key name");
+        let api_key_name = regex::Regex::new(
+            r"(?i)^(?:[a-z][a-z0-9]*_?)?api_?key(?:_[a-z0-9]+)*$",
+        )
+        .expect("api_key name");
         let env_name = regex::Regex::new(
             r"^(?:[A-Z][A-Z0-9]*_)?(?:TOKEN|SECRET|PASSWORD)(?:_[A-Z0-9]+)*$",
         )
@@ -245,6 +249,8 @@ fn scrub_regexes() -> &'static ScrubRegexes {
         .expect("quoted env secret name");
         let prefixed_key_name =
             regex::Regex::new(r"^[A-Z][A-Z0-9]*_KEY(?:_[A-Z0-9]+)*$").expect("prefixed key name");
+        let bearer = regex::Regex::new(r"(?i)bearer\s+(?P<token>[A-Za-z0-9._\-+/=]{8,})")
+            .expect("bearer token");
         let patterns = [
             r"(?:sk-proj-|sk-or-v1-|sk-ant-|gsk_)[A-Za-z0-9_-]{8,}",
             r"(?:sk_live_|sk_test_|sk-|ghp_|gho_|ghs_|ghu_|ghr_|github_pat_|glpat-|gsk_|npm_|xox[abprse]-)[A-Za-z0-9_-]{20,}",
@@ -255,7 +261,6 @@ fn scrub_regexes() -> &'static ScrubRegexes {
             r"pplx-[A-Za-z0-9_-]{20,}",
             r"AKIA[0-9A-Z]{16}",
             r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----",
-            r"(?i)bearer\s+[A-Za-z0-9._\-+/=]{8,}",
             r#"(?i)"api_key"\s*:\s*"[^"]+""#,
         ]
         .into_iter()
@@ -267,6 +272,7 @@ fn scrub_regexes() -> &'static ScrubRegexes {
             env_name,
             quoted_env_name,
             prefixed_key_name,
+            bearer,
             patterns,
             mistral_context: regex::Regex::new(r"(?i)mistral|api\.mistral\.ai")
                 .expect("mistral context"),
@@ -335,10 +341,16 @@ fn assignment_name_is_secret(name: &str, quoted: bool, scrubbers: &ScrubRegexes)
 
 /// Quoted values and unquoted uppercase `*PASSWORD` / `*SECRET` / `*TOKEN` /
 /// `*API_KEY` values are secrets at 6 characters. Other unquoted values need 8.
+/// An unquoted code reference is left alone. A dotted value is still a secret
+/// unless it is one identifier reading another (`settings.apiKey`). A JWT has
+/// more than one dot.
 fn assignment_value_is_secret(raw: &str, name: &str, scrubbers: &ScrubRegexes) -> bool {
     let quoted = (raw.starts_with('"') && raw.ends_with('"') && raw.len() >= 2)
         || (raw.starts_with('\'') && raw.ends_with('\'') && raw.len() >= 2);
     let inner = if quoted { &raw[1..raw.len() - 1] } else { raw };
+    if !quoted && unquoted_value_is_code(inner) {
+        return false;
+    }
     let mut chars = inner.chars();
     let Some(first) = chars.next() else {
         return false;
@@ -351,6 +363,66 @@ fn assignment_value_is_secret(raw: &str, name: &str, scrubbers: &ScrubRegexes) -
     let short_ok = quoted || scrubbers.env_name.is_match(name) || uppercase_api_key;
     let min = if short_ok { 6 } else { 8 };
     inner.chars().count() >= min
+}
+
+/// `process.env.…`, `os.environ[…]`, and `getKey()` are code. One dotted
+/// identifier is a field read. A value with more than one dot, such as a JWT,
+/// is not.
+fn unquoted_value_is_code(raw: &str) -> bool {
+    let value = raw.trim_end_matches(['}', ']', ')', ',', ';']);
+    if value.contains('(') || value.contains('[') {
+        return true;
+    }
+    if value.starts_with("process.env.")
+        || value.starts_with("import.meta.env.")
+        || value.starts_with("os.environ")
+        || value.starts_with("os.getenv")
+    {
+        return true;
+    }
+    let mut parts = value.split('.');
+    let Some(first) = parts.next() else {
+        return false;
+    };
+    if !is_code_ident(first) {
+        return false;
+    }
+    let Some(second) = parts.next() else {
+        return false;
+    };
+    is_code_ident(second) && parts.next().is_none()
+}
+
+fn is_code_ident(part: &str) -> bool {
+    let mut chars = part.chars();
+    match chars.next() {
+        Some(ch) if ch.is_ascii_alphabetic() || ch == '_' => {}
+        _ => return false,
+    }
+    chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+}
+
+/// `Bearer authentication` is a sentence. A token needs a digit or `. _ - / + =`.
+fn scrub_bearer(text: &str, scrubbers: &ScrubRegexes) -> String {
+    scrubbers
+        .bearer
+        .replace_all(text, |caps: &regex::Captures| {
+            let token = caps
+                .name("token")
+                .map(|matched| matched.as_str())
+                .unwrap_or("");
+            if token
+                .chars()
+                .any(|ch| ch.is_ascii_digit() || matches!(ch, '.' | '_' | '-' | '/' | '+' | '='))
+            {
+                "[redacted]".to_string()
+            } else {
+                caps.get(0)
+                    .map(|matched| matched.as_str().to_string())
+                    .unwrap_or_default()
+            }
+        })
+        .into_owned()
 }
 
 /// A bare Mistral key is 32 letters and digits with both cases, and only
@@ -1310,9 +1382,14 @@ mod tests {
 
     #[test]
     fn scrub_secrets_redacts_a_bearer_token() {
-        let token = format!("{}{}", "abcd", "wxyz");
+        let token = format!("{}{}", "abcd", "12xy");
         assert_eq!(token.len(), 8);
         assert_redacted(&format!("Authorization: Bearer {token}"), &token);
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_bearer_authentication_prose() {
+        assert_unchanged("uses Bearer authentication");
     }
 
     #[test]
@@ -1332,11 +1409,7 @@ mod tests {
     fn scrub_secrets_redacts_a_pem_block() {
         let pem = format!(
             "{}{}\n{}\n{}{}",
-            "-----BEGIN ",
-            "PRIVATE KEY-----",
-            "abcd",
-            "-----END ",
-            "PRIVATE KEY-----",
+            "-----BEGIN ", "PRIVATE KEY-----", "abcd", "-----END ", "PRIVATE KEY-----",
         );
         assert_redacted(&pem, "abcd");
     }
@@ -1362,6 +1435,59 @@ mod tests {
     #[test]
     fn scrub_secrets_redacts_a_short_db_password() {
         assert_redacted("DB_PASSWORD=hunter2", "hunter2");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_lowercase_api_key_suffix() {
+        let value = format!("{}{}", "super", "secret");
+        assert_redacted(&format!("api_key_prod={value}"), &value);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_an_uppercase_api_key_suffix() {
+        let value = format!("{}{}", "super", "secret");
+        assert_redacted(&format!("API_KEY_PROD={value}"), &value);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_jwt_after_api_key() {
+        let jwt = format!("{}.{}.{}", "aaaaBBBB", "ccccDDDD", "eeee12ff");
+        assert_redacted(&format!("apiKey: {jwt}"), &jwt);
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_an_api_key_read_from_process_env() {
+        assert_unchanged("apiKey: process.env.OPENAI_API_KEY");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_an_api_key_field_read() {
+        assert_unchanged("{ apiKey: settings.apiKey }");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_an_api_key_function_call() {
+        assert_unchanged("const apiKey = getKey()");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_an_api_key_read_from_os_environ() {
+        assert_unchanged(r#"api_key=os.environ["OPENAI_API_KEY"]"#);
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_a_quoted_secret_phrase() {
+        assert_unchanged(r#""secret": "sauce recipe""#);
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_an_empty_quoted_password() {
+        assert_unchanged(r#""password": """#);
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_an_api_key_label() {
+        assert_unchanged(r#""apiKeyLabel": "Enter key""#);
     }
 
     #[test]
