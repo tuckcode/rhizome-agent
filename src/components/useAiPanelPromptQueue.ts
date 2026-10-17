@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useState } from 'react'
+import { startTransition, useCallback, useEffect, useRef, useState } from 'react'
 import type { NoteReference } from '../utils/ai-context'
 import {
   AI_COMPOSER_PREFILL_EVENT,
@@ -67,6 +67,7 @@ export function useAiPanelPromptQueue({
   enabled = true,
 }: UseAiPanelPromptQueueArgs) {
   const [queuedPrompt, setQueuedPrompt] = useState<QueuedAiPrompt | null>(null)
+  const sentPromptIdRef = useRef<number | null>(null)
 
   const handleQueuedPrompt = useCallback((prompt: QueuedAiPrompt) => {
     setInput(prompt.text)
@@ -90,7 +91,11 @@ export function useAiPanelPromptQueue({
   useEffect(() => {
     const prompt = readyQueuedPrompt({ currentTargetId, enabled, input, isActive, onTargetChange, queuedPrompt })
     if (!prompt) return
+    if (sentPromptIdRef.current === prompt.id) return
+    sentPromptIdRef.current = prompt.id
 
+    // Intended: Cmd+K starts a fresh turn. clearConversation() drops the
+    // current thread, including one just retargeted by Use Rhizome.
     agent.clearConversation()
     agent.sendMessage(prompt.text, prompt.references)
     startTransition(() => {

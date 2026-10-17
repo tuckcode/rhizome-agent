@@ -50,6 +50,7 @@ export function CommandPaletteAiMode({
       onChange={onChange}
       onSubmit={(text, references) => onSubmit(stripLeadingSpace(text), references)}
       submitOnEmpty={true}
+      readOnly={!aiAgentReady}
       placeholder={t('ai.panel.placeholder.ready', { agent: aiAgentLabel })}
       dataTestId="command-palette-ai-input"
       editorClassName="border-none px-0 py-0 text-[15px]"
@@ -82,6 +83,7 @@ export function CommandPaletteAiMode({
                     ref={useRhizomeRef}
                     type="button"
                     size="sm"
+                    className="focus:ring-2 focus:ring-[var(--state-focus-ring)]"
                     onClick={onUseRhizome}
                     data-testid="command-palette-use-rhizome"
                   >

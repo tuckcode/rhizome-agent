@@ -9,18 +9,26 @@ export function settingsAfterUseRhizome(
   rhizomeTargetId: string,
   activeConversationId: string | null | undefined,
 ): Settings {
-  const stored = settings.ai_workspace_conversations ?? []
-  const conversations = stored.map((conversation) => (
-    activeConversationId && conversation.id === activeConversationId
-      ? { ...conversation, target_id: rhizomeTargetId }
-      : conversation
-  ))
+  const stored = [...(settings.ai_workspace_conversations ?? [])]
+  if (activeConversationId) {
+    const index = stored.findIndex((conversation) => conversation.id === activeConversationId)
+    if (index >= 0) {
+      stored[index] = { ...stored[index], target_id: rhizomeTargetId }
+    } else {
+      stored.push({
+        archived: false,
+        id: activeConversationId,
+        target_id: rhizomeTargetId,
+        title: 'AI Chat',
+      })
+    }
+  }
 
   return {
     ...settings,
     default_ai_target: rhizomeTargetId,
-    ai_workspace_conversations: conversations.length > 0
-      ? conversations
+    ai_workspace_conversations: stored.length > 0
+      ? stored
       : settings.ai_workspace_conversations,
   }
 }

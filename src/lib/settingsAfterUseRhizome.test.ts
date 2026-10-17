@@ -59,4 +59,15 @@ describe('settingsAfterUseRhizome', () => {
     expect(next.default_ai_agent).toBe('prime')
     expect(next.ai_workspace_conversations).toEqual(baseSettings.ai_workspace_conversations)
   })
+
+  it('upserts an unsaved active conversation so reopen keeps Rhizome', () => {
+    const settings = { ...baseSettings, ai_workspace_conversations: null }
+    const next = settingsAfterUseRhizome(settings, 'agent:prime', 'unsaved-codex')
+
+    expect(next.default_ai_target).toBe('agent:prime')
+    expect(next.default_ai_agent).toBe('prime')
+    expect(next.ai_workspace_conversations).toEqual([
+      { id: 'unsaved-codex', title: 'AI Chat', target_id: 'agent:prime', archived: false },
+    ])
+  })
 })

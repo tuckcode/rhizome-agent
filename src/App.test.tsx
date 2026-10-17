@@ -535,7 +535,6 @@ import { isTauri, mockInvoke } from './mock-tauri'
 import { resetPrimeHostStatus } from './hooks/usePrimeHostStatus'
 import { streamAiAgent } from './utils/streamAiAgent'
 import { streamNativeChat } from './utils/streamNativeChat'
-import { takeQueuedAiPrompt } from './utils/aiPromptBridge'
 import { panePresetStorageKey } from './lib/panePresetStorage'
 import { notesPanelModeStorageKey } from './lib/notesPanelMode'
 import { viewShortcutEventModifiers } from './lib/railViewShortcuts'
@@ -1242,6 +1241,17 @@ describe('App', () => {
       if (payload?.settings) settingsStore = payload.settings
       return null
     }
+    mockCommandResults.get_prime_session_host_status = {
+      installed: true,
+      version: 'mock',
+      running: true,
+      sessionId: 'sess-1',
+      isStreaming: false,
+      binaryPath: '/mock/prime-agent',
+      modelProvider: 'xai',
+      modelId: 'grok-4.5',
+      modelName: 'Grok 4.5',
+    }
     mockCommandResults.get_ai_agents_status = {
       prime: { installed: true, version: 'mock' },
       claude_code: { installed: true, version: '2.1.90' },
@@ -1282,11 +1292,14 @@ describe('App', () => {
     expect(settingsStore.default_ai_agent).toBe('prime')
     expect(settingsStore.ai_workspace_conversations?.find((conversation) => conversation.id === 'codex-chat')?.target_id)
       .toBe('agent:prime')
+    expect(screen.getByTestId('ai-workspace')).toBeInTheDocument()
 
-    const queued = takeQueuedAiPrompt()
-    const composerText = screen.queryByTestId('agent-input')?.textContent ?? ''
+    await waitFor(() => {
+      expect(streamNativeChat).toHaveBeenCalledTimes(1)
+    }, { timeout: 5000 })
+    expect(streamAiAgent).not.toHaveBeenCalled()
     const streamed = vi.mocked(streamNativeChat).mock.calls[0]?.[0] as { message?: string } | undefined
-    expect(`${queued?.text ?? ''} ${composerText} ${streamed?.message ?? ''}`).toMatch(/summarize the vault/)
+    expect(streamed?.message).toMatch(/summarize the vault/)
 
     blurTypingSurface()
     fireEvent.keyDown(window, { key: 'l', code: 'KeyL', metaKey: true, shiftKey: true })

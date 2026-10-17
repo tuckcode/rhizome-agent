@@ -11,6 +11,7 @@ import { localizeCommandGroup } from '../hooks/commands/localizeCommands'
 import { rememberFeedbackDialogOpener } from '../lib/feedbackDialogOpener'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { formatDroppedPathList } from './inlineWikilinkDropText'
+import { extractInlineWikilinkReferences } from './inlineWikilinkText'
 import { CommandPaletteAiMode } from './CommandPaletteAiMode'
 import { Input } from './ui/input'
 import { useNativePathDrop } from './useNativePathDrop'
@@ -430,8 +431,9 @@ function OpenCommandPalette({
     onUseRhizome?.()
     const prompt = aiValue.startsWith(' ') ? aiValue.slice(1).trim() : aiValue.trim()
     if (prompt) {
-      if (aiRhizomeTargetId) queueAiPrompt(prompt, [], aiRhizomeTargetId)
-      else queueAiPrompt(prompt, [])
+      const references = extractInlineWikilinkReferences(prompt, entries)
+      if (aiRhizomeTargetId) queueAiPrompt(prompt, references, aiRhizomeTargetId)
+      else queueAiPrompt(prompt, references)
       requestOpenAiChat()
     }
     onClose()

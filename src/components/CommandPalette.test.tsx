@@ -593,11 +593,42 @@ describe('CommandPalette', () => {
     expect(openExternalUrl).toHaveBeenCalledWith('https://developers.openai.com/codex/cli')
 
     updateAiInput(' keep this prompt')
+    const editor = screen.getByTestId('command-palette-ai-input')
+    expect(editor).toHaveAttribute('contenteditable', 'false')
+    expect(editor.textContent).toContain('keep this prompt')
+    expect(screen.getByTestId('command-palette-use-rhizome').className).toMatch(/focus:ring-2/)
     fireEvent.click(screen.getByTestId('command-palette-use-rhizome'))
     expect(onUseRhizome).toHaveBeenCalledOnce()
     expect(queueAiPrompt).toHaveBeenCalledWith('keep this prompt', [], 'agent:prime')
     expect(requestOpenAiChat).toHaveBeenCalledOnce()
     expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('passes note references when using Rhizome instead', () => {
+    const onUseRhizome = vi.fn()
+    render(
+      <CommandPalette
+        open={true}
+        commands={commands}
+        entries={entries}
+        aiAgentReady={false}
+        aiAgentLabel="Codex"
+        aiRhizomeTargetId="agent:prime"
+        onClose={onClose}
+        onUseRhizome={onUseRhizome}
+      />,
+    )
+
+    fireEvent.change(screen.getByPlaceholderText('Type a command...'), { target: { value: ' ' } })
+    updateAiInput(' ask [[Alpha]]')
+    fireEvent.click(screen.getByTestId('command-palette-use-rhizome'))
+
+    expect(onUseRhizome).toHaveBeenCalledOnce()
+    expect(queueAiPrompt).toHaveBeenCalledWith(
+      'ask [[Alpha]]',
+      [expect.objectContaining({ title: 'Alpha', path: '/vault/alpha.md' })],
+      'agent:prime',
+    )
   })
 
   it('does not send a missing-agent prompt with Enter', () => {

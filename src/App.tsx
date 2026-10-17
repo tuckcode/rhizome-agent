@@ -355,6 +355,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     setLastAiWorkspaceConversationId(id)
   }, [])
   const [lastAiWorkspaceTarget, setLastAiWorkspaceTarget] = useState<AiTarget | null>(null)
+  const [requestedConversationTargetId, setRequestedConversationTargetId] = useState<string | undefined>()
+  const [conversationRetargetToken, setConversationRetargetToken] = useState(0)
   const handleActiveAiWorkspaceTargetChange = useCallback((target: AiTarget) => {
     setLastAiWorkspaceTarget((current) => (current?.id === target.id ? current : target))
   }, [setLastAiWorkspaceTarget])
@@ -365,6 +367,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       return
     }
     setLastAiWorkspaceTarget(rhizome)
+    setRequestedConversationTargetId(rhizome.id)
+    setConversationRetargetToken((token) => token + 1)
     void saveSettings(settingsAfterUseRhizome(settings, rhizome.id, lastAiWorkspaceConversationId))
     dialogs.closeCommandPalette()
   }, [
@@ -2072,6 +2076,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       noteListFilter={aiNoteListFilter}
       onActiveConversationChange={handleActiveAiWorkspaceConversationChange}
       onActiveTargetChange={handleActiveAiWorkspaceTargetChange}
+      requestedConversationTargetId={requestedConversationTargetId}
+      conversationRetargetToken={conversationRetargetToken}
       onClose={closeAIChat}
       onConversationSettingsChange={handleAiWorkspaceConversationsChange}
       onOpenAiSettings={handleOpenAiSettings}
