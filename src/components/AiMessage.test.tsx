@@ -550,10 +550,11 @@ describe('AiMessage', () => {
   })
 
   it('keeps Allow and Deny focusable on the collapsed tool-use row', () => {
+    const raw = '{"command":"ls"}'
     render(
       <AiMessage
         userMessage="Run it"
-        actions={[pendingApprovalAction('bash')]}
+        actions={[pendingApprovalAction('bash', { args: raw, callId: 'bash-1' })]}
       />,
     )
 
@@ -569,6 +570,8 @@ describe('AiMessage', () => {
     expect(deny).not.toBeDisabled()
     allow.focus()
     expect(allow).toHaveFocus()
+    expect(screen.getByTestId('tool-use-approval-command').textContent).toBe(raw)
+    expect(screen.queryByRole('button', { name: 'Allow for session' })).toBeNull()
   })
 
   it('groups five identical tool names into one counted row', () => {
@@ -587,6 +590,264 @@ describe('AiMessage', () => {
     expect(screen.getByTestId('tool-use-count').textContent).toBe('5')
     expect(screen.getAllByTestId('ai-action-card')).toHaveLength(1)
     expect(screen.getByText('ipython ×5')).toBeTruthy()
+  })
+
+  it('shows the Run command card and bash result row', () => {
+    const { rerender } = render(
+      <AiMessage
+        userMessage="list files"
+        actions={[{
+          tool: 'bash',
+          toolId: 't1',
+          label: 'ls',
+          status: 'pending',
+          input: '{"command":"wrong","timeout_secs":30}',
+          approval: {
+            promptId: 'p1',
+            callId: 't1',
+            args: 'ls',
+            options: [
+              { id: 'allow_once', label: 'Allow once' },
+              { id: 'allow_session', label: 'Allow for session' },
+              { id: 'deny', label: 'Deny' },
+            ],
+          },
+        }]}
+      />,
+    )
+    expect(screen.getByText('Run command')).toBeTruthy()
+    expect(screen.getByTestId('approval-command')).toHaveTextContent('ls')
+    expect(screen.getByTestId('approval-timeout')).toHaveTextContent('Stops after 30 seconds.')
+    expect(screen.queryByRole('button', { name: 'Allow for session' })).toBeNull()
+
+    rerender(
+      <AiMessage
+        userMessage="list files"
+        actions={[{
+          tool: 'bash',
+          toolId: 't1',
+          label: 'ls',
+          status: 'done',
+          input: '{"command":"ls"}',
+          output: JSON.stringify({
+            kind: 'bash_result',
+            exit_code: 0,
+            timed_out: false,
+            stopped: false,
+            stdout: 'notes\n',
+            stderr: '',
+            stdout_truncated: false,
+            stderr_truncated: false,
+          }),
+        }]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByTestId('bash-result-card')).toBeTruthy()
+    expect(screen.getByTestId('bash-result-exit')).toHaveTextContent('exit 0')
+    expect(screen.queryByTestId('tool-approval-card')).toBeNull()
+  })
+
+  it('shows a raw ApprovalRequested command with surrounding whitespace and copies it exactly', () => {
+    writeClipboardText.mockResolvedValue(undefined)
+    render(
+      <AiMessage
+        userMessage="list files"
+        actions={[{
+          tool: 'bash',
+          toolId: 't1',
+          label: 'ls',
+          status: 'pending',
+          input: '{"command":"  ls notes  ","timeout_secs":30}',
+          approval: {
+            promptId: 'p1',
+            callId: 't1',
+            args: '  ls notes  ',
+            options: [
+              { id: 'allow_once', label: 'Allow once' },
+              { id: 'deny', label: 'Deny' },
+            ],
+          },
+        }]}
+      />,
+    )
+    expect(screen.getByTestId('approval-command').textContent).toBe('  ls notes  ')
+    fireEvent.click(screen.getByRole('button', { name: 'Copy command' }))
+    expect(writeClipboardText).toHaveBeenCalledWith('  ls notes  ')
+  })
+
+  it('shows JSON-looking approval args literally when call_id is present', () => {
+    writeClipboardText.mockResolvedValue(undefined)
+    const raw = '{"command":"ls"}'
+    render(
+      <AiMessage
+        userMessage="list files"
+        actions={[{
+          tool: 'bash',
+          toolId: 't1',
+          label: 'ls',
+          status: 'pending',
+          input: '{"command":"echo hi"}',
+          approval: {
+            promptId: 'p1',
+            callId: 't1',
+            args: raw,
+            options: [{ id: 'allow_once', label: 'Allow once' }, { id: 'deny', label: 'Deny' }],
+          },
+        }]}
+      />,
+    )
+    expect(screen.getByTestId('approval-command').textContent).toBe(raw)
+    fireEvent.click(screen.getByRole('button', { name: 'Copy command' }))
+    expect(writeClipboardText).toHaveBeenCalledWith(raw)
+  })
+
+  it('shows the full pwned command instead of the inner echo hi', () => {
+    writeClipboardText.mockResolvedValue(undefined)
+    const raw = '{"command":"echo hi","x":"$(touch /tmp/pwned)"}'
+    render(
+      <AiMessage
+        userMessage="run"
+        actions={[{
+          tool: 'bash',
+          toolId: 'call_1',
+          label: 'bash',
+          status: 'pending',
+          input: raw,
+          command: raw,
+          approval: {
+            promptId: 'p1',
+            callId: 'call_1',
+            args: raw,
+            options: [{ id: 'allow_once', label: 'Allow once' }, { id: 'deny', label: 'Deny' }],
+          },
+        }]}
+      />,
+    )
+    expect(screen.getByTestId('approval-command').textContent).toBe(raw)
+    expect(screen.getByTestId('approval-command').textContent).toContain('pwned')
+    fireEvent.click(screen.getByRole('button', { name: 'Copy command' }))
+    expect(writeClipboardText).toHaveBeenCalledWith(raw)
+  })
+
+  it('shows driver.rs:669 shown_args unchanged through VisibleCommand', () => {
+    writeClipboardText.mockResolvedValue(undefined)
+    // Exact `shown_args = command` payload from driver.rs:664-669.
+    const shownArgs = [
+      '{"command":"echo hi","x":"$(touch /tmp/pwned)"}',
+      '{"command":"echo safe","command":"rm -rf ~"}',
+      'echo \u202Esecret',
+    ]
+    for (const raw of shownArgs) {
+      const { unmount } = render(
+        <AiMessage
+          userMessage="run"
+          actions={[{
+            tool: 'bash',
+            toolId: 'call_1',
+            label: 'bash',
+            status: 'pending',
+            input: '{"command":"ls"}',
+            command: raw,
+            approval: {
+              promptId: 'p1',
+              callId: 'call_1',
+              args: raw,
+              options: [{ id: 'allow_once', label: 'Allow once' }, { id: 'deny', label: 'Deny' }],
+            },
+          }]}
+        />,
+      )
+      const card = screen.getByTestId('approval-command')
+      if (raw.includes('\u202E')) {
+        expect(card).toHaveTextContent('echo')
+        expect(card).toHaveTextContent('\\u{202E}')
+        expect(card).toHaveTextContent('secret')
+        expect(screen.getByTestId('command-hidden')).toHaveTextContent('\\u{202E}')
+      } else {
+        expect(card.textContent).toBe(raw)
+      }
+      fireEvent.click(screen.getByRole('button', { name: 'Copy command' }))
+      expect(writeClipboardText).toHaveBeenCalledWith(raw)
+      writeClipboardText.mockClear()
+      unmount()
+    }
+  })
+
+  it('reads the result command from JSON tool-call input without trimming', () => {
+    render(
+      <AiMessage
+        userMessage="list files"
+        actions={[{
+          tool: 'bash',
+          toolId: 't1',
+          label: 'ls',
+          status: 'done',
+          input: '{"command":"  ls notes  "}',
+          output: JSON.stringify({
+            kind: 'bash_result',
+            exit_code: 0,
+            timed_out: false,
+            stopped: false,
+            stdout: 'notes\n',
+            stderr: '',
+            stdout_truncated: false,
+            stderr_truncated: false,
+          }),
+        }]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByTestId('bash-result-summary').textContent).toContain('ls notes')
+  })
+
+  it('keeps two consecutive bash calls as separate cards', () => {
+    render(
+      <AiMessage
+        userMessage="run two"
+        actions={[
+          {
+            tool: 'bash',
+            toolId: 't1',
+            label: 'ls',
+            status: 'done',
+            input: '{"command":"ls"}',
+            output: JSON.stringify({
+              kind: 'bash_result',
+              exit_code: 0,
+              timed_out: false,
+              stopped: false,
+              stdout: 'a\n',
+              stderr: '',
+              stdout_truncated: false,
+              stderr_truncated: false,
+            }),
+          },
+          {
+            tool: 'bash',
+            toolId: 't2',
+            label: 'pwd',
+            status: 'done',
+            input: '{"command":"pwd"}',
+            output: JSON.stringify({
+              kind: 'bash_result',
+              exit_code: 0,
+              timed_out: false,
+              stopped: false,
+              stdout: '/vault\n',
+              stderr: '',
+              stdout_truncated: false,
+              stderr_truncated: false,
+            }),
+          },
+        ]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getAllByTestId('bash-result-card')).toHaveLength(2)
+    const summaries = screen.getAllByTestId('bash-result-summary')
+    expect(summaries[0]).toHaveTextContent('ls')
+    expect(summaries[1]).toHaveTextContent('pwd')
   })
 
   it('passes onOpenNote to action cards', () => {

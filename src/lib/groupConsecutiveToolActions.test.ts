@@ -27,6 +27,15 @@ describe('groupConsecutiveToolActions', () => {
     expect(grouped[0].label).toBe('ipython ×5')
   })
 
+  it('never groups consecutive bash calls', () => {
+    const grouped = groupConsecutiveToolActions([
+      action('bash', 'a', 'ls'),
+      action('bash', 'b', 'pwd'),
+    ])
+    expect(grouped).toHaveLength(2)
+    expect(grouped.map((row) => row.label)).toEqual(['ls', 'pwd'])
+  })
+
   it('keeps separate runs when another tool sits between them', () => {
     const grouped = groupConsecutiveToolActions([
       action('bash', 'a', 'rg foo'),

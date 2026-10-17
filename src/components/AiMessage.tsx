@@ -16,8 +16,17 @@ import { Button } from '@/components/ui/button'
 import { ActionTooltip } from '@/components/ui/action-tooltip'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AiActionCard, type AiActionStatus } from './AiActionCard'
+import { BashResultCard } from './BashResultCard'
 import { ToolApprovalCard } from './ToolApprovalCard'
-import type { NativeApprovalChoice, NativeApprovalOption } from '../lib/nativeToolApproval'
+import { VisibleCommand } from './VisibleCommand'
+import {
+  bashApprovalCommand,
+  commandFromToolCallInput,
+  isBashTool,
+  timeoutSecsFromToolArgs,
+  type NativeApprovalChoice,
+  type NativeApprovalOption,
+} from '../lib/nativeToolApproval'
 import { MarkdownContent } from './MarkdownContent'
 import { ReplySelectionPill } from './ReplySelectionPill'
 import { translate, type AppLocale } from '../lib/i18n'
@@ -40,12 +49,14 @@ import { TranscriptHitAnchor } from './TranscriptHitAnchor'
 export interface AiActionApproval {
   promptId: string
   options: NativeApprovalOption[]
+  args?: string
   preview?: string
   notes?: string[]
   capped?: boolean
   path?: string
   created?: boolean
   overwrite?: boolean
+  /** Mapped from ApprovalRequested.call_id. */
   callId?: string
   busy?: boolean
   onReply?: (choice: NativeApprovalChoice) => void
@@ -59,6 +70,12 @@ export interface AiAction {
   status: AiActionStatus
   input?: string
   output?: string
+  /** Bash command shown on the result row. */
+  command?: string
+  /** Set from a deny / approval-cancelled event, not from output text. */
+  denied?: boolean
+  /** Old pending row settled because a later approval.call_id did not match. */
+  superseded?: boolean
   /** Assistant text that was logged immediately before this tool round. */
   beforeText?: string
   approval?: AiActionApproval
@@ -311,36 +328,73 @@ function ActionCardsList({ actions, onOpenNote, expandedIds, onToggleExpand }: {
   return (
     <div className="flex flex-col gap-1" style={{ marginBottom: 8 }}>
       {groupConsecutiveToolActions(actions).map((action) => (
-        action.approval && action.status === 'pending' ? (
-          <ToolApprovalCard
-            key={action.toolId}
-            tool={action.tool}
-            path={action.approval.path ?? action.path}
-            preview={action.approval.preview}
-            notes={action.approval.notes}
-            capped={action.approval.capped}
-            created={action.approval.created}
-            overwrite={action.approval.overwrite}
-            options={action.approval.options}
-            busy={action.approval.busy}
-            onReply={(choice) => action.approval?.onReply?.(choice)}
-          />
-        ) : (
-          <AiActionCard
-            key={action.toolId}
-            tool={action.tool}
-            label={action.label}
-            path={action.path}
-            status={action.status}
-            input={action.input}
-            output={action.output}
-            expanded={expandedIds.has(action.toolId)}
-            onToggle={() => onToggleExpand(action.toolId)}
-            onOpenNote={onOpenNote}
-          />
-        )
+        <ActionCardRow
+          key={action.toolId}
+          action={action}
+          expanded={expandedIds.has(action.toolId)}
+          onOpenNote={onOpenNote}
+          onToggleExpand={onToggleExpand}
+        />
       ))}
     </div>
+  )
+}
+
+function ActionCardRow({
+  action,
+  expanded,
+  onOpenNote,
+  onToggleExpand,
+}: {
+  action: AiAction
+  expanded: boolean
+  onOpenNote?: (path: string) => void
+  onToggleExpand: (toolId: string) => void
+}) {
+  if (action.approval && action.status === 'pending') {
+    return (
+      <ToolApprovalCard
+        tool={action.tool}
+        path={action.approval.path ?? action.path}
+        preview={action.approval.preview}
+        notes={action.approval.notes}
+        capped={action.approval.capped}
+        created={action.approval.created}
+        overwrite={action.approval.overwrite}
+        command={bashApprovalCommand(action.approval.args)
+          ?? commandFromToolCallInput(action.input)}
+        timeoutSecs={timeoutSecsFromToolArgs(action.input)}
+        options={action.approval.options}
+        busy={action.approval.busy}
+        onReply={(choice) => action.approval?.onReply?.(choice)}
+      />
+    )
+  }
+  if (isBashTool(action.tool)) {
+    return (
+      <BashResultCard
+        command={action.command ?? commandFromToolCallInput(action.input)}
+        denied={action.denied}
+        superseded={action.superseded}
+        output={action.output}
+        status={action.status}
+        expanded={expanded}
+        onToggle={() => onToggleExpand(action.toolId)}
+      />
+    )
+  }
+  return (
+    <AiActionCard
+      tool={action.tool}
+      label={action.label}
+      path={action.path}
+      status={action.status}
+      input={action.input}
+      output={action.output}
+      expanded={expanded}
+      onToggle={() => onToggleExpand(action.toolId)}
+      onOpenNote={onOpenNote}
+    />
   )
 }
 
@@ -348,16 +402,25 @@ function pendingApprovalActions(actions: AiAction[]): AiAction[] {
   return actions.filter((action) => action.approval && action.status === 'pending')
 }
 
+function pendingApprovalCommand(action: AiAction): string | undefined {
+  if (!isBashTool(action.tool)) return undefined
+  return bashApprovalCommand(action.approval?.args)
+    ?? commandFromToolCallInput(action.input)
+}
+
 function ApprovalRowActions({ actions }: { actions: AiAction[] }) {
   return (
     <div
-      className="flex flex-wrap items-center justify-end gap-1.5"
+      className="flex shrink-0 items-center justify-end gap-1.5"
       data-testid="tool-use-approval-actions"
       onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => event.stopPropagation()}
     >
-      {actions.flatMap((action) => (
-        (action.approval?.options ?? []).map((option) => (
+      {actions.flatMap((action) => {
+        const options = isBashTool(action.tool)
+          ? (action.approval?.options ?? []).filter((option) => option.id !== 'allow_session')
+          : (action.approval?.options ?? [])
+        return options.map((option) => (
           <Button
             key={`${action.toolId}-${option.id}`}
             disabled={action.approval?.busy}
@@ -371,7 +434,7 @@ function ApprovalRowActions({ actions }: { actions: AiAction[] }) {
             {option.label}
           </Button>
         ))
-      ))}
+      })}
     </div>
   )
 }
@@ -393,16 +456,19 @@ function ToolUseBlock({
   const approvals = pendingApprovalActions(actions)
   const [userExpanded, setUserExpanded] = useState<boolean | null>(null)
   const expanded = userExpanded ?? approvals.length > 0
+  const collapsedCommand = !expanded
+    ? approvals.map(pendingApprovalCommand).find((command) => command !== undefined)
+    : undefined
 
   return (
     <div style={{ marginBottom: 8 }}>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-nowrap items-center gap-2">
         <button
           type="button"
           className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 border-none bg-transparent p-0 text-muted-foreground transition-colors hover:text-foreground"
           style={{ fontSize: 12, padding: '4px 0' }}
           aria-expanded={expanded}
-          onClick={() => setUserExpanded(!(userExpanded ?? approvals.length > 0))}
+          onClick={() => setUserExpanded(!expanded)}
           data-testid="tool-use-toggle"
         >
           <Terminal size={14} />
@@ -423,6 +489,14 @@ function ToolUseBlock({
           </span>
           {expanded ? <CaretDown size={12} /> : <CaretRight size={12} />}
         </button>
+        {!expanded && collapsedCommand !== undefined ? (
+          <code
+            className="min-w-0 truncate rounded-sm bg-[var(--syntax-monospace-bg)] px-0.5 font-mono text-[12px]"
+            data-testid="tool-use-approval-command"
+          >
+            <VisibleCommand command={collapsedCommand} wrap={false} />
+          </code>
+        ) : null}
         {!expanded && approvals.length > 0 ? <ApprovalRowActions actions={approvals} /> : null}
       </div>
       {expanded && (

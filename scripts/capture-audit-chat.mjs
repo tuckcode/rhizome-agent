@@ -9,6 +9,7 @@ mkdirSync(outDir, { recursive: true })
 const shots = [
   ['graphite', 'approval-collapsed-before'],
   ['graphite', 'approval-collapsed'],
+  ['graphite', 'approval-bash'],
   ['graphite', 'approval-allow-focus'],
   ['graphite', 'topbar-native'],
   ['graphite', 'header-title'],
@@ -16,6 +17,7 @@ const shots = [
   ['graphite', 'empty'],
   ['earth', 'approval-collapsed-before'],
   ['earth', 'approval-collapsed'],
+  ['earth', 'approval-bash'],
   ['earth', 'approval-allow-focus'],
   ['earth', 'topbar-native'],
   ['earth', 'header-title'],

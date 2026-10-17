@@ -14,6 +14,7 @@ type ShotTheme = 'graphite' | 'earth'
 type ShotState =
   | 'approval-collapsed-before'
   | 'approval-collapsed'
+  | 'approval-bash'
   | 'approval-allow-focus'
   | 'topbar-native'
   | 'header-title'
@@ -23,6 +24,7 @@ type ShotState =
 const STATES: ShotState[] = [
   'approval-collapsed-before',
   'approval-collapsed',
+  'approval-bash',
   'approval-allow-focus',
   'topbar-native',
   'header-title',
@@ -60,8 +62,11 @@ function pendingBash() {
     toolId: 'bash-1',
     label: 'bash',
     status: 'pending' as const,
+    input: '{"command":"pnpm test","timeout_secs":30}',
     approval: {
       promptId: 'p1',
+      callId: 'bash-1',
+      args: 'pnpm test',
       options: OPTIONS,
       onReply: () => {},
     },
@@ -168,10 +173,18 @@ export function Shot() {
         <BeforeCollapsedApproval />
       </div>
     )
+  } else if (state === 'approval-bash') {
+    title = 'Pending bash approval, auto-expanded'
+    body = (
+      <AiMessage
+        userMessage="Run the tests"
+        actions={[pendingBash()]}
+      />
+    )
   } else if (state === 'approval-collapsed' || state === 'approval-allow-focus') {
     title = state === 'approval-allow-focus'
-      ? 'Pending approval, Allow focused'
-      : 'Pending approval, collapsed (after)'
+      ? 'Pending bash approval, Allow focused'
+      : 'Pending bash approval, collapsed (after)'
     body = (
       <AiMessage
         userMessage="Run the tests"
