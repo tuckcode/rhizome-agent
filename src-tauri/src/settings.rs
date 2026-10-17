@@ -535,12 +535,12 @@ fn normalize_settings(settings: Settings) -> Settings {
     }
 }
 
-/// Absent on disk means native. Only `native` and `prime` are stored.
+/// Absent on disk means native. Leftover Prime/Hermes/garbage values become native.
 fn normalize_chat_engine(value: Option<String>) -> Option<String> {
     match value.as_deref().map(str::trim) {
+        None | Some("") => None,
         Some("native") => Some("native".into()),
-        Some("prime") => Some("prime".into()),
-        _ => None,
+        _ => Some("native".into()),
     }
 }
 
@@ -770,7 +770,7 @@ mod tests {
     }
 
     #[test]
-    fn chat_engine_defaults_to_native_and_prime_persists() {
+    fn chat_engine_defaults_to_native_and_leftovers_become_native() {
         let fresh = save_and_reload(Settings::default());
         assert_eq!(fresh.chat_engine, None);
 
@@ -785,25 +785,25 @@ mod tests {
             Some("open_ai/gpt-4.1-mini")
         );
 
-        let kept_prime = save_and_reload(Settings {
+        let migrated_prime = save_and_reload(Settings {
             chat_engine: Some("prime".into()),
             native_chat_target: Some("anthropic/claude-3-5-sonnet-latest".into()),
             ..Settings::default()
         });
-        assert_eq!(kept_prime.chat_engine.as_deref(), Some("prime"));
-        assert_eq!(kept_prime.native_chat_target, None);
+        assert_eq!(migrated_prime.chat_engine.as_deref(), Some("native"));
+        assert_eq!(migrated_prime.native_chat_target, None);
 
-        let dropped_hermes = save_and_reload(Settings {
+        let migrated_hermes = save_and_reload(Settings {
             chat_engine: Some("hermes".into()),
             ..Settings::default()
         });
-        assert_eq!(dropped_hermes.chat_engine, None);
+        assert_eq!(migrated_hermes.chat_engine.as_deref(), Some("native"));
 
-        let dropped_bogus = save_and_reload(Settings {
+        let migrated_bogus = save_and_reload(Settings {
             chat_engine: Some("bogus".into()),
             ..Settings::default()
         });
-        assert_eq!(dropped_bogus.chat_engine, None);
+        assert_eq!(migrated_bogus.chat_engine.as_deref(), Some("native"));
     }
 
     #[test]

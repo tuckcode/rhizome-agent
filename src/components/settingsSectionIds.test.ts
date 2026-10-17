@@ -6,13 +6,16 @@ import {
 } from './settingsSectionIds'
 
 describe('legacy Packages Settings deep links', () => {
-  it('sends the old Packages section ids to Advanced Prime engine', () => {
+  it('sends the old Packages and Advanced Prime section ids to Agents', () => {
     expect(resolveSettingsSectionId(SETTINGS_SECTION_IDS.extensions)).toBe(
-      SETTINGS_SECTION_IDS.primeEngine,
+      SETTINGS_SECTION_IDS.ai,
     )
-    expect(resolveSettingsSectionId('packages')).toBe(SETTINGS_SECTION_IDS.primeEngine)
+    expect(resolveSettingsSectionId('packages')).toBe(SETTINGS_SECTION_IDS.ai)
     expect(resolveSettingsSectionId('settings-section-packages')).toBe(
-      SETTINGS_SECTION_IDS.primeEngine,
+      SETTINGS_SECTION_IDS.ai,
+    )
+    expect(resolveSettingsSectionId(SETTINGS_SECTION_IDS.primeEngine)).toBe(
+      SETTINGS_SECTION_IDS.ai,
     )
   })
 
@@ -21,10 +24,10 @@ describe('legacy Packages Settings deep links', () => {
     expect(resolveSettingsSectionId(null)).toBeNull()
   })
 
-  it('opens Advanced Prime engine for Packages aliases and the Prime section itself', () => {
-    expect(shouldOpenAdvancedPrimeEngine('packages')).toBe(true)
-    expect(shouldOpenAdvancedPrimeEngine(SETTINGS_SECTION_IDS.extensions)).toBe(true)
-    expect(shouldOpenAdvancedPrimeEngine(SETTINGS_SECTION_IDS.primeEngine)).toBe(true)
+  it('never opens Advanced Prime engine; that Settings page is gone', () => {
+    expect(shouldOpenAdvancedPrimeEngine('packages')).toBe(false)
+    expect(shouldOpenAdvancedPrimeEngine(SETTINGS_SECTION_IDS.extensions)).toBe(false)
+    expect(shouldOpenAdvancedPrimeEngine(SETTINGS_SECTION_IDS.primeEngine)).toBe(false)
     expect(shouldOpenAdvancedPrimeEngine(SETTINGS_SECTION_IDS.ai)).toBe(false)
   })
 })

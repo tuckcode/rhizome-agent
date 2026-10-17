@@ -136,8 +136,9 @@ import { trackFocusedPaneSwitched, trackNotesFocusToggled, trackVaultCredentials
 import { redactCredentialTokens } from './lib/sensitiveTextRedaction'
 import { areAutomaticUpdateChecksEnabled } from './lib/automaticUpdateChecks'
 import { composerAgentLabel, DEFAULT_AI_AGENT } from './lib/aiAgents'
-import { aiTargetReady, type AiTarget } from './lib/aiTargets'
-import { chatEngineAllowsSendWithoutPrime, chatEngineFromSettings } from './lib/chatEngine'
+import { type AiTarget } from './lib/aiTargets'
+import { chatEngineFromSettings } from './lib/chatEngine'
+import { chatEngineForResolvedTarget, quickPromptTargetIsReady } from './lib/chatTargetRouting'
 import { areGitFeaturesEnabled } from './lib/gitSettings'
 import { useAppCommandAiActions } from './hooks/useAppCommandAiActions'
 import { RHIZOME_DOCS_URL } from './constants/feedback'
@@ -488,7 +489,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   })
   const chatEngine = chatEngineFromSettings(settings)
   const quickPromptTarget = lastAiWorkspaceTarget ?? aiAgentPreferences.defaultAiTarget
-  const quickPromptTargetReady = chatEngineAllowsSendWithoutPrime(chatEngine) || aiTargetReady(quickPromptTarget, aiAgentsStatus)
+  const quickPromptTargetReady = quickPromptTargetIsReady(quickPromptTarget, chatEngine, aiAgentsStatus)
 
   useVaultOpenedTelemetry({
     entryCount: vault.entries.length,
@@ -2592,7 +2593,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           entries={visibleEntries}
           aiAgentReady={quickPromptTargetReady}
           aiAgentLabel={composerAgentLabel({
-            chatEngine,
+            chatEngine: chatEngineForResolvedTarget(quickPromptTarget, chatEngine),
             agent: quickPromptTarget.kind === 'agent' ? quickPromptTarget.agent : DEFAULT_AI_AGENT,
             targetLabel: quickPromptTarget.label,
           })}

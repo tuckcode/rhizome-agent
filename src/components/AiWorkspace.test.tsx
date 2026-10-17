@@ -738,6 +738,17 @@ describe('AiWorkspace', () => {
         expectReadiness: 'missing',
       },
       {
+        id: 'claude-chat',
+        title: 'Claude chat',
+        targetId: 'agent:claude_code',
+        engine: 'native' as const,
+        nativeTarget: 'open_ai/gpt-4o',
+        agent: 'claude_code',
+        expectEngine: undefined,
+        expectNativeTarget: undefined,
+        expectReadiness: 'ready',
+      },
+      {
         id: 'model-chat',
         title: 'Model chat',
         targetId: 'model:openai/gpt-4.1',

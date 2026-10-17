@@ -20,6 +20,7 @@ import {
   type AiAgentsStatus,
 } from '../lib/aiAgents'
 import type { ChatEngine } from '../lib/chatEngine'
+import { chatEngineForResolvedTarget } from '../lib/chatTargetRouting'
 import {
   aiTargetReady,
   targetAgent,
@@ -543,8 +544,7 @@ function ConversationWorkspaceHeader({
 
 /** The Chat engine applies to Prime conversations. Codex, Claude, and API models keep their own target. */
 function engineForWorkspaceTarget(target: AiTarget, chatEngine: ChatEngine | undefined): ChatEngine | undefined {
-  if (target.kind === 'agent' && target.agent === 'prime') return chatEngine
-  return undefined
+  return chatEngineForResolvedTarget(target, chatEngine)
 }
 
 function ConversationSession({

@@ -181,7 +181,7 @@ export interface Settings {
    */
   agent_profile?: string | null
   /**
-   * `native` sends new chats through Rhizome's engine. Absent means Prime.
+   * Native is the only Chat engine. Leftover Prime/Hermes values migrate to `native`.
    */
   chat_engine?: string | null
   /** Native picker value. Absent uses the catalog default. */

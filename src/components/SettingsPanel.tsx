@@ -1,19 +1,12 @@
-import { CaretDown, CaretRight, Copy, Cube, Info, Monitor, Moon, Stack, Sun, X } from '@phosphor-icons/react'
+import { Copy, Cube, Info, Monitor, Moon, Stack, Sun, X } from '@phosphor-icons/react'
 import {
-  PRODUCT_AI_AGENT_DEFINITIONS,
-  DEFAULT_AI_AGENT,
   createMissingAiAgentsStatus,
-  getAiAgentAvailability,
-  type AiAgentAvailability,
   type AiAgentsStatus,
 } from '../lib/aiAgents'
 import {
-  agentTargetId,
   normalizeAiModelProviders,
   type AiModelProvider,
 } from '../lib/aiTargets'
-import { chatEngineForSave, readChatEngine } from '../lib/chatEngine'
-import { ChatEngineSettings } from './ChatEngineSettings'
 import { NativeChatModelPicker } from './NativeChatModelPicker'
 import { resetListProviderModelsCache } from '../lib/listProviderModels'
 import {
@@ -75,10 +68,6 @@ import { areGitFeaturesEnabled } from '../lib/gitSettings'
 import { areAutomaticUpdateChecksEnabled } from '../lib/automaticUpdateChecks'
 import { trackAllNotesVisibilityChanged } from '../lib/productAnalytics'
 import { AiProviderSettings } from './AiProviderSettings'
-import { PrimeDefaultModelSection } from './PrimeDefaultModelSection'
-import { PrimeModelAllowListSection } from './PrimeModelAllowListSection'
-import { PrimeProviderStatusSection } from './PrimeProviderStatusSection'
-import { AiAgentIcon } from './AiAgentIcon'
 import { readCelebrationsEnabled } from '../lib/celebration'
 import { GitSettingsSection } from './GitSettingsSection'
 import { PrivacySettingsSection } from './PrivacySettingsSection'
@@ -124,7 +113,6 @@ import type { VaultOption } from './status-bar/types'
 import {
   SETTINGS_SECTION_IDS,
   resolveSettingsSectionId,
-  shouldOpenAdvancedPrimeEngine,
 } from './settingsSectionIds'
 import {
   trackSettingsPreferenceChanges,
@@ -166,7 +154,6 @@ interface SettingsDraft {
   celebrationsEnabled: boolean
   keepInTaskbarOnClose: boolean
   agentProfile: string
-  chatEngine: 'prime' | 'native'
   nativeChatTarget: string | null
   aiModelProviders: AiModelProvider[]
   releaseChannel: ReleaseChannel
@@ -211,8 +198,6 @@ interface SettingsBodyProps {
   setKeepInTaskbarOnClose: (value: boolean) => void
   agentProfile: string
   setAgentProfile: (value: string) => void
-  chatEngine: 'prime' | 'native'
-  setChatEngine: (value: 'prime' | 'native') => void
   nativeChatTarget: string | null
   setNativeChatTarget: (value: string) => void
   aiAgentsStatus: AiAgentsStatus
@@ -267,8 +252,6 @@ interface SettingsBodyProps {
   onOpenFeedback?: () => void
   onOpenDocs?: () => void
   initialSectionId?: string | null
-  loadModelCatalog?: boolean
-  openAdvancedPrime?: boolean
   onClose?: () => void
 }
 
@@ -310,7 +293,6 @@ function createSettingsDraft(
     celebrationsEnabled: readCelebrationsEnabled(settings.celebrations_enabled),
     keepInTaskbarOnClose: settings.keep_in_taskbar_on_close === true,
     agentProfile: settings.agent_profile?.trim() ?? '',
-    chatEngine: readChatEngine(settings.chat_engine),
     nativeChatTarget: settings.native_chat_target ?? null,
     aiModelProviders: normalizeAiModelProviders(settings.ai_model_providers),
     releaseChannel: normalizeReleaseChannel(settings.release_channel),
@@ -395,10 +377,8 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     celebrations_enabled: draft.celebrationsEnabled,
     keep_in_taskbar_on_close: draft.keepInTaskbarOnClose ? true : null,
     agent_profile: draft.agentProfile.trim() || null,
-    chat_engine: chatEngineForSave(draft.chatEngine),
+    chat_engine: 'native',
     native_chat_target: draft.nativeChatTarget,
-    default_ai_agent: DEFAULT_AI_AGENT,
-    default_ai_target: agentTargetId(DEFAULT_AI_AGENT),
     ai_model_providers: draft.aiModelProviders.length > 0 ? draft.aiModelProviders : null,
     hide_gitignored_files: draft.hideGitignoredFiles,
     block_secret_files: draft.blockSecretFiles,
@@ -828,8 +808,6 @@ function SettingsBodyFromDraft({
       setKeepInTaskbarOnClose={(value) => updateDraft('keepInTaskbarOnClose', value)}
       agentProfile={draft.agentProfile}
       setAgentProfile={(value) => updateDraft('agentProfile', value)}
-      chatEngine={draft.chatEngine}
-      setChatEngine={(value) => updateDraft('chatEngine', value)}
       nativeChatTarget={draft.nativeChatTarget}
       setNativeChatTarget={(value) => updateDraft('nativeChatTarget', value)}
       aiAgentsStatus={aiAgentsStatus}
@@ -888,41 +866,13 @@ function SettingsBodyFromDraft({
 }
 
 function SettingsBody(props: SettingsBodyProps) {
-  const openAdvancedPrime = shouldOpenAdvancedPrimeEngine(props.initialSectionId)
-  const [loadModelCatalog, setLoadModelCatalog] = useState(
-    props.initialSectionId === SETTINGS_SECTION_IDS.ai || openAdvancedPrime,
-  )
-  useEffect(() => {
-    if (loadModelCatalog) return
-    const el = document.getElementById(SETTINGS_SECTION_IDS.ai)
-    if (!el || typeof IntersectionObserver === 'undefined') return
-    const root = el.closest('.overflow-auto')
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) setLoadModelCatalog(true)
-      },
-      { root: root instanceof Element ? root : null, threshold: 0.15 },
-    )
-    io.observe(el)
-    return () => io.disconnect()
-  }, [loadModelCatalog])
-
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden">
-      <SettingsBodyNav
-        t={props.t}
-        onVisit={(id) => {
-          if (id === SETTINGS_SECTION_IDS.ai) setLoadModelCatalog(true)
-        }}
-      />
+      <SettingsBodyNav t={props.t} />
       <div className="min-w-0 flex-1 overflow-auto px-6 py-4">
         <SettingsSyncAndAppearanceSections {...props} />
         <SettingsContentSections {...props} />
-        <SettingsAgentWorkflowSections
-          {...props}
-          loadModelCatalog={loadModelCatalog}
-          openAdvancedPrime={openAdvancedPrime}
-        />
+        <SettingsAgentWorkflowSections {...props} />
         {/* Lets the last sections scroll their heading to the top when picked
             in the nav (native audit 2026-09-26). Sized to the scroll box. */}
         <div data-testid="settings-scroll-end-spacer" aria-hidden="true" style={{ minHeight: 'calc(100% - 4rem)' }} />
@@ -1094,8 +1044,6 @@ function SettingsAgentWorkflowSections({
   setCelebrationsEnabled,
   agentProfile,
   setAgentProfile,
-  chatEngine,
-  setChatEngine,
   blockSecretFiles,
   setBlockSecretFiles,
   nativeChatTarget,
@@ -1116,8 +1064,6 @@ function SettingsAgentWorkflowSections({
   onOpenFeedback,
   onOpenDocs,
   activeVaultPath,
-  loadModelCatalog = false,
-  openAdvancedPrime = false,
 }: SettingsBodyProps) {
   return (
     <>
@@ -1129,8 +1075,6 @@ function SettingsAgentWorkflowSections({
           setCelebrationsEnabled={setCelebrationsEnabled}
           agentProfile={agentProfile}
           setAgentProfile={setAgentProfile}
-          chatEngine={chatEngine}
-          setChatEngine={setChatEngine}
           blockSecretFiles={blockSecretFiles}
           setBlockSecretFiles={setBlockSecretFiles}
           nativeChatTarget={nativeChatTarget}
@@ -1139,8 +1083,6 @@ function SettingsAgentWorkflowSections({
           aiModelProviders={aiModelProviders}
           setAiModelProviders={setAiModelProviders}
           onCopyMcpConfig={onCopyMcpConfig}
-          loadModelCatalog={loadModelCatalog}
-          openAdvancedPrime={openAdvancedPrime}
           activeVaultPath={activeVaultPath}
         />
         <div className="mt-4">
@@ -1515,8 +1457,6 @@ function AiAgentSettingsSection({
   setCelebrationsEnabled,
   agentProfile,
   setAgentProfile,
-  chatEngine,
-  setChatEngine,
   blockSecretFiles,
   setBlockSecretFiles,
   nativeChatTarget,
@@ -1525,8 +1465,6 @@ function AiAgentSettingsSection({
   aiModelProviders,
   setAiModelProviders,
   onCopyMcpConfig,
-  loadModelCatalog,
-  openAdvancedPrime,
   activeVaultPath,
 }: Pick<
   SettingsBodyProps,
@@ -1536,8 +1474,6 @@ function AiAgentSettingsSection({
   | 'setCelebrationsEnabled'
   | 'agentProfile'
   | 'setAgentProfile'
-  | 'chatEngine'
-  | 'setChatEngine'
   | 'blockSecretFiles'
   | 'setBlockSecretFiles'
   | 'nativeChatTarget'
@@ -1546,11 +1482,8 @@ function AiAgentSettingsSection({
   | 'aiModelProviders'
   | 'setAiModelProviders'
   | 'onCopyMcpConfig'
-  | 'loadModelCatalog'
-  | 'openAdvancedPrime'
   | 'activeVaultPath'
 >) {
-  const primeStatus = getAiAgentAvailability(aiAgentsStatus, DEFAULT_AI_AGENT)
   const vaultConfig = useSyncExternalStore(subscribeVaultConfig, getVaultConfig, getVaultConfig)
   const sessionAutoDistillEnabled = vaultConfig.session_auto_distill_enabled === true
 
@@ -1578,21 +1511,12 @@ function AiAgentSettingsSection({
       </SettingsGroup>
 
       <SettingsGroup>
-        <ChatEngineSettings engine={chatEngine} onChange={setChatEngine} locale={locale} />
         <NativeChatModelPicker
           locale={locale}
           value={nativeChatTarget}
           onChange={setNativeChatTarget}
           providers={aiModelProviders}
         />
-        {chatEngine === 'native' || isMockPrimeInstall(primeStatus) ? null : (
-          <div className="px-3 pb-3 text-xs text-muted-foreground" data-testid="settings-prime-chat-engine">
-            Prime Agent
-            {primeStatus.status === 'installed'
-              ? ` (${t('settings.aiAgents.installed')}${primeStatus.version ? ` ${primeStatus.version}` : ''})`
-              : ` (${t('settings.aiAgents.missing')})`}
-          </div>
-        )}
       </SettingsGroup>
 
       <div className="flex flex-col gap-2">
@@ -1624,16 +1548,10 @@ function AiAgentSettingsSection({
         aiModelProviders={aiModelProviders}
         setAiModelProviders={setAiModelProviders}
         onCopyMcpConfig={onCopyMcpConfig}
-        loadModelCatalog={loadModelCatalog}
-        openAdvancedPrime={openAdvancedPrime}
         vaultPath={activeVaultPath}
       />
     </>
   )
-}
-
-function isMockPrimeInstall(status: AiAgentAvailability): boolean {
-  return status.status === 'installed' && (status.version ?? '').trim().toLowerCase() === 'mock'
 }
 
 function SecretFilesSettingRow({
@@ -1703,21 +1621,15 @@ function SecretFilesSettingRow({
 
 function AiTargetManagementTabs({
   t,
-  aiAgentsStatus,
   aiModelProviders,
   setAiModelProviders,
   onCopyMcpConfig,
-  loadModelCatalog,
-  openAdvancedPrime,
-  vaultPath,
 }: {
   t: Translate
   aiAgentsStatus: AiAgentsStatus
   aiModelProviders: AiModelProvider[]
   setAiModelProviders: (value: AiModelProvider[]) => void
   onCopyMcpConfig?: () => void
-  loadModelCatalog?: boolean
-  openAdvancedPrime?: boolean
   vaultPath?: string | null
 }) {
   return (
@@ -1728,17 +1640,13 @@ function AiTargetManagementTabs({
         <TabsTrigger value="api">{t('settings.aiAgents.apiGroup')}</TabsTrigger>
       </TabsList>
       <TabsContent value="agents" className="space-y-3">
-        <AiAgentsInstalledSection t={t} aiAgentsStatus={aiAgentsStatus} />
-        {/* Same Agents-visible gate as the model list: skip provider IPC until then. */}
-        {loadModelCatalog ? <PrimeProviderStatusSection t={t} /> : null}
-        {loadModelCatalog ? <PrimeDefaultModelSection vaultPath={vaultPath} /> : null}
-        {loadModelCatalog ? <PrimeModelAllowListSection t={t} /> : null}
-        <AdvancedPrimeEngineSection
-          t={t}
-          aiAgentsStatus={aiAgentsStatus}
-          openAdvancedPrime={openAdvancedPrime}
-          onCopyMcpConfig={onCopyMcpConfig}
-        />
+        {onCopyMcpConfig ? (
+          <SettingsGroup>
+            <SettingsGroupItem>
+              <CopyMcpConfigButton t={t} onCopyMcpConfig={onCopyMcpConfig} />
+            </SettingsGroupItem>
+          </SettingsGroup>
+        ) : null}
         <BridgeTokenRow t={t} />
       </TabsContent>
       <TabsContent value="local">
@@ -1748,73 +1656,6 @@ function AiTargetManagementTabs({
         <AiProviderSettings t={t} mode="api" providers={aiModelProviders} onChange={setAiModelProviders} />
       </TabsContent>
     </Tabs>
-  )
-}
-
-function AdvancedPrimeEngineSection({
-  t,
-  aiAgentsStatus,
-  openAdvancedPrime = false,
-  onCopyMcpConfig,
-}: {
-  t: Translate
-  aiAgentsStatus: AiAgentsStatus
-  openAdvancedPrime?: boolean
-  onCopyMcpConfig?: () => void
-}) {
-  const [userExpanded, setUserExpanded] = useState<boolean | null>(null)
-  const expanded = userExpanded ?? openAdvancedPrime
-  const primeStatus = getAiAgentAvailability(aiAgentsStatus, DEFAULT_AI_AGENT)
-  const bodyId = 'settings-advanced-prime-engine-body'
-  const installed = primeStatus.status === 'installed'
-  const statusLabel = primeStatus.status === 'checking'
-    ? 'Checking Prime…'
-    : installed
-      ? 'Prime is installed'
-      : 'Prime is not installed'
-
-  return (
-    <div
-      id={SETTINGS_SECTION_IDS.primeEngine}
-      className="scroll-mt-4 overflow-hidden rounded-md border border-border bg-card"
-      data-testid="settings-advanced-prime-engine"
-    >
-      <Button
-        type="button"
-        variant="ghost"
-        aria-expanded={expanded}
-        aria-controls={bodyId}
-        data-testid="settings-advanced-prime-engine-toggle"
-        onClick={() => setUserExpanded(!expanded)}
-        className="h-auto w-full justify-start gap-2 rounded-none px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-muted/50"
-      >
-        {expanded ? (
-          <CaretDown size={12} className="shrink-0 text-muted-foreground" aria-hidden="true" />
-        ) : (
-          <CaretRight size={12} className="shrink-0 text-muted-foreground" aria-hidden="true" />
-        )}
-        Advanced Prime engine
-      </Button>
-      {expanded ? (
-        <div id={bodyId} className="space-y-3 border-t border-border px-3 py-3">
-          <SettingsGroup>
-            <SettingsGroupItem testId="settings-advanced-prime-install-status">
-              <div className="min-w-0">
-                <div className="text-sm font-medium text-foreground">{statusLabel}</div>
-                {primeStatus.version ? (
-                  <div className="mt-0.5 text-xs leading-5 text-muted-foreground">{primeStatus.version}</div>
-                ) : null}
-              </div>
-            </SettingsGroupItem>
-            {onCopyMcpConfig ? (
-              <SettingsGroupItem>
-                <CopyMcpConfigButton t={t} onCopyMcpConfig={onCopyMcpConfig} />
-              </SettingsGroupItem>
-            ) : null}
-          </SettingsGroup>
-        </div>
-      ) : null}
-    </div>
   )
 }
 
@@ -1838,43 +1679,6 @@ function CopyMcpConfigButton({
       <Copy size={15} />
       {t('ai.panel.copyMcpConfig')}
     </Button>
-  )
-}
-
-function AiAgentsInstalledSection({
-  t,
-  aiAgentsStatus,
-}: {
-  t: Translate
-  aiAgentsStatus: AiAgentsStatus
-}) {
-  return (
-    <div className="rounded-md border border-border bg-card p-3">
-      <div className="text-sm font-medium text-foreground">{t('settings.aiAgents.installedTitle')}</div>
-      <div className="mt-1 text-xs leading-5 text-muted-foreground">{t('settings.aiAgents.installedDescription')}</div>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        {PRODUCT_AI_AGENT_DEFINITIONS.map((definition) => {
-          const status = getAiAgentAvailability(aiAgentsStatus, definition.id)
-          const installed = status.status === 'installed'
-          return (
-            <div key={definition.id} className="rounded-md border border-border bg-background px-3 py-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
-                  <AiAgentIcon agent={definition.id} size={16} />
-                  <div className="truncate text-sm font-medium text-foreground">{definition.label}</div>
-                </div>
-                <div className={installed ? 'text-xs text-feedback-success-text' : 'text-xs text-muted-foreground'}>
-                  {installed ? t('settings.aiAgents.installed') : t('settings.aiAgents.missing')}
-                </div>
-              </div>
-              <div className="mt-1 truncate text-xs text-muted-foreground">
-                {status.version || t('settings.aiAgents.noVersion')}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
   )
 }
 

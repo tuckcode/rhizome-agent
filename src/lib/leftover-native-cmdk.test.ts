@@ -5,8 +5,9 @@ describe('leftover native Cmd+K send gate', () => {
   it('lets the palette AI prompt send when the Chat engine is native', () => {
     const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
     expect(app).toContain(
-      'chatEngineAllowsSendWithoutPrime(chatEngine) || aiTargetReady(quickPromptTarget, aiAgentsStatus)',
+      'quickPromptTargetIsReady(quickPromptTarget, chatEngine, aiAgentsStatus)',
     )
+    expect(app).toContain('chatEngine: chatEngineForResolvedTarget(quickPromptTarget, chatEngine)')
     expect(app).toContain('chatEngine={chatEngine}')
     expect(app).toContain('chatEngine={settingsLoaded ? chatEngine : undefined}')
     expect(app).toContain('nativeTarget={settingsLoaded ? settings.native_chat_target ?? undefined : undefined}')
