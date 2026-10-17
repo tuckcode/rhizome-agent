@@ -635,7 +635,19 @@ describe('AiMessage', () => {
     expect(screen.queryByRole('button', { name: /Allow for session/ })).toBeNull()
   })
 
-  it('reads a collapsed write row as Edit plus the path, with a pencil icon', () => {
+  it('reads a collapsed write row as Write plus the path, with a pencil icon', () => {
+    render(
+      <AiMessage
+        userMessage="Write"
+        actions={[pendingApprovalAction('write_file', { path: 'notes/fresh.md' })]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByTestId('tool-use-approval-command')).toHaveTextContent('Write notes/fresh.md')
+    expect(screen.getByTestId('tool-use-approval-icon')).toHaveAttribute('data-kind', 'write')
+  })
+
+  it('reads a new write_file as Create plus the path', () => {
     render(
       <AiMessage
         userMessage="Write"
@@ -643,8 +655,27 @@ describe('AiMessage', () => {
       />,
     )
     fireEvent.click(screen.getByTestId('tool-use-toggle'))
-    expect(screen.getByTestId('tool-use-approval-command')).toHaveTextContent('Edit notes/fresh.md')
-    expect(screen.getByTestId('tool-use-approval-icon')).toHaveAttribute('data-kind', 'write')
+    expect(screen.getByTestId('tool-use-approval-command')).toHaveTextContent('Create notes/fresh.md')
+    expect(screen.getByTestId('tool-use-approval-icon')).toHaveAttribute('data-kind', 'create')
+  })
+
+  it('badges hidden characters in a collapsed edit path instead of reordering it', () => {
+    const path = 'notes/invoice\u202Edm.exe'
+    render(
+      <AiMessage
+        userMessage="Edit"
+        actions={[pendingApprovalAction('edit_file', { path, preview: '@@\n-a\n+b' })]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByTestId('tool-use-approval-command')).toHaveTextContent(/Edit/)
+    expect(screen.getByTestId('command-hidden')).toHaveTextContent('\\u{202E}')
+    expect(screen.getByTestId('tool-use-approval-command').textContent).toContain('invoice')
+    expect(screen.getByTestId('tool-use-approval-command').textContent).toContain('dm.exe')
+    expect(screen.getByTestId('approval-review')).toHaveAttribute(
+      'aria-label',
+      'Review: notes/invoice\\u{202E}dm.exe',
+    )
   })
 
   it('keeps the filename on a long collapsed edit path', () => {
@@ -677,7 +708,9 @@ describe('AiMessage', () => {
     )
     fireEvent.click(screen.getByTestId('tool-use-toggle'))
     expect(screen.getByRole('button', { name: `Review: ${command}` })).toBeVisible()
-    expect(screen.getByTestId('approval-long-command')).toHaveTextContent('Long command')
+    const tag = screen.getByTestId('approval-overflow-tag')
+    expect(tag).toHaveTextContent('Long command')
+    expect(tag.className).toMatch(/me-2/)
     expect(screen.queryByRole('button', { name: `Allow once: ${command}` })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: `Review: ${command}` }))
     expect(screen.getByTestId('tool-use-toggle')).toHaveAttribute('aria-expanded', 'true')
@@ -695,7 +728,20 @@ describe('AiMessage', () => {
     expect(screen.getByRole('button', { name: 'Review' })).toBeVisible()
     expect(screen.getByRole('button', { name: 'Deny' })).toBeVisible()
     expect(screen.queryByRole('button', { name: /^Allow once/ })).toBeNull()
-    expect(screen.queryByTestId('tool-use-approval-command')).toBeNull()
+    expect(screen.getByTestId('tool-use-approval-command')).toHaveTextContent('Empty command')
+  })
+
+  it('offers Review and Deny for whitespace-only bash args', () => {
+    render(
+      <AiMessage
+        userMessage="Run it"
+        actions={[pendingApprovalAction('bash', { args: '   ', callId: 'spaces' })]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByTestId('tool-use-approval-command')).toHaveTextContent('Empty command')
+    expect(screen.getByRole('button', { name: 'Review' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: /^Allow once/ })).toBeNull()
   })
 
   it('offers Review and Deny when a collapsed file approval has no path', () => {
@@ -756,7 +802,7 @@ describe('AiMessage', () => {
     )
     fireEvent.click(screen.getByTestId('tool-use-toggle'))
     expect(screen.getByRole('button', { name: 'Review: ls⏎rm -rf ~' })).toBeVisible()
-    expect(screen.getByTestId('approval-long-command')).toHaveTextContent('Long command')
+    expect(screen.getByTestId('approval-overflow-tag')).toHaveTextContent('Multiple lines')
     expect(screen.queryByRole('button', { name: /^Allow once/ })).toBeNull()
     const label = screen.getByTestId('approval-review').getAttribute('aria-label') ?? ''
     expect(label).not.toContain('\n')

@@ -21,6 +21,8 @@ type ShotState =
   | 'approval-overflow'
   | 'approval-empty'
   | 'approval-newline'
+  | 'approval-write'
+  | 'approval-bidi-path'
   | 'topbar-native'
   | 'header-title'
   | 'header-long'
@@ -38,6 +40,8 @@ const STATES: ShotState[] = [
   'approval-overflow',
   'approval-empty',
   'approval-newline',
+  'approval-write',
+  'approval-bidi-path',
   'topbar-native',
   'header-title',
   'header-long',
@@ -179,6 +183,8 @@ export function Shot() {
       && state !== 'approval-overflow'
       && state !== 'approval-empty'
       && state !== 'approval-newline'
+      && state !== 'approval-write'
+      && state !== 'approval-bidi-path'
     ) return
     document.querySelector<HTMLButtonElement>('[data-testid="tool-use-toggle"]')?.click()
     if (state !== 'approval-allow-focus') return
@@ -283,6 +289,25 @@ export function Shot() {
       <AiMessage
         userMessage="Run two lines"
         actions={[pendingBash('ls\nrm -rf ~')]}
+      />
+    )
+  } else if (state === 'approval-write') {
+    title = 'Collapsed write approval'
+    body = (
+      <AiMessage
+        userMessage="Write the note"
+        actions={[pendingAction('write_file', { path: 'notes/fresh.md' })]}
+      />
+    )
+  } else if (state === 'approval-bidi-path') {
+    title = 'Collapsed edit path with a hidden character'
+    body = (
+      <AiMessage
+        userMessage="Edit the invoice"
+        actions={[pendingAction('edit_file', {
+          path: 'notes/invoice\u202Edm.exe',
+          preview: '@@\n-a\n+b',
+        })]}
       />
     )
   } else if (state === 'topbar-native') {

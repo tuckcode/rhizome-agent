@@ -3,6 +3,7 @@ import {
   APPROVAL_ARIA_LABEL_MAX,
   COLLAPSED_COMMAND_VISIBLE_CHARS,
   approvalAriaLabel,
+  approvalOverflowTag,
   collapsePathKeepFilename,
   collapsedApprovalOverflow,
   escapeApprovalLabel,
@@ -42,12 +43,32 @@ describe('collapsedApprovalOverflow', () => {
     })
   })
 
+  it('treats whitespace-only args as empty so Allow cannot sit on a blank', () => {
+    expect(collapsedApprovalOverflow('   ')).toMatchObject({
+      review: true,
+      empty: true,
+    })
+  })
+
   it('counts any newline as overflow so a second line cannot sit behind Allow', () => {
     expect(collapsedApprovalOverflow('ls\nrm -rf ~')).toMatchObject({
       review: true,
       hasNewline: true,
       long: false,
     })
+  })
+})
+
+describe('approvalOverflowTag', () => {
+  it('labels a newline as Multiple lines, even when the command is also long', () => {
+    expect(approvalOverflowTag({ empty: false, hasNewline: true, long: false })).toBe('Multiple lines')
+    expect(approvalOverflowTag({ empty: false, hasNewline: true, long: true })).toBe('Multiple lines')
+  })
+
+  it('labels real length overflow as Long command', () => {
+    expect(approvalOverflowTag({ empty: false, hasNewline: false, long: true })).toBe('Long command')
+    expect(approvalOverflowTag({ empty: false, hasNewline: false, long: false })).toBeNull()
+    expect(approvalOverflowTag({ empty: true, hasNewline: false, long: true })).toBeNull()
   })
 })
 
@@ -70,6 +91,7 @@ describe('approvalAriaLabel', () => {
   it('uses only the action when the display is empty', () => {
     expect(approvalAriaLabel('Review', '')).toBe('Review')
     expect(approvalAriaLabel('Allow once', '')).toBe('Allow once')
+    expect(approvalAriaLabel('Review', '   ')).toBe('Review')
   })
 
   it('prefixes the escaped command', () => {
@@ -88,5 +110,15 @@ describe('collapsePathKeepFilename', () => {
     expect(collapsed.startsWith('…/')).toBe(true)
     expect(collapsed.endsWith('plan.md')).toBe(true)
     expect(collapsed).not.toBe(path)
+  })
+
+  it('middle-truncates a filename that is itself longer than the budget', () => {
+    const file = 'very-long-invoice-filename-that-exceeds-the-visible-limit.exe'
+    const collapsed = collapsePathKeepFilename(file)
+    expect(collapsed.startsWith('very-long')).toBe(true)
+    expect(collapsed.endsWith('.exe')).toBe(true)
+    expect(collapsed).toContain('…')
+    expect([...collapsed].length).toBeLessThanOrEqual(40)
+    expect(collapsed).not.toBe(file)
   })
 })

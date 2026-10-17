@@ -1,5 +1,5 @@
 import { commandHasHiddenChars, visibleCommandParts } from './visibleCommand'
-import { sliceGraphemes } from './graphemeSlice'
+import { segmentGraphemes, sliceGraphemes } from './graphemeSlice'
 
 /**
  * Conservative visible-character budget for a collapsed approval row.
@@ -17,7 +17,7 @@ export function collapsedApprovalOverflow(display: string): {
   hasNewline: boolean
   empty: boolean
 } {
-  const empty = display.length === 0
+  const empty = display.trim().length === 0
   const hiddenChars = commandHasHiddenChars(display)
   const hasNewline = display.includes('\n')
   const long = [...display].length > COLLAPSED_COMMAND_VISIBLE_CHARS
@@ -28,6 +28,17 @@ export function collapsedApprovalOverflow(display: string): {
     hasNewline,
     empty,
   }
+}
+
+export function approvalOverflowTag(overflow: {
+  empty: boolean
+  hasNewline: boolean
+  long: boolean
+}): 'Multiple lines' | 'Long command' | null {
+  if (overflow.empty) return null
+  if (overflow.hasNewline) return 'Multiple lines'
+  if (overflow.long) return 'Long command'
+  return null
 }
 
 export function escapeApprovalLabel(
@@ -43,14 +54,28 @@ export function escapeApprovalLabel(
 }
 
 export function approvalAriaLabel(actionLabel: string, display: string): string {
+  if (!display.trim()) return actionLabel
   const escaped = escapeApprovalLabel(display)
   return escaped ? `${actionLabel}: ${escaped}` : actionLabel
+}
+
+function middleTruncateFilename(file: string, max: number): string {
+  const parts = segmentGraphemes(file)
+  if (parts.length <= max) return file
+  const lastDot = file.lastIndexOf('.')
+  const ext = lastDot > 0 ? file.slice(lastDot) : ''
+  const extParts = segmentGraphemes(ext)
+  const startBudget = max - 1 - extParts.length
+  if (startBudget < 1) return sliceGraphemes(file, max)
+  const stem = lastDot > 0 ? file.slice(0, lastDot) : file
+  return `${segmentGraphemes(stem).slice(0, startBudget).join('')}…${ext}`
 }
 
 export function collapsePathKeepFilename(path: string, max = 40): string {
   if ([...path].length <= max) return path
   const parts = path.replace(/\\/gu, '/').split('/')
   const file = parts.pop() || path
+  if ([...file].length >= max) return middleTruncateFilename(file, max)
   let kept = file
   for (let index = parts.length - 1; index >= 0; index -= 1) {
     const next = `${parts[index]}/${kept}`

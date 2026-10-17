@@ -7,6 +7,7 @@ import {
   CircleNotch,
   Copy,
   File,
+  FilePlus,
   FloppyDisk,
   GitFork,
   NotePencil,
@@ -24,6 +25,7 @@ import { ToolApprovalCard } from './ToolApprovalCard'
 import { VisibleCommand } from './VisibleCommand'
 import {
   approvalAriaLabel,
+  approvalOverflowTag,
   collapsePathKeepFilename,
   collapsedApprovalOverflow,
 } from '../lib/collapsedApproval'
@@ -409,23 +411,30 @@ function pendingApprovalDisplay(action: AiAction): string {
   return action.approval?.path ?? action.path ?? ''
 }
 
-function isEditOrWriteTool(tool: string): boolean {
-  return tool === 'edit_file' || tool === 'write_file' || tool === 'Edit' || tool === 'Write'
+function collapsedApprovalVerb(action: AiAction): string | null {
+  if (action.tool === 'edit_file' || action.tool === 'Edit') return 'Edit'
+  if (action.tool === 'write_file' || action.tool === 'Write') {
+    return action.approval?.created ? 'Create' : 'Write'
+  }
+  return null
 }
 
-function CollapsedApprovalIcon({ tool }: { tool: string }) {
+function CollapsedApprovalIcon({ tool, created }: { tool: string; created?: boolean }) {
   const kind = isBashTool(tool)
     ? 'bash'
     : tool === 'edit_file' || tool === 'Edit'
       ? 'edit'
-      : tool === 'write_file' || tool === 'Write'
-        ? 'write'
-        : 'file'
+      : (tool === 'write_file' || tool === 'Write') && created
+        ? 'create'
+        : tool === 'write_file' || tool === 'Write'
+          ? 'write'
+          : 'file'
   return (
     <span aria-hidden="true" data-kind={kind} data-testid="tool-use-approval-icon">
       {kind === 'bash' ? <Terminal size={14} /> : null}
       {kind === 'edit' ? <NotePencil size={14} /> : null}
       {kind === 'write' ? <PencilSimple size={14} /> : null}
+      {kind === 'create' ? <FilePlus size={14} /> : null}
       {kind === 'file' ? <File size={14} /> : null}
     </span>
   )
@@ -441,7 +450,9 @@ function CollapsedApprovalRow({
   const display = pendingApprovalDisplay(action)
   const overflow = collapsedApprovalOverflow(display)
   const bash = isBashTool(action.tool)
-  const visiblePath = !bash && display ? collapsePathKeepFilename(display) : display
+  const verb = collapsedApprovalVerb(action)
+  const visiblePath = !bash && display && !overflow.empty ? collapsePathKeepFilename(display) : display
+  const overflowTag = approvalOverflowTag(overflow)
   const options = (action.approval?.options ?? []).filter((option) => (
     option.id === 'allow_once' || option.id === 'deny'
   ))
@@ -457,20 +468,28 @@ function CollapsedApprovalRow({
       onKeyDown={(event) => event.stopPropagation()}
     >
       <div className="flex min-w-0 flex-1 items-center gap-1.5">
-        <CollapsedApprovalIcon tool={action.tool} />
-        {display && isEditOrWriteTool(action.tool) ? (
+        <CollapsedApprovalIcon tool={action.tool} created={action.approval?.created} />
+        {bash && overflow.empty ? (
+          <span
+            className="font-sans text-[12px] text-muted-foreground"
+            data-testid="tool-use-approval-command"
+          >
+            Empty command
+          </span>
+        ) : null}
+        {display && !overflow.empty && verb ? (
           <span
             className="min-w-0 font-sans text-[12px]"
             data-testid="tool-use-approval-command"
             title={display}
           >
-            {'Edit '}
+            {`${verb} `}
             <code className="rounded-sm bg-[var(--syntax-monospace-bg)] px-0.5 font-mono text-[12px]">
-              {visiblePath}
+              <VisibleCommand command={visiblePath} wrap={false} />
             </code>
           </span>
         ) : null}
-        {display && bash ? (
+        {display && !overflow.empty && bash ? (
           <code
             className="min-w-0 truncate rounded-sm bg-[var(--syntax-monospace-bg)] px-0.5 font-mono text-[12px]"
             data-testid="tool-use-approval-command"
@@ -479,21 +498,24 @@ function CollapsedApprovalRow({
             <VisibleCommand command={display} wrap={false} />
           </code>
         ) : null}
-        {display && !bash && !isEditOrWriteTool(action.tool) ? (
+        {display && !overflow.empty && !bash && !verb ? (
           <code
             className="min-w-0 rounded-sm bg-[var(--syntax-monospace-bg)] px-0.5 font-mono text-[12px]"
             data-testid="tool-use-approval-command"
             title={display}
           >
-            {visiblePath}
+            <VisibleCommand command={visiblePath} wrap={false} />
           </code>
         ) : null}
-        {overflow.long || overflow.hasNewline ? (
-          <span className="shrink-0 text-[11px] text-muted-foreground" data-testid="approval-long-command">
-            Long command
-          </span>
-        ) : null}
       </div>
+      {overflowTag ? (
+        <span
+          className="me-2 shrink-0 text-[11px] text-muted-foreground"
+          data-testid="approval-overflow-tag"
+        >
+          {overflowTag}
+        </span>
+      ) : null}
       <div
         className="grid w-[15rem] shrink-0 grid-cols-2 items-center gap-1.5"
         data-testid="tool-use-approval-actions"
