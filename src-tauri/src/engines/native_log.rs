@@ -236,19 +236,19 @@ fn scrub_regexes() -> &'static ScrubRegexes {
         )
         .expect("assignment scrubber");
         let api_key_name = regex::Regex::new(
-            r"(?i)^(?:[a-z][a-z0-9]*_?)?api_?key(?:_[a-z0-9]+)*$",
+            r"(?i)^(?:[a-z][a-z0-9]*_?)*api_?key(?:_[a-z0-9]+)*$",
         )
         .expect("api_key name");
         let env_name = regex::Regex::new(
-            r"^(?:[A-Z][A-Z0-9]*_)?(?:TOKEN|SECRET|PASSWORD)(?:_[A-Z0-9]+)*$",
+            r"^(?:[A-Z][A-Z0-9]*_)*(?:TOKEN|SECRET|PASSWORD)(?:_[A-Z0-9]+)*$",
         )
         .expect("env secret name");
         let quoted_env_name = regex::Regex::new(
-            r"(?i)^(?:[A-Z][A-Z0-9]*_)?(?:TOKEN|SECRET|PASSWORD)(?:_[A-Z0-9]+)*$",
+            r"(?i)^(?:[A-Z][A-Z0-9]*_)*(?:TOKEN|SECRET|PASSWORD)(?:_[A-Z0-9]+)*$",
         )
         .expect("quoted env secret name");
-        let prefixed_key_name =
-            regex::Regex::new(r"^[A-Z][A-Z0-9]*_KEY(?:_[A-Z0-9]+)*$").expect("prefixed key name");
+        let prefixed_key_name = regex::Regex::new(r"^(?:[A-Z][A-Z0-9]*_)+KEY(?:_[A-Z0-9]+)*$")
+            .expect("prefixed key name");
         let bearer = regex::Regex::new(r"(?i)bearer\s+(?P<token>[A-Za-z0-9._\-+/=]{8,})")
             .expect("bearer token");
         let patterns = [
@@ -261,6 +261,7 @@ fn scrub_regexes() -> &'static ScrubRegexes {
             r"pplx-[A-Za-z0-9_-]{20,}",
             r"AKIA[0-9A-Z]{16}",
             r"SG\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}",
+            r"\beyJ[A-Za-z0-9_-]{7,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b",
             r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----",
             r#"(?i)"api_key"\s*:\s*"[^"]+""#,
         ]
@@ -409,7 +410,10 @@ fn is_env_accessor(value: &str) -> bool {
 }
 
 fn name_is_uppercase_env(name: &str) -> bool {
-    !name.is_empty() && name.chars().all(|ch| ch.is_ascii_uppercase() || ch == '_')
+    !name.is_empty()
+        && name
+            .chars()
+            .all(|ch| ch.is_ascii_uppercase() || ch.is_ascii_digit() || ch == '_')
 }
 
 /// A call, an index, or two or more identifiers split on `.` or `?.`.
@@ -1521,11 +1525,47 @@ mod tests {
     }
 
     #[test]
+    fn scrub_secrets_redacts_multiword_secret_names() {
+        let value = format!("{}{}", "super", "secret");
+        for name in [
+            "GOOGLE_MAPS_API_KEY",
+            "AZURE_OPENAI_API_KEY",
+            "azure_openai_api_key",
+            "AZURE_CLIENT_SECRET",
+            "GITHUB_APP_TOKEN",
+            "MY_SERVICE_KEY",
+            "MY_APP_PASSWORD",
+            "STRIPE_LIVE_SECRET",
+        ] {
+            assert_redacted(&format!("{name}={value}"), &value);
+        }
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_s3_secret_with_a_dot() {
+        let value = format!("{}.{}", "abcdef", "ghijkl");
+        assert_redacted(&format!("S3_SECRET={value}"), &value);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_aws_s3_secret_with_a_dot() {
+        let value = format!("{}.{}", "abcdef", "ghijkl");
+        assert_redacted(&format!("AWS_S3_SECRET={value}"), &value);
+    }
+
+    #[test]
     fn scrub_secrets_redacts_a_jwt_after_api_key() {
         let header = format!("eyJ{}", "aaaaaaa");
         let jwt = format!("{header}.{}.{}", "bbbbbbbbbb", "cccccccccc");
         assert!(header.len() >= 10);
         assert_redacted(&format!("apiKey: {jwt}"), &jwt);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_bare_jwt() {
+        let header = format!("eyJ{}", "aaaaaaa");
+        let jwt = format!("{header}.{}.{}", "bbbbbbbbbb", "cccccccccc");
+        assert_redacted(&format!("see {jwt} later"), &jwt);
     }
 
     #[test]

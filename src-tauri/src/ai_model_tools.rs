@@ -826,7 +826,17 @@ mod tests {
         fs::create_dir(&git).unwrap();
         fs::write(git.join("config"), "keep\n").unwrap();
         let link = vault.path().join("note");
-        if !relative_symlink(".git/config", &link) {
+        #[cfg(windows)]
+        let target = ".git\\config";
+        #[cfg(not(windows))]
+        let target = ".git/config";
+        if !relative_symlink(target, &link) {
+            if std::env::var_os("CI").is_some() {
+                panic!("symlink support is required when CI is set");
+            }
+            eprintln!(
+                "skipping create_note_refuses_a_relative_symlink_into_git: this platform cannot create a symlink"
+            );
             return;
         }
         let vault_path = vault.path().to_string_lossy().into_owned();
