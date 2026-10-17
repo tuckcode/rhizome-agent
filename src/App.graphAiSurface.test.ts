@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readAppShellSource } from './test-utils/appShellSource'
 
 /**
  * Regression guard for a real user-reported bug: clicking the AI bubble while
@@ -18,7 +18,7 @@ import { readFileSync } from 'node:fs'
  * (see BreadcrumbBar.visibility.test.tsx and indexBootDiagnostics.test.ts).
  */
 describe('graph view mounts the AI workspace surface', () => {
-  const source = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+  const source = readAppShellSource()
 
   function graphBranch(): string {
     const start = source.indexOf('isGraphDestination ? (')

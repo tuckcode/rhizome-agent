@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { readAppShellSource } from '../test-utils/appShellSource'
 
 describe('leftover Ask chat excerpt', () => {
   it('locks the excerpt prompt on formatAskChatExcerpt', () => {
@@ -13,7 +14,7 @@ describe('leftover Ask chat excerpt', () => {
   })
 
   it('locks AskChatExcerptMenu wiring in App', () => {
-    const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+    const app = readAppShellSource()
     expect(app).toContain('<AskChatExcerptMenu onAsk={handleAskChatAboutExcerpt}>')
   })
 })
