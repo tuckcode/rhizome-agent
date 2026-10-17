@@ -164,6 +164,7 @@ import {
   vaultPathForEntry,
 } from './utils/workspaces'
 import { notePathsMatch } from './utils/notePathIdentity'
+import { clearStashedConflict, overwriteNoteContent, subscribeSaveConflicts } from './hooks/useSaveNote'
 import { activeGitRepositories } from './utils/gitRepositories'
 import { isMarkdownEntry } from './utils/typeDefinitions'
 import { resolveTypeDeleteRequest, typeDeleteBlockedMessageKey } from './utils/typeDeletion'
@@ -232,7 +233,11 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const visibleNotesRef = useRef<VaultEntry[]>([])
   const multiSelectionCommandRef = useRef<NoteListMultiSelectionCommands | null>(null)
   const [toastMessage, setToastMessage] = useState<string | null>(null)
-  const [toastAction, setToastAction] = useState<{ label: string; onClick: () => void } | null>(null)
+  const [toastAction, setToastAction] = useState<{
+    label: string
+    onClick: () => void
+    secondary?: { label: string; onClick: () => void }
+  } | null>(null)
   // "Ask the agent about this note" — the vault pointing at the conversation.
   // `requestId` rather than a bare path so asking twice about the same note
   // reopens it after the user has closed the pane.
@@ -767,6 +772,30 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   useEffect(() => {
     noteTabsRef.current = notes.tabs
   }, [notes.tabs])
+  // A save conflict moved the editor's text to a "(conflict)" copy.
+  // Keep mine writes it over the note. Reload takes the note from disk.
+  const { clearUnsaved: clearVaultUnsaved } = vault
+  useEffect(() => subscribeSaveConflicts((conflict) => {
+    const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path
+    const settle = () => {
+      clearStashedConflict(conflict.path)
+      clearVaultUnsaved(conflict.path)
+      const tab = noteTabsRef.current.find((t) => notePathsMatch(t.entry.path, conflict.path))
+      // Single-note model: an open tab is the active note.
+      if (tab) void handleReplaceActiveTab(tab.entry)
+    }
+    setToastMessage(`${fileName(conflict.path)} changed on disk. Your edits are in ${fileName(conflict.copyPath)}.`)
+    setToastAction({
+      label: 'Keep mine',
+      onClick: () => {
+        overwriteNoteContent(conflict.path, conflict.content).then(settle, (error: unknown) => {
+          setToastAction(null)
+          setToastMessage(`Could not keep your edits: ${error instanceof Error ? error.message : String(error)}`)
+        })
+      },
+      secondary: { label: 'Reload', onClick: settle },
+    })
+  }), [clearVaultUnsaved, handleReplaceActiveTab])
   const refocusActiveEditor = useCallback((path: string) => {
     window.dispatchEvent(new CustomEvent('laputa:focus-editor', { detail: { path } }))
   }, [])
@@ -2621,6 +2650,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           message={toastMessage}
           actionLabel={toastAction?.label}
           onAction={toastAction?.onClick}
+          secondaryActionLabel={toastAction?.secondary?.label}
+          onSecondaryAction={toastAction?.secondary?.onClick}
           onDismiss={() => {
             setToastMessage(null)
             setToastAction(null)

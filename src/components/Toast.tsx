@@ -7,9 +7,28 @@ interface ToastProps {
   onDismiss: () => void
   actionLabel?: string
   onAction?: () => void
+  secondaryActionLabel?: string
+  onSecondaryAction?: () => void
 }
 
-export function Toast({ message, onDismiss, actionLabel, onAction }: ToastProps) {
+function ToastAction({ label, onClick, onDismiss }: { label: string; onClick: () => void; onDismiss: () => void }) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="h-7 px-2"
+      onClick={() => {
+        onClick()
+        onDismiss()
+      }}
+    >
+      {label}
+    </Button>
+  )
+}
+
+export function Toast({ message, onDismiss, actionLabel, onAction, secondaryActionLabel, onSecondaryAction }: ToastProps) {
   const hasAction = Boolean(actionLabel && onAction)
 
   useEffect(() => {
@@ -32,19 +51,11 @@ export function Toast({ message, onDismiss, actionLabel, onAction }: ToastProps)
       )}
     >
       <span>{message}</span>
-      {hasAction ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-7 px-2"
-          onClick={() => {
-            onAction?.()
-            onDismiss()
-          }}
-        >
-          {actionLabel}
-        </Button>
+      {hasAction && actionLabel && onAction ? (
+        <ToastAction label={actionLabel} onClick={onAction} onDismiss={onDismiss} />
+      ) : null}
+      {hasAction && secondaryActionLabel && onSecondaryAction ? (
+        <ToastAction label={secondaryActionLabel} onClick={onSecondaryAction} onDismiss={onDismiss} />
       ) : null}
     </div>
   )

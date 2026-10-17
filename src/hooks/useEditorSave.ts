@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type MutableRefObject } from 'react'
 import type { SetStateAction } from 'react'
-import { useSaveNote } from './useSaveNote'
+import { emitSaveConflict, isSaveConflictError, stashConflictCopy, subscribeSaveConflicts, useSaveNote } from './useSaveNote'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { canWritePathToVault } from '../utils/vaultPathContainment'
 import { setSaveBaseline } from './noteContentCache'
@@ -227,6 +227,24 @@ function reconcileSplicedSave({
   setSaveBaseline(targetPath, pending.content)
 }
 
+/**
+ * A real save conflict. The buffer goes to a "(conflict)" copy, so the
+ * caller can drop it and let navigation go ahead. Listeners (the app
+ * toast) offer Keep mine and Reload. Any other error, or a failed copy,
+ * throws as before and the buffer stays pending.
+ */
+async function stashSaveConflict(error: unknown, path: string, content: string): Promise<void> {
+  if (!isSaveConflictError(error)) throw error
+  let copyPath: string
+  try {
+    copyPath = await stashConflictCopy(path, content)
+  } catch (stashError) {
+    console.error('Failed to stash conflicting edits:', stashError)
+    throw error
+  }
+  emitSaveConflict({ path, content, copyPath })
+}
+
 function applyTabContent(
   setTabs: EditorSaveConfig['setTabs'],
   path: string,
@@ -256,15 +274,27 @@ async function persistPendingContent({
   applySplicedContent,
 }: PersistPendingContentParams): Promise<boolean> {
   const { path, content } = pending
-  const result = await persistResolvedContent({
-    path,
-    content,
-    saveNote,
-    onBeforePersist,
-    resolvePath,
-    resolvePathBeforeSave,
-    persistenceScopeRef,
-  })
+  let result: Awaited<ReturnType<typeof persistResolvedContent>>
+  try {
+    result = await persistResolvedContent({
+      path,
+      content,
+      saveNote,
+      onBeforePersist,
+      resolvePath,
+      resolvePathBeforeSave,
+      persistenceScopeRef,
+    })
+  } catch (error) {
+    // Stash the newest text for this note, typed during the save or not.
+    const current = pendingContentRef.current
+    const latest = current && current.path === path ? current : pending
+    await stashSaveConflict(error, resolvePath?.(path) ?? path, latest.content)
+    if (pendingContentRef.current === latest || pendingContentRef.current === pending) {
+      pendingContentRef.current = null
+    }
+    return false
+  }
   if (result === null) {
     if (pendingContentRef.current === pending) pendingContentRef.current = null
     return false
@@ -419,15 +449,21 @@ async function persistUnsavedFallback({
   persistenceScopeRef: MutableRefObject<string | readonly string[] | undefined>
 }): Promise<boolean> {
   if (!unsavedFallback) return false
-  const result = await persistResolvedContent({
-    path: unsavedFallback.path,
-    content: unsavedFallback.content,
-    saveNote,
-    onBeforePersist,
-    resolvePath,
-    resolvePathBeforeSave,
-    persistenceScopeRef,
-  })
+  let result: Awaited<ReturnType<typeof persistResolvedContent>>
+  try {
+    result = await persistResolvedContent({
+      path: unsavedFallback.path,
+      content: unsavedFallback.content,
+      saveNote,
+      onBeforePersist,
+      resolvePath,
+      resolvePathBeforeSave,
+      persistenceScopeRef,
+    })
+  } catch (error) {
+    await stashSaveConflict(error, resolvePath?.(unsavedFallback.path) ?? unsavedFallback.path, unsavedFallback.content)
+    return false
+  }
   if (result === null) return false
   onNotePersisted?.(result.targetPath, result.saved)
   return true
@@ -479,9 +515,12 @@ async function persistImmediateSave({
   onAfterSave: () => void
   t: Translator
 }): Promise<boolean> {
+  // A conflict has its own toast (Keep mine / Reload). Do not replace it.
+  let conflicted = false
+  const unsubscribe = subscribeSaveConflicts(() => { conflicted = true })
   try {
     const saved = await flushPending()
-    const savedFallback = !saved && await persistUnsavedFallback({
+    const savedFallback = !saved && !conflicted && await persistUnsavedFallback({
       unsavedFallback,
       saveNote,
       onBeforePersist,
@@ -490,6 +529,7 @@ async function persistImmediateSave({
       resolvePathBeforeSave,
       persistenceScopeRef,
     })
+    if (conflicted) return false
     setToastMessage(saved || savedFallback ? t('save.toast.saved') : t('save.toast.nothingToSave'))
     onAfterSave()
     return true
@@ -497,6 +537,8 @@ async function persistImmediateSave({
     console.error('Save failed:', err)
     setToastMessage(formatSaveFailureMessage(err, t))
     return false
+  } finally {
+    unsubscribe()
   }
 }
 

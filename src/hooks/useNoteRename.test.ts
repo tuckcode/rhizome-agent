@@ -9,6 +9,7 @@ import {
   renameToastMessage,
   useNoteRename,
 } from './useNoteRename'
+import { clearSaveBaselines, getSaveBaseline, setSaveBaseline } from './noteContentCache'
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 vi.mock('../mock-tauri', () => ({
@@ -169,6 +170,22 @@ describe('useNoteRename hook', () => {
 
     return { onEntryRenamed }
   }
+
+  it('moves the open note\'s save baseline to the new path', async () => {
+    clearSaveBaselines()
+    setSaveBaseline('/vault/old.md', '# Old\n')
+    stubRenameNote({ new_path: '/vault/new.md', updated_files: 0, failed_updates: 0 }, '# New\n')
+    const open = { entry: makeEntry({ path: '/vault/old.md' }), content: '# Old\n' }
+    const { result } = renderHook(() => useNoteRename(
+      { entries: [], setToastMessage },
+      { tabs: [open], setTabs, activeTabPathRef, handleSwitchTab, updateTabContent },
+    ))
+    await act(async () => {
+      await result.current.handleRenameNote('/vault/old.md', 'New', '/vault', vi.fn())
+    })
+    expect(getSaveBaseline('/vault/old.md')).toBeNull()
+    expect(getSaveBaseline('/vault/new.md')).toBe('# New\n')
+  })
 
   it('handleRenameNote calls rename_note and updates toast', async () => {
     const entry = makeEntry({ path: '/vault/old.md', title: 'Old' })

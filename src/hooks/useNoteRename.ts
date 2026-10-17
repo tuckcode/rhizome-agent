@@ -2,6 +2,7 @@ import { useCallback, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import type { VaultEntry, WorkspaceIdentity } from '../types'
+import { moveSaveBaseline } from './noteContentCache'
 import { slugify } from './useNoteCreation'
 import {
   findByNotePath,
@@ -440,6 +441,10 @@ function useRenameResultApplier(
       .filter((tab) => !notePathsMatch(tab.entry.path, oldPath) && !notePathsMatch(tab.entry.path, result.new_path))
       .map((tab) => tab.entry.path)
     if (!notePathsMatch(oldPath, result.new_path)) onPathRenamed?.(oldPath, result.new_path)
+    // The open note now lives at the new path, with the text just read.
+    if (currentTabs.some((tab) => notePathsMatch(tab.entry.path, oldPath))) {
+      moveSaveBaseline(oldPath, result.new_path, newContent)
+    }
     setTabs((prev) => prev.map((tab) => notePathsMatch(tab.entry.path, oldPath) ? { entry: newEntry, content: newContent } : tab))
     if (notePathsMatch(activeTabPathRef.current, oldPath)) handleSwitchTab(result.new_path)
     onEntryRenamed(oldPath, newEntry, newContent)

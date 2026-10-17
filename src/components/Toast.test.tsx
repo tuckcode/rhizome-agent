@@ -24,4 +24,25 @@ describe('Toast', () => {
     expect(onAction).toHaveBeenCalledOnce()
     expect(onDismiss).toHaveBeenCalledOnce()
   })
+
+  it('offers two actions for a save conflict', () => {
+    const keep = vi.fn()
+    const reload = vi.fn()
+    const onDismiss = vi.fn()
+    render(
+      <Toast
+        message="plan.md changed on disk."
+        actionLabel="Keep mine"
+        onAction={keep}
+        secondaryActionLabel="Reload"
+        onSecondaryAction={reload}
+        onDismiss={onDismiss}
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Reload' }))
+    expect(reload).toHaveBeenCalledOnce()
+    expect(keep).not.toHaveBeenCalled()
+    expect(onDismiss).toHaveBeenCalledOnce()
+    expect(screen.getByRole('button', { name: 'Keep mine' })).toBeInTheDocument()
+  })
 })

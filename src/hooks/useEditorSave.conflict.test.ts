@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { AUTO_SAVE_DEBOUNCE_MS, useEditorSave } from './useEditorSave'
-import { useSaveNote } from './useSaveNote'
+import { clearStashedConflict, conflictCopyPath, subscribeSaveConflicts, useSaveNote, type SaveConflict } from './useSaveNote'
 import { cacheNoteContent, clearPrefetchCache } from './useTabManagement'
 import { clearSaveBaselines } from './noteContentCache'
 
@@ -163,24 +163,95 @@ describe('useEditorSave with a board move', () => {
     expect(updateVaultContent).not.toHaveBeenCalledWith(PATH, SPLICED)
   })
 
-  it('keeps the buffer dirty on a real conflict', async () => {
-    invokeFn.mockRejectedValue(new Error('Save conflict: /vault/plan.md changed on disk since the editor read it.'))
-    const { result } = renderSave()
+  describe('a real conflict', () => {
+    const CONFLICT = new Error('Save conflict: /vault/plan.md changed on disk since the editor read it.')
+    const COPY = '/vault/plan (conflict).md'
+    let conflicts: SaveConflict[]
+    let unsubscribe: () => void
 
-    act(() => {
-      result.current.handleContentChange(PATH, BUFFER)
-    })
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS)
+    beforeEach(() => {
+      clearStashedConflict(PATH)
+      conflicts = []
+      unsubscribe = subscribeSaveConflicts((conflict) => { conflicts.push(conflict) })
+      invokeFn.mockImplementation(async (cmd) => {
+        if (cmd === 'save_note_content_checked') throw CONFLICT
+        return null
+      })
     })
 
-    expect(setToastMessage).toHaveBeenLastCalledWith(expect.stringContaining('Save conflict:'))
-    expect(updateVaultContent).not.toHaveBeenCalled()
+    afterEach(() => { unsubscribe() })
 
-    await act(async () => {
-      await result.current.handleSave()
+    function calls(cmd: string) {
+      return invokeFn.mock.calls.filter(([name]) => name === cmd).map(([, args]) => args)
+    }
+
+    it('stashes the buffer in a conflict copy and lets the flush finish', async () => {
+      const { result } = renderSave()
+      act(() => { result.current.handleContentChange(PATH, BUFFER) })
+
+      let flushed: boolean | undefined
+      await act(async () => { flushed = await result.current.savePendingForPath(PATH) })
+
+      expect(flushed).toBe(false) // resolves, so navigation goes ahead
+      expect(calls('create_note_content')).toEqual([{ path: COPY, content: BUFFER }])
+      expect(conflicts).toEqual([{ path: PATH, content: BUFFER, copyPath: COPY }])
+      expect(updateVaultContent).not.toHaveBeenCalled()
+      expect(setToastMessage).not.toHaveBeenCalled()
+
+      // The buffer is no longer pending, so a retry does not loop on the conflict.
+      await act(async () => { await result.current.savePendingForPath(PATH) })
+      expect(calls('save_note_content_checked')).toHaveLength(1)
     })
-    expect(savedArgs(1)).toEqual({ path: PATH, content: BUFFER, expectedContent: OPENED })
+
+    it('a second conflict on the same note updates the same copy', async () => {
+      const { result } = renderSave()
+      act(() => { result.current.handleContentChange(PATH, BUFFER) })
+      await act(async () => { await result.current.savePendingForPath(PATH) })
+      act(() => { result.current.handleContentChange(PATH, `${BUFFER}more\n`) })
+      await act(async () => { await result.current.savePendingForPath(PATH) })
+
+      expect(calls('create_note_content')).toHaveLength(1)
+      expect(calls('save_note_content')).toEqual([{ path: COPY, content: `${BUFFER}more\n` }])
+      expect(conflicts.map((c) => c.copyPath)).toEqual([COPY, COPY])
+    })
+
+    it('a taken copy name moves on to the next one', async () => {
+      invokeFn.mockImplementation(async (cmd, args) => {
+        if (cmd === 'save_note_content_checked') throw CONFLICT
+        if (cmd === 'create_note_content' && args?.path === COPY) throw new Error(`File already exists: ${COPY}`)
+        return null
+      })
+      const { result } = renderSave()
+      act(() => { result.current.handleContentChange(PATH, BUFFER) })
+      await act(async () => { await result.current.savePendingForPath(PATH) })
+      expect(conflicts[0]?.copyPath).toBe(conflictCopyPath(PATH, 2))
+      expect(conflictCopyPath(PATH, 2)).toBe('/vault/plan (conflict 2).md')
+    })
+
+    it('Cmd+S on a conflict leaves the conflict toast alone', async () => {
+      const { result } = renderSave()
+      act(() => { result.current.handleContentChange(PATH, BUFFER) })
+      await act(async () => { await result.current.handleSave() })
+      expect(conflicts).toHaveLength(1)
+      expect(setToastMessage).not.toHaveBeenCalled()
+    })
+
+    it('keeps the buffer pending when the copy cannot be written', async () => {
+      invokeFn.mockImplementation(async (cmd) => {
+        if (cmd === 'save_note_content_checked') throw CONFLICT
+        throw new Error('disk full')
+      })
+      const { result } = renderSave()
+      act(() => { result.current.handleContentChange(PATH, BUFFER) })
+      await act(async () => {
+        await expect(result.current.savePendingForPath(PATH)).rejects.toThrow('Save conflict:')
+      })
+      expect(conflicts).toEqual([])
+      await act(async () => {
+        await expect(result.current.savePendingForPath(PATH)).rejects.toThrow('Save conflict:')
+      })
+      expect(savedArgs(1)).toEqual({ path: PATH, content: BUFFER, expectedContent: OPENED })
+    })
   })
 })
 
