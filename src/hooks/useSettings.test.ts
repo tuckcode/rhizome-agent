@@ -153,6 +153,7 @@ function changedSettings(): Settings {
     all_notes_show_images: false,
     all_notes_show_unsupported: true,
     agent_profile: null,
+    chat_engine: 'native',
   }
 }
 
@@ -185,6 +186,59 @@ describe('useSettings', () => {
     })
 
     expect(readChatEngine(result.current.settings.chat_engine)).toBe('native')
+  })
+
+  it('writes leftover Prime/Hermes engine choices to native once', async () => {
+    mockSettingsStore = {
+      ...savedSettings,
+      chat_engine: 'prime',
+      default_ai_agent: 'hermes',
+      default_ai_target: 'agent:pi',
+    }
+    const { result } = renderHook(() => useSettings())
+    await waitFor(() => {
+      expect(result.current.loaded).toBe(true)
+    })
+    expect(result.current.settings.chat_engine).toBe('native')
+    expect(result.current.settings.default_ai_agent).toBe('hermes')
+    expect(result.current.settings.default_ai_target).toBeNull()
+    expect(mockInvokeFn).toHaveBeenCalledWith('save_settings', {
+      settings: expect.objectContaining({
+        chat_engine: 'native',
+        default_ai_agent: 'hermes',
+        default_ai_target: null,
+      }),
+    })
+  })
+
+  it('leaves a persisted Rhizome target on disk', async () => {
+    mockSettingsStore = {
+      ...savedSettings,
+      chat_engine: 'native',
+      default_ai_agent: 'prime',
+      default_ai_target: 'agent:prime',
+    }
+    const { result } = renderHook(() => useSettings())
+    await waitFor(() => {
+      expect(result.current.loaded).toBe(true)
+    })
+    expect(result.current.settings.default_ai_agent).toBe('prime')
+    expect(result.current.settings.default_ai_target).toBe('agent:prime')
+    expect(mockInvokeFn).not.toHaveBeenCalledWith('save_settings', expect.anything())
+  })
+
+  it('leaves default_ai_agent prime on disk', async () => {
+    mockSettingsStore = {
+      ...savedSettings,
+      chat_engine: 'native',
+      default_ai_agent: 'prime',
+    }
+    const { result } = renderHook(() => useSettings())
+    await waitFor(() => {
+      expect(result.current.loaded).toBe(true)
+    })
+    expect(result.current.settings.default_ai_agent).toBe('prime')
+    expect(mockInvokeFn).not.toHaveBeenCalledWith('save_settings', expect.anything())
   })
 
   it('loads settings from backend on mount', async () => {
@@ -396,8 +450,12 @@ describe('useSettings', () => {
       await result.current.saveSettings(savedSettings)
     })
 
-    // Settings should not have changed on error
-    expect(result.current.settings).toEqual(defaultSettings)
+    // Settings should not have changed on error. Load already migrated
+    // a missing chat_engine to native in memory.
+    expect(result.current.settings).toEqual({
+      ...defaultSettings,
+      chat_engine: 'native',
+    })
     errorSpy.mockRestore()
   })
 

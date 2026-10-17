@@ -35,12 +35,17 @@ describe('aiAgents helpers', () => {
     expect(getAiAgentDefinition('prime').shortLabel).toBe('Prime')
   })
 
-  it('names the composer after the engine running the chat', () => {
+  it('names the composer after the resolved target, not the global Chat engine', () => {
     expect(composerAgentLabel({ chatEngine: 'prime', agent: 'prime' })).toBe('Prime')
     expect(composerAgentLabel({ chatEngine: 'native', agent: 'prime' })).toBe('Rhizome')
     expect(composerAgentLabel({ agent: 'prime' })).toBe('Prime')
     expect(composerAgentLabel({ chatEngine: 'prime', agent: 'codex', targetLabel: 'Codex' })).toBe('Codex')
-    expect(composerAgentLabel({ chatEngine: 'native', agent: 'codex', targetLabel: 'Codex' })).toBe('Rhizome')
+    expect(composerAgentLabel({ chatEngine: 'native', agent: 'codex', targetLabel: 'Codex' })).toBe('Codex')
+    expect(composerAgentLabel({
+      chatEngine: 'native',
+      agent: 'claude_code',
+      targetLabel: 'Claude Code',
+    })).toBe('Claude Code')
   })
 
   it('normalizes raw status payloads including prime', () => {

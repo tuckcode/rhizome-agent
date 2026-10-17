@@ -539,7 +539,7 @@ function AiPanelEmptyState({
           {t('ai.panel.empty.missingTitle', { agent: agentLabel })}
         </p>
         <p style={{ fontSize: 11, margin: 0, opacity: 0.6 }}>
-          {t('ai.panel.empty.missingDescription')}
+          {t('ai.panel.empty.missingDescription', { agent: agentLabel })}
         </p>
       </div>
     )

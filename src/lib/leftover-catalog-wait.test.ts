@@ -2,14 +2,13 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 describe('leftover catalog wait', () => {
-  it('skips provider IPC until the Agents tab loads the catalog', () => {
+  it('does not load a Prime catalog from Settings', () => {
     const panel = readFileSync(
       `${process.cwd()}/src/components/SettingsPanel.tsx`,
       'utf8',
     )
-    expect(panel).toContain('skip provider IPC until then')
-    expect(panel).toContain(
-      '{loadModelCatalog ? <PrimeProviderStatusSection t={t} /> : null}',
-    )
+    expect(panel).not.toContain('skip provider IPC until then')
+    expect(panel).not.toContain('PrimeProviderStatusSection')
+    expect(panel).not.toContain('loadModelCatalog')
   })
 })

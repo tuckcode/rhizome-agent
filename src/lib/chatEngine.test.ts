@@ -13,33 +13,25 @@ import {
 } from './nativeChatTargets'
 
 describe('chat engine setting', () => {
-  it('reads native when the value is absent', () => {
+  it('reads native for every stored value, including leftover engines', () => {
     expect(readChatEngine(undefined)).toBe('native')
     expect(readChatEngine(null)).toBe('native')
     expect(readChatEngine('')).toBe('native')
     expect(readChatEngine('native')).toBe('native')
+    expect(readChatEngine('prime')).toBe('native')
     expect(readChatEngine('hermes')).toBe('native')
     expect(readChatEngine('bogus')).toBe('native')
     expect(chatEngineFromSettings({})).toBe('native')
     expect(chatEngineFromSettings(null)).toBe('native')
-    expect(chatEngineForSave('native')).toBeNull()
+    expect(chatEngineFromSettings({ chat_engine: 'prime' })).toBe('native')
+    expect(chatEngineForSave('native')).toBe('native')
+    expect(chatEngineForSave('prime')).toBe('native')
   })
 
   it('lets only a resolved native engine send without a Prime install', () => {
     expect(chatEngineAllowsSendWithoutPrime('native')).toBe(true)
     expect(chatEngineAllowsSendWithoutPrime(undefined)).toBe(false)
     expect(chatEngineAllowsSendWithoutPrime('prime')).toBe(false)
-  })
-
-  it('persists prime and stores the native default as null', () => {
-    expect(readChatEngine('prime')).toBe('prime')
-    expect(chatEngineForSave('prime')).toBe('prime')
-    expect(chatEngineFromSettings({ chat_engine: 'prime' })).toBe('prime')
-    expect(chatEngineFromSettings({ chat_engine: chatEngineForSave('prime') })).toBe('prime')
-    expect(chatEngineFromSettings({ chat_engine: 'native' })).toBe('native')
-    expect(chatEngineFromSettings({ chat_engine: chatEngineForSave('native') })).toBe('native')
-    expect(chatEngineFromSettings({ chat_engine: 'hermes' })).toBe('native')
-    expect(chatEngineFromSettings({ chat_engine: 'bogus' })).toBe('native')
   })
 })
 

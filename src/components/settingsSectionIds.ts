@@ -25,11 +25,9 @@ export function isLegacyPackagesSettingsSection(id: string | null | undefined): 
 
 export function resolveSettingsSectionId(id: string | null | undefined): string | null {
   if (!id) return null
-  if (isLegacyPackagesSettingsSection(id)) return SETTINGS_SECTION_IDS.primeEngine
+  if (isLegacyPackagesSettingsSection(id) || id === SETTINGS_SECTION_IDS.primeEngine) {
+    return SETTINGS_SECTION_IDS.ai
+  }
   return id
 }
 
-export function shouldOpenAdvancedPrimeEngine(id: string | null | undefined): boolean {
-  if (!id) return false
-  return id === SETTINGS_SECTION_IDS.primeEngine || isLegacyPackagesSettingsSection(id)
-}
