@@ -205,9 +205,18 @@ pub(crate) fn recall_call_reasoning(session: &str, call_ids: &[String]) -> Optio
 
 /// Reasoning for text-only assistant steps, in history order.
 ///
-/// The kept turns are the newest ones, so they line up with the end of
-/// `texts`. An older step that was dropped, or a step this session never
-/// captured, is `None`. Identical answers stay in capture order.
+/// Walks `texts` and the stored turns backwards together. The stored
+/// cursor moves only when the texts match, so a missing middle turn
+/// does not slide reasoning onto a later answer. A stored turn whose
+/// text is nowhere in the history still ahead is skipped, so an orphan
+/// does not block an older match. A step this session never captured,
+/// or that the cap already dropped, is `None`. The caller sends `""`
+/// for that miss.
+///
+/// Identical text can still mis-pair. Stored `D1` then `D2`, both
+/// `"Done."`, against history `[D1, X, D2]` that is also all `"Done."`
+/// gives `X` the reasoning from `D1`. Telling those turns apart needs
+/// a per-turn id. DeepSeek does not answer 400 for that mismatch.
 pub(crate) fn recall_text_reasoning(session: &str, texts: &[&str]) -> Vec<Option<String>> {
     if session.is_empty() {
         return vec![None; texts.len()];
@@ -229,18 +238,29 @@ pub(crate) fn recall_text_reasoning(session: &str, texts: &[&str]) -> Vec<Option
             })
             .collect::<Vec<_>>()
     };
-    let start = texts.len().saturating_sub(stored.len());
-    texts
-        .iter()
-        .enumerate()
-        .map(|(index, text)| {
-            if index < start {
-                return None;
+    let mut matched = vec![None; texts.len()];
+    let mut stored_at = stored.len();
+    for (index, text) in texts.iter().enumerate().rev() {
+        while stored_at > 0 {
+            let (stored_text, _) = &stored[stored_at - 1];
+            let still_ahead = texts[..=index]
+                .iter()
+                .any(|candidate| candidate == stored_text);
+            if still_ahead {
+                break;
             }
-            let (stored_text, reasoning) = &stored[index - start];
-            (*text == stored_text).then(|| reasoning.clone())
-        })
-        .collect()
+            stored_at -= 1;
+        }
+        if stored_at == 0 {
+            break;
+        }
+        let (stored_text, reasoning) = &stored[stored_at - 1];
+        if *text == stored_text {
+            matched[index] = Some(reasoning.clone());
+            stored_at -= 1;
+        }
+    }
+    matched
 }
 
 fn store_current_reasoning(call_ids: &[String], text: &str, reasoning: &str) {
@@ -872,6 +892,55 @@ mod tests {
             recall_text_reasoning("completion-session", &["Done."]),
             vec![Some("checked the tool".into())]
         );
+    }
+
+    #[test]
+    fn an_orphan_stored_turn_does_not_block_an_older_match() {
+        note_reasoning_limited("orphan", &[], "A", "kept", 8, 1_000_000);
+        note_reasoning_limited("orphan", &[], "ORPHAN", "dropped", 8, 1_000_000);
+
+        assert_eq!(
+            recall_text_reasoning("orphan", &["A", "B"]),
+            vec![Some("kept".into()), None]
+        );
+        clear_reasoning_session("orphan");
+    }
+
+    #[test]
+    fn a_gap_in_the_middle_does_not_shift_reasoning_onto_a_later_turn() {
+        note_reasoning_limited("gap-mid", &[], "alpha", "first", 8, 1_000_000);
+        note_reasoning_limited("gap-mid", &[], "gamma", "third", 8, 1_000_000);
+
+        assert_eq!(
+            recall_text_reasoning("gap-mid", &["alpha", "beta", "gamma"]),
+            vec![Some("first".into()), None, Some("third".into())]
+        );
+        clear_reasoning_session("gap-mid");
+    }
+
+    #[test]
+    fn a_gap_between_identical_neighbours_keeps_each_text_match() {
+        note_reasoning_limited("gap-same", &[], "same", "left", 8, 1_000_000);
+        note_reasoning_limited("gap-same", &[], "same", "right", 8, 1_000_000);
+
+        assert_eq!(
+            recall_text_reasoning("gap-same", &["same", "other", "same"]),
+            vec![Some("left".into()), None, Some("right".into())]
+        );
+        clear_reasoning_session("gap-same");
+    }
+
+    #[test]
+    fn fully_aligned_text_turns_replay_in_capture_order() {
+        note_reasoning_limited("aligned", &[], "alpha", "one", 8, 1_000_000);
+        note_reasoning_limited("aligned", &[], "beta", "two", 8, 1_000_000);
+        note_reasoning_limited("aligned", &[], "gamma", "three", 8, 1_000_000);
+
+        assert_eq!(
+            recall_text_reasoning("aligned", &["alpha", "beta", "gamma"]),
+            vec![Some("one".into()), Some("two".into()), Some("three".into())]
+        );
+        clear_reasoning_session("aligned");
     }
 
     #[test]

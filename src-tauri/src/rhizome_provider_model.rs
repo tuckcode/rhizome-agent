@@ -139,25 +139,36 @@ fn next_replay_session() -> String {
     format!("replay-{}", NEXT.fetch_add(1, Ordering::Relaxed))
 }
 
-/// Gemini 3 and 4 reject a tool step that has no thought signature.
-/// The leading number is the generation: `gemini-2.5` is 2, `gemini-3.8` is 3.
+/// Last `/` segment, then the text before the first `:`.
+///
+/// `google/gemini-3.8-flash:free` becomes `gemini-3.8-flash`. A dash
+/// inside the name stays. Any OpenRouter-style tag (`:free`, `:floor`)
+/// is dropped the same way.
+fn normalized_model_name(model_id: &str) -> String {
+    let name = model_id.trim().to_ascii_lowercase();
+    let segment = name.rsplit('/').next().unwrap_or(name.as_str());
+    segment
+        .split_once(':')
+        .map(|(name, _tag)| name)
+        .unwrap_or(segment)
+        .to_string()
+}
+
+/// Gemini rejects a tool step that has no thought signature, except
+/// Gemini 1 and Gemini 2. A versionless alias such as
+/// `gemini-flash-latest` needs the placeholder too. The generation is
+/// the leading number: `gemini-2.5` is 2, `gemini-3.8` is 3. No leading
+/// number is not 1 or 2.
 fn needs_gemini_thought_placeholder(model_id: &str) -> bool {
-    let mut name = model_id.trim().to_ascii_lowercase();
-    // OpenRouter tags the free pool as `:free`. That is a suffix, not the
-    // model name. A vendor prefix still splits on `/` or `:`.
-    if let Some(stripped) = name.strip_suffix(":free") {
-        name = stripped.to_string();
-    }
-    let name = name
-        .rsplit(['/', ':'])
-        .next()
-        .unwrap_or(name.as_str())
-        .to_string();
+    let name = normalized_model_name(model_id);
     let Some(rest) = name.strip_prefix("gemini-") else {
         return false;
     };
     let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
-    digits.parse::<u32>().is_ok_and(|major| major >= 3)
+    match digits.parse::<u32>() {
+        Ok(major) => major >= 3,
+        Err(_) => true,
+    }
 }
 
 fn is_deepseek_target(model_id: &str, provider_id: &str, base_url: Option<&str>) -> bool {
@@ -168,9 +179,10 @@ fn is_deepseek_target(model_id: &str, provider_id: &str, base_url: Option<&str>)
 
 /// `openai_messages` plus Gemini 3+/4 and DeepSeek wire fixes.
 ///
-/// Gemini gets `skip_thought_signature_validator` on the first tool call
-/// of each assistant step, including a call that another provider made
-/// before a Taproot reroute. DeepSeek gets `reasoning_content` on every
+/// Gemini, other than Gemini 1 and Gemini 2, gets
+/// `skip_thought_signature_validator` on the first tool call of each
+/// assistant step, including a call that another provider made before a
+/// Taproot reroute. DeepSeek gets `reasoning_content` on every
 /// assistant message. A step this process did not capture sends `""`.
 fn openai_messages_for(view: &ModelView, turn_start: usize, wire: &OutboundWire<'_>) -> Vec<Value> {
     let gemini = needs_gemini_thought_placeholder(wire.model_id);
@@ -784,6 +796,59 @@ mod tests {
     }
 
     #[test]
+    fn versionless_gemini_aliases_need_the_thought_signature() {
+        let history = vec![tool_step("call_a", "call_b")];
+        let view = view("go", history);
+        for model_id in [
+            "gemini-flash-latest",
+            "gemini-pro-latest",
+            "models/gemini-flash-latest",
+            "google/gemini-pro-latest:free",
+        ] {
+            let messages = openai_messages_for(&view, 0, &wire(model_id, "gemini", None, ""));
+            assert_eq!(
+                messages[1]["tool_calls"][0]["extra_content"]["google"]["thought_signature"],
+                "skip_thought_signature_validator",
+                "{model_id}"
+            );
+        }
+        for model_id in ["gemini-2.5-flash", "gemini-1.5-pro"] {
+            let messages = openai_messages_for(&view, 0, &wire(model_id, "lan", None, ""));
+            assert!(
+                messages[1]["tool_calls"][0].get("extra_content").is_none(),
+                "{model_id}"
+            );
+        }
+    }
+
+    #[test]
+    fn model_name_keeps_the_last_segment_and_drops_the_first_tag() {
+        assert_eq!(
+            normalized_model_name("gemini-3.8-flash"),
+            "gemini-3.8-flash"
+        );
+        assert_eq!(
+            normalized_model_name("google/gemini-3.8-flash"),
+            "gemini-3.8-flash"
+        );
+        assert_eq!(
+            normalized_model_name("google/gemini-3.8-flash:free"),
+            "gemini-3.8-flash"
+        );
+        assert_eq!(normalized_model_name("a/b/model:tag"), "model");
+        assert_eq!(
+            normalized_model_name("gemini-2.5-flash"),
+            "gemini-2.5-flash"
+        );
+        assert!(needs_gemini_thought_placeholder("a/b/gemini-3-pro:tag"));
+        assert!(needs_gemini_thought_placeholder(
+            "google/gemini-3.8-flash:floor"
+        ));
+        assert!(!needs_gemini_thought_placeholder("a/b/model:tag"));
+        assert!(!needs_gemini_thought_placeholder("gemini-2.5-flash"));
+    }
+
+    #[test]
     fn a_reroute_onto_gemini_signs_tool_calls_from_the_previous_provider() {
         // Routing keeps one ProviderModel and retargets it
         // (`rhizome_routing` attempt loop). The calls in history were
@@ -910,6 +975,38 @@ mod tests {
         assert_eq!(messages[0]["reasoning_content"], "first thought");
         assert_eq!(messages[2]["reasoning_content"], "second thought");
         clear_reasoning_session("deepseek-order");
+    }
+
+    #[test]
+    fn a_missing_middle_text_turn_sends_empty_reasoning() {
+        crate::ai_models::note_reasoning("deepseek-gap", &[], "alpha", "first");
+        crate::ai_models::note_reasoning("deepseek-gap", &[], "gamma", "third");
+        let history = vec![
+            HistoryItem::Assistant {
+                text: "alpha".into(),
+                tool_calls: vec![],
+            },
+            HistoryItem::User { text: "mid".into() },
+            HistoryItem::Assistant {
+                text: "beta".into(),
+                tool_calls: vec![],
+            },
+            HistoryItem::User {
+                text: "next".into(),
+            },
+            HistoryItem::Assistant {
+                text: "gamma".into(),
+                tool_calls: vec![],
+            },
+        ];
+        let target = wire("deepseek-flash", "deepseek", None, "deepseek-gap");
+
+        let messages = openai_messages_for(&view("go", history), 5, &target);
+
+        assert_eq!(messages[0]["reasoning_content"], "first");
+        assert_eq!(messages[2]["reasoning_content"], "");
+        assert_eq!(messages[4]["reasoning_content"], "third");
+        clear_reasoning_session("deepseek-gap");
     }
 
     #[test]
