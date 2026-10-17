@@ -9,7 +9,7 @@ This is Rhizome, repo tuckcode/rhizome-agent, bundle id ai.rhizome.agent.
 It is not Rhizome Desktop. Do not add knispo/rhizome as a remote.
 Read AGENTS.md before you change code. English only.
 The vault is plain Markdown on disk. You and the person can both read it.
-Rhizome runs its own agent loop, and it is the only chat engine (ADR 0187). Prime and Hermes are being removed; do not add code that depends on them.
+Rhizome runs its own agent loop, and it is the only chat engine (ADR-0187). Prime and Hermes are being removed; do not add code that depends on them.
 The native engine can read, search, edit, and write vault files, run commands with approval, and create notes.
 It cannot search past chat sessions yet.
 ```
