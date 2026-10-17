@@ -48,6 +48,7 @@ import { AiPanelView } from './AiPanel'
 import { GuidanceWarning, WorkspaceHeader } from './AiWorkspaceChrome'
 import { WorkspaceResizeHandles } from './AiWorkspaceResizeHandles'
 import { AiAgentIcon } from './AiAgentIcon'
+import { BrandMark } from './BrandMark'
 import { ConversationSidebar } from './AiWorkspaceSidebar'
 import { ResizeHandle } from './ResizeHandle'
 import { SideWorkspaceHeader } from './AiWorkspaceSideHeader'
@@ -130,7 +131,7 @@ function TargetGroup({ label, targets }: { label: string; targets: AiTarget[] })
       <DropdownMenuLabel>{label}</DropdownMenuLabel>
       {targets.map((target) => (
         <DropdownMenuRadioItem key={target.id} value={target.id} className="gap-2">
-          {target.kind === 'agent' ? <AiAgentIcon agent={target.agent} size={16} /> : null}
+          <WorkspaceTargetIcon target={target} size={16} />
           <span className="truncate">{workspaceTargetChipLabel(target, 'full')}</span>
         </DropdownMenuRadioItem>
       ))}
@@ -165,7 +166,7 @@ function TargetPickerTrigger({
         aria-label={translate(locale, 'ai.workspace.targetLabel')}
         data-testid="ai-workspace-target-trigger"
       >
-        {selectedTarget.kind === 'agent' ? <AiAgentIcon agent={selectedTarget.agent} size={compact ? 14 : 16} /> : null}
+        <WorkspaceTargetIcon target={selectedTarget} size={compact ? 14 : 16} />
         <span className="truncate">{workspaceTargetChipLabel(selectedTarget)}</span>
         <CaretDown size={compact ? 12 : 13} />
       </Button>
@@ -550,12 +551,20 @@ function engineForWorkspaceTarget(target: AiTarget, chatEngine: ChatEngine | und
   return chatEngineForResolvedTarget(target, chatEngine)
 }
 
+function isRhizomeWorkspaceTarget(target: AiTarget): boolean {
+  return target.kind === 'agent' && (target.agent === 'prime' || target.agent === 'hermes')
+}
+
 /** Chip copy for leftover Prime/Hermes chats. Internal ids stay `agent:prime` / `agent:hermes`. */
 function workspaceTargetChipLabel(target: AiTarget, variant: 'short' | 'full' = 'short'): string {
-  if (target.kind === 'agent' && (target.agent === 'prime' || target.agent === 'hermes')) {
-    return 'Rhizome'
-  }
+  if (isRhizomeWorkspaceTarget(target)) return 'Rhizome'
   return variant === 'full' ? target.label : target.shortLabel
+}
+
+function WorkspaceTargetIcon({ size, target }: { size: number; target: AiTarget }) {
+  if (target.kind !== 'agent') return null
+  if (isRhizomeWorkspaceTarget(target)) return <BrandMark size={size} />
+  return <AiAgentIcon agent={target.agent} size={size} />
 }
 
 function ConversationSession({
@@ -1001,7 +1010,7 @@ function useAiWorkspaceModel(workspace: ResolvedAiWorkspaceProps): AiWorkspaceMo
     const token = workspace.conversationRetargetToken
     const targetId = workspace.requestedConversationTargetId
     if (!token || !targetId || !activeId) return
-    if (lastRetargetTokenRef.current === token) return
+    if (token <= (lastRetargetTokenRef.current ?? 0)) return
     lastRetargetTokenRef.current = token
     setConversationTarget(activeId, targetId)
   }, [

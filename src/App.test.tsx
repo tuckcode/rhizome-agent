@@ -1,4 +1,5 @@
 import { act, render as testingLibraryRender, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { ReactElement, ReactNode } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { DEFAULT_VAULTS } from './hooks/useVaultSwitcher'
@@ -1278,13 +1279,14 @@ describe('App', () => {
     act(() => {
       window.__rhizomeTest?.dispatchBrowserMenuCommand?.('view-command-palette')
     })
-    fireEvent.change(await screen.findByPlaceholderText('Type a command...'), { target: { value: ' ' } })
+    const user = userEvent.setup()
+    await user.type(await screen.findByPlaceholderText('Type a command...'), ' ')
     expect(screen.getByText('Codex is not available on this machine.')).toBeInTheDocument()
 
-    const editor = screen.getByTestId('command-palette-ai-input')
-    editor.textContent = ' summarize the vault'
-    fireEvent.input(editor)
-    fireEvent.click(screen.getByTestId('command-palette-use-rhizome'))
+    const editor = await screen.findByTestId('command-palette-ai-input')
+    expect(editor).toHaveAttribute('contenteditable', 'true')
+    await user.type(editor, 'summarize the vault')
+    await user.click(screen.getByTestId('command-palette-use-rhizome'))
 
     await waitFor(() => {
       expect(settingsStore.default_ai_target).toBe('agent:prime')
@@ -1335,6 +1337,78 @@ describe('App', () => {
     fireEvent.change(await screen.findByPlaceholderText('Type a command...'), { target: { value: ' ' } })
     expect(screen.getAllByText('Ask Rhizome').length).toBeGreaterThan(0)
     expect(screen.queryByText('Codex is not available on this machine.')).not.toBeInTheDocument()
+  })
+
+  it('keeps Cmd+K open in Rhizome mode when Use Rhizome has no prompt', async () => {
+    localStorage.setItem('ff_shell_command_rail', 'false')
+    let settingsStore = createSettings({
+      auto_advance_inbox_after_organize: null,
+      default_ai_agent: 'prime',
+      default_ai_target: null,
+      chat_engine: 'native',
+      ai_workspace_conversations: [
+        { id: 'codex-chat', title: 'Codex notes', target_id: 'agent:codex', archived: false },
+      ],
+    })
+    mockCommandResults.get_settings = () => settingsStore
+    mockCommandResults.save_settings = (args: unknown) => {
+      const payload = args as { settings?: Settings }
+      if (payload?.settings) settingsStore = payload.settings
+      return null
+    }
+    mockCommandResults.get_prime_session_host_status = {
+      installed: true,
+      version: 'mock',
+      running: true,
+      sessionId: 'sess-1',
+      isStreaming: false,
+      binaryPath: '/mock/prime-agent',
+      modelProvider: 'xai',
+      modelId: 'grok-4.5',
+      modelName: 'Grok 4.5',
+    }
+    mockCommandResults.get_ai_agents_status = {
+      prime: { installed: true, version: 'mock' },
+      claude_code: { installed: true, version: '2.1.90' },
+      codex: { installed: false, version: null },
+      opencode: { installed: false, version: null },
+      antigravity: { installed: false, version: null },
+      kiro: { installed: false, version: null },
+      hermes: { installed: false, version: null },
+    }
+
+    render(<App />)
+    await screen.findByText('All Notes')
+    await waitFor(() => {
+      expect(typeof window.__rhizomeTest?.dispatchBrowserMenuCommand).toBe('function')
+    })
+    blurTypingSurface()
+    fireEvent.keyDown(window, { key: 'l', code: 'KeyL', metaKey: true, shiftKey: true })
+    await screen.findByTestId('ai-workspace', {}, { timeout: 5000 })
+    await waitFor(() => {
+      expect(screen.getByText('Codex notes')).toBeInTheDocument()
+    })
+
+    blurTypingSurface()
+    act(() => {
+      window.__rhizomeTest?.dispatchBrowserMenuCommand?.('view-command-palette')
+    })
+    const user = userEvent.setup()
+    await user.type(await screen.findByPlaceholderText('Type a command...'), ' ')
+    expect(screen.getByText('Codex is not available on this machine.')).toBeInTheDocument()
+    await user.click(screen.getByTestId('command-palette-use-rhizome'))
+
+    await waitFor(() => {
+      expect(settingsStore.default_ai_target).toBe('agent:prime')
+    })
+    expect(screen.getByTestId('command-palette-ai-input')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getAllByText('Ask Rhizome').length).toBeGreaterThan(0)
+    })
+    expect(screen.queryByText('Codex is not available on this machine.')).not.toBeInTheDocument()
+    expect(screen.getByTestId('command-palette-ai-input')).toHaveFocus()
+    expect(streamNativeChat).not.toHaveBeenCalled()
+    expect(streamAiAgent).not.toHaveBeenCalled()
   })
 
   it('waits for saved AI agent settings before sending right-panel messages', async () => {

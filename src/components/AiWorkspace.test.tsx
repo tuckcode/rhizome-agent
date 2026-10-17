@@ -621,6 +621,7 @@ describe('AiWorkspace', () => {
     const primeSession = screen.getByTestId('ai-workspace-session-prime-chat')
     expect(within(primeSession).getByTestId('ai-workspace-target-trigger')).toHaveTextContent('Rhizome')
     expect(within(primeSession).getByTestId('ai-workspace-target-trigger')).not.toHaveTextContent('Prime')
+    expect(within(primeSession).getByTestId('brand-mark')).toBeInTheDocument()
     expect(within(primeSession).getByTestId('agent-input')).toHaveAttribute('aria-placeholder', 'Ask Rhizome')
     expect(within(primeSession).getByText('Ask Rhizome')).toBeTruthy()
 
@@ -631,6 +632,7 @@ describe('AiWorkspace', () => {
     expect(hermesSession).toHaveClass('flex')
     expect(within(hermesSession).getByTestId('ai-workspace-target-trigger')).toHaveTextContent('Rhizome')
     expect(within(hermesSession).getByTestId('ai-workspace-target-trigger')).not.toHaveTextContent('Hermes')
+    expect(within(hermesSession).getByTestId('brand-mark')).toBeInTheDocument()
     expect(within(hermesSession).getByTestId('agent-input')).toHaveAttribute('aria-placeholder', 'Ask Rhizome')
     expect(within(hermesSession).getByText('Ask Rhizome')).toBeTruthy()
   })

@@ -75,8 +75,6 @@ interface InlineWikilinkInputProps {
   unsupportedPasteMessage?: string
   submitOnEmpty?: boolean
   disabled?: boolean
-  /** Keeps the field visible but not editable. Programmatic input still syncs. */
-  readOnly?: boolean
   placeholder?: string
   placeholderClassName?: string
   inputRef?: React.RefObject<HTMLDivElement | null>
@@ -258,7 +256,6 @@ export function InlineWikilinkInput({
   unsupportedPasteMessage,
   submitOnEmpty = false,
   disabled = false,
-  readOnly = false,
   placeholder,
   placeholderClassName,
   inputRef,
@@ -772,7 +769,6 @@ export function InlineWikilinkInput({
       value={value}
       placeholder={placeholder}
       disabled={disabled}
-      readOnly={readOnly}
       inputRef={setCombinedRef}
       dataTestId={dataTestId}
       placeholderClassName={placeholderClassName}

@@ -34,6 +34,15 @@ function shouldWaitForTargetChange(
   return !!onTargetChange && queuedPromptTargetChange(prompt, currentTargetId) !== null
 }
 
+export function claimQueuedPromptSend(
+  sentPromptIdRef: { current: number | null },
+  promptId: number,
+): boolean {
+  if (sentPromptIdRef.current === promptId) return false
+  sentPromptIdRef.current = promptId
+  return true
+}
+
 function readyQueuedPrompt({
   currentTargetId,
   enabled,
@@ -91,8 +100,7 @@ export function useAiPanelPromptQueue({
   useEffect(() => {
     const prompt = readyQueuedPrompt({ currentTargetId, enabled, input, isActive, onTargetChange, queuedPrompt })
     if (!prompt) return
-    if (sentPromptIdRef.current === prompt.id) return
-    sentPromptIdRef.current = prompt.id
+    if (!claimQueuedPromptSend(sentPromptIdRef, prompt.id)) return
 
     // Intended: Cmd+K starts a fresh turn. clearConversation() drops the
     // current thread, including one just retargeted by Use Rhizome.

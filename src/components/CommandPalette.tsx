@@ -317,7 +317,6 @@ function OpenCommandPalette({
   }
 
   useLayoutEffect(() => {
-    if (aiMode && !aiAgentReady) return
     const target = aiMode ? aiInputRef.current : inputRef.current
     if (!target) return
 
@@ -430,12 +429,12 @@ function OpenCommandPalette({
   const handleUseRhizome = () => {
     onUseRhizome?.()
     const prompt = aiValue.startsWith(' ') ? aiValue.slice(1).trim() : aiValue.trim()
-    if (prompt) {
-      const references = extractInlineWikilinkReferences(prompt, entries)
-      if (aiRhizomeTargetId) queueAiPrompt(prompt, references, aiRhizomeTargetId)
-      else queueAiPrompt(prompt, references)
-      requestOpenAiChat()
-    }
+    if (!prompt) return
+
+    const references = extractInlineWikilinkReferences(prompt, entries)
+    if (aiRhizomeTargetId) queueAiPrompt(prompt, references, aiRhizomeTargetId)
+    else queueAiPrompt(prompt, references)
+    requestOpenAiChat()
     onClose()
   }
 

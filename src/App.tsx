@@ -370,7 +370,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     setRequestedConversationTargetId(rhizome.id)
     setConversationRetargetToken((token) => token + 1)
     void saveSettings(settingsAfterUseRhizome(settings, rhizome.id, lastAiWorkspaceConversationId))
-    dialogs.closeCommandPalette()
   }, [
     dialogs,
     lastAiWorkspaceConversationId,

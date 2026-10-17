@@ -121,6 +121,21 @@ function updateAiInput(text: string) {
   return screen.queryByTestId('command-palette-ai-input') ?? editor
 }
 
+function typeAiEditorKey(key: string) {
+  const editor = screen.getByTestId('command-palette-ai-input')
+  const event = new Event('beforeinput', { bubbles: true, cancelable: true })
+  Object.defineProperties(event, {
+    data: { value: key },
+    inputType: { value: 'insertText' },
+    isComposing: { value: false },
+  })
+  fireEvent(editor, event)
+}
+
+function typeAiEditorKeys(text: string) {
+  for (const key of text) typeAiEditorKey(key)
+}
+
 function resetNativeDropState() {
   nativeDropState.tauriMode = false
   for (const eventName of Object.keys(nativeDropState.handlers)) {
@@ -586,22 +601,65 @@ describe('CommandPalette', () => {
     expect(screen.getByText('Codex is not available on this machine.')).toBeInTheDocument()
     expect(screen.queryByTestId('command-palette-ai-send-hint')).not.toBeInTheDocument()
     expect(screen.queryByText('↵ send')).not.toBeInTheDocument()
-    expect(screen.getByTestId('command-palette-use-rhizome')).toHaveFocus()
-    expect(screen.getByTestId('command-palette-ai-input')).not.toHaveFocus()
+    expect(screen.getByTestId('command-palette-ai-input')).toHaveFocus()
+    expect(screen.getByTestId('command-palette-ai-input')).toHaveAttribute('contenteditable', 'true')
+    expect(screen.getByTestId('command-palette-ai-input')).not.toHaveAttribute('aria-readonly')
 
     fireEvent.click(screen.getByTestId('command-palette-install-agent'))
     expect(openExternalUrl).toHaveBeenCalledWith('https://developers.openai.com/codex/cli')
 
-    updateAiInput(' keep this prompt')
+    typeAiEditorKeys('keep this prompt')
     const editor = screen.getByTestId('command-palette-ai-input')
-    expect(editor).toHaveAttribute('contenteditable', 'false')
+    expect(editor).toHaveAttribute('contenteditable', 'true')
     expect(editor.textContent).toContain('keep this prompt')
     expect(screen.getByTestId('command-palette-use-rhizome').className).toMatch(/focus:ring-2/)
+    expect(screen.getByTestId('command-palette-use-rhizome').className).toMatch(/focus:ring-offset-2/)
+    expect(screen.getByTestId('command-palette-use-rhizome').className).toMatch(/focus:ring-offset-popover/)
     fireEvent.click(screen.getByTestId('command-palette-use-rhizome'))
     expect(onUseRhizome).toHaveBeenCalledOnce()
     expect(queueAiPrompt).toHaveBeenCalledWith('keep this prompt', [], 'agent:prime')
     expect(requestOpenAiChat).toHaveBeenCalledOnce()
     expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('keeps an empty Use Rhizome click open in Rhizome mode with the input focused', () => {
+    const onUseRhizome = vi.fn()
+    const view = render(
+      <CommandPalette
+        open={true}
+        commands={commands}
+        aiAgentReady={false}
+        aiAgentLabel="Codex"
+        aiRhizomeTargetId="agent:prime"
+        onClose={onClose}
+        onUseRhizome={onUseRhizome}
+      />,
+    )
+
+    fireEvent.change(screen.getByPlaceholderText('Type a command...'), { target: { value: ' ' } })
+    fireEvent.click(screen.getByTestId('command-palette-use-rhizome'))
+
+    expect(onUseRhizome).toHaveBeenCalledOnce()
+    expect(queueAiPrompt).not.toHaveBeenCalled()
+    expect(requestOpenAiChat).not.toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByTestId('command-palette-ai-input')).toBeInTheDocument()
+
+    view.rerender(
+      <CommandPalette
+        open={true}
+        commands={commands}
+        aiAgentReady={true}
+        aiAgentLabel="Rhizome"
+        aiRhizomeTargetId="agent:prime"
+        onClose={onClose}
+        onUseRhizome={onUseRhizome}
+      />,
+    )
+
+    expect(screen.getAllByText('Ask Rhizome').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Codex is not available on this machine.')).not.toBeInTheDocument()
+    expect(screen.getByTestId('command-palette-ai-input')).toHaveFocus()
   })
 
   it('passes note references when using Rhizome instead', () => {
@@ -643,10 +701,8 @@ describe('CommandPalette', () => {
     )
 
     fireEvent.change(screen.getByPlaceholderText('Type a command...'), { target: { value: ' ' } })
-    const editor = screen.getByTestId('command-palette-ai-input')
-    editor.textContent = ' still blocked'
-    fireEvent.input(editor)
-    fireEvent.keyDown(editor, { key: 'Enter' })
+    typeAiEditorKeys('still blocked')
+    fireEvent.keyDown(screen.getByTestId('command-palette-ai-input'), { key: 'Enter' })
     expect(queueAiPrompt).not.toHaveBeenCalled()
   })
 

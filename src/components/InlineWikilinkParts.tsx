@@ -199,7 +199,6 @@ export function InlineWikilinkEditorField({
   value,
   placeholder,
   disabled,
-  readOnly = false,
   inputRef,
   dataTestId,
   placeholderClassName,
@@ -221,7 +220,6 @@ export function InlineWikilinkEditorField({
   value: string
   placeholder?: string
   disabled: boolean
-  readOnly?: boolean
   inputRef: React.Ref<HTMLDivElement>
   dataTestId: string
   placeholderClassName?: string
@@ -274,10 +272,9 @@ export function InlineWikilinkEditorField({
       )}
       <div
         ref={editorRef}
-        contentEditable={!disabled && !readOnly}
+        contentEditable={!disabled}
         suppressContentEditableWarning={true}
         aria-disabled={disabled ? 'true' : undefined}
-        aria-readonly={readOnly ? 'true' : undefined}
         data-testid={dataTestId}
         className={cn(
           'min-h-[34px] w-full rounded-lg border border-border bg-transparent px-[10px] py-[8px] text-[13px] text-foreground',

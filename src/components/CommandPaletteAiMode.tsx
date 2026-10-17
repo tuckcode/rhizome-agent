@@ -1,4 +1,3 @@
-import { useLayoutEffect, useRef } from 'react'
 import { Sparkle } from '@phosphor-icons/react'
 import type { VaultEntry } from '../types'
 import type { NoteReference } from '../utils/ai-context'
@@ -35,12 +34,6 @@ export function CommandPaletteAiMode({
   onUseRhizome,
 }: CommandPaletteAiModeProps) {
   const t = createTranslator()
-  const useRhizomeRef = useRef<HTMLButtonElement>(null)
-
-  useLayoutEffect(() => {
-    if (aiAgentReady || !onUseRhizome) return
-    useRhizomeRef.current?.focus()
-  }, [aiAgentReady, onUseRhizome])
 
   return (
     <InlineWikilinkInput
@@ -50,7 +43,6 @@ export function CommandPaletteAiMode({
       onChange={onChange}
       onSubmit={(text, references) => onSubmit(stripLeadingSpace(text), references)}
       submitOnEmpty={true}
-      readOnly={!aiAgentReady}
       placeholder={t('ai.panel.placeholder.ready', { agent: aiAgentLabel })}
       dataTestId="command-palette-ai-input"
       editorClassName="border-none px-0 py-0 text-[15px]"
@@ -80,10 +72,9 @@ export function CommandPaletteAiMode({
                 ) : null}
                 {onUseRhizome ? (
                   <Button
-                    ref={useRhizomeRef}
                     type="button"
                     size="sm"
-                    className="focus:ring-2 focus:ring-[var(--state-focus-ring)]"
+                    className="focus:ring-2 focus:ring-[var(--state-focus-ring)] focus:ring-offset-2 focus:ring-offset-popover"
                     onClick={onUseRhizome}
                     data-testid="command-palette-use-rhizome"
                   >
