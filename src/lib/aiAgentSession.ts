@@ -18,7 +18,7 @@ import { trackAiAgentMessageBlocked, trackAiAgentMessageSent, trackAiAgentRespon
 import { streamAiAgent } from '../utils/streamAiAgent'
 import { streamAiModel } from '../utils/streamAiModel'
 import { streamNativeChat } from '../utils/streamNativeChat'
-import { chatEngineAllowsSendWithoutPrime } from './chatEngine'
+import { usesNativeChatStream } from './chatTargetRouting'
 import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
 import { rememberNativeSession } from './nativeChatTranscript'
 import { hydrateNoteReferences } from '../utils/ai-reference-content'
@@ -104,7 +104,20 @@ async function streamWithSelectedTarget({
   callbacks,
   signal,
 }: SelectedTargetStreamRequest): Promise<void> {
-  if (context.chatEngine === 'native') {
+  if (context.target?.kind === 'api_model') {
+    await streamAiModel({
+      provider: context.target.provider,
+      model: context.target.model,
+      message: formattedMessage,
+      systemPrompt,
+      vaultPath: context.vaultPath,
+      vaultPaths: context.vaultPaths,
+      callbacks,
+    })
+    return
+  }
+
+  if (usesNativeChatStream(context.target, context.agent, context.chatEngine)) {
     const sessionId = await streamNativeChat({
       target: resolveNativeChatTarget(context.nativeTarget),
       message: formattedMessage,
@@ -119,19 +132,6 @@ async function streamWithSelectedTarget({
     if (sessionId && context.nativeLiveSlot) {
       rememberNativeSession(context.nativeLiveSlot, sessionId, false)
     }
-    return
-  }
-
-  if (context.target?.kind === 'api_model') {
-    await streamAiModel({
-      provider: context.target.provider,
-      model: context.target.model,
-      message: formattedMessage,
-      systemPrompt,
-      vaultPath: context.vaultPath,
-      vaultPaths: context.vaultPaths,
-      callbacks,
-    })
     return
   }
 
@@ -164,7 +164,9 @@ export async function sendAgentMessage({
 
   if (shouldIgnorePrompt(currentStatus, normalizedPrompt)) return
 
-  if (context.chatEngine === 'native' && context.nativeReadOnly) {
+  const nativeStream = usesNativeChatStream(context.target, context.agent, context.chatEngine)
+
+  if (nativeStream && context.nativeReadOnly) {
     appendLocalMarker(runtime.setMessages, 'This chat is read-only.')
     return
   }
@@ -175,7 +177,7 @@ export async function sendAgentMessage({
     return
   }
 
-  if (!context.ready && !chatEngineAllowsSendWithoutPrime(context.chatEngine)) {
+  if (!context.ready && !nativeStream) {
     blockUnavailableAgent(runtime, context, normalizedPrompt)
     return
   }
@@ -209,7 +211,7 @@ export async function sendAgentMessage({
     runtime.messagesRef.current,
     promptForAgent,
   )
-  const liveNativeSession = context.chatEngine === 'native' && Boolean(context.nativeSessionId)
+  const liveNativeSession = nativeStream && Boolean(context.nativeSessionId)
   const nativeTurnMessage = liveNativeSession
     ? formatPromptWithReferences(promptForAgent.text, promptForAgent.references)
     : formattedMessage

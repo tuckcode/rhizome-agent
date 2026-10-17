@@ -156,7 +156,7 @@ describe('SettingsPanel', () => {
     expect(screen.getByTestId('settings-panel')).toHaveAttribute('aria-hidden', 'true')
   })
 
-  it('does not fetch the Prime catalog until Agents is opened', async () => {
+  it('does not fetch the Prime catalog from Settings', async () => {
     resetPrimeModelCatalog()
     const spy = vi.spyOn(mockTauri, 'mockInvoke')
     try {
@@ -166,12 +166,11 @@ describe('SettingsPanel', () => {
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 30))
       })
+      fireEvent.click(screen.getByTestId(`settings-nav-${SETTINGS_SECTION_IDS.ai}`))
+      expect(screen.queryByTestId('prime-model-allow-list')).not.toBeInTheDocument()
       expect(
         spy.mock.calls.filter(([cmd]) => cmd === 'get_available_prime_models'),
       ).toHaveLength(0)
-
-      fireEvent.click(screen.getByTestId(`settings-nav-${SETTINGS_SECTION_IDS.ai}`))
-      expect(await screen.findByTestId('prime-model-allow-list')).toBeInTheDocument()
     } finally {
       spy.mockRestore()
       resetPrimeModelCatalog()
@@ -184,13 +183,13 @@ describe('SettingsPanel', () => {
     expect(screen.queryByText('Packages')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Browse packages' })).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByTestId('settings-advanced-prime-engine-toggle'))
-    expect(await screen.findByText('Prime is not installed')).toBeInTheDocument()
+    expect(screen.queryByTestId('settings-advanced-prime-engine-toggle')).not.toBeInTheDocument()
+    expect(screen.queryByText('Prime is not installed')).not.toBeInTheDocument()
     expect(screen.queryByText('Packages')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Browse packages' })).not.toBeInTheDocument()
   })
 
-  it('opens Advanced Prime engine for an old Packages section id', async () => {
+  it('opens Agents for an old Packages section id', async () => {
     render(
       <SettingsPanel
         open={true}
@@ -200,15 +199,12 @@ describe('SettingsPanel', () => {
         onClose={onClose}
       />,
     )
-    expect(screen.getByTestId('settings-advanced-prime-engine-toggle')).toHaveAttribute(
-      'aria-expanded',
-      'true',
-    )
-    expect(await screen.findByText('Prime is not installed')).toBeInTheDocument()
+    expect(screen.queryByTestId('settings-advanced-prime-engine-toggle')).not.toBeInTheDocument()
+    expect(screen.getByTestId('native-chat-model-picker')).toBeInTheDocument()
     expect(screen.queryByText('Packages')).not.toBeInTheDocument()
   })
 
-  it('puts Prime install status and Copy MCP in Advanced Prime engine', () => {
+  it('keeps Copy MCP in Agents after Prime engine settings are gone', () => {
     const aiAgentsStatus: AiAgentsStatus = {
       ...createMissingAiAgentsStatus(),
       prime: createAiAgentAvailability('installed', '2.1.18'),
@@ -223,20 +219,12 @@ describe('SettingsPanel', () => {
         onClose={onClose}
       />,
     )
-    expect(screen.queryByRole('button', { name: 'Copy MCP config' })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByTestId('settings-advanced-prime-engine-toggle'))
-    const advanced = screen.getByTestId('settings-advanced-prime-engine')
-    expect(within(advanced).getByTestId('settings-advanced-prime-install-status')).toHaveTextContent(
-      'Prime is installed',
-    )
-    expect(within(advanced).getByTestId('settings-advanced-prime-install-status')).toHaveTextContent(
-      '2.1.18',
-    )
-    expect(within(advanced).getByRole('button', { name: 'Copy MCP config' })).toBeInTheDocument()
-    expect(within(advanced).queryByText('Packages')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('settings-advanced-prime-engine')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copy MCP config' })).toBeInTheDocument()
+    expect(screen.queryByText('Packages')).not.toBeInTheDocument()
   })
 
-  it('loads the Prime catalog when Settings opens on Agents', async () => {
+  it('does not load the Prime catalog when Settings opens on Agents', () => {
     resetPrimeModelCatalog()
     render(
       <SettingsPanel
@@ -247,7 +235,8 @@ describe('SettingsPanel', () => {
         onClose={onClose}
       />
     )
-    expect(await screen.findByTestId('prime-model-allow-list')).toBeInTheDocument()
+    expect(screen.queryByTestId('prime-model-allow-list')).not.toBeInTheDocument()
+    expect(screen.getByTestId('native-chat-model-picker')).toBeInTheDocument()
   })
 
   it('renders modal when open', () => {
@@ -276,10 +265,14 @@ describe('SettingsPanel', () => {
     )
 
     expect(screen.getByText('Recognized local agents')).toBeInTheDocument()
-    expect(screen.getAllByText('Prime Agent').length).toBeGreaterThan(0)
-    expect(screen.getByText('2.1.18')).toBeInTheDocument()
-    // Claude Code is import-source copy (SessionImportSettingsSection), not a
-    // listed local agent. Probe status must still stay off the agents list.
+    expect(screen.getByTestId('settings-cli-agent-status')).toHaveTextContent('Claude Code')
+    expect(screen.getByTestId('settings-cli-agent-status')).toHaveTextContent('Codex')
+    expect(screen.getByTestId('settings-cli-agent-status')).toHaveTextContent('OpenCode')
+    expect(screen.getByTestId('settings-cli-agent-status')).toHaveTextContent('Antigravity')
+    expect(screen.getByTestId('settings-cli-agent-status')).toHaveTextContent('Kiro')
+    expect(screen.queryByText('Prime Agent')).not.toBeInTheDocument()
+    expect(screen.queryByText('Hermes Agent')).not.toBeInTheDocument()
+    // Claude Code also remains import-source copy in SessionImportSettingsSection.
     expect(screen.getByText(/Bring Claude Code sessions into this vault/)).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Local model' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'API model' })).toBeInTheDocument()
@@ -290,6 +283,7 @@ describe('SettingsPanel', () => {
     expect(await screen.findByText('Connection works. The model replied successfully.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add local model' })).toBeInTheDocument()
     expect(screen.queryByText('Recognized local agents')).not.toBeInTheDocument()
+    expect(screen.queryByText('Prime Agent')).not.toBeInTheDocument()
 
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'API model' }), { button: 0, ctrlKey: false })
     expect(screen.getByRole('button', { name: 'Add API model' })).toBeInTheDocument()
@@ -964,16 +958,52 @@ describe('SettingsPanel', () => {
     })
   })
 
-  it('uses the native Chat engine when no engine is saved', () => {
+  it('does not render a Chat engine picker', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
 
-    expect(screen.getByTestId('settings-chat-engine')).toHaveTextContent('Chat engine')
-    expect(screen.getByRole('switch', { name: 'Chat engine' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.queryByTestId('settings-chat-engine')).not.toBeInTheDocument()
+    expect(screen.queryByRole('switch', { name: 'Chat engine' })).not.toBeInTheDocument()
     expect(screen.queryByTestId('settings-prime-chat-engine')).not.toBeInTheDocument()
     expect(screen.getByTestId('native-chat-model-picker')).toBeInTheDocument()
     expect(screen.queryByTestId('settings-default-ai-agent')).not.toBeInTheDocument()
+  })
+
+  it('puts Chat model at the top of AI Agents and shows Codex and Claude Code install status', () => {
+    const aiAgentsStatus: AiAgentsStatus = createMissingAiAgentsStatus()
+    aiAgentsStatus.claude_code = createAiAgentAvailability('installed', '2.1.90')
+    aiAgentsStatus.codex = createAiAgentAvailability('missing', null)
+    render(
+      <SettingsPanel
+        open={true}
+        settings={emptySettings}
+        aiAgentsStatus={aiAgentsStatus}
+        onSave={onSave}
+        onClose={onClose}
+      />,
+    )
+
+    const chatModel = screen.getByTestId('settings-chat-model')
+    expect(chatModel).toHaveTextContent('Chat model')
+    expect(chatModel).toHaveTextContent(
+      'New chats start with this model. You can change it per chat in the composer.',
+    )
+    expect(within(chatModel).getByTestId('native-chat-model-picker')).toBeInTheDocument()
+
+    const section = chatModel.parentElement
+    expect(section?.firstElementChild).toBe(chatModel)
+
+    const status = screen.getByTestId('settings-cli-agent-status')
+    expect(within(status).getByText('Claude Code')).toBeInTheDocument()
+    expect(within(status).getByText('Codex')).toBeInTheDocument()
+    expect(within(status).getByText('OpenCode')).toBeInTheDocument()
+    expect(within(status).getByText('Antigravity CLI')).toBeInTheDocument()
+    expect(within(status).getByText('Kiro')).toBeInTheDocument()
+    expect(within(status).queryByText('Prime Agent')).not.toBeInTheDocument()
+    expect(within(status).queryByText('Hermes Agent')).not.toBeInTheDocument()
+    expect(within(status).getByText('installed')).toBeInTheDocument()
+    expect(within(status).getAllByText('missing').length).toBeGreaterThan(0)
   })
 
   it('hides secret files by default, warns when off, and reloads the saved value', () => {
@@ -1030,7 +1060,7 @@ describe('SettingsPanel', () => {
     )
   })
 
-  it('hides the Prime engine line when mock-tauri reports version mock', () => {
+  it('does not show Prime engine copy for a leftover saved prime value', () => {
     const status = createMissingAiAgentsStatus()
     status.prime = createAiAgentAvailability('installed', 'mock')
     render(
@@ -1043,6 +1073,7 @@ describe('SettingsPanel', () => {
       />,
     )
     expect(screen.queryByTestId('settings-prime-chat-engine')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('settings-chat-engine')).not.toBeInTheDocument()
   })
 
   /**
@@ -1146,49 +1177,36 @@ describe('SettingsPanel', () => {
     expect(trigger).toHaveTextContent('Taproot')
   })
 
-  it('persists the native Chat engine across a settings save and reload', () => {
-    const { rerender } = render(
+  it('writes native when Settings saves', () => {
+    render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
-    expect(screen.getByRole('switch', { name: 'Chat engine' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.queryByRole('switch', { name: 'Chat engine' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByTestId('settings-save'))
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ chat_engine: null }))
-    const saved = onSave.mock.calls.at(-1)?.[0]
-    rerender(
-      <SettingsPanel open={true} settings={saved} onSave={onSave} onClose={onClose} />
-    )
-    expect(screen.getByRole('switch', { name: 'Chat engine' })).toHaveAttribute('aria-checked', 'true')
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ chat_engine: 'native' }))
   })
 
-  it('persists Prime when the Chat engine switch is turned off', () => {
-    const { rerender } = render(
+  it('does not offer a Prime engine switch', () => {
+    render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
-    fireEvent.click(screen.getByRole('switch', { name: 'Chat engine' }))
-    expect(screen.getByRole('switch', { name: 'Chat engine' })).toHaveAttribute('aria-checked', 'false')
-    expect(screen.getByTestId('settings-prime-chat-engine')).toHaveTextContent('Prime Agent')
+    expect(screen.queryByRole('switch', { name: 'Chat engine' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('settings-prime-chat-engine')).not.toBeInTheDocument()
     fireEvent.click(screen.getByTestId('settings-save'))
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ chat_engine: 'prime' }))
-    const saved = onSave.mock.calls.at(-1)?.[0]
-    rerender(
-      <SettingsPanel open={true} settings={saved} onSave={onSave} onClose={onClose} />
-    )
-    expect(screen.getByRole('switch', { name: 'Chat engine' })).toHaveAttribute('aria-checked', 'false')
+    expect(onSave).not.toHaveBeenCalledWith(expect.objectContaining({ chat_engine: 'prime' }))
   })
 
-  it('explains that Chat models are selected inside Prime', () => {
+  it('does not explain a Prime fallback engine', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
 
-    expect(screen.getByText(/On: new chats use Rhizome's engine/)).toBeInTheDocument()
-    expect(screen.getByText(/Off: new chats use Prime, and they switch to Rhizome's engine if Prime isn't installed/)).toBeInTheDocument()
-    expect(screen.getByText(/Changes apply to new chats, and an open chat keeps the engine it started with/)).toBeInTheDocument()
+    expect(screen.queryByText(/On: new chats use Rhizome's engine/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Off: new chats use Prime/)).not.toBeInTheDocument()
     expect(screen.queryByText(/Prime Agent runs Chat/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/skips Prime sessions and vault tools/)).not.toBeInTheDocument()
   })
 
-  it('replaces a stored direct-model default with Prime when Settings saves', () => {
+  it('does not replace a stored model default with Prime when Settings saves', () => {
     render(
       <SettingsPanel
         open={true}
@@ -1221,13 +1239,11 @@ describe('SettingsPanel', () => {
       />,
     )
 
-    expect(screen.getByRole('switch', { name: 'Chat engine' })).toHaveAttribute('aria-checked', 'true')
-    expect(screen.queryByText(/My Anthropic.*Claude Sonnet/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('switch', { name: 'Chat engine' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByTestId('settings-save'))
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
-      default_ai_agent: 'prime',
-      default_ai_target: 'agent:prime',
-    }))
+    const saved = onSave.mock.calls.at(-1)?.[0] as Settings
+    expect(saved.chat_engine).toBe('native')
+    expect(saved.default_ai_target).not.toBe('agent:prime')
   })
 
   it('treats a legacy beta release channel as stable', () => {
@@ -1647,7 +1663,6 @@ describe('SettingsPanel', () => {
       />
     )
 
-    fireEvent.click(screen.getByTestId('settings-advanced-prime-engine-toggle'))
     fireEvent.click(screen.getByRole('button', { name: 'Copy MCP config' }))
 
     expect(onCopyMcpConfig).toHaveBeenCalledOnce()

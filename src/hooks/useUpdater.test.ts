@@ -29,6 +29,10 @@ vi.mock('@tauri-apps/api/core', () => ({
 }))
 
 import { isTauri } from '../mock-tauri'
+import {
+  UPDATER_CHECK_FAILED_MESSAGE,
+  UPDATER_USER_MESSAGES,
+} from '../lib/updaterUserMessages'
 
 interface AppUpdateMetadata {
   currentVersion: string
@@ -273,10 +277,50 @@ describe('useUpdater', () => {
 
     expect(outcome).toEqual({
       kind: 'error',
-      message: 'Could not check for updates: network error',
+      message: UPDATER_CHECK_FAILED_MESSAGE,
     })
-    expect(console.warn).toHaveBeenCalledWith('[updater] Failed to check for updates')
+    expect(console.warn).toHaveBeenCalledWith('[updater] Failed to check for updates', 'network error')
     expect(result.current.status).toEqual({ state: 'error' })
+  })
+
+  it('keeps the honest unavailable sentence and hides other plugin text', async () => {
+    const unavailable = await performManualCheck(
+      'stable',
+      new Error(UPDATER_USER_MESSAGES.inAppUpdatesUnavailable),
+    )
+    expect(unavailable.outcome).toEqual({
+      kind: 'error',
+      message: UPDATER_USER_MESSAGES.inAppUpdatesUnavailable,
+    })
+
+    const plugin = await performManualCheck(
+      'stable',
+      new Error('Could not fetch a valid release JSON from the remote'),
+    )
+    expect(plugin.outcome).toEqual({
+      kind: 'error',
+      message: UPDATER_CHECK_FAILED_MESSAGE,
+    })
+    expect(console.warn).toHaveBeenCalledWith(
+      '[updater] Failed to check for updates',
+      'Could not fetch a valid release JSON from the remote',
+    )
+  })
+
+  it('maps an unknown invoke error to the shared check fallback', async () => {
+    const { outcome } = await performManualCheck(
+      'stable',
+      new Error('internal invoke detail users should not see'),
+    )
+
+    expect(outcome).toEqual({
+      kind: 'error',
+      message: UPDATER_CHECK_FAILED_MESSAGE,
+    })
+    expect(console.warn).toHaveBeenCalledWith(
+      '[updater] Failed to check for updates',
+      'internal invoke detail users should not see',
+    )
   })
 
   it('dismiss resets the banner state', async () => {

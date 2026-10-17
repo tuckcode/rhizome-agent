@@ -23,6 +23,7 @@ export interface StartupScreenParams {
   noteWindowParams: NoteWindowParams | null
   onboarding: OnboardingState
   runtimeMissingVaultPath: string | null
+  loadError: string | null
   saveSettings: (settings: Settings) => Promise<void>
   settings: Settings
   settingsLoaded: boolean
@@ -37,6 +38,7 @@ function shouldShowTelemetryConsent(params: StartupScreenParams): boolean {
   return !params.noteWindowParams
     && !params.isStartupLoading
     && params.settingsLoaded
+    && params.loadError == null
     && params.settings.telemetry_consent === null
 }
 

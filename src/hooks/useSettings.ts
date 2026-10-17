@@ -2,6 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import { normalizeStoredAiAgent } from '../lib/aiAgents'
+import {
+  migrateRemovedHarnessSettings,
+  removedHarnessSettingsNeedPersist,
+} from '../lib/migrateRemovedHarnessChoices'
 import { normalizeAiModelProviders } from '../lib/aiTargets'
 import { shouldHideGitignoredFiles } from '../lib/gitignoredVisibility'
 import {
@@ -80,7 +84,7 @@ const EMPTY_SETTINGS: Settings = {
 function normalizeSettings(settings: Settings): Settings {
   const aiModelProviders = normalizeAiModelProviders(settings.ai_model_providers)
 
-  return {
+  return migrateRemovedHarnessSettings({
     ...settings,
     git_enabled: settings.git_enabled ?? null,
     release_channel: serializeReleaseChannel(
@@ -107,7 +111,8 @@ function normalizeSettings(settings: Settings): Settings {
     all_notes_show_unsupported: settings.all_notes_show_unsupported ?? null,
     multi_workspace_enabled: settings.multi_workspace_enabled ?? null,
     agent_profile: settings.agent_profile?.trim() || null,
-  }
+    chat_engine: settings.chat_engine ?? null,
+  })
 }
 
 function normalizeAiWorkspaceConversations(settings: Settings['ai_workspace_conversations']) {
@@ -133,28 +138,60 @@ function effectiveAccentColor(settings: Settings): string {
   return normalizeAccentColor(settings.accent_color) ?? DEFAULT_ACCENT_COLOR
 }
 
+function assignChangedSetting<K extends keyof Settings>(target: Settings, key: K, value: Settings[K]) {
+  target[key] = value
+}
+
+function mergeChangedSettings(base: Settings, previous: Settings, next: Settings): Settings {
+  const merged = { ...base }
+  const keys = new Set<keyof Settings>([
+    ...(Object.keys(previous) as Array<keyof Settings>),
+    ...(Object.keys(next) as Array<keyof Settings>),
+  ])
+  keys.forEach((key) => {
+    if (!Object.is(previous[key], next[key])) {
+      assignChangedSetting(merged, key, next[key])
+    }
+  })
+  return merged
+}
+
+function loadErrorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
+
 export function useSettings() {
   const [settings, setSettings] = useState<Settings>(EMPTY_SETTINGS)
   const [loaded, setLoaded] = useState(false)
-  const [nativeChatTargetLoaded, setNativeChatTargetLoaded] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const settingsRef = useRef(settings)
-  const nativeChatTargetLoadedRef = useRef(false)
+  const loadOkRef = useRef(false)
   const loadEpoch = useRef(0)
 
   const loadSettings = useCallback(async (): Promise<Settings | null> => {
-    const epoch = loadEpoch.current
+    const epoch = ++loadEpoch.current
     try {
-      const s = normalizeSettings(await tauriCall<Settings>('get_settings', {}))
+      const raw = await tauriCall<Settings>('get_settings', {})
       if (epoch !== loadEpoch.current) {
-        return nativeChatTargetLoadedRef.current ? settingsRef.current : null
+        return loadOkRef.current ? settingsRef.current : null
       }
-      settingsRef.current = s
-      nativeChatTargetLoadedRef.current = true
-      setNativeChatTargetLoaded(true)
-      setSettings(s)
-      return s
+      const normalized = normalizeSettings(raw)
+      settingsRef.current = normalized
+      loadOkRef.current = true
+      setLoadError(null)
+      setSettings(normalized)
+      if (removedHarnessSettingsNeedPersist(raw, normalized)) {
+        if (epoch !== loadEpoch.current) return normalized
+        try {
+          await tauriCall<null>('save_settings', { settings: normalized })
+        } catch (persistErr) {
+          console.warn('Failed to persist harness migration:', persistErr)
+        }
+      }
+      return normalized
     } catch (err) {
       console.warn('Failed to load settings:', err)
+      if (epoch === loadEpoch.current) setLoadError(loadErrorMessage(err))
       return null
     } finally {
       setLoaded(true)
@@ -166,11 +203,25 @@ export function useSettings() {
   }, [loadSettings])
 
   const saveSettings = useCallback(async (newSettings: Settings) => {
-    const previousHideGitignored = shouldHideGitignoredFiles(settings)
-    const previousThemeMode = effectiveThemeMode(settings)
-    const previousColorTheme = effectiveColorTheme(settings)
-    const previousAccentColor = effectiveAccentColor(settings)
-    const normalizedSettings = normalizeSettings(newSettings)
+    const memory = settingsRef.current
+    let toSave = newSettings
+    if (!loadOkRef.current) {
+      const disk = await loadSettings()
+      if (!disk || !loadOkRef.current) {
+        // TODO: tell the user this change was not saved. Copy belongs in
+        // en.json, which another PR is editing, so this stays silent.
+        return
+      }
+      toSave = mergeChangedSettings(disk, memory, newSettings)
+    }
+
+    loadEpoch.current += 1
+    const previous = settingsRef.current
+    const previousHideGitignored = shouldHideGitignoredFiles(previous)
+    const previousThemeMode = effectiveThemeMode(previous)
+    const previousColorTheme = effectiveColorTheme(previous)
+    const previousAccentColor = effectiveAccentColor(previous)
+    const normalizedSettings = normalizeSettings(toSave)
     // Optimistic local state so theme/UI prefs flip immediately; disk write follows.
     settingsRef.current = normalizedSettings
     setSettings(normalizedSettings)
@@ -194,39 +245,14 @@ export function useSettings() {
       }
     } catch (err) {
       console.error('Failed to save settings:', err)
-      // Roll back in-memory settings if persist failed.
-      settingsRef.current = settings
-      setSettings(settings)
-    }
-  }, [settings])
-
-  const reloadSettings = useCallback(async () => {
-    const loadedSettings = await loadSettings()
-    return loadedSettings != null
-  }, [loadSettings])
-
-  // A failed get_settings leaves EMPTY_SETTINGS in memory. Saving that
-  // object replaces the file. Skip while the load is still failing. A
-  // retry that succeeds merges this change into the settings just read.
-  const saveNativeChatTarget = useCallback(async (target: string) => {
-    if (!nativeChatTargetLoadedRef.current) {
-      await loadSettings()
-    }
-    if (!nativeChatTargetLoadedRef.current) return
-
-    loadEpoch.current += 1
-    const previous = settingsRef.current
-    const next = normalizeSettings({ ...previous, native_chat_target: target })
-    settingsRef.current = next
-    setSettings(next)
-    try {
-      await tauriCall<null>('save_settings', { settings: next })
-    } catch (err) {
-      console.error('Failed to save settings:', err)
       settingsRef.current = previous
       setSettings(previous)
     }
   }, [loadSettings])
+
+  const saveNativeChatTarget = useCallback(async (target: string) => {
+    await saveSettings({ ...settingsRef.current, native_chat_target: target })
+  }, [saveSettings])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -244,12 +270,5 @@ export function useSettings() {
     }
   }, [saveSettings, settings])
 
-  return {
-    settings,
-    loaded,
-    nativeChatTargetLoaded,
-    reloadSettings,
-    saveSettings,
-    saveNativeChatTarget,
-  }
+  return { settings, loaded, loadError, saveSettings, saveNativeChatTarget }
 }

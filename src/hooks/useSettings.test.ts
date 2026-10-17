@@ -100,8 +100,18 @@ function savedChatTarget(): Settings {
   return {
     ...savedSettings,
     theme_mode: 'dark',
-    chat_engine: 'prime',
+    chat_engine: 'native',
     native_chat_target: 'openai/gpt-4.1-mini',
+  }
+}
+
+function declineTelemetry(settings: Settings): Settings {
+  return {
+    ...settings,
+    telemetry_consent: false,
+    crash_reporting_enabled: false,
+    analytics_enabled: false,
+    anonymous_id: null,
   }
 }
 
@@ -168,6 +178,7 @@ function changedSettings(): Settings {
     all_notes_show_images: false,
     all_notes_show_unsupported: true,
     agent_profile: null,
+    chat_engine: 'native',
   }
 }
 
@@ -202,6 +213,59 @@ describe('useSettings', () => {
     })
 
     expect(readChatEngine(result.current.settings.chat_engine)).toBe('native')
+  })
+
+  it('writes leftover Prime/Hermes engine choices to native once', async () => {
+    mockSettingsStore = {
+      ...savedSettings,
+      chat_engine: 'prime',
+      default_ai_agent: 'hermes',
+      default_ai_target: 'agent:pi',
+    }
+    const { result } = renderHook(() => useSettings())
+    await waitFor(() => {
+      expect(result.current.loaded).toBe(true)
+    })
+    expect(result.current.settings.chat_engine).toBe('native')
+    expect(result.current.settings.default_ai_agent).toBe('hermes')
+    expect(result.current.settings.default_ai_target).toBeNull()
+    expect(mockInvokeFn).toHaveBeenCalledWith('save_settings', {
+      settings: expect.objectContaining({
+        chat_engine: 'native',
+        default_ai_agent: 'hermes',
+        default_ai_target: null,
+      }),
+    })
+  })
+
+  it('leaves a persisted Rhizome target on disk', async () => {
+    mockSettingsStore = {
+      ...savedSettings,
+      chat_engine: 'native',
+      default_ai_agent: 'prime',
+      default_ai_target: 'agent:prime',
+    }
+    const { result } = renderHook(() => useSettings())
+    await waitFor(() => {
+      expect(result.current.loaded).toBe(true)
+    })
+    expect(result.current.settings.default_ai_agent).toBe('prime')
+    expect(result.current.settings.default_ai_target).toBe('agent:prime')
+    expect(mockInvokeFn).not.toHaveBeenCalledWith('save_settings', expect.anything())
+  })
+
+  it('leaves default_ai_agent prime on disk', async () => {
+    mockSettingsStore = {
+      ...savedSettings,
+      chat_engine: 'native',
+      default_ai_agent: 'prime',
+    }
+    const { result } = renderHook(() => useSettings())
+    await waitFor(() => {
+      expect(result.current.loaded).toBe(true)
+    })
+    expect(result.current.settings.default_ai_agent).toBe('prime')
+    expect(mockInvokeFn).not.toHaveBeenCalledWith('save_settings', expect.anything())
   })
 
   it('loads settings from backend on mount', async () => {
@@ -413,8 +477,12 @@ describe('useSettings', () => {
       await result.current.saveSettings(savedSettings)
     })
 
-    // Settings should not have changed on error
-    expect(result.current.settings).toEqual(defaultSettings)
+    // Settings should not have changed on error. Load already migrated
+    // a missing chat_engine to native in memory.
+    expect(result.current.settings).toEqual({
+      ...defaultSettings,
+      chat_engine: 'native',
+    })
     errorSpy.mockRestore()
   })
 
@@ -448,9 +516,13 @@ describe('useSettings', () => {
     })
   })
 
-  it('does not overwrite the stored chat target when settings failed to load', async () => {
+  it('does not overwrite stored settings when a save follows a failed load', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    mockSettingsStore = savedChatTarget()
+    mockSettingsStore = {
+      ...savedChatTarget(),
+      chat_engine: 'prime',
+      telemetry_consent: null,
+    }
     mockInvokeFn.mockImplementation((cmd: string) => {
       if (cmd === 'get_settings') return Promise.reject(new Error('disk'))
       return Promise.resolve(null)
@@ -460,16 +532,17 @@ describe('useSettings', () => {
     await waitFor(() => {
       expect(result.current.loaded).toBe(true)
     })
-    expect(result.current.nativeChatTargetLoaded).toBe(false)
+    expect(result.current.loadError).toBe('disk')
 
     await act(async () => {
-      await result.current.saveNativeChatTarget('free_tier_auto')
+      await result.current.saveSettings(declineTelemetry(result.current.settings))
     })
 
     expect(saveSettingsCalls()).toHaveLength(0)
     expect(mockSettingsStore.native_chat_target).toBe('openai/gpt-4.1-mini')
     expect(mockSettingsStore.theme_mode).toBe('dark')
     expect(mockSettingsStore.chat_engine).toBe('prime')
+    expect(mockSettingsStore.telemetry_consent).toBeNull()
     warnSpy.mockRestore()
   })
 
@@ -478,7 +551,8 @@ describe('useSettings', () => {
     const { result } = renderHook(() => useSettings())
 
     await waitFor(() => {
-      expect(result.current.nativeChatTargetLoaded).toBe(true)
+      expect(result.current.loaded).toBe(true)
+      expect(result.current.loadError).toBeNull()
     })
 
     await act(async () => {
@@ -487,11 +561,11 @@ describe('useSettings', () => {
 
     expect(mockSettingsStore.native_chat_target).toBe('groq/llama-3.3-70b')
     expect(mockSettingsStore.theme_mode).toBe('dark')
-    expect(mockSettingsStore.chat_engine).toBe('prime')
+    expect(mockSettingsStore.chat_engine).toBe('native')
     expect(mockSettingsStore.auto_pull_interval_minutes).toBe(15)
   })
 
-  it('saves a native chat target again after a failed load succeeds on retry', async () => {
+  it('merges one target change onto disk when the first load fails and the retry works', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     mockSettingsStore = savedChatTarget()
     let getSettingsFails = true
@@ -504,29 +578,100 @@ describe('useSettings', () => {
     await waitFor(() => {
       expect(result.current.loaded).toBe(true)
     })
-
-    await act(async () => {
-      await result.current.saveNativeChatTarget('free_tier_auto')
-    })
-    expect(saveSettingsCalls()).toHaveLength(0)
-    expect(mockSettingsStore.native_chat_target).toBe('openai/gpt-4.1-mini')
+    expect(result.current.loadError).toBe('disk')
 
     getSettingsFails = false
-    await act(async () => {
-      await expect(result.current.reloadSettings()).resolves.toBe(true)
-    })
-    expect(result.current.nativeChatTargetLoaded).toBe(true)
-    expect(result.current.settings.native_chat_target).toBe('openai/gpt-4.1-mini')
-    expect(result.current.settings.theme_mode).toBe('dark')
-
     await act(async () => {
       await result.current.saveNativeChatTarget('groq/llama-3.3-70b')
     })
 
+    expect(saveSettingsCalls()).toHaveLength(1)
     expect(mockSettingsStore.native_chat_target).toBe('groq/llama-3.3-70b')
     expect(mockSettingsStore.theme_mode).toBe('dark')
-    expect(mockSettingsStore.chat_engine).toBe('prime')
+    expect(mockSettingsStore.chat_engine).toBe('native')
+    expect(mockSettingsStore.auto_pull_interval_minutes).toBe(15)
+    expect(result.current.loadError).toBeNull()
+    warnSpy.mockRestore()
+  })
+
+  it('merges a declined telemetry choice onto disk after the load retry works', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mockSettingsStore = {
+      ...savedChatTarget(),
+      telemetry_consent: null,
+    }
+    let getSettingsFails = true
+    mockInvokeFn.mockImplementation((cmd: string, args?: Record<string, unknown>) => {
+      if (cmd === 'get_settings' && getSettingsFails) return Promise.reject(new Error('disk'))
+      return settingsInvoke(cmd, args)
+    })
+
+    const { result } = renderHook(() => useSettings())
+    await waitFor(() => {
+      expect(result.current.loadError).toBe('disk')
+    })
+
+    getSettingsFails = false
+    await act(async () => {
+      await result.current.saveSettings(declineTelemetry(result.current.settings))
+    })
+
+    expect(saveSettingsCalls()).toHaveLength(1)
+    expect(mockSettingsStore.telemetry_consent).toBe(false)
+    expect(mockSettingsStore.crash_reporting_enabled).toBe(false)
+    expect(mockSettingsStore.analytics_enabled).toBe(false)
+    expect(mockSettingsStore.theme_mode).toBe('dark')
+    expect(mockSettingsStore.native_chat_target).toBe('openai/gpt-4.1-mini')
     expect(mockSettingsStore.auto_pull_interval_minutes).toBe(15)
     warnSpy.mockRestore()
+  })
+
+  it('does not let a stale settings load persist the harness migration', async () => {
+    const resolvers: Array<(value: Settings) => void> = []
+    mockInvokeFn.mockImplementation((cmd: string, args?: Record<string, unknown>) => {
+      if (cmd === 'get_settings') {
+        return new Promise<Settings>((resolve) => {
+          resolvers.push(resolve)
+        })
+      }
+      return settingsInvoke(cmd, args)
+    })
+
+    const disk: Settings = {
+      ...savedSettings,
+      chat_engine: 'prime',
+      theme_mode: 'dark',
+      native_chat_target: 'openai/gpt-4.1-mini',
+    }
+    const { result } = renderHook(() => useSettings())
+    await waitFor(() => {
+      expect(resolvers).toHaveLength(1)
+    })
+
+    let saveDone: Promise<void> = Promise.resolve()
+    act(() => {
+      saveDone = result.current.saveNativeChatTarget('groq/llama-3.3-70b')
+    })
+    await waitFor(() => {
+      expect(resolvers).toHaveLength(2)
+    })
+
+    await act(async () => {
+      resolvers[1]({ ...disk })
+      await saveDone
+    })
+    const writesAfterFreshLoad = saveSettingsCalls().length
+    expect(writesAfterFreshLoad).toBeGreaterThan(0)
+    expect(mockSettingsStore.theme_mode).toBe('dark')
+    expect(mockSettingsStore.native_chat_target).toBe('groq/llama-3.3-70b')
+
+    await act(async () => {
+      resolvers[0]({ ...disk, theme_mode: 'light' })
+      await Promise.resolve()
+    })
+
+    expect(saveSettingsCalls()).toHaveLength(writesAfterFreshLoad)
+    expect(mockSettingsStore.theme_mode).toBe('dark')
+    expect(mockSettingsStore.native_chat_target).toBe('groq/llama-3.3-70b')
   })
 })
