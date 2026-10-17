@@ -20,6 +20,9 @@ pub const NATIVE_LOG_VERSION: u32 = 1;
 pub const SESSION_SIZE_CAP: u64 = 100 * 1024 * 1024;
 /// 1 MiB per single tool result, counted in bytes.
 pub const TOOL_RESULT_CAP: usize = 1024 * 1024;
+/// One assignment value read. A longer unquoted secret is finished by
+/// `token_end`, so the cap does not leave a tail in the clear.
+const ASSIGNMENT_VALUE_CAP: usize = 512;
 /// Reserved so a full session can still record cancel/completion.
 const COMPLETION_RESERVE: u64 = 4096;
 /// User-facing notice when a mid-turn log append fails. The turn continues.
@@ -231,8 +234,10 @@ fn scrub_regexes() -> &'static ScrubRegexes {
     SCRUBBERS.get_or_init(|| {
         // `_` is part of the name, so `SORT_KEY` is not a bare `KEY`.
         // `=` is not `==`. The value is checked in `scrub_assignments`.
+        // The value width matches ASSIGNMENT_VALUE_CAP. An unbounded value
+        // makes the rescan after a skipped `=` or `:` reread the rest of the token.
         let assignment = regex::Regex::new(
-            r#"(?P<pre>(?:^|[^A-Za-z0-9_])(?:(?:export|set)[ \t]+)?)(?P<quote>["']?)(?P<name>[A-Za-z][A-Za-z0-9_]*)["']?[ \t]*(?P<sep>[=:])[ \t]*(?P<value>"[^"\r\n]*"|'[^'\r\n]*'|[^[:space:]#]+)"#,
+            r#"(?P<pre>(?:^|[^A-Za-z0-9_])(?:(?:export|set)[ \t]+)?)(?P<quote>["']?)(?P<name>[A-Za-z][A-Za-z0-9_]*)["']?[ \t]*(?P<sep>[=:])[ \t]*(?P<value>"[^"\r\n]{0,512}"|'[^'\r\n]{0,512}'|[^[:space:]#]{1,512})"#,
         )
         .expect("assignment scrubber");
         let api_key_name = regex::Regex::new(
@@ -316,12 +321,27 @@ fn scrub_assignments(text: &str, scrubbers: &ScrubRegexes) -> String {
             && assignment_name_is_secret(name.as_str(), quoted, scrubbers)
             && assignment_value_is_secret(value.as_str(), name.as_str(), scrubbers);
         if redact {
+            let mut end = value.end();
+            if unquoted_value_hit_cap(value.as_str()) {
+                end = token_end(text, end);
+            }
             out.push_str(&text[copied..value.start()]);
             out.push_str("[redacted]");
-            copied = value.end();
-            search_from = value.end();
+            copied = end;
+            search_from = end;
         } else {
             search_from = sep.end();
+            // A capped value has already been read. Jump to its end when it
+            // holds no secret name, so `a=a=a=` does not reread those bytes
+            // once per separator. Rewind to a name that straddles the cap.
+            if unquoted_value_hit_cap(value.as_str())
+                && !window_has_secret_name(value.as_str(), scrubbers)
+            {
+                let jumped = rewind_to_name_start(text, value.end());
+                if jumped > search_from {
+                    search_from = jumped;
+                }
+            }
         }
         if search_from <= whole.start() {
             search_from = whole.start() + 1;
@@ -329,6 +349,89 @@ fn scrub_assignments(text: &str, scrubbers: &ScrubRegexes) -> String {
     }
     out.push_str(&text[copied..]);
     out
+}
+
+/// The unquoted alternative stops at `ASSIGNMENT_VALUE_CAP` characters.
+/// A finished quoted value is not extended.
+fn unquoted_value_hit_cap(value: &str) -> bool {
+    value.chars().count() == ASSIGNMENT_VALUE_CAP && !value_is_finished_quote(value)
+}
+
+fn value_is_finished_quote(value: &str) -> bool {
+    let mut chars = value.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    (first == '"' || first == '\'') && chars.next_back() == Some(first)
+}
+
+fn window_has_secret_name(value: &str, scrubbers: &ScrubRegexes) -> bool {
+    let bytes = value.as_bytes();
+    for index in 0..bytes.len() {
+        let sep = bytes[index];
+        if sep != b'=' && sep != b':' {
+            continue;
+        }
+        if sep == b'=' && bytes.get(index + 1) == Some(&b'=') {
+            continue;
+        }
+        let Some((name, quoted)) = name_touching_separator(value, index) else {
+            continue;
+        };
+        if assignment_name_is_secret(name, quoted, scrubbers) {
+            return true;
+        }
+    }
+    false
+}
+
+fn name_touching_separator(value: &str, sep: usize) -> Option<(&str, bool)> {
+    let bytes = value.as_bytes();
+    let mut end = sep;
+    if end > 0 && (bytes[end - 1] == b'"' || bytes[end - 1] == b'\'') {
+        end -= 1;
+    }
+    let mut start = end;
+    while start > 0 {
+        let byte = bytes[start - 1];
+        if byte.is_ascii_alphanumeric() || byte == b'_' {
+            start -= 1;
+        } else {
+            break;
+        }
+    }
+    if start == end || !bytes[start].is_ascii_alphabetic() {
+        return None;
+    }
+    let quoted = start > 0 && (bytes[start - 1] == b'"' || bytes[start - 1] == b'\'');
+    Some((&value[start..end], quoted))
+}
+
+fn rewind_to_name_start(text: &str, index: usize) -> usize {
+    let bytes = text.as_bytes();
+    let mut start = index.min(bytes.len());
+    while start > 0 && (bytes[start - 1].is_ascii_alphanumeric() || bytes[start - 1] == b'_') {
+        start -= 1;
+    }
+    if start > 0 && (bytes[start - 1] == b'"' || bytes[start - 1] == b'\'') {
+        start -= 1;
+    }
+    // The assignment pattern consumes the boundary before the name.
+    start = start.saturating_sub(1);
+    start
+}
+
+/// Byte index of the next whitespace or `#`, or the end of `text`.
+fn token_end(text: &str, start: usize) -> usize {
+    let Some(rest) = text.get(start..) else {
+        return text.len();
+    };
+    for (offset, ch) in rest.char_indices() {
+        if ch == '#' || ch.is_whitespace() {
+            return start + offset;
+        }
+    }
+    text.len()
 }
 
 fn assignment_name_is_secret(name: &str, quoted: bool, scrubbers: &ScrubRegexes) -> bool {
@@ -575,7 +678,7 @@ fn scrub_event(event: &DurableEvent) -> DurableEvent {
         DurableEvent::ToolResult { id, name, output } => DurableEvent::ToolResult {
             id,
             name,
-            output: cap_tool_result(scrub.apply(&output)),
+            output: scrub.apply(&cap_tool_result(output)),
         },
         DurableEvent::ToolDenied { id, name, reason } => DurableEvent::ToolDenied {
             id,
@@ -1767,6 +1870,97 @@ mod tests {
         assert_eq!(scrub_secrets(&near_sha), near_sha);
     }
 
+    #[test]
+    fn scrub_secrets_redacts_a_long_unquoted_secret() {
+        let body = "ab".repeat(300);
+        assert_eq!(body.len(), 600);
+        let input = format!("API_KEY={body} kept");
+        let scrubbed = scrub_secrets(&input);
+        assert!(
+            scrubbed.starts_with("API_KEY=[redacted]"),
+            "long secret must be redacted"
+        );
+        assert!(scrubbed.ends_with(" kept"), "text after the secret stays");
+        assert!(!scrubbed.contains(body.as_str()), "secret must be removed");
+        assert_eq!(
+            scrubbed.len(),
+            "API_KEY=[redacted] kept".len(),
+            "long secret must be fully redacted"
+        );
+    }
+
+    #[test]
+    fn scrub_secrets_still_finds_a_secret_inside_a_long_token() {
+        let filler = "a=".repeat(200);
+        let input = format!("{filler}api_key=abcdefghijklmnop tail");
+        let scrubbed = scrub_secrets(&input);
+        assert!(
+            scrubbed.contains("api_key=[redacted]"),
+            "a nested secret must be redacted"
+        );
+        assert!(
+            !scrubbed.contains("abcdefghijklmnop"),
+            "secret must be removed"
+        );
+        assert!(scrubbed.ends_with(" tail"), "text after the secret stays");
+
+        let pad = "b".repeat(508);
+        let straddling = format!("foo={pad}&api_key=abcdefghijklmnop tail");
+        let scrubbed = scrub_secrets(&straddling);
+        assert!(
+            scrubbed.contains("api_key=[redacted]"),
+            "a secret that straddles the value cap must be redacted"
+        );
+        assert!(
+            !scrubbed.contains("abcdefghijklmnop"),
+            "secret must be removed"
+        );
+    }
+
+    #[test]
+    fn scrub_assignments_stays_fast_on_repeated_separators() {
+        let repeated = "a=".repeat(50 * 1024);
+        assert_eq!(repeated.len(), 100 * 1024);
+        let started = std::time::Instant::now();
+        let scrubbed = scrub_secrets(&repeated);
+        let repeated_elapsed = started.elapsed();
+        eprintln!("scrub timing: a=a= {} ms", repeated_elapsed.as_millis());
+        assert_eq!(scrubbed, repeated);
+        assert!(
+            repeated_elapsed < scrub_timing_limit(),
+            "a=a= scrub took too long"
+        );
+
+        let piece = "function(a,b){return a.b?c.d:e.f;var g=h.i(j,k);}";
+        let mut minified = String::new();
+        while minified.len() < 400 * 1024 {
+            minified.push_str(piece);
+        }
+        let started = std::time::Instant::now();
+        let minified_scrubbed = scrub_secrets(&minified);
+        let minified_elapsed = started.elapsed();
+        eprintln!(
+            "scrub timing: minified {} ms, limit {} ms",
+            minified_elapsed.as_millis(),
+            scrub_timing_limit().as_millis()
+        );
+        assert_eq!(minified_scrubbed, minified);
+        assert!(
+            minified_elapsed < scrub_timing_limit(),
+            "minified js scrub took too long"
+        );
+    }
+
+    fn scrub_timing_limit() -> std::time::Duration {
+        // Release is the number that matters. Debug builds are slower, and
+        // CI must not flake on them.
+        if cfg!(debug_assertions) {
+            std::time::Duration::from_secs(30)
+        } else {
+            std::time::Duration::from_secs(3)
+        }
+    }
+
     fn assert_redacted(input: &str, secret: &str) {
         let scrubbed = scrub_secrets(input);
         assert!(!scrubbed.contains(secret), "secret must be removed");
@@ -1877,6 +2071,41 @@ mod tests {
         let scrubbed = scrub_secrets("custom keychain-custom-key-value here");
 
         assert!(!scrubbed.contains("keychain-custom-key-value"));
+    }
+
+    #[test]
+    fn scrub_event_caps_tool_result_before_scrubbing() {
+        let secret = "ab".repeat(300);
+        let mut output = format!("API_KEY={secret} ");
+        output.push_str(&"z".repeat(TOOL_RESULT_CAP));
+        assert!(output.len() > TOOL_RESULT_CAP);
+        let event = DurableEvent::ToolResult {
+            id: "1".into(),
+            name: "tool".into(),
+            output,
+        };
+        let DurableEvent::ToolResult {
+            output: scrubbed, ..
+        } = scrub_event(&event)
+        else {
+            panic!("tool result");
+        };
+        assert!(
+            scrubbed.contains("[truncated: tool result exceeded 1 MiB]"),
+            "the cap is applied before redaction shortens the text"
+        );
+        assert!(
+            scrubbed.contains("API_KEY=[redacted]"),
+            "kept prefix is scrubbed"
+        );
+        assert!(
+            !scrubbed.contains(secret.as_str()),
+            "secret must be removed"
+        );
+        assert!(
+            scrubbed.len() <= TOOL_RESULT_CAP,
+            "tool result stays within the cap"
+        );
     }
 
     #[test]

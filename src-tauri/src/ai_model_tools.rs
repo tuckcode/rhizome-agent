@@ -802,6 +802,15 @@ mod tests {
         assert!(!vault.path().join(".env.production").exists());
     }
 
+    /// `CI` counts only when it is set to a real value. An empty string,
+    /// `false`, and `0` are the same as unset.
+    fn ci_is_set() -> bool {
+        std::env::var("CI").ok().is_some_and(|value| {
+            let value = value.trim();
+            !value.is_empty() && value != "false" && value != "0"
+        })
+    }
+
     /// False when this platform cannot make a symlink. The test then returns.
     fn relative_symlink(target: &str, link: &std::path::Path) -> bool {
         #[cfg(unix)]
@@ -831,7 +840,7 @@ mod tests {
         #[cfg(not(windows))]
         let target = ".git/config";
         if !relative_symlink(target, &link) {
-            if std::env::var_os("CI").is_some() {
+            if ci_is_set() {
                 panic!("symlink support is required when CI is set");
             }
             eprintln!(
