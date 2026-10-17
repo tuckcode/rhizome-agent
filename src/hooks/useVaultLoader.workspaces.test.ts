@@ -320,7 +320,7 @@ describe('useVaultLoader workspaces', () => {
     })
 
     await waitFor(() => {
-      expect(result.current.entries.map((entry) => entry.workspace?.path).sort()).toEqual(['/brian', '/vault', '/team'])
+      expect(result.current.entries.map((entry) => entry.workspace?.path).sort()).toEqual(['/brian', '/team', '/vault'])
     })
   })
 

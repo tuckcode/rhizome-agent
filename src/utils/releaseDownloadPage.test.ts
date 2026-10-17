@@ -45,8 +45,8 @@ describe('release workflow macOS artifact names', () => {
     expect(stableWorkflow).not.toContain(
       'Rhizome_${{ needs.version.outputs.version }}_macOS_Intel.dmg',
     )
-    expect(alphaWorkflow).not.toContain('Rhizome_')
-    expect(stableWorkflow).not.toContain('Rhizome_')
+    expect(alphaWorkflow).not.toContain('Tolaria_')
+    expect(stableWorkflow).not.toContain('Tolaria_')
     expect(alphaWorkflow).toContain('name: Rhizome ${{ needs.version.outputs.display_version }}')
     expect(stableWorkflow).toContain('name: Rhizome ${{ needs.version.outputs.display_version }}')
     expect(artifactWorkflow).toContain('fail-fast: false')

@@ -21,7 +21,7 @@ describe('preFilterWikilinks', () => {
   })
 
   it('returns matches for query of exactly MIN_QUERY_LENGTH', () => {
-    const result = preFilterWikilinks(items, 'la')
+    const result = preFilterWikilinks(items, 'rh')
     expect(result.length).toBeGreaterThan(0)
     expect(result.some(r => r.title === 'Build Rhizome App')).toBe(true)
   })

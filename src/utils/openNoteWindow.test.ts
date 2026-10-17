@@ -81,7 +81,7 @@ describe('openNoteWindow', () => {
     vi.mocked(isTauri).mockReturnValue(true)
 
     await openNoteInNewWindow('/vault/Folder/My Note.md', '/Users/mock/Vault Vault', 'AI / ML')
-    const expectedUrl = `${window.location.origin}/?window=note&path=%2Fvault%2FFolder%2FMy+Note.md&vault=%2FUsers%2Fluca%2FVault+Vault&title=AI+%2F+ML&windowLabel=note-1776182400000`
+    const expectedUrl = `${window.location.origin}/?window=note&path=%2Fvault%2FFolder%2FMy+Note.md&vault=%2FUsers%2Fmock%2FVault+Vault&title=AI+%2F+ML&windowLabel=note-1776182400000`
 
     expect(webviewWindowCalls).toHaveBeenCalledWith(
       'note-1776182400000',
