@@ -170,8 +170,7 @@ pub async fn save_note_content(
 }
 
 /// `save_note_content` with a conflict check. `expected_content` is the
-/// note as the editor last read or wrote it. Its hash is the expected hash
-/// for [`vault::save_note_content_expecting`]. No text means no check.
+/// note as the editor last read or wrote it. No text means no check.
 #[tauri::command]
 pub async fn save_note_content_checked(
     path: PathBuf,
@@ -179,13 +178,12 @@ pub async fn save_note_content_checked(
     vault_path: Option<PathBuf>,
     expected_content: Option<String>,
 ) -> Result<vault::SaveOutcome, String> {
-    let expected_hash = expected_content.as_deref().map(crate::board::content_hash);
     tokio::task::spawn_blocking(move || {
         with_writable_note_path(path, vault_path, |validated_path, vault_root| {
             let outcome = vault::save_note_content_expecting(
                 validated_path,
                 &content,
-                expected_hash.as_deref(),
+                expected_content.as_deref(),
             )?;
             let artifact_path = crate::rhizome_write_location::relative_to_vault(
                 vault_root,

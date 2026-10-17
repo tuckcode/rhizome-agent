@@ -183,11 +183,11 @@ pub fn save_note_content(path: &str, content: &str) -> Result<(), String> {
     .map_err(|e| note_io_error(NoteIoOperation::Save, NotePathDisplay::new(path), &e))
 }
 
-/// Save with a conflict check. `expected_hash` is the SHA-256 of the
-/// note as the editor last read or wrote it. With no hash, this is
-/// [`save_note_content`] and nothing else.
+/// Save with a conflict check. `expected` is the note as the editor last
+/// read or wrote it. With no text, this is [`save_note_content`] and
+/// nothing else.
 ///
-/// The content hash decides. When disk still matches, the buffer is
+/// The disk bytes decide. When disk still matches, the buffer is
 /// written. When the only change on disk is the `Status` value (a board
 /// move), that status is spliced into the buffer and the result is
 /// written. Any other change is a conflict: nothing is written and the
@@ -195,9 +195,9 @@ pub fn save_note_content(path: &str, content: &str) -> Result<(), String> {
 pub fn save_note_content_expecting(
     path: &str,
     content: &str,
-    expected_hash: Option<&str>,
+    expected: Option<&str>,
 ) -> Result<SaveOutcome, String> {
-    let Some(expected) = expected_hash.map(str::trim).filter(|hash| !hash.is_empty()) else {
+    let Some(expected) = expected else {
         save_note_content(path, content)?;
         return Ok(saved(content));
     };
@@ -215,7 +215,7 @@ pub fn save_note_content_expecting(
             ))
         }
     };
-    let disk_matches = crate::board::content_hash_bytes(&disk).eq_ignore_ascii_case(expected);
+    let disk_matches = disk == expected.as_bytes();
     let disk = String::from_utf8(disk).map_err(|_| conflict(path, "is no longer UTF-8 text"))?;
     if disk_matches {
         save_note_content(path, content)?;
@@ -365,8 +365,7 @@ mod tests {
             let dir = TempDir::new().unwrap();
             let path = note(&dir, OPENED);
             let buffer = OPENED.replace("first draft", "second draft");
-            let outcome =
-                save_note_content_expecting(&path, &buffer, Some(&content_hash(OPENED))).unwrap();
+            let outcome = save_note_content_expecting(&path, &buffer, Some(OPENED)).unwrap();
             assert_eq!(disk(&path), buffer);
             assert_eq!(outcome.spliced_content, None);
         }
@@ -377,11 +376,11 @@ mod tests {
         fn board_move_during_dirty_edit_keeps_done() {
             let dir = TempDir::new().unwrap();
             let path = note(&dir, OPENED);
-            let expected = content_hash(OPENED);
+            let expected = OPENED;
             let buffer = OPENED.replace("first draft", "typed while the card moved");
 
             move_card(dir.path(), "plan.md", "Done", None).unwrap();
-            let outcome = save_note_content_expecting(&path, &buffer, Some(&expected)).unwrap();
+            let outcome = save_note_content_expecting(&path, &buffer, Some(expected)).unwrap();
 
             let want = buffer.replace("Status: In progress", "Status: Done");
             assert_eq!(disk(&path), want);
@@ -390,7 +389,7 @@ mod tests {
 
             // The next autosave sends the spliced text and its hash.
             let next = want.replace("typed while", "kept typing while");
-            save_note_content_expecting(&path, &next, Some(&outcome.content_hash)).unwrap();
+            save_note_content_expecting(&path, &next, Some(&want)).unwrap();
             assert!(disk(&path).contains("Status: Done"));
             assert!(disk(&path).contains("kept typing while"));
         }
@@ -402,8 +401,7 @@ mod tests {
             let path = note(&dir, opened);
             move_card(dir.path(), "plan.md", "Blocked", None).unwrap();
             let buffer = opened.replace("body", "body edited");
-            let outcome =
-                save_note_content_expecting(&path, &buffer, Some(&content_hash(opened))).unwrap();
+            let outcome = save_note_content_expecting(&path, &buffer, Some(opened)).unwrap();
             assert_eq!(
                 disk(&path),
                 "---\ntitle: Plan\nStatus: Blocked\n---\nbody edited\n"
@@ -413,12 +411,9 @@ mod tests {
             let plain = "no frontmatter\n";
             let path = note(&dir, plain);
             move_card(dir.path(), "plan.md", "Done", None).unwrap();
-            let outcome = save_note_content_expecting(
-                &path,
-                "no frontmatter, edited\n",
-                Some(&content_hash(plain)),
-            )
-            .unwrap();
+            let outcome =
+                save_note_content_expecting(&path, "no frontmatter, edited\n", Some(plain))
+                    .unwrap();
             assert_eq!(
                 disk(&path),
                 "---\nStatus: Done\n---\nno frontmatter, edited\n"
@@ -433,8 +428,7 @@ mod tests {
             let external = OPENED.replace("first draft", "edited elsewhere");
             fs::write(&path, &external).unwrap();
             let buffer = OPENED.replace("first draft", "edited here");
-            let error = save_note_content_expecting(&path, &buffer, Some(&content_hash(OPENED)))
-                .unwrap_err();
+            let error = save_note_content_expecting(&path, &buffer, Some(OPENED)).unwrap_err();
             assert!(error.starts_with(SAVE_CONFLICT), "{error}");
             assert_eq!(disk(&path), external);
 
@@ -443,9 +437,7 @@ mod tests {
                 .replace("In progress", "Done")
                 .replace("title: Plan", "title: Other");
             fs::write(&path, &both).unwrap();
-            assert!(
-                save_note_content_expecting(&path, &buffer, Some(&content_hash(OPENED))).is_err()
-            );
+            assert!(save_note_content_expecting(&path, &buffer, Some(OPENED)).is_err());
             assert_eq!(disk(&path), both);
         }
 
@@ -458,9 +450,7 @@ mod tests {
                 .replace("first draft", "x");
             fs::write(&path, &external).unwrap();
             let buffer = OPENED.replace("In progress", "Done");
-            assert!(
-                save_note_content_expecting(&path, &buffer, Some(&content_hash(OPENED))).is_err()
-            );
+            assert!(save_note_content_expecting(&path, &buffer, Some(OPENED)).is_err());
             assert_eq!(disk(&path), external);
         }
 
@@ -469,8 +459,7 @@ mod tests {
             let dir = TempDir::new().unwrap();
             let path = note(&dir, OPENED);
             fs::remove_file(&path).unwrap();
-            let error = save_note_content_expecting(&path, OPENED, Some(&content_hash(OPENED)))
-                .unwrap_err();
+            let error = save_note_content_expecting(&path, OPENED, Some(OPENED)).unwrap_err();
             assert!(error.starts_with(SAVE_CONFLICT), "{error}");
             assert!(!Path::new(&path).exists());
         }
@@ -480,8 +469,7 @@ mod tests {
             let dir = TempDir::new().unwrap();
             let buffer = OPENED.replace("first draft", "same text");
             let path = note(&dir, &buffer);
-            let outcome =
-                save_note_content_expecting(&path, &buffer, Some(&content_hash(OPENED))).unwrap();
+            let outcome = save_note_content_expecting(&path, &buffer, Some(OPENED)).unwrap();
             assert_eq!(outcome.spliced_content, None);
             assert_eq!(disk(&path), buffer);
         }
@@ -493,7 +481,7 @@ mod tests {
             let path = note(&dir, opened);
             move_card(dir.path(), "plan.md", "Done", None).unwrap();
             let buffer = opened.replace("body", "body edited");
-            save_note_content_expecting(&path, &buffer, Some(&content_hash(opened))).unwrap();
+            save_note_content_expecting(&path, &buffer, Some(opened)).unwrap();
             assert_eq!(
                 disk(&path),
                 "\u{FEFF}---\r\nStatus: Done\r\n---\r\nbody edited\r\n"

@@ -3,7 +3,7 @@ import type { SetStateAction } from 'react'
 import { useSaveNote } from './useSaveNote'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { canWritePathToVault } from '../utils/vaultPathContainment'
-import { splitFrontmatter } from '../utils/wikilinks'
+import { setSaveBaseline } from './noteContentCache'
 
 interface Tab {
   entry: { path: string }
@@ -198,9 +198,11 @@ async function persistResolvedContent({
 
 /**
  * A board moved the card while the editor had unsaved edits, so the save
- * wrote the buffer with the on-disk Status. The editor takes that text.
- * Edits typed during the save were built on the old frontmatter, so they
- * get the spliced frontmatter and stay pending.
+ * wrote the buffer with the on-disk Status. With no newer edits, the
+ * editor takes that text. Edits typed during the save were built on the
+ * text from before the splice, so that text stays their baseline. Their
+ * next save then shows Rust the same Status-only change, and Rust splices
+ * the Status value into them. Nothing else in the newer edits changes.
  */
 function reconcileSplicedSave({
   applySplicedContent,
@@ -222,10 +224,7 @@ function reconcileSplicedSave({
     applySplicedContent(targetPath, saved)
     return
   }
-  const [frontmatter] = splitFrontmatter(saved)
-  const [, body] = splitFrontmatter(current.content)
-  pendingContentRef.current = { path: current.path, content: `${frontmatter}${body}` }
-  applySplicedContent(targetPath, pendingContentRef.current.content)
+  setSaveBaseline(targetPath, pending.content)
 }
 
 function applyTabContent(

@@ -1,7 +1,7 @@
 import { useCallback } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke, updateMockContent } from '../mock-tauri'
-import { getCachedNoteContentEntry } from './noteContentCache'
+import { getSaveBaseline } from './noteContentCache'
 import { cacheNoteContent } from './useTabManagement'
 
 /** Result of `save_note_content_checked`. */
@@ -20,16 +20,6 @@ export async function persistContent(path: string, content: string): Promise<voi
 }
 
 /**
- * The note as the editor last read or wrote it. The content cache holds
- * that text: notes load into it, and saves and property edits update it.
- * No cached text means no check, the same as before. The text goes to Rust,
- * which hashes it, so the save stays synchronous up to the invoke.
- */
-function expectedContentFor(path: string): string | null {
-  return getCachedNoteContentEntry(path)?.value ?? null
-}
-
-/**
  * Save with the conflict check. Returns the text now on disk: the buffer,
  * or the buffer with a Status a board move wrote. A real conflict throws
  * an error that starts with "Save conflict:" and writes nothing.
@@ -39,7 +29,9 @@ export async function persistContentChecked(path: string, content: string): Prom
     await mockInvoke('save_note_content', { path, content })
     return content
   }
-  const expectedContent = expectedContentFor(path)
+  // The text goes to Rust, which hashes it, so the save stays synchronous
+  // up to the invoke. No baseline means no check, the same as before.
+  const expectedContent = getSaveBaseline(path)
   const outcome = await invoke<SaveOutcome | null>('save_note_content_checked', { path, content, expectedContent })
   return outcome?.splicedContent ?? content
 }

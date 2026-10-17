@@ -4,7 +4,7 @@ use std::time::{Duration, UNIX_EPOCH};
 
 use tempfile::TempDir;
 
-use super::status::{read_status, status_removed, StatusEdit, MAX_STATUS_CHARS};
+use super::status::{read_status, StatusEdit, MAX_STATUS_CHARS};
 use super::*;
 use crate::rhizome_loop::BLOCKED_SECRET;
 
@@ -825,40 +825,88 @@ fn read_status_returns_the_top_level_value() {
 }
 
 #[test]
-fn status_removed_undoes_a_status_write() {
+fn splice_needs_the_status_to_be_the_only_change() {
+    let opened = "---\nStatus: Not started\n---\nbody\n";
+    let disk = set_status(opened, "Done").unwrap().content;
+    let buffer = "---\nStatus: Not started\n---\nbody edited\n";
+    assert_eq!(
+        splice_disk_status(&disk, buffer, opened).as_deref(),
+        Some("---\nStatus: Done\n---\nbody edited\n")
+    );
+    let other = disk.replace("body", "changed elsewhere");
+    assert_eq!(splice_disk_status(&other, buffer, opened), None);
+    assert_eq!(splice_disk_status(&disk, buffer, "stale"), None);
+    // No change on disk: the replay matches and the buffer is unchanged.
+    assert_eq!(
+        splice_disk_status(opened, buffer, opened).as_deref(),
+        Some(buffer)
+    );
+}
+
+/// A board move on any of these shapes replays exactly, so the save
+/// splices it and does not report a false conflict.
+#[test]
+fn splice_replays_every_status_shape_a_move_writes() {
     for opened in [
         "---\ntitle: A\n---\nbody\n",
         "body\n",
         "",
         "\u{FEFF}body\r\n",
+        "---\nStatus:\n---\nbody\n",
+        "---\nStatus:\n  - Draft\n  - Review\n---\nbody\n",
+        "---\nStatus: Draft\nstatus: Draft\n---\nbody\n",
+        "---\nStatus: 'Draft' # was todo\n--- \nbody\n",
     ] {
-        let moved = set_status(opened, "Done").unwrap().content;
-        let forms = status_removed(&moved).unwrap();
-        assert!(
-            forms.iter().any(|form| form == opened),
-            "{opened:?} -> {forms:?}"
-        );
+        let disk = set_status(opened, "Done").unwrap().content;
+        let buffer = format!("{opened}typed\n");
+        let spliced = splice_disk_status(&disk, &buffer, opened)
+            .unwrap_or_else(|| panic!("false conflict for {opened:?}"));
+        assert_eq!(read_status(&spliced).as_deref(), Some("Done"), "{opened:?}");
+        assert!(spliced.ends_with("typed\n"), "{opened:?} -> {spliced:?}");
     }
-    assert_eq!(status_removed("---\ntitle: A\n---\n"), None);
 }
 
+/// Both sides set the same status and the buffer has other edits too.
 #[test]
-fn splice_needs_the_status_to_be_the_only_change() {
-    let opened = "---\nStatus: Not started\n---\nbody\n";
-    let expected = content_hash(opened);
+fn splice_accepts_the_same_status_on_both_sides() {
+    let opened = "---\nStatus: Draft\n---\nbody\n";
     let disk = set_status(opened, "Done").unwrap().content;
-    let buffer = "---\nStatus: Not started\n---\nbody edited\n";
+    let buffer = "---\nStatus: Done\n---\nbody edited\n";
     assert_eq!(
-        splice_disk_status(&disk, buffer, &expected).as_deref(),
-        Some("---\nStatus: Done\n---\nbody edited\n")
+        splice_disk_status(&disk, buffer, opened).as_deref(),
+        Some(buffer)
     );
-    let other = disk.replace("body", "changed elsewhere");
-    assert_eq!(splice_disk_status(&other, buffer, &expected), None);
-    assert_eq!(
-        splice_disk_status(&disk, buffer, &content_hash("stale")),
-        None
-    );
-    assert_eq!(splice_disk_status(opened, buffer, &expected), None);
+}
+
+/// The editor typed during a spliced save. Its next save sends the text
+/// from before the splice as the baseline, and the splice runs again on
+/// the newer buffer. PROBE4 to PROBE6 from the #242 hold review.
+#[test]
+fn splice_keeps_edits_typed_during_a_spliced_save() {
+    let bom = "\u{FEFF}";
+    for (before_splice, newer, want) in [
+        (
+            format!("{bom}---\nStatus: In progress\n---\nbody 1\n"),
+            format!("{bom}---\nStatus: In progress\n---\nbody 12\n"),
+            format!("{bom}---\nStatus: Done\n---\nbody 12\n"),
+        ),
+        (
+            "---\nStatus: In progress\ntitle: A\n---\nbody 1\n".to_string(),
+            "---\nStatus: In progress\ntitle: Renamed\n---\nbody 1\n".to_string(),
+            "---\nStatus: Done\ntitle: Renamed\n---\nbody 1\n".to_string(),
+        ),
+        (
+            "---\nStatus: In progress\n--- \nbody 1\n".to_string(),
+            "---\nStatus: In progress\n--- \nbody 12\n".to_string(),
+            "---\nStatus: Done\n--- \nbody 12\n".to_string(),
+        ),
+    ] {
+        let disk = set_status(&before_splice, "Done").unwrap().content;
+        assert_eq!(
+            splice_disk_status(&disk, &newer, &before_splice).as_deref(),
+            Some(want.as_str())
+        );
+    }
 }
 
 #[test]

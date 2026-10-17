@@ -6,9 +6,9 @@
 //! line of one note and nothing else.
 //!
 //! The live move is the `move_board_card` command. The editor's save
-//! runs the same content-hash check (`vault::save_note_content_expecting`),
-//! and [`splice_disk_status`] lets an autosave keep a status the board
-//! wrote. Listing boards has no command yet.
+//! checks the disk against the text it last read or wrote
+//! (`vault::save_note_content_expecting`), and [`splice_disk_status`]
+//! lets an autosave keep a status the board wrote. Listing boards has no command yet.
 #![cfg_attr(not(test), allow(dead_code))]
 
 mod status;
@@ -29,8 +29,8 @@ use crate::rhizome_loop::{
 };
 use crate::vault::{evaluate_view, scan_vault_cached, scan_views, VaultEntry, ViewFile};
 
+use status::read_status;
 pub use status::set_status;
-use status::{read_status, status_removed};
 
 /// Columns when a board view has no usable `presentation.columns`.
 /// Same list, same order, as `SUGGESTED_STATUSES` in
@@ -208,36 +208,23 @@ fn check_precondition(
 /// SHA-256 of a note's bytes, lowercase hex. The editor's expected
 /// hash uses the same form.
 pub fn content_hash(text: &str) -> String {
-    content_hash_bytes(text.as_bytes())
+    format!("{:x}", Sha256::digest(text.as_bytes()))
 }
 
-pub fn content_hash_bytes(bytes: &[u8]) -> String {
-    format!("{:x}", Sha256::digest(bytes))
-}
-
-/// When the only change on disk since `expected_hash` is the `Status`
-/// value, returns `buffer` with the on-disk status. Any other change
-/// returns `None`, which the caller treats as a real conflict.
+/// When the only change on disk since `expected` is a `Status` write,
+/// returns `buffer` with the on-disk status. Any other change returns
+/// `None`, which the caller treats as a real conflict.
 ///
-/// The check undoes the status change on `disk` (back to the buffer's
-/// status, or no status) and compares that with `expected_hash`.
-pub fn splice_disk_status(disk: &str, buffer: &str, expected_hash: &str) -> Option<String> {
-    let disk_status = read_status(disk)?;
-    let expected = expected_hash.trim();
-    let undone: Vec<String> = match read_status(buffer) {
-        Some(buffer_status) if buffer_status == disk_status => return None,
-        Some(buffer_status) => vec![set_status(disk, &buffer_status).ok()?.content],
-        None => status_removed(disk)?,
-    };
-    if !undone
-        .iter()
-        .any(|text| content_hash(text).eq_ignore_ascii_case(expected))
-    {
+/// `expected` is the note as the editor last read or wrote it. The check
+/// replays the write: `expected` with the disk's status must equal `disk`
+/// byte for byte. A board move makes exactly that write, so list-form,
+/// empty and duplicate `Status` keys all replay the same way.
+pub fn splice_disk_status(disk: &str, buffer: &str, expected: &str) -> Option<String> {
+    let status = read_status(disk)?;
+    if set_status(expected, &status).ok()?.content != disk {
         return None;
     }
-    set_status(buffer, &disk_status)
-        .ok()
-        .map(|edit| edit.content)
+    set_status(buffer, &status).ok().map(|edit| edit.content)
 }
 
 fn find_board_view(vault: &Path, filename: &str) -> Result<(ViewFile, BoardConfig), String> {
