@@ -443,40 +443,6 @@ pub async fn get_prime_session_host_status(
     run_blocking(crate::prime_session_host::get_status).await
 }
 
-/// Set the attached session's reasoning level (#9).
-///
-/// Paired with `set_prime_model` behind one strip control: the daemon takes
-/// them as two commands, but the user changes them as one decision.
-#[cfg(desktop)]
-#[tauri::command]
-pub fn set_prime_thinking_level(level: String) -> Result<(), String> {
-    crate::prime_session_host::set_thinking_level(&level)
-}
-
-/// The reasoning levels Prime accepts, ordered. Sourced from the host rather
-/// than duplicated in the frontend so there is one list, not two that drift.
-#[cfg(desktop)]
-#[tauri::command]
-pub fn get_prime_thinking_levels() -> Vec<String> {
-    crate::prime_session_host::PRIME_THINKING_LEVELS
-        .iter()
-        .map(|level| (*level).to_string())
-        .collect()
-}
-
-/// The subset of that scale the attached model can actually run, ordered.
-///
-/// Prime clamps every pick to the model's own set. Offering a level outside it
-/// is a click that applies nothing, which reads as a broken control rather
-/// than as a model limitation — the reason a pill on `deepseek-v4-flash`
-/// would not leave High. Falls back to the full scale when no model is known
-/// yet, so this is never a narrower menu than the truth.
-#[cfg(desktop)]
-#[tauri::command]
-pub fn get_prime_supported_thinking_levels() -> Vec<String> {
-    crate::prime_session_host::supported_thinking_levels_for_session()
-}
-
 /// Pause, resume, or stop one heartbeat (#14).
 ///
 /// Only heartbeats accept this. The daemon has no `cron_pause`, so a plain
@@ -710,40 +676,6 @@ mod tests {
     // the only place a command name, an argument name, and a host call line up,
     // and a typo in any of the three fails at runtime with no compile error.
     // Calling them here is what proves the wiring exists.
-
-    #[cfg(desktop)]
-    #[test]
-    fn thinking_levels_are_offered_in_increasing_order() {
-        let levels = get_prime_thinking_levels();
-        assert_eq!(
-            levels,
-            vec!["off", "minimal", "low", "medium", "high", "xhigh", "max"],
-            "the strip renders these as a scale, so order is part of the contract",
-        );
-    }
-
-    #[cfg(desktop)]
-    #[test]
-    fn thinking_levels_come_from_the_host_not_a_second_copy() {
-        // #9 requires no hardcoded model or level anywhere in the frontend.
-        // The guard that makes that true is this command returning the host's
-        // own list rather than a duplicate maintained here.
-        assert_eq!(
-            get_prime_thinking_levels().len(),
-            crate::prime_session_host::PRIME_THINKING_LEVELS.len(),
-        );
-    }
-
-    #[cfg(desktop)]
-    #[test]
-    fn setting_an_unknown_thinking_level_is_refused_before_any_host_call() {
-        let error = set_prime_thinking_level("turbo".into()).unwrap_err();
-        assert!(
-            error.contains("turbo"),
-            "the message must name the bad level: {error}"
-        );
-        assert!(error.contains("off"), "and list the valid ones: {error}");
-    }
 
     #[cfg(desktop)]
     #[test]

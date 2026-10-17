@@ -13,7 +13,6 @@ import type { AiModelProvider } from '../lib/aiTargets'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { trackComposerPillOpened } from '../lib/productAnalytics'
 import { NativeChatModelPicker } from './NativeChatModelPicker'
-import { PrimeThinkingToggle } from './PrimeThinkingToggle'
 
 interface ChatComposerDeckProps {
   locale?: AppLocale
@@ -21,11 +20,10 @@ interface ChatComposerDeckProps {
   contextLabel?: string | null
   /** Stop sending the open note. Without it the pill stays a plain label. */
   onCloseContext?: () => void
-  thinkingLevel?: string | null
   vaultPath?: string
-  /** Agent activity — idle/working pill, sits next to thinking. */
+  /** Agent activity — idle/working pill on the composer row. */
   activity?: ReactNode
-  /** Prime thinking stays on a Prime chat; the model chip is always Rhizome. */
+  /** Rhizome vs Prime catalog for the native model chip. */
   catalog?: 'prime' | 'rhizome'
   nativeTarget?: string | null
   onNativeTargetChange?: (target: string) => void
@@ -71,17 +69,15 @@ function Chip({
 }
 
 /**
- * Live turn controls on the compact composer row (#38 / #9 / #35, native
- * audit 2026-09-26): model, thinking, active agents, the open note.
+ * Live turn controls on the compact composer row (#38, native audit
+ * 2026-09-26): model chip, active agents, and the open note.
  *
- * The model chip is always NativeChatModelPicker. Prime stays an optional
- * engine — thinking still lives next to the chip on a Prime chat.
+ * The model chip is always NativeChatModelPicker.
  */
 export function ChatComposerDeck({
   locale = 'en',
   contextLabel,
   onCloseContext,
-  thinkingLevel,
   vaultPath,
   activity,
   catalog = 'prime',
@@ -109,14 +105,6 @@ export function ChatComposerDeck({
           onOpenProviders={onOpenProviders}
         />
       </span>
-
-      {rhizome ? null : (
-        <PrimeThinkingToggle
-          locale={locale}
-          thinkingLevel={thinkingLevel}
-          vaultPath={vaultPath}
-        />
-      )}
 
       {activity}
 

@@ -8,6 +8,13 @@ mod openai_stream;
 #[cfg(test)]
 pub(crate) mod test_server;
 
+#[cfg(test)]
+pub(crate) use openai_stream::note_reasoning;
+pub(crate) use openai_stream::{
+    clear_reasoning_session, enter_reasoning_replay_session, recall_call_reasoning,
+    recall_text_reasoning,
+};
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum AiModelProviderKind {
@@ -34,7 +41,9 @@ pub struct AiModelCapabilities {
     pub tools: bool,
     pub vision: bool,
     pub json_mode: bool,
-    pub reasoning: bool,
+    /// Unknown, no, or a level list. A legacy bool loads as unknown.
+    #[serde(default)]
+    pub reasoning: crate::reasoning_levels::ReasoningSupport,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -392,11 +401,31 @@ pub fn stream_chat_events_with_params(
         "model": request.model_id,
         "messages": system.into_iter().chain(messages).collect::<Vec<_>>(),
     });
+    let reasoning = crate::ai_model_tools::chat_tools_reasoning(
+        &request.provider.kind,
+        request.provider.base_url.as_deref(),
+        &request.model_id,
+        !tools.is_empty(),
+    );
+    if let crate::ai_model_tools::ChatToolsReasoning::OmitTools(message)
+    | crate::ai_model_tools::ChatToolsReasoning::Refuse(message) = &reasoning
+    {
+        emit(ModelEvent::Error(model_error(
+            ModelErrorKind::Rejected,
+            message.clone(),
+        )));
+        return;
+    }
     if !tools.is_empty() {
         payload["tools"] = serde_json::Value::Array(tools);
         payload["tool_choice"] = serde_json::Value::String("auto".into());
         for (key, value) in tool_params {
             payload[key] = value.clone();
+        }
+        // After tool_params, so a caller's reasoning_effort cannot put this
+        // family back on medium.
+        if reasoning == crate::ai_model_tools::ChatToolsReasoning::None {
+            payload["reasoning_effort"] = serde_json::Value::String("none".into());
         }
     }
     stream_payload(request, payload, limits, emit);
@@ -560,6 +589,19 @@ fn send_openai_compatible_message<F>(
 where
     F: FnMut(AiAgentStreamEvent),
 {
+    // create_note is optional on this path. Astra and GPT-6.1 Sol cannot
+    // take the tool, so the payload omits it and the chat still goes out.
+    // A `-pro` id is not on Chat Completions at all.
+    if let crate::ai_model_tools::ChatToolsReasoning::Refuse(message) =
+        crate::ai_model_tools::chat_tools_reasoning(
+            &request.provider.kind,
+            request.provider.base_url.as_deref(),
+            &request.model_id,
+            crate::ai_model_tools::should_offer_openai_tools(request),
+        )
+    {
+        return Err(message);
+    }
     let endpoint = chat_completions_url(request)?;
     let payload = crate::ai_model_tools::openai_chat_payload(request);
     let json = send_json_request(request, endpoint, payload)?;
@@ -808,7 +850,7 @@ mod tests {
             tools: false,
             vision: false,
             json_mode: true,
-            reasoning: false,
+            reasoning: crate::reasoning_levels::ReasoningSupport::Unknown,
         }
     }
 
@@ -1133,6 +1175,226 @@ mod tests {
         );
         assert!(body.get("tools").is_none());
         assert!(body.get("tool_choice").is_none());
+    }
+
+    fn echo_tool() -> Vec<serde_json::Value> {
+        vec![json!({ "type": "function", "function": { "name": "echo" } })]
+    }
+
+    fn stream_tool_body(
+        model_id: &str,
+        kind: AiModelProviderKind,
+        tools: Vec<serde_json::Value>,
+    ) -> (Vec<ModelEvent>, Vec<(String, String)>) {
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}"#,
+        ])]);
+        let mut request = compatible_request(&server.base_url);
+        request.provider.kind = kind;
+        request.model_id = model_id.into();
+        let mut events = Vec::new();
+        stream_chat_events_with_params(
+            &request,
+            user_message(&request),
+            tools,
+            &serde_json::Map::new(),
+            TEST_LIMITS,
+            &mut |event| {
+                events.push(event);
+                true
+            },
+        );
+        let requests = server.requests.lock().unwrap().clone();
+        (events, requests)
+    }
+
+    #[test]
+    fn stream_sends_reasoning_none_only_with_tools_on_the_gpt_family() {
+        for (model_id, kind) in [
+            ("gpt-6-sol", AiModelProviderKind::OpenAi),
+            ("gpt-6-luna", AiModelProviderKind::OpenAiCompatible),
+            ("GPT-6-LUNA", AiModelProviderKind::OpenAi),
+            ("gpt-5.4", AiModelProviderKind::LmStudio),
+            ("gpt-5.4-2026-03-01", AiModelProviderKind::OpenAi),
+            ("gpt-5.5", AiModelProviderKind::OpenAi),
+            ("gpt-5.6", AiModelProviderKind::OpenAi),
+            ("openai/gpt-6-luna", AiModelProviderKind::OpenAiCompatible),
+        ] {
+            let (events, requests) = stream_tool_body(model_id, kind, echo_tool());
+            assert!(
+                matches!(events.last(), Some(ModelEvent::Finish { .. })),
+                "{model_id}"
+            );
+            assert_eq!(requests.len(), 1, "{model_id}");
+            let body: serde_json::Value = serde_json::from_str(&requests[0].1).unwrap();
+            assert_eq!(body["reasoning_effort"], "none", "{model_id}");
+            assert_eq!(body["tools"][0]["function"]["name"], "echo", "{model_id}");
+            assert_eq!(body["model"], model_id, "{model_id}");
+        }
+
+        for model_id in [
+            "gpt-4.1",
+            "gpt-5-nano",
+            "gpt-5.3",
+            "gpt-5.40",
+            "gpt-5.55",
+            "gpt-6-lunatic",
+        ] {
+            let (events, requests) =
+                stream_tool_body(model_id, AiModelProviderKind::OpenAi, echo_tool());
+            assert!(
+                matches!(events.last(), Some(ModelEvent::Finish { .. })),
+                "{model_id}"
+            );
+            let body: serde_json::Value = serde_json::from_str(&requests[0].1).unwrap();
+            assert!(body.get("tools").is_some(), "{model_id}");
+            assert!(body.get("reasoning_effort").is_none(), "{model_id}");
+        }
+
+        for model_id in ["gpt-6-luna", "gpt-6-astra", "gpt-6.1-sol"] {
+            let (events, requests) =
+                stream_tool_body(model_id, AiModelProviderKind::OpenAi, Vec::new());
+            assert!(
+                matches!(events.last(), Some(ModelEvent::Finish { .. })),
+                "{model_id}"
+            );
+            let body: serde_json::Value = serde_json::from_str(&requests[0].1).unwrap();
+            assert!(body.get("tools").is_none(), "{model_id}");
+            assert!(body.get("reasoning_effort").is_none(), "{model_id}");
+        }
+
+        for model_id in ["openai/gpt-6-luna", "gpt-6-astra", "gpt-6.1-sol"] {
+            let (events, requests) =
+                stream_tool_body(model_id, AiModelProviderKind::OpenRouter, echo_tool());
+            assert!(
+                matches!(events.last(), Some(ModelEvent::Finish { .. })),
+                "{model_id}"
+            );
+            let body: serde_json::Value = serde_json::from_str(&requests[0].1).unwrap();
+            assert!(body.get("tools").is_some(), "{model_id}");
+            assert!(body.get("reasoning_effort").is_none(), "{model_id}");
+        }
+    }
+
+    #[test]
+    fn stream_refuses_tools_for_models_that_cannot_disable_reasoning() {
+        for (model_id, name) in [
+            ("gpt-6-astra", "GPT-6 Astra"),
+            ("gpt-6-astra-900k", "GPT-6 Astra"),
+            ("gpt-6.1-sol", "GPT-6.1 Sol"),
+            ("openai/gpt-6.1-sol", "GPT-6.1 Sol"),
+        ] {
+            let (events, requests) =
+                stream_tool_body(model_id, AiModelProviderKind::OpenAi, echo_tool());
+            assert!(requests.is_empty(), "{model_id}");
+            let error = only_error(&events);
+            assert_eq!(error.kind, ModelErrorKind::Rejected, "{model_id}");
+            assert_eq!(error.status, None, "{model_id}");
+            assert_eq!(
+                error.message,
+                format!(
+                    "{name} can't use vault tools in Rhizome yet. Switch to GPT-6 Luna or Sol, or chat without a vault."
+                ),
+                "{model_id}"
+            );
+        }
+
+        for (model_id, message) in [
+            (
+                "gpt-6-luna-pro",
+                "GPT-6 Luna Pro doesn't work in Rhizome chat yet. Pick GPT-6 Sol or Luna instead.",
+            ),
+            (
+                "GPT-5.4-pro",
+                "GPT-5.4 Pro doesn't work in Rhizome chat yet. Pick GPT-5.4 instead.",
+            ),
+            (
+                "gpt-6-luna-mini-pro",
+                "GPT-6 Luna Mini Pro doesn't work in Rhizome chat yet. Pick GPT-6 Sol or Luna instead.",
+            ),
+        ] {
+            let (events, requests) =
+                stream_tool_body(model_id, AiModelProviderKind::OpenAiCompatible, echo_tool());
+            assert!(requests.is_empty(), "{model_id}");
+            let error = only_error(&events);
+            assert_eq!(error.message, message, "{model_id}");
+        }
+    }
+
+    #[test]
+    fn stream_reasoning_none_overwrites_tool_params() {
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}"#,
+        ])]);
+        let mut request = compatible_request(&server.base_url);
+        request.model_id = "gpt-6-luna".into();
+        let mut tool_params = serde_json::Map::new();
+        tool_params.insert("parallel_tool_calls".into(), json!(false));
+        tool_params.insert("reasoning_effort".into(), json!("high"));
+
+        stream_chat_events_with_params(
+            &request,
+            user_message(&request),
+            echo_tool(),
+            &tool_params,
+            TEST_LIMITS,
+            &mut |_| true,
+        );
+
+        let requests = server.requests.lock().unwrap();
+        let body: serde_json::Value = serde_json::from_str(&requests[0].1).unwrap();
+        assert_eq!(body["parallel_tool_calls"], false);
+        assert_eq!(body["reasoning_effort"], "none");
+        assert_eq!(body["tools"][0]["function"]["name"], "echo");
+    }
+
+    #[test]
+    fn send_drops_astra_and_gpt61_tools_and_still_calls() {
+        for model_id in ["gpt-6-astra", "gpt-6.1-sol"] {
+            let server = serve(vec![http_response(
+                "200 OK",
+                &["Content-Type: application/json"],
+                r#"{"choices":[{"message":{"content":"hello"}}]}"#,
+            )]);
+            let mut request = request(provider(AiModelProviderKind::OpenAi));
+            request.model_id = model_id.into();
+            request.vault_path = Some("vault".into());
+            request.provider.base_url = Some(server.base_url.clone());
+            request.provider.api_key_env_var = None;
+            request.provider.api_key_storage = Some(AiModelApiKeyStorage::None);
+
+            let text = send_openai_compatible_message(&request, &mut |_| {}).unwrap();
+
+            assert_eq!(text, "hello", "{model_id}");
+            let requests = server.requests.lock().unwrap();
+            assert_eq!(requests.len(), 1, "{model_id}");
+            let body: serde_json::Value = serde_json::from_str(&requests[0].1).unwrap();
+            assert!(body.get("tools").is_none(), "{model_id}");
+            assert!(body.get("reasoning_effort").is_none(), "{model_id}");
+        }
+    }
+
+    #[test]
+    fn send_refuses_pro_models_before_any_http_call() {
+        let server = serve(vec![http_response(
+            "200 OK",
+            &["Content-Type: application/json"],
+            r#"{"choices":[{"message":{"content":"nope"}}]}"#,
+        )]);
+        let mut request = request(provider(AiModelProviderKind::OpenAi));
+        request.model_id = "gpt-6-sol-pro".into();
+        request.vault_path = Some("vault".into());
+        request.provider.base_url = Some(server.base_url.clone());
+        request.provider.api_key_env_var = None;
+        request.provider.api_key_storage = Some(AiModelApiKeyStorage::None);
+
+        let error = send_openai_compatible_message(&request, &mut |_| {}).unwrap_err();
+
+        assert_eq!(
+            error,
+            "GPT-6 Sol Pro doesn't work in Rhizome chat yet. Pick GPT-6 Sol or Luna instead."
+        );
+        assert!(server.requests.lock().unwrap().is_empty());
     }
 
     #[test]

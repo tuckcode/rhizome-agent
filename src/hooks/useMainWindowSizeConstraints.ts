@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { CHAT_MIN_WIDTH, RAIL_WIDTH, RESTORE_WIDTH } from '../lib/panePresets'
+import { isTauri } from '../mock-tauri'
 import { isWindows } from '../utils/platform'
 
 const MAIN_WINDOW_MIN_HEIGHT = 400
@@ -59,6 +60,10 @@ export async function applyMainWindowSizeConstraints(
   minWidth: number,
   options: { growToFit?: boolean } = {},
 ): Promise<void> {
+  // The browser build has no native window. Calling Tauri invoke there throws
+  // TypeError: Cannot read properties of undefined (reading 'invoke').
+  if (!isTauri()) return
+
   await invoke('update_current_window_min_size', {
     minWidth,
     minHeight: MAIN_WINDOW_MIN_HEIGHT,

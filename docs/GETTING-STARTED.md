@@ -71,7 +71,7 @@ pnpm tauri build --target x86_64-unknown-linux-gnu --bundles deb,rpm,appimage
 
 Release validation verifies that the Linux job produced an AppImage and at least one installer bundle. A signed release also produces updater signature files (`.sig`).
 
-The app checks for updates on startup, and from the existing Check for updates control. Alpha reads `https://github.com/tuckcode/rhizome-agent/releases/download/alpha-latest/alpha-latest.json`. Stable reads the same kind of URL on the `stable-latest` tag. Those tags are prereleases on purpose: GitHub's `releases/latest/download` URL does not serve alpha releases. Update now downloads and installs through the Tauri updater. Restart uses the existing Restart control. While `plugins.updater.pubkey` is still `PLACEHOLDER_KNISPO_TAURI_UPDATER_PUBKEY`, check and install stop before any network call and say that in-app updates are not available yet.
+The app checks for updates on startup, and from the existing Check for updates control. Alpha reads `https://github.com/tuckcode/rhizome-agent/releases/download/alpha-latest/alpha-latest.json`. Stable reads the same kind of URL on the `stable-latest` tag. Those tags are prereleases on purpose: GitHub's `releases/latest/download` URL does not serve alpha releases. Update now downloads and installs through the Tauri updater. Restart uses the existing Restart control. `plugins.updater.pubkey` in `tauri.conf.json` is the minisign public key for verifying update bundles; release CI supplies the matching private key via `TAURI_SIGNING_PRIVATE_KEY`.
 
 Rust always passes the channel URL. The `plugins.updater.endpoints` entry in `src-tauri/tauri.conf.json` stays as an unused fallback. In tauri-plugin-updater 2.10.0, `UpdaterBuilder::endpoints` replaces that list. `build()` uses the config list only when no runtime list was given, and it errors only when both are empty. The checked-in URL is the alpha feed. Rust passes the stable feed unless the release channel is alpha.
 
@@ -424,7 +424,6 @@ rhizome-agent/
 | `src/components/aiWorkspaceConversations.ts` | Conversation metadata state, settings persistence, default title generation, and target resolution. |
 | `src/components/aiWorkspaceSizing.ts` | AI workspace sizing, localStorage persistence, class names, and layout style helpers. |
 | `src/components/AiPanel.tsx` | Reusable AI transcript/composer surface — selected target with tool execution, reasoning, actions, and per-vault permission mode. |
-| `src/components/PrimeThinkingToggle.tsx` | Composer thinking-level menu. Levels come from the host and are filtered to the model's own set; no hardcoded list. |
 | `src/components/usePrimeSessionSwitcher.ts` | Session list switch / fork / branch. Skips `ensure_prime_session_host` when the host is already running. Clears the transcript on the same click as the row highlight. |
 | `src/lib/replySuggestions.ts` | Rules-first reply pills and Tab ghost-text (#51 Case 1). Options win over completion. Model-backed suggestions are not built. |
 | `src/components/chatNoteSplit.ts` | On top / Beside for an open note over Chat. Beside forces compact Sessions/Notes. |
@@ -535,10 +534,11 @@ Verified against source 2026-09-14. Longer landmine list:
   itself. `ConnectionsPanel` is the **Show in Graph** overlay, not the
   rail Graph. ADR-0171's "mount only on Changes" does not match `App.tsx`.
   Inbox stays a Notes filter. Do not remount Graph under Inbox.
-- **Thinking levels come from the host.** Call `get_prime_thinking_levels`
-  for the scale and `get_prime_supported_thinking_levels` for the attached
-  model's subset of it. Do not hardcode Off → Max in the frontend, and do not
-  offer a level the model refuses — Prime clamps it and the click looks dead.
+- **Prime `thinkingLevelMap` in `models.json` is live.** The external Prime
+  daemon reads it to clamp thinking per model. Settings → Add to Chat list still
+  writes maps via `prime_custom_models` / `merge_nous_portal`; do not drop those
+  fields on merge. Rhizome no longer ships a composer pill or Tauri commands to
+  change thinking levels from the UI.
 - **Session switch skip-ensure.** `usePrimeSessionSwitcher` skips
   `ensure_prime_session_host` when `hostRunning` is true. Status-poll retry
   of ensure is still required when the host is down. The click must clear the

@@ -8,7 +8,9 @@ import {
 } from '../lib/appUpdater'
 import {
   UPDATER_CHECK_FAILED_MESSAGE,
+  UPDATER_INSTALL_FAILED_MESSAGE,
   isAllowlistedUpdaterCheckError,
+  isAllowlistedUpdaterInstallError,
 } from '../lib/updaterUserMessages'
 import { formatCalendarVersionForDisplay } from '../utils/calendarVersion'
 import { openExternalUrl } from '../utils/url'
@@ -26,15 +28,17 @@ export type UpdateStatus =
   | ({ state: 'available'; notes: string | undefined } & UpdateVersionInfo)
   | ({ state: 'downloading'; progress: number } & UpdateVersionInfo)
   | ({ state: 'ready' } & UpdateVersionInfo)
-  | { state: 'error' }
+  | { state: 'error'; message: string }
 
 export type UpdateCheckResult =
   | { kind: 'up-to-date' }
   | ({ kind: 'available' } & UpdateVersionInfo)
   | { kind: 'error'; message: string }
 
+export type UpdateCheckInitiator = 'manual' | 'background'
+
 export interface UpdateActions {
-  checkForUpdates: () => Promise<UpdateCheckResult>
+  checkForUpdates: (options?: { initiator?: UpdateCheckInitiator }) => Promise<UpdateCheckResult>
   startDownload: () => void
   openReleaseNotes: () => void
   dismiss: () => void
@@ -72,6 +76,17 @@ function buildUpdateCheckErrorMessage(error: unknown): string {
   // is logged and replaced with the shared check-failed sentence.
   if (detail && isAllowlistedUpdaterCheckError(detail)) return detail
   return UPDATER_CHECK_FAILED_MESSAGE
+}
+
+function buildUpdateInstallErrorMessage(error: unknown): string {
+  const detail = updateCheckDetail(error)
+  if (detail) {
+    console.warn('[updater] Download failed', detail)
+  } else {
+    console.warn('[updater] Download failed')
+  }
+  if (detail && isAllowlistedUpdaterInstallError(detail)) return detail
+  return UPDATER_INSTALL_FAILED_MESSAGE
 }
 
 function toAvailableStatus(update: AppUpdateMetadata): UpdateStatus {
@@ -113,9 +128,12 @@ export function useUpdater(
   const [status, setStatus] = useState<UpdateStatus>({ state: 'idle' })
   const updateRef = useRef<AppUpdateMetadata | null>(null)
 
-  const checkForUpdates = useCallback(async (): Promise<UpdateCheckResult> => {
+  const checkForUpdates = useCallback(async (
+    options?: { initiator?: UpdateCheckInitiator },
+  ): Promise<UpdateCheckResult> => {
     if (!isTauri()) return { kind: 'up-to-date' }
 
+    const initiator = options?.initiator ?? 'manual'
     setStatus({ state: 'checking' })
 
     try {
@@ -131,15 +149,22 @@ export function useUpdater(
       setStatus(toAvailableStatus(update))
       return { kind: 'available', ...versionInfo }
     } catch (error) {
-      setStatus({ state: 'error' })
-      return { kind: 'error', message: buildUpdateCheckErrorMessage(error) }
+      const message = buildUpdateCheckErrorMessage(error)
+      if (initiator === 'background') {
+        setStatus({ state: 'idle' })
+      } else {
+        setStatus({ state: 'error', message })
+      }
+      return { kind: 'error', message }
     }
   }, [releaseChannel])
 
   useEffect(() => {
     if (!automaticChecksEnabled) return
     if (!isTauri()) return
-    const timer = setTimeout(() => { checkForUpdates() }, 3000)
+    const timer = setTimeout(() => {
+      void checkForUpdates({ initiator: 'background' })
+    }, 3000)
     return () => clearTimeout(timer)
   }, [automaticChecksEnabled, checkForUpdates])
 
@@ -159,9 +184,8 @@ export function useUpdater(
 
       // If Finished wasn't emitted via callback, set ready after await resolves
       setStatus((prev) => (prev.state === 'downloading' ? { state: 'ready', ...versionInfo } : prev))
-    } catch {
-      console.warn('[updater] Download failed')
-      setStatus({ state: 'error' })
+    } catch (error) {
+      setStatus({ state: 'error', message: buildUpdateInstallErrorMessage(error) })
     }
   }, [releaseChannel])
 

@@ -309,12 +309,20 @@ function HeaderOptionalTools({ collapsed, locale, ...sortProps }: OptionalToolsP
   )
 }
 
+/** The sort menu portals to <body>, outside this dropdown's layer. */
+function isInsideSortMenu(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest('[data-testid^="sort-menu-"]') !== null
+}
+
 function HeaderOverflowMenu({ collapsed, locale, ...sortProps }: OptionalToolsProps) {
   if (!collapsed) return null
   // Inline English string — this repo does not add new en.json keys (C18).
   const label = 'More list actions'
+  // Not modal: a modal menu sets pointer-events: none on <body>, and the
+  // portaled sort menu would take no clicks. A click in the sort menu must
+  // not close this menu either, or the sort menu unmounts mid-click.
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <Button
           type="button"
@@ -328,7 +336,13 @@ function HeaderOverflowMenu({ collapsed, locale, ...sortProps }: OptionalToolsPr
           <DotsThree size={16} weight="bold" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" data-testid="note-list-header-overflow-menu">
+      <DropdownMenuContent
+        align="end"
+        data-testid="note-list-header-overflow-menu"
+        onInteractOutside={(event) => {
+          if (isInsideSortMenu(event.target)) event.preventDefault()
+        }}
+      >
         <div className="flex flex-col gap-1 px-1 py-1" onClick={(event) => event.stopPropagation()}>
           <div className="flex items-center gap-2">
             <SortAndColumnsTools locale={locale} {...sortProps} />

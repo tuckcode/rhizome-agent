@@ -2,23 +2,69 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useAiActivity } from './useAiActivity'
 
+const tauri = vi.hoisted(() => ({ on: true }))
+
+vi.mock('../mock-tauri', () => ({
+  isTauri: () => tauri.on,
+}))
+
 let lastWsInstance: MockWebSocket | null = null
+let wsConstructCount = 0
 
 class MockWebSocket {
+  static readonly CONNECTING = 0
+  static readonly OPEN = 1
+  static readonly CLOSED = 3
+
   onmessage: ((event: MessageEvent) => void) | null = null
   onerror: (() => void) | null = null
-  onclose: (() => void) | null = null
-  close = vi.fn()
+  private openHandler: (() => void) | null = null
+  private closeHandler: (() => void) | null = null
+  readyState = MockWebSocket.CONNECTING
   url: string
 
   constructor(url: string) {
     this.url = url
+    wsConstructCount += 1
     lastWsInstance = this // eslint-disable-line @typescript-eslint/no-this-alias
   }
+
+  set onopen(handler: (() => void) | null) {
+    this.openHandler = handler
+  }
+
+  get onopen(): (() => void) | null {
+    return this.openHandler
+      ? () => {
+          this.readyState = MockWebSocket.OPEN
+          this.openHandler?.()
+        }
+      : null
+  }
+
+  set onclose(handler: (() => void) | null) {
+    this.closeHandler = handler
+  }
+
+  get onclose(): (() => void) | null {
+    return this.closeHandler
+      ? () => {
+          this.readyState = MockWebSocket.CLOSED
+          this.closeHandler?.()
+        }
+      : null
+  }
+
+  close = vi.fn(() => {
+    this.readyState = MockWebSocket.CLOSED
+    this.onclose?.()
+  })
 }
 
 beforeEach(() => {
+  tauri.on = true
   lastWsInstance = null
+  wsConstructCount = 0
   vi.stubGlobal('WebSocket', MockWebSocket)
   vi.useFakeTimers()
 })
@@ -39,10 +85,168 @@ describe('useAiActivity', () => {
     expect(result.current.highlightPath).toBeNull()
   })
 
-  it('connects to ws://localhost:9711', () => {
+  it('connects to ws://localhost:9711 inside the desktop app', () => {
     renderHook(() => useAiActivity())
     expect(lastWsInstance).not.toBeNull()
     expect(lastWsInstance!.url).toBe('ws://localhost:9711')
+  })
+
+  it('does not open the UI bridge socket in the browser build', () => {
+    tauri.on = false
+    renderHook(() => useAiActivity())
+    expect(lastWsInstance).toBeNull()
+  })
+
+  it('logs a bridge failure at debug and backs off before the next try', () => {
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
+    renderHook(() => useAiActivity())
+    const first = lastWsInstance
+    act(() => { first?.onerror?.() })
+    act(() => { first?.onclose?.() })
+    expect(debug).toHaveBeenCalled()
+    act(() => { vi.advanceTimersByTime(2999) })
+    expect(lastWsInstance).toBe(first)
+    act(() => { vi.advanceTimersByTime(1) })
+    const second = lastWsInstance
+    expect(second).not.toBe(first)
+    act(() => { second?.onclose?.() })
+    act(() => { vi.advanceTimersByTime(5999) })
+    expect(lastWsInstance).toBe(second)
+    act(() => { vi.advanceTimersByTime(1) })
+    expect(lastWsInstance).not.toBe(second)
+    debug.mockRestore()
+  })
+
+  it('keeps retrying through a slow restart when those tries never connect', () => {
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
+    renderHook(() => useAiActivity())
+    act(() => { lastWsInstance?.onopen?.() })
+    act(() => { lastWsInstance?.onclose?.() })
+    for (let retry = 0; retry < 8; retry += 1) {
+      act(() => { vi.advanceTimersByTime(30_000) })
+      const failed = lastWsInstance
+      act(() => { failed?.onclose?.() })
+      expect(debug).not.toHaveBeenCalledWith('[ai-activity] UI bridge dropped; stopped reconnecting')
+    }
+    act(() => { vi.advanceTimersByTime(30_000) })
+    expect(lastWsInstance).not.toBeNull()
+    debug.mockRestore()
+  })
+
+  it('resets the drop count after a minute of healthy connection', () => {
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
+    renderHook(() => useAiActivity())
+    for (let drop = 0; drop < 4; drop += 1) {
+      act(() => { lastWsInstance?.onopen?.() })
+      act(() => { lastWsInstance?.onclose?.() })
+      act(() => { vi.advanceTimersByTime(30_000) })
+    }
+    act(() => { lastWsInstance?.onopen?.() })
+    act(() => { vi.advanceTimersByTime(60_000) })
+    for (let drop = 0; drop < 4; drop += 1) {
+      const current = lastWsInstance
+      act(() => { current?.onclose?.() })
+      act(() => { vi.advanceTimersByTime(30_000) })
+      expect(lastWsInstance).not.toBe(current)
+    }
+    expect(debug).not.toHaveBeenCalledWith('[ai-activity] UI bridge dropped; stopped reconnecting')
+    debug.mockRestore()
+  })
+
+  it('opens only one socket when focus fires during a pending reconnect backoff', () => {
+    renderHook(() => useAiActivity())
+    expect(wsConstructCount).toBe(1)
+    act(() => { lastWsInstance?.onclose?.() })
+    expect(wsConstructCount).toBe(1)
+    act(() => { window.dispatchEvent(new Event('focus')) })
+    expect(wsConstructCount).toBe(2)
+    act(() => { vi.advanceTimersByTime(30_000) })
+    expect(wsConstructCount).toBe(2)
+  })
+
+  it('does not open a second socket on focus while the first is still connecting', () => {
+    renderHook(() => useAiActivity())
+    expect(wsConstructCount).toBe(1)
+    expect(lastWsInstance!.readyState).toBe(MockWebSocket.CONNECTING)
+    act(() => { window.dispatchEvent(new Event('focus')) })
+    expect(wsConstructCount).toBe(1)
+  })
+
+  it('reconnects on the online event after giving up', () => {
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
+    renderHook(() => useAiActivity())
+    for (let drop = 0; drop < 5; drop += 1) {
+      act(() => { lastWsInstance?.onopen?.() })
+      const current = lastWsInstance
+      act(() => { current?.onclose?.() })
+      act(() => { vi.advanceTimersByTime(30_000) })
+    }
+    const givenUp = lastWsInstance
+    act(() => { window.dispatchEvent(new Event('online')) })
+    expect(lastWsInstance).not.toBe(givenUp)
+    debug.mockRestore()
+  })
+
+  it('reconnects when the document becomes visible after giving up', () => {
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+    renderHook(() => useAiActivity())
+    for (let drop = 0; drop < 5; drop += 1) {
+      act(() => { lastWsInstance?.onopen?.() })
+      const current = lastWsInstance
+      act(() => { current?.onclose?.() })
+      act(() => { vi.advanceTimersByTime(30_000) })
+    }
+    const givenUp = lastWsInstance
+    act(() => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    expect(lastWsInstance).not.toBe(givenUp)
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+    debug.mockRestore()
+  })
+
+  it('skips wake while the document is hidden', () => {
+    renderHook(() => useAiActivity())
+    for (let drop = 0; drop < 5; drop += 1) {
+      act(() => { lastWsInstance?.onopen?.() })
+      act(() => { lastWsInstance?.onclose?.() })
+      act(() => { vi.advanceTimersByTime(30_000) })
+    }
+    const countAtGiveUp = wsConstructCount
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' })
+    act(() => { window.dispatchEvent(new Event('focus')) })
+    expect(wsConstructCount).toBe(countAtGiveUp)
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
+  })
+
+  it('removes focus, online, and visibility listeners on unmount', () => {
+    const removeSpy = vi.spyOn(window, 'removeEventListener')
+    const docRemoveSpy = vi.spyOn(document, 'removeEventListener')
+    const { unmount } = renderHook(() => useAiActivity())
+    unmount()
+    expect(removeSpy).toHaveBeenCalledWith('focus', expect.any(Function))
+    expect(removeSpy).toHaveBeenCalledWith('online', expect.any(Function))
+    expect(docRemoveSpy).toHaveBeenCalledWith('visibilitychange', expect.any(Function))
+    removeSpy.mockRestore()
+    docRemoveSpy.mockRestore()
+  })
+
+  it('reconnects on window focus after giving up', () => {
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
+    renderHook(() => useAiActivity())
+    for (let drop = 0; drop < 5; drop += 1) {
+      act(() => { lastWsInstance?.onopen?.() })
+      const current = lastWsInstance
+      act(() => { current?.onclose?.() })
+      act(() => { vi.advanceTimersByTime(30_000) })
+    }
+    const givenUp = lastWsInstance
+    act(() => { window.dispatchEvent(new Event('focus')) })
+    expect(lastWsInstance).not.toBe(givenUp)
+    expect(debug).toHaveBeenCalledWith('[ai-activity] UI bridge dropped; stopped reconnecting')
+    debug.mockRestore()
   })
 
   it('sets highlight on ui_action highlight message', () => {

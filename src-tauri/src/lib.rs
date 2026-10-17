@@ -69,7 +69,9 @@ pub mod engines;
 pub mod rhizome_loop;
 // Provider adapter and free-tier routing. They compile now. Chat must not
 // call them until Phase 6.
+pub mod hermes_reasoning;
 pub mod provider_keys;
+pub mod reasoning_levels;
 pub mod rhizome_provider_model;
 pub mod rhizome_routing;
 pub mod rhizome_search;
@@ -777,9 +779,6 @@ macro_rules! app_invoke_handler {
             commands::get_prime_commands,
             commands::export_prime_session,
             commands::set_prime_model,
-            commands::set_prime_thinking_level,
-            commands::get_prime_thinking_levels,
-            commands::get_prime_supported_thinking_levels,
             commands::fork_prime_session,
             commands::settle_prime_session,
             commands::finish_main_window_close,

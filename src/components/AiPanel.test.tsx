@@ -977,7 +977,6 @@ describe('the native composer deck', () => {
 
     expect(screen.queryByTestId('native-chat-model-picker')).not.toBeInTheDocument()
     expect(screen.queryByTestId('prime-model-chip')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('prime-thinking-toggle')).not.toBeInTheDocument()
     expect(screen.queryByTestId('chat-composer-bar')).not.toBeInTheDocument()
   })
 

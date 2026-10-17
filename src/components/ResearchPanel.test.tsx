@@ -32,7 +32,7 @@ const anthropicProvider: AiModelProvider = {
     {
       id: 'claude-sonnet',
       display_name: 'Claude Sonnet',
-      capabilities: { streaming: true, tools: true, vision: true, json_mode: true, reasoning: false },
+      capabilities: { streaming: true, tools: true, vision: true, json_mode: true, reasoning: { state: 'unknown' as const } },
     },
   ],
 }
