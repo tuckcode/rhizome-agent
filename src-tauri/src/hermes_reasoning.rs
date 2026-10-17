@@ -18,9 +18,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 //
-// Ported from Hermes Agent (MIT), Nous Research. Upstream:
-// https://github.com/NousResearch/hermes-agent/blob/main/hermes_cli/models_reasoning_caps.py
-// https://github.com/NousResearch/hermes-agent/blob/main/agent/reasoning_effort.py
+// Ported from Hermes Agent (MIT), Nous Research. Upstream, pinned:
+// https://github.com/NousResearch/hermes-agent/blob/5ff34f565e3ec23870a461249c0091bdaaae8f05/hermes_cli/models_reasoning_caps.py
+// https://github.com/NousResearch/hermes-agent/blob/7e85c68a0d93fdab996b446b957bffb4275cd99a/agent/reasoning_effort.py
 //
 // This file is the three-state OpenRouter parser, the effort ladder, the
 // nearest-weaker clamp, and the hand-checked effort constants. Rhizome does

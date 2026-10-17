@@ -494,6 +494,8 @@ mod tests {
 
     #[test]
     fn provider_request_uses_resolved_reasoning_instead_of_false() {
+        let dir = tempfile::tempdir().expect("temp");
+        crate::reasoning_levels::reset_reasoning_state_for_test(Some(dir.path().to_path_buf()));
         let nvidia: CatalogProvider = serde_json::from_value(json!({
             "id": "nvidia",
             "name": "NVIDIA NIM",
@@ -516,6 +518,7 @@ mod tests {
             unknown.provider.models[0].capabilities.reasoning,
             crate::reasoning_levels::ReasoningSupport::Unknown
         );
+        crate::reasoning_levels::reset_reasoning_state_for_test(None);
     }
 
     struct FakeKeys(HashMap<String, Credential>);
