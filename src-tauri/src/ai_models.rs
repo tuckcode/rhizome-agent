@@ -550,7 +550,7 @@ pub(crate) fn user_turn_reasoning(request: &AiModelStreamRequest) -> (TurnExtras
         );
     }
     let mut body = fields.body;
-    if let Some(floor) = fields.min_max_tokens {
+    if let Some(floor) = fields.output_floor {
         // Raise a short cap so reasoning tokens do not consume the whole reply.
         // https://platform.openai.com/docs/guides/reasoning
         // https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking
@@ -567,7 +567,7 @@ pub(crate) fn user_turn_reasoning(request: &AiModelStreamRequest) -> (TurnExtras
             body,
             system_prefix: fields.system_prefix,
         },
-        fields.min_max_tokens.is_some(),
+        fields.output_floor.is_some(),
     )
 }
 

@@ -1262,7 +1262,7 @@ pub struct ReasoningTargetRequest {
     pub downgraded_from: Option<String>,
     /// Set when the sent level spends completion tokens on reasoning.
     /// `none` and `off` stay unset.
-    pub min_max_tokens: Option<u32>,
+    pub output_floor: Option<u32>,
 }
 
 /// Model plus level, as the provider request fields for one user chat turn.
@@ -1343,13 +1343,13 @@ fn fields_for_resolution(resolution: &ReasoningResolution) -> ReasoningTargetReq
         }
     }
     let thinking = !matches!(selected, "off" | "none" | "false" | "disabled");
-    let min_max_tokens = thinking.then_some(REASONING_OUTPUT_FLOOR);
+    let output_floor = thinking.then_some(REASONING_OUTPUT_FLOOR);
     ReasoningTargetRequest {
         body,
         system_prefix,
         selected_level: Some(selected.to_string()),
         downgraded_from: resolution.downgraded_from.clone(),
-        min_max_tokens,
+        output_floor,
     }
 }
 
@@ -1359,7 +1359,7 @@ fn empty_target() -> ReasoningTargetRequest {
         system_prefix: None,
         selected_level: None,
         downgraded_from: None,
-        min_max_tokens: None,
+        output_floor: None,
     }
 }
 
@@ -2327,7 +2327,7 @@ mod tests {
             grok.body.get("reasoning_effort").and_then(Value::as_str),
             Some("high")
         );
-        assert_eq!(grok.min_max_tokens, Some(REASONING_OUTPUT_FLOOR));
+        assert_eq!(grok.output_floor, Some(REASONING_OUTPUT_FLOOR));
         assert!(grok.downgraded_from.is_none());
 
         let gemini = reasoning_levels_for_target(
@@ -2413,7 +2413,7 @@ mod tests {
         assert!(unknown.body.is_empty());
         assert!(unknown.system_prefix.is_none());
         assert!(unknown.selected_level.is_none());
-        assert!(unknown.min_max_tokens.is_none());
+        assert!(unknown.output_floor.is_none());
         assert!(unknown.downgraded_from.is_none());
     }
 

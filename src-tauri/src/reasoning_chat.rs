@@ -4,36 +4,29 @@
 #[cfg(test)]
 mod tests {
     use crate::ai_models::test_server::{serve, sse};
-    use crate::ai_models::{
-        AiModelCapabilities, AiModelDefinition, AiModelProvider, AiModelProviderKind,
-        AiModelStreamRequest,
-    };
+    use crate::ai_models::{AiModelProvider, AiModelStreamRequest};
     use crate::ai_run_target::{run_prompt_via_target_with_model_runner, AiRunTarget};
     use serde_json::Value;
 
     fn provider(base_url: &str) -> AiModelProvider {
-        AiModelProvider {
-            id: "xai".into(),
-            name: "xAI".into(),
-            kind: AiModelProviderKind::OpenAiCompatible,
-            base_url: Some(base_url.into()),
-            api_key_storage: None,
-            api_key_env_var: None,
-            headers: None,
-            models: vec![AiModelDefinition {
-                id: "grok-4.7".into(),
-                display_name: None,
-                context_window: None,
-                max_output_tokens: Some(1024),
-                capabilities: AiModelCapabilities {
-                    streaming: true,
-                    tools: false,
-                    vision: false,
-                    json_mode: false,
-                    reasoning: crate::reasoning_levels::ReasoningSupport::Unknown,
-                },
-            }],
-        }
+        serde_json::from_value(serde_json::json!({
+            "id": "xai",
+            "name": "xAI",
+            "kind": "open_ai_compatible",
+            "base_url": base_url,
+            "api_key_storage": "none",
+            "models": [{
+                "id": "grok-4.7",
+                "capabilities": {
+                    "streaming": true,
+                    "tools": false,
+                    "vision": false,
+                    "json_mode": false,
+                    "reasoning": {"state": "unknown"}
+                }
+            }]
+        }))
+        .expect("provider")
     }
 
     fn assert_no_reasoning(body: &Value) {
