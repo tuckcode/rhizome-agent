@@ -5036,6 +5036,7 @@ dependencies = [
  "keyring",
  "libc",
  "log",
+ "nix 0.30.1",
  "notify",
  "objc2",
  "objc2-app-kit",

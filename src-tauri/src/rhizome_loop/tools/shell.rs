@@ -13,6 +13,7 @@ use std::collections::VecDeque;
 use std::io::{ErrorKind, Read};
 use std::path::PathBuf;
 use std::process::{ExitStatus, Stdio};
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -27,7 +28,7 @@ pub(crate) const SCHEMA: &str = r#"{
   "type": "function",
   "function": {
     "name": "bash",
-    "description": "Run one shell command in the active vault. The working directory is the vault root and cannot be set by the caller. Offered in Power User only. Every call asks for approval; there is no session grant. timeout_secs defaults to 60 and is capped at 300. stdin is closed. Each of stdout and stderr keeps the first 15360 bytes and the last 15360 bytes.",
+    "description": "Run one shell command in the active vault. The working directory is the vault root and cannot be set by the caller. Offered in Power User only. Every call asks for approval; there is no session grant. timeout_secs defaults to 60, including when the value is missing or invalid, and is capped at 300. stdin is closed. Each of stdout and stderr keeps the first 15360 bytes and the last 15360 bytes.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -50,6 +51,11 @@ pub(crate) const SCHEMA: &str = r#"{
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(60);
 const MAX_TIMEOUT_SECS: u64 = 300;
+/// After the leader is gone, how long readers may wait for a detached child to close the pipes.
+const READER_GRACE: Duration = Duration::from_millis(750);
+/// Timeout and cancel ask the group to exit before SIGKILL.
+const TERM_GRACE: Duration = Duration::from_secs(2);
+const DETACHED_NOTE: &str = "[background process still holds output; detached]";
 /// First bytes kept from each stream. A character that does not fit stays out of this buffer.
 const HEAD_BYTES: usize = 15 * 1024;
 /// Rolling end of each stream. Bytes that fall out of this ring are the hidden middle.
@@ -108,16 +114,25 @@ pub(crate) fn command_from_args(raw_args: &str) -> Result<String, String> {
 }
 
 /// Binds an approval to this tool-call id and the exact command.
+/// Each part is length-prefixed so a NUL inside either string cannot shift the boundary.
 pub(crate) fn approval_stamp(call_id: &str, command: &str) -> String {
-    text::hash_bytes(format!("{call_id}\0{command}").as_bytes())
+    let mut bytes = Vec::with_capacity(16 + call_id.len() + command.len());
+    push_prefixed(&mut bytes, call_id.as_bytes());
+    push_prefixed(&mut bytes, command.as_bytes());
+    text::hash_bytes(&bytes)
+}
+
+fn push_prefixed(out: &mut Vec<u8>, part: &[u8]) {
+    let len = u64::try_from(part.len()).unwrap_or(u64::MAX);
+    out.extend_from_slice(&len.to_le_bytes());
+    out.extend_from_slice(part);
 }
 
 pub(crate) fn run(input: &ShellInput<'_>) -> Result<String, String> {
     let command = command_from_args(input.args)?;
-    let timeout = match input.timeout {
-        Some(timeout) => timeout,
-        None => bounded_timeout(timeout_secs(input.args)?)?,
-    };
+    let timeout = input
+        .timeout
+        .unwrap_or_else(|| timeout_from_args(input.args));
     if (input.is_cancelled)() {
         return stopped_result();
     }
@@ -138,24 +153,28 @@ pub(crate) fn run(input: &ShellInput<'_>) -> Result<String, String> {
         reaped: false,
     };
     let outcome = running.wait_for(timeout, input.is_cancelled)?;
-    let stdout = join_reader(stdout_reader);
-    let stderr = join_reader(stderr_reader);
-    render_outcome(outcome, stdout, stderr)
+    let (stdout, stderr, detached) =
+        finish_readers(stdout_reader, stderr_reader, input.is_cancelled);
+    let outcome = if detached && (input.is_cancelled)() {
+        Outcome::Cancelled
+    } else {
+        outcome
+    };
+    render_outcome(outcome, stdout, stderr, detached)
 }
 
-fn timeout_secs(raw_args: &str) -> Result<Option<u64>, String> {
-    let args = args::parse_object(raw_args, "bash")?;
-    match args::optional_usize(&args, "timeout_secs", "bash")? {
-        Some(secs) => Ok(Some(secs as u64)),
-        None => Ok(None),
-    }
-}
-
-fn bounded_timeout(secs: Option<u64>) -> Result<Duration, String> {
-    match secs {
-        None => Ok(DEFAULT_TIMEOUT),
-        Some(0) => Err("bash timeout_secs must be 1 or greater.".into()),
-        Some(secs) => Ok(Duration::from_secs(secs.min(MAX_TIMEOUT_SECS))),
+/// Missing or unusable `timeout_secs` uses 60s. Values above 300 are clamped.
+fn timeout_from_args(raw_args: &str) -> Duration {
+    let Ok(args) = args::parse_object(raw_args, "bash") else {
+        return DEFAULT_TIMEOUT;
+    };
+    match args.get("timeout_secs") {
+        None | Some(serde_json::Value::Null) => DEFAULT_TIMEOUT,
+        Some(serde_json::Value::Number(number)) => match number.as_u64() {
+            Some(0) | None => DEFAULT_TIMEOUT,
+            Some(secs) => Duration::from_secs(secs.min(MAX_TIMEOUT_SECS)),
+        },
+        _ => DEFAULT_TIMEOUT,
     }
 }
 
@@ -258,30 +277,43 @@ impl Running {
         let deadline = Instant::now() + timeout;
         loop {
             if is_cancelled() {
-                self.kill_group()?;
+                self.stop_group(true)?;
                 return Ok(Outcome::Cancelled);
             }
             if Instant::now() >= deadline {
-                self.kill_group()?;
+                self.stop_group(true)?;
                 return Ok(Outcome::TimedOut);
             }
             if self.leader_finished()? {
-                let status = self.kill_group()?;
+                let status = self.stop_group(false)?;
                 return Ok(Outcome::Exit(status));
             }
             thread::sleep(POLL);
         }
     }
 
-    /// Kill or drain the group, then reap. Does nothing after a reap.
-    fn kill_group(&mut self) -> Result<ExitStatus, String> {
+    /// Drain the group, then reap.
+    ///
+    /// `polite` is the timeout and cancel path: SIGTERM, about 2s, then
+    /// SIGKILL. A leader that has already exited skips that wait so
+    /// `sleep 600 &` does not sit out the grace. `start_kill` is
+    /// `killpg` SIGKILL on Unix and `TerminateJobObject` on Windows.
+    fn stop_group(&mut self, polite: bool) -> Result<ExitStatus, String> {
         if self.reaped {
             return Err("bash already reaped".into());
         }
-        // The leader may already be a zombie. Signalling the group
-        // first closes pipes held by `sleep 600 &` before `wait`
-        // reaps the leader. `start_kill` is `killpg` on Unix and
-        // `TerminateJobObject` on Windows — not `taskkill /T`.
+        if polite && !self.leader_finished()? {
+            self.signal_term();
+            let deadline = Instant::now() + TERM_GRACE;
+            while Instant::now() < deadline {
+                if self.leader_finished()? {
+                    break;
+                }
+                thread::sleep(POLL);
+            }
+        }
+        // Kill the group before `wait` reaps the leader. A later
+        // `killpg` could hit a recycled pid.
         let _ = self.child.start_kill();
         let status = self
             .child
@@ -289,6 +321,21 @@ impl Running {
             .map_err(|error| format!("Failed to wait for bash: {error}"))?;
         self.reaped = true;
         Ok(status)
+    }
+
+    fn signal_term(&self) {
+        #[cfg(unix)]
+        {
+            use nix::sys::signal::{killpg, Signal};
+            use nix::unistd::Pid;
+            let Ok(raw) = i32::try_from(self.child.id()) else {
+                return;
+            };
+            if raw <= 0 {
+                return;
+            }
+            let _ = killpg(Pid::from_raw(raw), Signal::SIGTERM);
+        }
     }
 
     fn leader_finished(&mut self) -> Result<bool, String> {
@@ -327,46 +374,116 @@ fn leader_exited_unreaped(pid: u32) -> bool {
     if pid <= 0 {
         return false;
     }
-    // `waitpid` rejects `WNOWAIT` with EINVAL. `waitid` reports the
-    // zombie and leaves it unreaped, so the later `killpg` still names
-    // this process group. `si_pid` accounts for the glibc pad that a
-    // hand-rolled `siginfo` misses.
-    let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
-    let rc = unsafe {
-        libc::waitid(
-            libc::P_PID,
-            pid as libc::id_t,
-            &mut info,
-            libc::WEXITED | libc::WNOHANG | libc::WNOWAIT,
-        )
-    };
-    rc == 0 && unsafe { info.si_pid() } == pid
+    // `waitpid` rejects `WNOWAIT` with EINVAL on Linux. `waitid` reports
+    // the zombie and leaves it unreaped, so the later `killpg` still
+    // names this process group.
+    use nix::sys::wait::{WaitPidFlag, WaitStatus};
+    use nix::unistd::Pid;
+    let pid = Pid::from_raw(pid);
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    let result = nix::sys::wait::waitid(
+        nix::sys::wait::Id::Pid(pid),
+        WaitPidFlag::WEXITED | WaitPidFlag::WNOHANG | WaitPidFlag::WNOWAIT,
+    );
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    let result = nix::sys::wait::waitpid(pid, Some(WaitPidFlag::WNOHANG | WaitPidFlag::WNOWAIT));
+    match result {
+        Ok(WaitStatus::StillAlive) => false,
+        Ok(status) => status.pid() == Some(pid),
+        Err(_) => false,
+    }
 }
 
-fn spawn_reader<R>(pipe: Option<R>) -> thread::JoinHandle<StreamCapture>
+struct PipeReader {
+    capture: Arc<Mutex<StreamCapture>>,
+    handle: Option<thread::JoinHandle<()>>,
+}
+
+fn spawn_reader<R>(pipe: Option<R>) -> PipeReader
 where
     R: Read + Send + 'static,
 {
-    thread::spawn(move || {
-        let mut capture = StreamCapture::default();
-        let Some(mut pipe) = pipe else {
-            return capture;
+    let capture = Arc::new(Mutex::new(StreamCapture::default()));
+    let Some(mut pipe) = pipe else {
+        return PipeReader {
+            capture,
+            handle: None,
         };
+    };
+    let slot = Arc::clone(&capture);
+    let handle = thread::spawn(move || {
         let mut buf = [0u8; 8192];
         loop {
             match pipe.read(&mut buf) {
                 Ok(0) => break,
-                Ok(n) => capture.push_bytes(&buf[..n]),
+                Ok(n) => {
+                    if let Ok(mut guard) = slot.lock() {
+                        guard.push_bytes(&buf[..n]);
+                    }
+                }
                 Err(error) if error.kind() == ErrorKind::Interrupted => continue,
                 Err(_) => break,
             }
         }
-        capture
-    })
+    });
+    PipeReader {
+        capture,
+        handle: Some(handle),
+    }
 }
 
-fn join_reader(handle: thread::JoinHandle<StreamCapture>) -> StreamCapture {
-    handle.join().unwrap_or_default()
+/// One grace for both pipes. A detached child that still holds a write
+/// end would otherwise block the join forever.
+fn finish_readers(
+    mut stdout: PipeReader,
+    mut stderr: PipeReader,
+    is_cancelled: &dyn Fn() -> bool,
+) -> (StreamCapture, StreamCapture, bool) {
+    let started = Instant::now();
+    let detached = loop {
+        let out_done = stdout.try_join();
+        let err_done = stderr.try_join();
+        if out_done && err_done {
+            break false;
+        }
+        if is_cancelled() || started.elapsed() >= READER_GRACE {
+            stdout.detach();
+            stderr.detach();
+            break true;
+        }
+        thread::sleep(POLL);
+    };
+    (stdout.take(), stderr.take(), detached)
+}
+
+impl PipeReader {
+    fn try_join(&mut self) -> bool {
+        let Some(handle) = self.handle.as_ref() else {
+            return true;
+        };
+        if !handle.is_finished() {
+            return false;
+        }
+        if let Some(handle) = self.handle.take() {
+            let _ = handle.join();
+        }
+        true
+    }
+
+    fn detach(&mut self) {
+        // Dropping the handle detaches the thread. It may stay blocked
+        // in `read` until the detached child exits.
+        self.handle.take();
+    }
+
+    fn take(&self) -> StreamCapture {
+        let mut guard = self
+            .capture
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        guard.flush_pending();
+        std::mem::take(&mut *guard)
+    }
 }
 
 fn stopped_result() -> Result<String, String> {
@@ -374,6 +491,7 @@ fn stopped_result() -> Result<String, String> {
         Outcome::Cancelled,
         StreamCapture::default(),
         StreamCapture::default(),
+        false,
     )
 }
 
@@ -381,9 +499,17 @@ fn render_outcome(
     outcome: Outcome,
     stdout: StreamCapture,
     stderr: StreamCapture,
+    detached: bool,
 ) -> Result<String, String> {
     let stdout = stdout.finish();
-    let stderr = stderr.finish();
+    let mut stderr = stderr.finish();
+    if detached {
+        if !stderr.text.is_empty() && !stderr.text.ends_with('\n') {
+            stderr.text.push('\n');
+        }
+        stderr.text.push_str(DETACHED_NOTE);
+        stderr.text.push('\n');
+    }
     let (exit_code, timed_out, stopped) = match outcome {
         Outcome::Exit(status) => (Some(exit_code(status)), false, false),
         Outcome::TimedOut => (None, true, false),
@@ -484,7 +610,12 @@ impl StreamCapture {
                             self.pending = data[index..].to_vec();
                             return;
                         }
-                        Some(len) => index += len,
+                        Some(len) => {
+                            for _ in 0..len {
+                                self.push_char('\u{FFFD}');
+                            }
+                            index += len;
+                        }
                     }
                 }
             }
@@ -514,7 +645,15 @@ impl StreamCapture {
         self.tail.extend(bytes);
     }
 
-    fn finish(self) -> CapturedText {
+    fn flush_pending(&mut self) {
+        let pending = std::mem::take(&mut self.pending);
+        for _ in pending {
+            self.push_char('\u{FFFD}');
+        }
+    }
+
+    fn finish(mut self) -> CapturedText {
+        self.flush_pending();
         let StreamCapture {
             head,
             tail,
@@ -759,13 +898,24 @@ mod tests {
 
     #[test]
     fn timeout_defaults_to_60_and_caps_at_300() {
-        assert_eq!(bounded_timeout(None).unwrap(), Duration::from_secs(60));
+        assert_eq!(timeout_from_args("{}"), Duration::from_secs(60));
         assert_eq!(
-            bounded_timeout(Some(301)).unwrap(),
+            timeout_from_args(r#"{"timeout_secs":301}"#),
             Duration::from_secs(300)
         );
-        assert_eq!(bounded_timeout(Some(12)).unwrap(), Duration::from_secs(12));
-        assert!(bounded_timeout(Some(0)).is_err());
+        assert_eq!(
+            timeout_from_args(r#"{"timeout_secs":12}"#),
+            Duration::from_secs(12)
+        );
+        for raw in [
+            r#"{"timeout_secs":0}"#,
+            r#"{"timeout_secs":-3}"#,
+            r#"{"timeout_secs":"abc"}"#,
+            r#"{"timeout_secs":1.5}"#,
+            r#"{"timeout_secs":true}"#,
+        ] {
+            assert_eq!(timeout_from_args(raw), Duration::from_secs(60), "{raw}");
+        }
     }
 
     #[test]
@@ -912,11 +1062,17 @@ mod tests {
     fn env_has_no_api_key() {
         let (_dir, root) = root_dir();
         std::env::set_var("RHIZOME_SHELL_TEST_API_KEY", "super-secret-value");
+        std::env::set_var("GITHUB_TOKEN", "ghp-test-token-value");
+        std::env::set_var("AWS_SECRET_ACCESS_KEY", "aws-test-secret-value");
         let output = run_approved("env", &root, Some(Duration::from_secs(5))).unwrap();
         let value = bash_json(&output);
         let stdout = value["stdout"].as_str().unwrap();
         assert!(!stdout.contains("RHIZOME_SHELL_TEST_API_KEY"), "{stdout}");
         assert!(!stdout.contains("super-secret-value"), "{stdout}");
+        assert!(!stdout.contains("GITHUB_TOKEN"), "{stdout}");
+        assert!(!stdout.contains("ghp-test-token-value"), "{stdout}");
+        assert!(!stdout.contains("AWS_SECRET_ACCESS_KEY"), "{stdout}");
+        assert!(!stdout.contains("aws-test-secret-value"), "{stdout}");
         assert!(stdout.contains("PATH="), "{stdout}");
         assert_eq!(value["exit_code"], 0);
     }
@@ -967,7 +1123,7 @@ mod tests {
         );
         let started = Instant::now();
         let output = run_approved(&command, &root, Some(Duration::from_millis(700))).unwrap();
-        assert!(started.elapsed() < Duration::from_secs(3), "{output}");
+        assert!(started.elapsed() < Duration::from_secs(5), "{output}");
         let value = bash_json(&output);
         assert_eq!(value["timed_out"], true);
         assert_eq!(value["stopped"], false);
@@ -1031,7 +1187,7 @@ mod tests {
             Some(Duration::from_secs(5)),
         )
         .unwrap();
-        assert!(started.elapsed() < Duration::from_secs(3), "{output}");
+        assert!(started.elapsed() < Duration::from_secs(5), "{output}");
         let value = bash_json(&output);
         assert_eq!(value["stopped"], true);
         assert_eq!(value["timed_out"], false);
@@ -1045,6 +1201,92 @@ mod tests {
         let text = std::fs::read_to_string(path)
             .unwrap_or_else(|error| panic!("missing pid file {}: {error}", path.display()));
         text.trim().parse().expect("pid")
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn setsid_background_returns_without_waiting_for_the_child() {
+        let (_dir, root) = root_dir();
+        let pid_path = std::path::Path::new(&root).join("sleep.pid");
+        let command = format!(
+            "setsid sh -c 'echo $$ > \"{}\"; exec sleep 20' & while ! test -s \"{}\"; do :; done; echo done",
+            pid_path.display(),
+            pid_path.display()
+        );
+        let started = Instant::now();
+        let output = run_approved(&command, &root, Some(Duration::from_secs(3))).unwrap();
+        assert!(started.elapsed() < Duration::from_secs(5), "{output}");
+        let value = bash_json(&output);
+        assert!(
+            value["stdout"].as_str().unwrap().contains("done"),
+            "{output}"
+        );
+        assert_eq!(value["exit_code"], 0);
+        assert_eq!(value["timed_out"], false);
+        assert_eq!(value["stopped"], false);
+        assert!(
+            value["stderr"].as_str().unwrap().contains(DETACHED_NOTE),
+            "{output}"
+        );
+        kill_written_pid(&pid_path);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn setsid_sleep_infinity_does_not_hang() {
+        let (_dir, root) = root_dir();
+        let pid_path = std::path::Path::new(&root).join("sleep.pid");
+        let command = format!(
+            "setsid sh -c 'echo $$ > \"{}\"; exec sleep infinity' & while ! test -s \"{}\"; do :; done",
+            pid_path.display(),
+            pid_path.display()
+        );
+        let started = Instant::now();
+        let output = run_approved(&command, &root, Some(Duration::from_secs(3))).unwrap();
+        assert!(started.elapsed() < Duration::from_secs(5), "{output}");
+        let value = bash_json(&output);
+        assert_eq!(value["timed_out"], false);
+        assert!(
+            value["stderr"].as_str().unwrap().contains(DETACHED_NOTE),
+            "{output}"
+        );
+        kill_written_pid(&pid_path);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn sigterm_reaches_a_trap_before_sigkill() {
+        let (_dir, root) = root_dir();
+        let started = Instant::now();
+        let output = run_approved(
+            "trap 'echo got-term; exit 0' TERM; sleep 30",
+            &root,
+            Some(Duration::from_millis(400)),
+        )
+        .unwrap();
+        assert!(started.elapsed() < Duration::from_secs(5), "{output}");
+        let value = bash_json(&output);
+        assert!(
+            value["stdout"].as_str().unwrap().contains("got-term"),
+            "{output}"
+        );
+        assert_eq!(value["timed_out"], true);
+        assert_eq!(value["stopped"], false);
+        assert!(value["exit_code"].is_null());
+    }
+
+    #[test]
+    fn invalid_utf8_becomes_replacement_and_pending_is_flushed() {
+        let mut capture = StreamCapture::default();
+        capture.push_bytes(b"a\xff b");
+        let text = capture.finish();
+        assert_eq!(text.text, "a\u{FFFD} b");
+
+        let mut split = StreamCapture::default();
+        split.push_bytes(&[b'a', 0xC3]);
+        let text = split.finish();
+        assert_eq!(text.text, "a\u{FFFD}");
+        assert!(!text.text.contains('\u{0000}'));
     }
 
     fn bash_json(output: &str) -> serde_json::Value {
@@ -1208,7 +1450,29 @@ mod tests {
 
     #[cfg(unix)]
     fn assert_dead(pid: i32) {
-        let alive = unsafe { libc::kill(pid, 0) } == 0;
+        let alive = nix::sys::signal::kill(nix::unistd::Pid::from_raw(pid), None).is_ok();
         assert!(!alive, "pid {pid} is still alive");
+    }
+
+    #[cfg(unix)]
+    fn kill_written_pid(path: &std::path::Path) {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        let text = loop {
+            if let Ok(text) = std::fs::read_to_string(path) {
+                if !text.trim().is_empty() {
+                    break text;
+                }
+            }
+            if Instant::now() >= deadline {
+                return;
+            }
+            thread::sleep(Duration::from_millis(20));
+        };
+        if let Ok(pid) = text.trim().parse::<i32>() {
+            let _ = nix::sys::signal::kill(
+                nix::unistd::Pid::from_raw(pid),
+                nix::sys::signal::Signal::SIGKILL,
+            );
+        }
     }
 }

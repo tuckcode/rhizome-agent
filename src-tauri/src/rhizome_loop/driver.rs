@@ -1,8 +1,8 @@
 use std::collections::VecDeque;
-use std::sync::mpsc;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
-use std::time::Duration;
+
+use tokio::sync::{oneshot, Notify};
 
 use crate::ai_agents::AiAgentPermissionMode;
 use crate::model_events::ModelEvent;
@@ -102,6 +102,9 @@ struct OpenCall {
 #[derive(Clone)]
 pub struct AgentLoop {
     shared: Arc<Mutex<Shared>>,
+    /// Wakes an approval wait when cancel or quit lands. The wait itself
+    /// does not block a tokio worker.
+    cancel_notify: Arc<Notify>,
 }
 
 impl Default for AgentLoop {
@@ -258,6 +261,7 @@ impl AgentLoop {
                 after_tool: None,
                 on_durable: None,
             })),
+            cancel_notify: Arc::new(Notify::new()),
         }
     }
 
@@ -276,6 +280,7 @@ impl AgentLoop {
             shared.cancel_cause = Some(cause.into());
         }
         drop(shared);
+        self.cancel_notify.notify_waiters();
         self.dismiss_live_prompt();
     }
 
@@ -341,6 +346,7 @@ impl AgentLoop {
             shared.cancel_cause = Some(cause.into());
         }
         drop(shared);
+        self.cancel_notify.notify_waiters();
         self.dismiss_live_prompt();
     }
 
@@ -673,7 +679,9 @@ impl AgentLoop {
             shown_args = args.to_string();
             None
         };
-        let reply = self.wait_for_approval(name, &shown_args, prepared.as_ref(), id);
+        let reply = self
+            .wait_for_approval(name, &shown_args, prepared.as_ref(), id)
+            .await;
         // Cancel or quit can land while the waiter is blocked, or just
         // after it returns. Either way the tool does not run.
         if self.is_cancelled() {
@@ -697,10 +705,10 @@ impl AgentLoop {
         }
     }
 
-    /// Runs the waiter off-thread so cancel/quit can end the wait
-    /// without waiting for a human reply. The waiter is not locked
-    /// for the whole wait, so a later turn can ask again.
-    fn wait_for_approval(
+    /// The waiter runs on its own thread. This task awaits that reply,
+    /// or cancel, without blocking a tokio worker. The tool run stays
+    /// on `spawn_blocking`.
+    async fn wait_for_approval(
         &self,
         name: &str,
         args: &str,
@@ -716,7 +724,7 @@ impl AgentLoop {
             shared.live_prompt = Some(shared.prompt_gen);
             shared.prompt_gen
         };
-        let (tx, rx) = mpsc::channel();
+        let (tx, mut rx) = oneshot::channel();
         let asked = name.to_string();
         let asked_args = args.to_string();
         let call_id = call_id.to_string();
@@ -725,27 +733,29 @@ impl AgentLoop {
             let reply = waiter(&asked, &asked_args, preview.as_ref(), &call_id);
             let _ = tx.send((gen, reply));
         });
+        let notify = Arc::clone(&self.cancel_notify);
         loop {
             if self.is_cancelled() {
                 self.dismiss_live_prompt();
                 return ApprovalReply::Cancelled;
             }
-            // 10ms poll: cancel/quit must end the wait without a human
-            // reply. A condvar would wake faster; this is enough while
-            // the loop is test-only.
-            match rx.recv_timeout(Duration::from_millis(10)) {
-                Ok((reply_gen, reply)) => {
-                    let live = self.lock().live_prompt;
-                    if live == Some(reply_gen) {
-                        self.lock().live_prompt = None;
-                        return reply;
+            tokio::select! {
+                result = &mut rx => {
+                    match result {
+                        Ok((reply_gen, reply)) => {
+                            let live = self.lock().live_prompt;
+                            if live == Some(reply_gen) {
+                                self.lock().live_prompt = None;
+                                return reply;
+                            }
+                        }
+                        Err(_) => {
+                            self.dismiss_live_prompt();
+                            return ApprovalReply::Cancelled;
+                        }
                     }
                 }
-                Err(mpsc::RecvTimeoutError::Timeout) => {}
-                Err(mpsc::RecvTimeoutError::Disconnected) => {
-                    self.dismiss_live_prompt();
-                    return ApprovalReply::Cancelled;
-                }
+                _ = notify.notified() => {}
             }
         }
     }

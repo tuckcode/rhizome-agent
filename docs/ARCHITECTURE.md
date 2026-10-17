@@ -536,8 +536,15 @@ Power User `bash` runs one command with the vault root as its working
 directory (`sh -c` on Unix, `cmd /S /C` on Windows). The model cannot
 choose that directory. The child environment starts empty and keeps an
 allowlist (`PATH`, `HOME`, `USER`, `LANG`, `TERM`, `TMPDIR`, plus Windows
-system variables such as `SystemRoot`, `COMSPEC`, and `PATHEXT`). stdin
-is closed. stdout and stderr each keep the first 15360 bytes and a
+system variables such as `SystemRoot`, `COMSPEC`, and `PATHEXT`). `HOME`
+is passed through, so a command can still read `~/.ssh` and `~/.aws`.
+stdin is closed. A child that calls `setsid` or `nohup` leaves the
+process group. On Linux it can outlive the group. After the leader
+exits or is killed, readers wait 750ms and then detach; the result's
+stderr then contains `[background process still holds output; detached]`.
+Timeout and cancel send SIGTERM and wait about 2s before SIGKILL. An
+invalid `timeout_secs` (0, negative, a non-integer, or a non-number)
+uses the 60s default. stdout and stderr each keep the first 15360 bytes and a
 rolling last 15360 bytes (30720 bytes per stream). A trimmed stream
 inserts one marker, `\n… [N lines hidden] …\n`, between those parts.
 `N` is the number of newline bytes that fell out of the tail. The

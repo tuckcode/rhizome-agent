@@ -105,6 +105,8 @@ keyring = { version = "3.6.3", features = ["sync-secret-service", "crypto-rust"]
 # (Finder tags / quarantine on macOS). MIT OR Apache-2.0.
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
+# Safe waitid / killpg. Apache-2.0 OR MIT. process-wrap already uses 0.30.
+nix = { version = "0.30", default-features = false, features = ["signal"] }
 xattr = "1"
 
 [dev-dependencies]

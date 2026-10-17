@@ -59,7 +59,8 @@ pub enum EngineEvent {
         notes: Option<Vec<String>>,
         #[serde(skip_serializing_if = "Option::is_none")]
         capped: Option<bool>,
-        /// Tool-call id for this approval. The card matches on this, not the tool name.
+        /// Tool-call id for this approval. The chat card still matches a
+        /// pending action by tool name; a later card can match on this id.
         call_id: String,
     },
     ApprovalDismissed {
