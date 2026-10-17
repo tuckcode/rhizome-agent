@@ -29,6 +29,10 @@ vi.mock('@tauri-apps/api/core', () => ({
 }))
 
 import { isTauri } from '../mock-tauri'
+import {
+  UPDATER_CHECK_FAILED_MESSAGE,
+  UPDATER_USER_MESSAGES,
+} from '../lib/updaterUserMessages'
 
 interface AppUpdateMetadata {
   currentVersion: string
@@ -273,7 +277,7 @@ describe('useUpdater', () => {
 
     expect(outcome).toEqual({
       kind: 'error',
-      message: 'Could not check for updates',
+      message: UPDATER_CHECK_FAILED_MESSAGE,
     })
     expect(console.warn).toHaveBeenCalledWith('[updater] Failed to check for updates', 'network error')
     expect(result.current.status).toEqual({ state: 'error' })
@@ -282,11 +286,11 @@ describe('useUpdater', () => {
   it('keeps the honest unavailable sentence and hides other plugin text', async () => {
     const unavailable = await performManualCheck(
       'stable',
-      new Error("In-app updates aren't available yet."),
+      new Error(UPDATER_USER_MESSAGES.inAppUpdatesUnavailable),
     )
     expect(unavailable.outcome).toEqual({
       kind: 'error',
-      message: "In-app updates aren't available yet.",
+      message: UPDATER_USER_MESSAGES.inAppUpdatesUnavailable,
     })
 
     const plugin = await performManualCheck(
@@ -295,7 +299,7 @@ describe('useUpdater', () => {
     )
     expect(plugin.outcome).toEqual({
       kind: 'error',
-      message: 'Could not check for updates',
+      message: UPDATER_CHECK_FAILED_MESSAGE,
     })
     expect(console.warn).toHaveBeenCalledWith(
       '[updater] Failed to check for updates',

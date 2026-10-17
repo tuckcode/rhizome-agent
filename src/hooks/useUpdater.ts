@@ -6,6 +6,7 @@ import {
   type AppUpdateDownloadEvent,
   type AppUpdateMetadata,
 } from '../lib/appUpdater'
+import { UPDATER_CHECK_FAILED_MESSAGE } from '../lib/updaterUserMessages'
 import { formatCalendarVersionForDisplay } from '../utils/calendarVersion'
 import { openExternalUrl } from '../utils/url'
 
@@ -68,10 +69,10 @@ function buildUpdateCheckErrorMessage(error: unknown): string {
   } else {
     console.warn('[updater] Failed to check for updates')
   }
-  // The unavailable sentence lives in app_updater.rs. Show that text as-is.
-  // Hide transport and plugin wording.
+  // User-facing copy lives in src/shared/updaterUserMessages.json. Show Rust
+  // messages as-is. Hide transport and plugin wording.
   if (detail && !looksLikeTransportOrPluginFailure(detail)) return detail
-  return 'Could not check for updates'
+  return UPDATER_CHECK_FAILED_MESSAGE
 }
 
 function toAvailableStatus(update: AppUpdateMetadata): UpdateStatus {

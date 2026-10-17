@@ -1,10 +1,38 @@
 use reqwest::Url;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use std::sync::OnceLock;
 use tauri::{ipc::Channel, AppHandle, Runtime};
 use tauri_plugin_updater::UpdaterExt;
 
 #[cfg(test)]
 use std::sync::atomic::{AtomicUsize, Ordering};
+
+#[derive(Deserialize)]
+struct UpdaterUserMessages {
+    #[serde(rename = "inAppUpdatesUnavailable")]
+    in_app_updates_unavailable: String,
+    #[serde(rename = "checkFailed")]
+    check_failed: String,
+    #[serde(rename = "installFailed")]
+    install_failed: String,
+    #[serde(rename = "noUpdateToInstall")]
+    no_update_to_install: String,
+    #[serde(rename = "versionChangedWhileDownloading")]
+    version_changed_while_downloading: String,
+}
+
+static UPDATER_USER_MESSAGES: OnceLock<UpdaterUserMessages> = OnceLock::new();
+
+fn updater_user_messages() -> &'static UpdaterUserMessages {
+    UPDATER_USER_MESSAGES.get_or_init(|| {
+        serde_json::from_str(include_str!("../../src/shared/updaterUserMessages.json"))
+            .expect("updater user messages must be valid JSON")
+    })
+}
+
+fn check_failed_user_message() -> String {
+    updater_user_messages().check_failed.clone()
+}
 
 /// Moving alpha manifest. Alpha GitHub Releases are prereleases, so
 /// `releases/latest/download` does not serve them. The release workflow
@@ -58,14 +86,16 @@ pub fn endpoint_for_release_channel(release_channel: Option<&str>) -> &'static s
 }
 
 /// Shown for check and install while `plugins.updater.pubkey` is still the placeholder.
-pub const IN_APP_UPDATES_UNAVAILABLE: &str = "In-app updates aren't available yet.";
+pub fn in_app_updates_unavailable_message() -> String {
+    updater_user_messages().in_app_updates_unavailable.clone()
+}
 
 /// Stop before any feed request. A placeholder, empty, or whitespace-only
 /// key cannot verify a download.
 pub fn refuse_placeholder_pubkey(pubkey: &str) -> Result<(), String> {
     let trimmed = pubkey.trim();
     if trimmed.is_empty() || trimmed == UPDATER_PUBKEY_PLACEHOLDER {
-        Err(IN_APP_UPDATES_UNAVAILABLE.into())
+        Err(in_app_updates_unavailable_message())
     } else {
         Ok(())
     }
@@ -85,13 +115,13 @@ pub fn interpret_feed_response(
     }
     if !(200..300).contains(&status) {
         log::warn!("updater feed responded with status {status}");
-        return Err("Could not check for updates.".into());
+        return Err(check_failed_user_message());
     }
     match serde_json::from_str::<serde_json::Value>(body) {
         Ok(value) if value.is_object() => Ok(Some(value)),
         _ => {
             log::warn!("updater feed was not a JSON object");
-            Err("Could not check for updates.".into())
+            Err(check_failed_user_message())
         }
     }
 }
@@ -100,9 +130,9 @@ pub fn ensure_expected_version(found: &str, expected: &str) -> Result<(), String
     if found == expected {
         Ok(())
     } else {
-        Err(format!(
-            "The update feed now offers {found}, not {expected}. Check for updates again."
-        ))
+        Err(updater_user_messages()
+            .version_changed_while_downloading
+            .replace("{found}", found))
     }
 }
 
@@ -130,13 +160,13 @@ fn fetch_feed(endpoint: &str) -> Result<Option<serde_json::Value>, String> {
         .build()
         .map_err(|error| {
             log::warn!("updater client failed: {error}");
-            "Could not check for updates.".to_string()
+            check_failed_user_message()
         })?
         .get(endpoint)
         .send()
         .map_err(|error| {
             log::warn!("updater feed request failed: {error}");
-            "Could not check for updates.".to_string()
+            check_failed_user_message()
         })?;
     let status = response.status().as_u16();
     let body = response.text().unwrap_or_default();
@@ -165,7 +195,7 @@ async fn find_update<R: Runtime>(
         .await
         .map_err(|error| {
             log::warn!("updater feed probe panicked: {error}");
-            "Could not check for updates.".to_string()
+            check_failed_user_message()
         })??;
     if manifest.is_none() {
         return Ok(None);
@@ -173,26 +203,26 @@ async fn find_update<R: Runtime>(
 
     let url = Url::parse(&endpoint).map_err(|error| {
         log::warn!("updater endpoint was not a URL: {error}");
-        "Could not check for updates.".to_string()
+        check_failed_user_message()
     })?;
     let updater = app_handle
         .updater_builder()
         .endpoints(vec![url])
         .map_err(|error| {
             log::warn!("updater builder rejected the endpoint: {error}");
-            "Could not check for updates.".to_string()
+            check_failed_user_message()
         })?
         .build()
         .map_err(|error| {
             log::warn!("updater builder failed: {error}");
-            "Could not check for updates.".to_string()
+            check_failed_user_message()
         })?;
 
     match updater.check().await {
         Ok(update) => Ok(update),
         Err(error) => {
             log::warn!("updater plugin check failed: {error}");
-            Err("Could not check for updates.".into())
+            Err(check_failed_user_message())
         }
     }
 }
@@ -218,7 +248,7 @@ pub async fn download_and_install_app_update<R: Runtime>(
     on_event: Channel<AppUpdateDownloadEvent>,
 ) -> Result<(), String> {
     let Some(update) = find_update(&app_handle, release_channel.as_deref()).await? else {
-        return Err("No update is available to install.".into());
+        return Err(updater_user_messages().no_update_to_install.clone());
     };
     ensure_expected_version(&update.version, &expected_version)?;
 
@@ -237,7 +267,7 @@ pub async fn download_and_install_app_update<R: Runtime>(
         .await
         .map_err(|error| {
             log::warn!("updater install failed: {error}");
-            "Could not install the update.".to_string()
+            updater_user_messages().install_failed.clone()
         })?;
 
     let _ = on_event.send(AppUpdateDownloadEvent::Finished);
@@ -248,9 +278,9 @@ pub async fn download_and_install_app_update<R: Runtime>(
 mod tests {
     use super::{
         endpoint_for_release_channel, ensure_expected_version, find_update,
-        interpret_feed_response, refuse_placeholder_pubkey, AppUpdateDownloadEvent,
-        AppUpdateMetadata, ALPHA_UPDATE_FEED, FEED_FETCHES, IN_APP_UPDATES_UNAVAILABLE,
-        STABLE_UPDATE_FEED, UPDATER_PUBKEY_PLACEHOLDER,
+        in_app_updates_unavailable_message, interpret_feed_response, refuse_placeholder_pubkey,
+        updater_user_messages, AppUpdateDownloadEvent, AppUpdateMetadata, ALPHA_UPDATE_FEED,
+        FEED_FETCHES, STABLE_UPDATE_FEED, UPDATER_PUBKEY_PLACEHOLDER,
     };
     use serde_json::json;
     use std::sync::atomic::Ordering;
@@ -294,7 +324,7 @@ mod tests {
         ] {
             assert_eq!(
                 refuse_placeholder_pubkey(pubkey).unwrap_err(),
-                IN_APP_UPDATES_UNAVAILABLE,
+                in_app_updates_unavailable_message(),
                 "pubkey {pubkey:?} must refuse before a request"
             );
         }
@@ -328,7 +358,7 @@ mod tests {
             Err(error) => error,
             Ok(_) => panic!("placeholder config must not check the feed"),
         };
-        assert_eq!(error, IN_APP_UPDATES_UNAVAILABLE);
+        assert_eq!(error, in_app_updates_unavailable_message());
         assert_eq!(FEED_FETCHES.load(Ordering::SeqCst), 0);
     }
 
@@ -357,7 +387,9 @@ mod tests {
         assert!(ensure_expected_version("2026.10.17-alpha.2", "2026.10.17-alpha.2").is_ok());
         assert_eq!(
             ensure_expected_version("2026.10.17-alpha.3", "2026.10.17-alpha.2").unwrap_err(),
-            "The update feed now offers 2026.10.17-alpha.3, not 2026.10.17-alpha.2. Check for updates again."
+            updater_user_messages()
+                .version_changed_while_downloading
+                .replace("{found}", "2026.10.17-alpha.3")
         );
     }
 
