@@ -44,3 +44,18 @@ not parse it.
 - Onboarding still offers optional Prime Agent install (not an engine picker)
 - NativeChatModelPicker (model picker, not engine)
 - OpenCode / Antigravity / Kiro kept as CLI targets like Codex
+
+## Review shots
+
+`docs/review-shots/prime-hermes-picker/`
+
+- `graphite-settings-before.png` / `earth-light-settings-before.png`
+- `graphite-settings-after.png` / `earth-light-settings-after.png`
+- `graphite-composer-before.png` / `earth-light-composer-before.png`
+- `graphite-composer-after.png` / `earth-light-composer-after.png`
+- `graphite-cmdk-before.png` / `earth-light-cmdk-before.png`
+- `graphite-cmdk-after.png` / `earth-light-cmdk-after.png`
+- `graphite-cmdk-codex-missing.png` / `earth-light-cmdk-codex-missing.png`
+
+Cmd+K with a last Codex target and Codex missing shows
+`Codex is not available on this machine.` Graphite and Earth light.
