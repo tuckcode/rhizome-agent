@@ -21,6 +21,9 @@ thread_local! {
 }
 
 const INDEX_VERSION: u32 = 1;
+/// Bump this when the scrubber changes, so an index written by an older
+/// scrubber is rewritten on the next load.
+const SCRUB_VERSION: u32 = 1;
 const INDEX_FILE_NAME: &str = "v1.json";
 
 /// One writer at a time. Append is read-modify-write, and two of those
@@ -38,10 +41,11 @@ fn with_index_lock<T>(body: impl FnOnce() -> T) -> T {
 #[serde(rename_all = "camelCase")]
 pub struct SessionTranscriptIndexDocument {
     pub version: u32,
-    /// Set after this file has been run through the secret scrubber.
-    /// Missing on indexes written before the marker existed.
+    /// Scrubber generation stored in the file. Missing reads as 0, so an
+    /// index written before this field (including one marked only with
+    /// `secretsScrubbed`) is scrubbed again.
     #[serde(default)]
-    pub secrets_scrubbed: bool,
+    pub scrub_version: u32,
     pub sessions: Vec<PersistedSessionRecord>,
 }
 
@@ -67,7 +71,7 @@ impl SessionTranscriptIndexDocument {
     fn empty() -> Self {
         Self {
             version: INDEX_VERSION,
-            secrets_scrubbed: true,
+            scrub_version: SCRUB_VERSION,
             sessions: Vec::new(),
         }
     }
@@ -75,8 +79,8 @@ impl SessionTranscriptIndexDocument {
 
 /// Load the persisted index. A missing file is an empty index, not an error.
 /// An index left by the old writer (mode 0644, or a `v1.json.tmp` copy) is
-/// locked down. A file without `secretsScrubbed` is rewritten once with
-/// secrets removed, including a file that is already mode 0600.
+/// locked down. A file whose `scrubVersion` is below the current scrubber
+/// is rewritten, including a file that is already mode 0600.
 pub fn load() -> Result<SessionTranscriptIndexDocument, String> {
     with_index_lock(load_locked)
 }
@@ -184,7 +188,7 @@ pub fn save(document: &SessionTranscriptIndexDocument) -> Result<(), String> {
         let index = index_path()?;
         secure_existing_index(&index)?;
         let mut document = scrub_document_once(document);
-        document.secrets_scrubbed = true;
+        document.scrub_version = SCRUB_VERSION;
         save_to(index, &document)
     })
 }
@@ -200,12 +204,14 @@ fn load_from(path: PathBuf) -> Result<SessionTranscriptIndexDocument, String> {
     if document.version != INDEX_VERSION {
         return Ok(SessionTranscriptIndexDocument::empty());
     }
-    if document.secrets_scrubbed {
+    if document.scrub_version >= SCRUB_VERSION {
         return Ok(document);
     }
     let mut document = scrub_document_once(&document);
-    document.secrets_scrubbed = true;
-    save_to(path, &document)?;
+    document.scrub_version = SCRUB_VERSION;
+    if let Err(error) = save_to(path, &document) {
+        log::warn!("session transcript index rewrite failed: {error}");
+    }
     Ok(document)
 }
 
@@ -242,8 +248,8 @@ fn scrub_document_once(
 }
 
 /// Lock down an index written before the owner-only format. A leftover
-/// `v1.json.tmp` is deleted. Scrubbing is decided by `secretsScrubbed`, not
-/// by the file mode, so a 0600 file and a Windows file are still rewritten.
+/// `v1.json.tmp` is deleted. Scrubbing is decided by `scrubVersion`, not by
+/// the file mode.
 fn secure_existing_index(path: &Path) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         if parent.exists() {
@@ -346,10 +352,20 @@ mod tests {
         }
     }
 
+    #[cfg(not(unix))]
+    #[allow(clippy::permissions_set_readonly_false)]
+    fn clear_readonly(path: &Path) {
+        if let Ok(meta) = fs::metadata(path) {
+            let mut perms = meta.permissions();
+            perms.set_readonly(false);
+            let _ = fs::set_permissions(path, perms);
+        }
+    }
+
     fn sample_document() -> SessionTranscriptIndexDocument {
         SessionTranscriptIndexDocument {
             version: INDEX_VERSION,
-            secrets_scrubbed: true,
+            scrub_version: SCRUB_VERSION,
             sessions: vec![PersistedSessionRecord {
                 path: "/Users/mock/.prime/agent/sessions/daemon.jsonl".into(),
                 stamp: "10".into(),
@@ -523,46 +539,87 @@ mod tests {
         });
     }
 
-    #[cfg(unix)]
     #[test]
-    fn load_rescrubs_an_owner_only_index_without_a_scrub_marker() {
-        use std::os::unix::fs::PermissionsExt;
-
+    fn load_rescrubs_when_scrub_version_is_behind() {
         with_cache_dir(|_| {
             let key = "sk-proj-abcdefghijklmnopqrstuvwxyz";
             let path = index_path().expect("index path");
             let dir = path.parent().expect("index dir");
             fs::create_dir_all(dir).expect("create dir");
-            fs::set_permissions(dir, fs::Permissions::from_mode(0o700)).expect("dir mode");
-            let body = format!(
-                r#"{{"version":1,"sessions":[{{"path":"rhizome-native:old","stamp":"1","id":"old","title":"kept","turns":[{{"messageIndex":0,"role":"assistant","text":"saw {key}"}}]}}]}}"#
+            let session = format!(
+                r#"{{"path":"rhizome-native:old","stamp":"1","id":"old","title":"kept","turns":[{{"messageIndex":0,"role":"assistant","text":"saw {key}"}}]}}"#
             );
-            fs::write(&path, body).expect("write old index");
-            fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).expect("file mode");
+            fs::write(
+                &path,
+                format!(r#"{{"version":1,"secretsScrubbed":true,"sessions":[{session}]}}"#),
+            )
+            .expect("write leaky index");
 
-            let loaded = load().expect("load unmarked index");
-
+            let loaded = load().expect("load leaky index");
             let raw = fs::read_to_string(&path).expect("read scrubbed index");
             assert!(!raw.contains(key), "{raw}");
-            assert!(raw.contains("\"secretsScrubbed\":true"), "{raw}");
+            assert!(
+                raw.contains(&format!("\"scrubVersion\":{SCRUB_VERSION}")),
+                "{raw}"
+            );
             assert!(
                 !loaded.sessions[0].turns[0].text.contains(key),
                 "{}",
                 loaded.sessions[0].turns[0].text
             );
-            let file_mode = fs::metadata(&path).expect("file").permissions().mode() & 0o777;
-            assert_eq!(file_mode, 0o600);
 
-            let marked = format!(
-                r#"{{"version":1,"secretsScrubbed":true,"sessions":[{{"path":"rhizome-native:old","stamp":"1","id":"old","title":"kept","turns":[{{"messageIndex":0,"role":"assistant","text":"saw {key}"}}]}}]}}"#
-            );
-            fs::write(&path, marked).expect("write marked index");
-            fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).expect("file mode");
-            let again = load().expect("load marked index");
+            fs::write(
+                &path,
+                format!(r#"{{"version":1,"scrubVersion":{SCRUB_VERSION},"sessions":[{session}]}}"#),
+            )
+            .expect("write current index");
+            let again = load().expect("load current index");
             assert!(
                 again.sessions[0].turns[0].text.contains(key),
-                "a marked index is scrubbed once"
+                "the current scrub version is left alone"
             );
+        });
+    }
+
+    #[test]
+    fn load_returns_scrubbed_text_when_the_rewrite_cannot_be_saved() {
+        with_cache_dir(|_| {
+            let key = "sk-proj-abcdefghijklmnopqrstuvwxyz";
+            let path = index_path().expect("index path");
+            let dir = path.parent().expect("index dir");
+            fs::create_dir_all(dir).expect("create dir");
+            fs::write(
+                &path,
+                format!(
+                    r#"{{"version":1,"sessions":[{{"path":"rhizome-native:old","stamp":"1","id":"old","title":"kept","turns":[{{"messageIndex":0,"role":"assistant","text":"saw {key}"}}]}}]}}"#
+                ),
+            )
+            .expect("write old index");
+            let mut perms = fs::metadata(&path).expect("metadata").permissions();
+            perms.set_readonly(true);
+            fs::set_permissions(&path, perms).expect("readonly");
+            struct MakeWritable(PathBuf);
+            impl Drop for MakeWritable {
+                fn drop(&mut self) {
+                    #[cfg(unix)]
+                    {
+                        use std::os::unix::fs::PermissionsExt;
+                        let _ = fs::set_permissions(&self.0, fs::Permissions::from_mode(0o644));
+                    }
+                    #[cfg(not(unix))]
+                    clear_readonly(&self.0);
+                }
+            }
+            let _restore = MakeWritable(path.clone());
+
+            let loaded = load().expect("load returns the scrubbed copy");
+            assert!(
+                !loaded.sessions[0].turns[0].text.contains(key),
+                "{}",
+                loaded.sessions[0].turns[0].text
+            );
+            let raw = fs::read_to_string(&path).expect("read unchanged index");
+            assert!(raw.contains(key), "{raw}");
         });
     }
 

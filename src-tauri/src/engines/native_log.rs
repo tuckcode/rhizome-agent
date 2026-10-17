@@ -216,6 +216,7 @@ struct ScrubRegexes {
     assignment: regex::Regex,
     api_key_name: regex::Regex,
     env_name: regex::Regex,
+    quoted_env_name: regex::Regex,
     prefixed_key_name: regex::Regex,
     patterns: Vec<regex::Regex>,
     mistral_context: regex::Regex,
@@ -232,14 +233,16 @@ fn scrub_regexes() -> &'static ScrubRegexes {
             r#"(?P<pre>(?:^|[^A-Za-z0-9_])(?:(?:export|set)[ \t]+)?)(?P<quote>["']?)(?P<name>[A-Za-z][A-Za-z0-9_]*)["']?[ \t]*(?P<sep>[=:])[ \t]*(?P<value>"[^"\r\n]*"|'[^'\r\n]*'|[^[:space:]#]+)"#,
         )
         .expect("assignment scrubber");
-        let api_key_name = regex::Regex::new(
-            r"(?i)^(?:[A-Z][A-Z0-9]*_)?API_KEY(?:_[A-Z0-9]+)*$",
-        )
-        .expect("api_key name");
+        let api_key_name =
+            regex::Regex::new(r"(?i)^(?:[a-z][a-z0-9]*_?)?api_?key$").expect("api_key name");
         let env_name = regex::Regex::new(
             r"^(?:[A-Z][A-Z0-9]*_)?(?:TOKEN|SECRET|PASSWORD)(?:_[A-Z0-9]+)*$",
         )
         .expect("env secret name");
+        let quoted_env_name = regex::Regex::new(
+            r"(?i)^(?:[A-Z][A-Z0-9]*_)?(?:TOKEN|SECRET|PASSWORD)(?:_[A-Z0-9]+)*$",
+        )
+        .expect("quoted env secret name");
         let prefixed_key_name =
             regex::Regex::new(r"^[A-Z][A-Z0-9]*_KEY(?:_[A-Z0-9]+)*$").expect("prefixed key name");
         let patterns = [
@@ -252,7 +255,7 @@ fn scrub_regexes() -> &'static ScrubRegexes {
             r"pplx-[A-Za-z0-9_-]{20,}",
             r"AKIA[0-9A-Z]{16}",
             r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----",
-            r"(?i)bearer\s+[A-Za-z0-9._\-+/=]{16,}",
+            r"(?i)bearer\s+[A-Za-z0-9._\-+/=]{8,}",
             r#"(?i)"api_key"\s*:\s*"[^"]+""#,
         ]
         .into_iter()
@@ -262,6 +265,7 @@ fn scrub_regexes() -> &'static ScrubRegexes {
             assignment,
             api_key_name,
             env_name,
+            quoted_env_name,
             prefixed_key_name,
             patterns,
             mistral_context: regex::Regex::new(r"(?i)mistral|api\.mistral\.ai")
@@ -271,74 +275,82 @@ fn scrub_regexes() -> &'static ScrubRegexes {
     })
 }
 
-/// `api_key` matches in any case. `TOKEN`, `SECRET`, `PASSWORD`, and a
-/// prefixed `_KEY` match only as uppercase env names. A `:` assignment also
-/// needs a quoted or uppercase name. The value has no spaces, is at least 8
-/// characters, and does not start with `{`, `$`, `<`, or `[`.
+/// `apiKey` / `api_key` match in any case. Unquoted `TOKEN`, `SECRET`,
+/// `PASSWORD`, and a prefixed `_KEY` match only as uppercase env names.
+/// A quoted name matches those words in any case. After a name that is not
+/// a secret, scanning resumes just after its `=` or `:` so `api_key` inside
+/// a URL is still found. `==` is not an assignment.
 fn scrub_assignments(text: &str, scrubbers: &ScrubRegexes) -> String {
     let mut out = String::with_capacity(text.len());
-    let mut last = 0;
-    for caps in scrubbers.assignment.captures_iter(text) {
+    let mut copied = 0;
+    let mut search_from = 0;
+    while search_from < text.len() {
+        let Some(caps) = scrubbers.assignment.captures_at(text, search_from) else {
+            break;
+        };
+        let Some(whole) = caps.get(0) else {
+            break;
+        };
         let Some(name) = caps.name("name") else {
-            continue;
+            break;
         };
         let Some(value) = caps.name("value") else {
-            continue;
+            break;
         };
         let Some(sep) = caps.name("sep") else {
-            continue;
+            break;
         };
-        if !assignment_name_is_secret(name.as_str(), scrubbers) {
-            continue;
-        }
-        if sep.as_str() == "=" && text.as_bytes().get(sep.end()) == Some(&b'=') {
-            continue;
-        }
         let quoted = caps
             .name("quote")
             .is_some_and(|quote| !quote.as_str().is_empty());
-        let uppercase = name
-            .as_str()
-            .chars()
-            .all(|ch| ch.is_ascii_uppercase() || ch == '_');
-        if sep.as_str() == ":" && !quoted && !uppercase {
-            continue;
+        let comparison = sep.as_str() == "=" && text.as_bytes().get(sep.end()) == Some(&b'=');
+        let redact = !comparison
+            && assignment_name_is_secret(name.as_str(), quoted, scrubbers)
+            && assignment_value_is_secret(value.as_str(), name.as_str(), scrubbers);
+        if redact {
+            out.push_str(&text[copied..value.start()]);
+            out.push_str("[redacted]");
+            copied = value.end();
+            search_from = value.end();
+        } else {
+            search_from = sep.end();
         }
-        if !assignment_value_is_secret(value.as_str()) {
-            continue;
+        if search_from <= whole.start() {
+            search_from = whole.start() + 1;
         }
-        out.push_str(&text[last..value.start()]);
-        out.push_str("[redacted]");
-        last = value.end();
     }
-    out.push_str(&text[last..]);
+    out.push_str(&text[copied..]);
     out
 }
 
-fn assignment_name_is_secret(name: &str, scrubbers: &ScrubRegexes) -> bool {
+fn assignment_name_is_secret(name: &str, quoted: bool, scrubbers: &ScrubRegexes) -> bool {
     if scrubbers.api_key_name.is_match(name) {
         return true;
+    }
+    if quoted {
+        return scrubbers.quoted_env_name.is_match(name);
     }
     scrubbers.env_name.is_match(name) || scrubbers.prefixed_key_name.is_match(name)
 }
 
-fn assignment_value_is_secret(raw: &str) -> bool {
-    let inner = raw
-        .strip_prefix('"')
-        .and_then(|rest| rest.strip_suffix('"'))
-        .or_else(|| {
-            raw.strip_prefix('\'')
-                .and_then(|rest| rest.strip_suffix('\''))
-        })
-        .unwrap_or(raw);
+/// Quoted values and unquoted uppercase `*PASSWORD` / `*SECRET` / `*TOKEN` /
+/// `*API_KEY` values are secrets at 6 characters. Other unquoted values need 8.
+fn assignment_value_is_secret(raw: &str, name: &str, scrubbers: &ScrubRegexes) -> bool {
+    let quoted = (raw.starts_with('"') && raw.ends_with('"') && raw.len() >= 2)
+        || (raw.starts_with('\'') && raw.ends_with('\'') && raw.len() >= 2);
+    let inner = if quoted { &raw[1..raw.len() - 1] } else { raw };
     let mut chars = inner.chars();
     let Some(first) = chars.next() else {
         return false;
     };
-    if matches!(first, '{' | '$' | '<' | '[') {
+    if matches!(first, '{' | '$' | '<' | '[') || inner.chars().any(char::is_whitespace) {
         return false;
     }
-    inner.chars().count() >= 8 && !inner.chars().any(char::is_whitespace)
+    let uppercase_api_key = scrubbers.api_key_name.is_match(name)
+        && name.chars().all(|ch| ch.is_ascii_uppercase() || ch == '_');
+    let short_ok = quoted || scrubbers.env_name.is_match(name) || uppercase_api_key;
+    let min = if short_ok { 6 } else { 8 };
+    inner.chars().count() >= min
 }
 
 /// A bare Mistral key is 32 letters and digits with both cases, and only
@@ -1252,6 +1264,117 @@ mod tests {
     #[test]
     fn scrub_secrets_redacts_json_api_key() {
         assert_redacted(r#""X_API_KEY": "supersecret""#, "supersecret");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_camel_case_api_key() {
+        assert_redacted(r#"apiKey: "hunter2""#, "hunter2");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_quoted_password() {
+        assert_redacted(r#""password": "hunter2""#, "hunter2");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_quoted_password_in_single_quotes() {
+        assert_redacted("'password': 'hunter2'", "hunter2");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_quoted_token() {
+        assert_redacted(r#""token": "hunter2""#, "hunter2");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_quoted_secret() {
+        assert_redacted(r#""secret": "hunter2""#, "hunter2");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_quoted_client_secret() {
+        assert_redacted(r#""client_secret": "hunter2""#, "hunter2");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_exported_github_token() {
+        let value = format!("{}{}", "abcd", "efghij");
+        assert_redacted(&format!("export GITHUB_TOKEN={value}"), &value);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_aws_secret_access_key() {
+        let value = format!("{}{}", "abcd", "efghij");
+        assert_redacted(&format!("AWS_SECRET_ACCESS_KEY={value}"), &value);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_bearer_token() {
+        let token = format!("{}{}", "abcd", "wxyz");
+        assert_eq!(token.len(), 8);
+        assert_redacted(&format!("Authorization: Bearer {token}"), &token);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_slack_bot_token() {
+        let token = format!("xoxb-{}", "ab".repeat(10));
+        assert_redacted(&token, &token);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_an_aws_access_key_id() {
+        let key = format!("AKIA{}{}", "ABCD1234", "WXYZ5678");
+        assert_eq!(key.len(), 20);
+        assert_redacted(&format!("id {key}"), &key);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_pem_block() {
+        let pem = "-----BEGIN PRIVATE KEY-----\nabcd\n-----END PRIVATE KEY-----";
+        assert_redacted(pem, "abcd");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_api_key_inside_a_url() {
+        let value = format!("{}{}", "super", "secret");
+        assert_redacted(&format!("curl https://x.test/?api_key={value}"), &value);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_api_key_inside_a_url_assignment() {
+        let value = format!("{}{}", "super", "secret");
+        assert_redacted(&format!("url=https://x.test/?API_KEY={value}"), &value);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_api_key_after_another_assignment() {
+        let value = format!("{}{}", "super", "secret");
+        assert_redacted(&format!("X=1;API_KEY={value}"), &value);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_short_db_password() {
+        assert_redacted("DB_PASSWORD=hunter2", "hunter2");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_max_tokens() {
+        assert_unchanged("max_tokens: 512");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_an_equality() {
+        assert_unchanged("a == b");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_a_bare_key_assignment() {
+        assert_unchanged("KEY=1");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_password_field() {
+        assert_unchanged("passwordField: input");
     }
 
     #[test]
