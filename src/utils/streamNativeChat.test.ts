@@ -136,6 +136,37 @@ describe('native stream events', () => {
       callId: 'call_1',
     }))
   })
+
+  it('maps ApprovalRequested.call_id to prompt.callId and ignores event.id', () => {
+    const next = callbacks()
+    next.onApprovalRequested = vi.fn()
+    expect(applyNativeEvent({
+      kind: 'approval_requested',
+      prompt_id: 'prompt_2',
+      tool: 'bash',
+      args: '{"command":"ls"}',
+      id: 'not-the-call-id',
+      call_id: 'call_2',
+    }, next)).toBe(false)
+    expect(next.onApprovalRequested).toHaveBeenCalledWith(expect.objectContaining({
+      callId: 'call_2',
+    }))
+  })
+
+  it('leaves callId unset when ApprovalRequested has no call_id', () => {
+    const next = callbacks()
+    next.onApprovalRequested = vi.fn()
+    expect(applyNativeEvent({
+      kind: 'approval_requested',
+      prompt_id: 'prompt_3',
+      tool: 'bash',
+      args: '{"command":"ls"}',
+      id: 'not-the-call-id',
+    }, next)).toBe(false)
+    expect(next.onApprovalRequested).toHaveBeenCalledWith(expect.objectContaining({
+      callId: undefined,
+    }))
+  })
 })
 
 describe('native stream listen', () => {
