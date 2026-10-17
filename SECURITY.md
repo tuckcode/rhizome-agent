@@ -21,7 +21,7 @@ Use **GitHub private vulnerability reporting** for this repository:
 1. Open the repository [Security](https://github.com/tuckcode/rhizome-agent/security) tab.
 2. Choose **Report a vulnerability**.
 
-If that channel is unavailable, email rhizome-agent@proton.me. Do not open a public issue for a vulnerability.
+Do not open a public issue for a vulnerability.
 
 Include as much of the following as you can:
 
