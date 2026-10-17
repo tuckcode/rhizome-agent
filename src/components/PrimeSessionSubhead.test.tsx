@@ -206,6 +206,12 @@ describe('PrimeSessionSubhead — actions', () => {
    * moves — leaving a maximised window with no obvious place to grab it.
    * Reported from use, 2026-09-05.
    */
+  it('hides the Idle dot and session popover when asked', () => {
+    render(<PrimeSessionSubhead live={false} showSessionStatus={false} sessionTitle="Plan the launch" />)
+    expect(screen.getByTestId('prime-session-title')).toHaveTextContent('Plan the launch')
+    expect(screen.queryByTestId('prime-session-status')).toBeNull()
+  })
+
   it('does not let a drag select its text instead of moving the window', () => {
     const { container } = render(<PrimeSessionSubhead live sessionId="abc123" vaultPath="/vault" />)
 
