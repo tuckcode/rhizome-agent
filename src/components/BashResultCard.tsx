@@ -11,6 +11,7 @@ import { VisibleCommand } from './VisibleCommand'
 export interface BashResultCardProps {
   command?: string
   denied?: boolean
+  superseded?: boolean
   output?: string
   status: AiActionStatus
   expanded: boolean
@@ -50,7 +51,7 @@ function OutputBlock({
       ) : null}
       {content ? (
         <pre
-          className="max-h-48 overflow-auto whitespace-pre-wrap [overflow-wrap:anywhere] rounded-md border border-border bg-[var(--editor-code-block-background)] px-1.5 py-1 font-mono text-[11px] leading-4 text-[var(--editor-code-block-text)]"
+          className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-[var(--editor-code-block-background)] px-1.5 py-1 font-mono text-[11px] leading-4 text-[var(--editor-code-block-text)]"
           data-testid={testId}
         >
           {content}
@@ -154,9 +155,10 @@ export function BashResultCard({
   onToggle,
   output,
   status,
+  superseded,
 }: BashResultCardProps) {
   const result = parseBashToolResult(output)
-  const row = bashResultRowStatus(status, result, { denied })
+  const row = bashResultRowStatus(status, result, { denied, superseded })
   const displayCommand = command ? truncateCommand(command) : 'command'
 
   return (

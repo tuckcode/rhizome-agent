@@ -53,25 +53,30 @@ describe('native tool approval helpers', () => {
     expect(commandFromToolCallInput('{"command":"  rg foo wiki/  ","timeout_secs":30}')).toBe('  rg foo wiki/  ')
     expect(timeoutSecsFromToolArgs('{"command":"  rg foo wiki/  ","timeout_secs":30}')).toBe(30)
     expect(timeoutSecsFromToolArgs('{"command":"ls"}')).toBeUndefined()
-    expect(timeoutSecsFromToolArgs('{"command":"ls","timeout_secs":"7"}')).toBe(7)
+    expect(timeoutSecsFromToolArgs('{"command":"ls","timeout_secs":"7"}')).toBe(60)
+    expect(timeoutSecsFromToolArgs('{"command":"ls","timeout_secs":" 7 "}')).toBe(60)
     expect(timeoutSecsFromToolArgs('{"command":"ls","timeout_secs":7.5}')).toBe(60)
     expect(timeoutSecsFromToolArgs('{"command":"ls","timeout_secs":"7.5"}')).toBe(60)
+    expect(timeoutSecsFromToolArgs('{"command":"ls","timeout_secs":7.0}')).toBe(60)
+    expect(timeoutSecsFromToolArgs('{"command":"ls","timeout_secs":1e20}')).toBe(60)
+    expect(timeoutSecsFromToolArgs('{"command":"ls","timeout_secs":true}')).toBe(60)
     expect(timeoutSecsFromToolArgs('{"command":"ls","timeout_secs":0}')).toBe(60)
+    expect(timeoutSecsFromToolArgs('{"command":"ls","timeout_secs":301}')).toBe(300)
     expect(timeoutSecsFromToolArgs('{"command":"ls","timeout_secs":500}')).toBe(300)
+    expect(timeoutSecsFromToolArgs('{"command":"echo \\"timeout_secs\\": 7.0","timeout_secs":30}')).toBe(30)
   })
 
   it('uses a raw ApprovalRequested command as-is, including surrounding whitespace', () => {
-    expect(bashApprovalCommand('  ls notes  ', 'call_1')).toBe('  ls notes  ')
-    expect(bashApprovalCommand('ls', 'call_1')).toBe('ls')
+    expect(bashApprovalCommand('  ls notes  ')).toBe('  ls notes  ')
+    expect(bashApprovalCommand('ls')).toBe('ls')
     expect(bashApprovalCommand('')).toBe('')
     expect(bashApprovalCommand()).toBeUndefined()
   })
 
   it('does not JSON-parse approval.args when call_id is present', () => {
-    expect(bashApprovalCommand('{"command":"ls"}', 'call_1')).toBe('{"command":"ls"}')
+    expect(bashApprovalCommand('{"command":"ls"}')).toBe('{"command":"ls"}')
     expect(bashApprovalCommand(
       '{"command":"echo hi","x":"$(touch /tmp/pwned)"}',
-      'call_1',
     )).toBe('{"command":"echo hi","x":"$(touch /tmp/pwned)"}')
   })
 

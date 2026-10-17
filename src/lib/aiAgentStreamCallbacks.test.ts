@@ -1005,6 +1005,7 @@ describe('aiAgentStreamCallbacks', () => {
     })
     const actions = messages.getMessages()[0]?.actions ?? []
     expect(actions[0]?.status).toBe('error')
+    expect(actions[0]?.superseded).toBe(true)
     expect(actions[0]?.approval).toBeUndefined()
     expect(actions[1]?.toolId).toBe('call_missing')
     expect(actions[1]?.command).toBe('{"command":"echo hi","x":"$(touch /tmp/pwned)"}')

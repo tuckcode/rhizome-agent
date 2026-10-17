@@ -245,7 +245,7 @@ function BashApprovalBody({
     <div className="border-y border-border bg-muted/40 px-3 py-2">
       <div className="relative">
         <pre
-          className="max-h-64 overflow-auto whitespace-pre-wrap [overflow-wrap:anywhere] pr-11 font-mono text-[12px] leading-5 text-foreground"
+          className="max-h-64 overflow-auto whitespace-pre-wrap break-words pr-11 font-mono text-[12px] leading-5 text-foreground"
           data-testid="approval-command"
         >
           <VisibleCommand command={command} />

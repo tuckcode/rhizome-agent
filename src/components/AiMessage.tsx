@@ -73,6 +73,8 @@ export interface AiAction {
   command?: string
   /** Set from a deny / approval-cancelled event, not from output text. */
   denied?: boolean
+  /** Old pending row settled because a later approval.call_id did not match. */
+  superseded?: boolean
   /** Assistant text that was logged immediately before this tool round. */
   beforeText?: string
   approval?: AiActionApproval
@@ -358,7 +360,7 @@ function ActionCardRow({
         capped={action.approval.capped}
         created={action.approval.created}
         overwrite={action.approval.overwrite}
-        command={bashApprovalCommand(action.approval.args, action.approval.callId)
+        command={bashApprovalCommand(action.approval.args)
           ?? commandFromToolCallInput(action.input)}
         timeoutSecs={timeoutSecsFromToolArgs(action.input)}
         options={action.approval.options}
@@ -372,6 +374,7 @@ function ActionCardRow({
       <BashResultCard
         command={action.command ?? commandFromToolCallInput(action.input)}
         denied={action.denied}
+        superseded={action.superseded}
         output={action.output}
         status={action.status}
         expanded={expanded}

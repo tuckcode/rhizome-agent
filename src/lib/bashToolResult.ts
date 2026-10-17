@@ -36,7 +36,7 @@ export interface ParsedBashToolResult {
   stderrLinesHidden?: number
 }
 
-export type BashRowVerb = 'Running' | 'Ran' | 'Denied' | 'Failed'
+export type BashRowVerb = 'Running' | 'Ran' | 'Denied' | 'Failed' | 'Superseded'
 
 export interface BashRowStatus {
   verb: BashRowVerb
@@ -93,10 +93,11 @@ export function parseBashToolResult(output?: string): ParsedBashToolResult {
 export function bashResultRowStatus(
   actionStatus: 'pending' | 'done' | 'error',
   result: ParsedBashToolResult,
-  options?: { denied?: boolean },
+  options?: { denied?: boolean; superseded?: boolean },
 ): BashRowStatus {
   if (actionStatus === 'pending') return { verb: 'Running', verbDanger: false }
   if (options?.denied) return { verb: 'Denied', verbDanger: true }
+  if (options?.superseded) return { verb: 'Superseded', verbDanger: false }
   if (result.structured) {
     if (result.timedOut) {
       return {
@@ -143,7 +144,14 @@ export function bashResultRowStatus(
   }
 }
 
-/** Accept a JSON integer or an integer string. Floats and other invalid values fall back to 60. Values over 300 clamp to 300. */
+/**
+ * Match the runner at f413535 (`timeout_from_args`): only a JSON whole
+ * number that fits u64. Strings, floats, 0, negatives, booleans, and
+ * missing values fall back to 60. Values over 300 clamp to 300.
+ *
+ * After JSON.parse, a `7.0` literal cannot be told apart from `7`.
+ * Callers with the raw JSON text must reject frac/exp tokens first.
+ */
 export function bashTimeoutSecs(value?: unknown): number {
   const n = coerceTimeout(value)
   if (n === undefined || n <= 0) return BASH_DEFAULT_TIMEOUT_SECS
@@ -162,9 +170,9 @@ export function trimmedOutputNote(hiddenLines?: number): string {
 }
 
 export function truncateCommand(command: string, max = DEFAULT_COMMAND_MAX): string {
-  const single = command.replace(/\s+/gu, ' ').trim()
-  if (single.length <= max) return single
-  return `${single.slice(0, Math.max(0, max - 1))}…`
+  const collapsed = command.replace(/[ \n]+/gu, ' ').replace(/^ +| +$/gu, '')
+  if (collapsed.length <= max) return collapsed
+  return `${collapsed.slice(0, Math.max(0, max - 1))}…`
 }
 
 function isStructuredBashResult(record: Record<string, unknown>): boolean {
@@ -180,16 +188,8 @@ function numberOrZero(value: unknown): number | undefined {
 }
 
 function coerceTimeout(value: unknown): number | undefined {
-  if (typeof value === 'number') {
-    if (!Number.isInteger(value)) return undefined
-    return value
-  }
-  if (typeof value === 'string') {
-    const text = value.trim()
-    if (!/^[0-9]+$/u.test(text)) return undefined
-    return Number(text)
-  }
-  return undefined
+  if (typeof value !== 'number' || !Number.isSafeInteger(value)) return undefined
+  return value
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

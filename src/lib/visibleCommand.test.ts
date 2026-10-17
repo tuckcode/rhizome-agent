@@ -100,6 +100,15 @@ describe('visibleCommandParts', () => {
     ])
   })
 
+  it('badges NBSP so rm\\u00A0-rf does not look like rm -rf', () => {
+    expect(visibleCommandParts('rm\u00A0-rf')).toEqual([
+      { kind: 'text', text: 'rm' },
+      { kind: 'hidden', hex: '00A0' },
+      { kind: 'text', text: '-rf' },
+    ])
+    expect(commandHasHiddenChars('rm\u00A0-rf')).toBe(true)
+  })
+
   it('shows Hangul fillers as hex badges', () => {
     expect(visibleCommandParts('\u115F\u1160\u3164\uFFA0')).toEqual([
       { kind: 'hidden', hex: '115F' },

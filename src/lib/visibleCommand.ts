@@ -5,6 +5,7 @@ export type VisibleCommandPart =
 
 const HIDDEN_CATEGORY = /\p{Cf}|\p{Cc}|\p{Zl}|\p{Zp}/u
 const EXTRA_HIDDEN = new Set([
+  0x00A0,
   0x061C,
   0x180E,
   0x115F,

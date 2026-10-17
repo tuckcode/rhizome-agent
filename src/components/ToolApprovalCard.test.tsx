@@ -83,6 +83,22 @@ describe('ToolApprovalCard', () => {
     expect(screen.getByRole('button', { name: 'Deny' })).not.toHaveClass('bg-primary')
   })
 
+  it('gives Allow once a ring-offset against the card', () => {
+    render(
+      <ToolApprovalCard
+        tool="write_file"
+        path="a.md"
+        created
+        preview={'@@ -0,0 +1,1 @@\n+x\n'}
+        options={OPTIONS}
+        onReply={vi.fn()}
+      />,
+    )
+    const allowOnce = screen.getByTestId('approval-allow_once')
+    expect(allowOnce.className).toContain('focus-visible:ring-offset-2')
+    expect(allowOnce.className).toContain('focus-visible:ring-offset-card')
+  })
+
   it('offers Show all when the diff body overflows', () => {
     const long = ['@@ -1,20 +1,20 @@', ...Array.from({ length: 20 }, (_, i) => `+line${i}`)].join('\n')
     render(
@@ -236,7 +252,7 @@ describe('ToolApprovalCard', () => {
     expect(screen.getByRole('button', { name: 'Allow once' })).toHaveClass('bg-primary')
     expect(screen.getByRole('button', { name: 'Allow once' }).className).toContain('ring-offset-2')
     expect(screen.getByRole('button', { name: 'Allow once' }).className).toContain('ring-offset-card')
-    expect(screen.getByTestId('approval-command').className).toContain('[overflow-wrap:anywhere]')
+    expect(screen.getByTestId('approval-command')).toHaveClass('break-words')
     expect(screen.getByTestId('approval-command')).not.toHaveClass('break-all')
     expect(screen.queryByRole('button', { name: 'Allow for session' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Deny' })).toBeInTheDocument()

@@ -387,7 +387,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
           const settled = callId
             ? message.actions.map((action) => (
               action.status === 'pending' && action.tool === prompt.tool && !action.approval
-                ? { ...action, status: 'error' as const }
+                ? { ...action, status: 'error' as const, superseded: true }
                 : action
             ))
             : message.actions

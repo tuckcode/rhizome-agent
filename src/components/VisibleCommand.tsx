@@ -13,7 +13,7 @@ export function VisibleCommand({ command }: { command: string }) {
                 return (
                   <span
                     key={chunkIndex}
-                    className="inline-block max-w-full [overflow-wrap:anywhere]"
+                    className="inline-block max-w-full break-words"
                   >
                     {chunk}
                   </span>

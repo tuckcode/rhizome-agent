@@ -16,6 +16,7 @@ type ShotState =
   | 'result-ok'
   | 'result-expanded'
   | 'result-failed'
+  | 'result-superseded'
   | 'result-timed-out'
   | 'result-truncated'
   | 'result-focus'
@@ -43,6 +44,7 @@ const STATES: ShotState[] = [
   'result-ok',
   'result-expanded',
   'result-failed',
+  'result-superseded',
   'result-timed-out',
   'result-truncated',
   'result-focus',
@@ -69,6 +71,7 @@ const LABELS: Record<ShotState, string> = {
   'result-ok': 'exit 0',
   'result-expanded': 'stdout and stderr',
   'result-failed': 'failed exit',
+  'result-superseded': 'superseded',
   'result-timed-out': 'timed out',
   'result-truncated': 'trimmed output',
   'result-focus': 'row toggle focused',
@@ -104,17 +107,20 @@ function ResultShot({
   expanded,
   output,
   status,
+  superseded,
 }: {
   command: string
   expanded: boolean
   output: string
   status: 'done' | 'error'
+  superseded?: boolean
 }) {
   return (
     <BashResultCard
       command={command}
       output={output}
       status={status}
+      superseded={superseded}
       expanded={expanded}
       onToggle={() => {}}
     />
@@ -162,6 +168,17 @@ function ShotBody() {
         expanded={false}
         status="error"
         output={bashOutput({ stdout: '', stderr: 'No files found\n', exit_code: 2 })}
+      />
+    )
+  }
+  if (state === 'result-superseded') {
+    return (
+      <ResultShot
+        command="pwd"
+        expanded={false}
+        status="error"
+        superseded
+        output=""
       />
     )
   }

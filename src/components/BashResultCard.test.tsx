@@ -95,6 +95,36 @@ describe('BashResultCard', () => {
     expect(screen.getByTestId('bash-result-unknown')).toHaveTextContent('status unknown')
   })
 
+  it('labels a superseded settled row without Failed · status unknown', () => {
+    render(
+      <BashResultCard
+        command="pwd"
+        output=""
+        status="error"
+        superseded
+        expanded={false}
+        onToggle={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('bash-result-summary')).toHaveTextContent('Superseded')
+    expect(screen.getByTestId('bash-result-summary')).not.toHaveTextContent('Failed')
+    expect(screen.queryByTestId('bash-result-unknown')).not.toBeInTheDocument()
+  })
+
+  it('keeps CR on the collapsed row so ls\\r\\nrm x is not Ran ls rm x', () => {
+    render(
+      <BashResultCard
+        command={'ls\r\nrm x'}
+        output={result()}
+        status="done"
+        expanded={false}
+        onToggle={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('command-hidden')).toHaveTextContent('\\u{000D}')
+    expect(screen.getByTestId('bash-result-summary').textContent).not.toContain('Ran ls rm x')
+  })
+
   it('escapes hidden characters on the collapsed row', () => {
     render(
       <BashResultCard
@@ -135,7 +165,7 @@ describe('BashResultCard', () => {
         onToggle={onToggle}
       />,
     )
-    expect(screen.getByTestId('bash-result-stdout').className).toContain('[overflow-wrap:anywhere]')
+    expect(screen.getByTestId('bash-result-stdout')).toHaveClass('break-words')
     expect(screen.getByTestId('bash-result-stdout')).not.toHaveClass('break-all')
     expect(screen.getByTestId('bash-result-stdout')).toHaveTextContent('hello vault')
     expect(screen.getByTestId('bash-result-stdout-label')).toHaveTextContent('stdout')

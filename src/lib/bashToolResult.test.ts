@@ -64,6 +64,10 @@ describe('bashResultRowStatus', () => {
       verb: 'Denied',
       verbDanger: true,
     })
+    expect(bashResultRowStatus('error', empty, { superseded: true })).toEqual({
+      verb: 'Superseded',
+      verbDanger: false,
+    })
     expect(bashResultRowStatus('error', empty)).toMatchObject({
       verb: 'Failed',
       verbDanger: true,
@@ -124,13 +128,18 @@ describe('timeout and trim copy', () => {
     expect(bashTimeoutSecs('nope')).toBe(60)
     expect(bashTimeoutSecs(7.5)).toBe(60)
     expect(bashTimeoutSecs('7.5')).toBe(60)
-    expect(bashTimeoutSecs('7')).toBe(7)
+    expect(bashTimeoutSecs('7')).toBe(60)
     expect(bashTimeoutSecs(500)).toBe(300)
     expect(bashTimeoutLabel(0)).toBe('Stops after 60 seconds.')
-    expect(bashTimeoutLabel('7')).toBe('Stops after 7 seconds.')
+    expect(bashTimeoutLabel('7')).toBe('Stops after 60 seconds.')
     expect(bashTimeoutLabel(7.5)).toBe('Stops after 60 seconds.')
     expect(bashTimeoutLabel('7.5')).toBe('Stops after 60 seconds.')
     expect(bashTimeoutLabel(900)).toBe('Stops after 300 seconds.')
+    expect(bashTimeoutSecs(' 7 ')).toBe(60)
+    expect(bashTimeoutSecs(1e20)).toBe(60)
+    expect(bashTimeoutSecs(301)).toBe(300)
+    expect(bashTimeoutSecs(true)).toBe(60)
+    expect(bashTimeoutSecs(false)).toBe(60)
   })
 
   it('includes hidden line counts when known', () => {
@@ -147,5 +156,9 @@ describe('truncateCommand', () => {
   it('clips a long command with an ellipsis', () => {
     const long = 'a'.repeat(80)
     expect(truncateCommand(long, 12)).toBe(`${'a'.repeat(11)}…`)
+  })
+
+  it('keeps CR so ls\\r\\nrm x is not collapsed to ls rm x', () => {
+    expect(truncateCommand('ls\r\nrm x')).toBe('ls\r rm x')
   })
 })
