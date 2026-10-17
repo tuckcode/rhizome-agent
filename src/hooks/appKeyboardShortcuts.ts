@@ -40,6 +40,7 @@ export type KeyboardActions = Pick<
   | 'onToggleFavorite'
   | 'onToggleOrganized'
   | 'onOpenInNewWindow'
+  | 'onSelectFilter'
   | 'activeTabPathRef'
   | 'multiSelectionCommandRef'
 > & {

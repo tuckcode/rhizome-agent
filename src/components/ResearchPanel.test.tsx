@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ResearchPanel } from './ResearchPanel'
+import { parseLibraryScan } from './researchLibraryScan'
 import { createAiAgentAvailability, createCheckingAiAgentsStatus, createMissingAiAgentsStatus, type AiAgentsStatus } from '../lib/aiAgents'
 import { agentTargetId, modelTargetId, type AiModelProvider } from '../lib/aiTargets'
 import type { Settings } from '../types'
@@ -144,6 +145,41 @@ describe('ResearchPanel', () => {
 
     expect(onOpenNote).toHaveBeenCalledWith('sources/repos/my-repo.md')
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('shows a library row whose description and filename contain quotes, a backslash, a tab, and a newline', async () => {
+    const description = 'quote " backslash \\ tab \t newline \n'
+    const filename = 'quote " backslash \\ tab \t newline \n.md'
+    const raw = JSON.stringify([
+      {
+        id: filename,
+        path: `wiki/concepts/${filename}`,
+        title: 'Nasty note',
+        description,
+        type: 'card',
+        tag: 'Concept',
+        date: 0,
+      },
+    ])
+    expect(parseLibraryScan(raw)[0].description).toBe(description)
+
+    mockInvokeFn.mockImplementation((command: string, payload?: Record<string, unknown>) => {
+      if ((payload as { name?: string })?.name === 'rhizome_scan_library') {
+        return Promise.resolve(raw)
+      }
+      if (command === 'rhizome_read_events' || (payload as { name?: string })?.name === 'rhizome_read_events') {
+        return Promise.resolve(JSON.stringify(historyEvents))
+      }
+      return Promise.resolve('{}')
+    })
+
+    render(
+      <ResearchPanel open={true} onClose={onClose} vaultPath="/vault" onOpenNote={onOpenNote} />
+    )
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /library/i }), { button: 0, ctrlKey: false })
+
+    expect(await screen.findByText('Nasty note')).toBeInTheDocument()
+    expect(screen.getByText((_content, el) => el?.tagName === 'P' && el.textContent === description)).toBeInTheDocument()
   })
 
   it('keeps every tab enabled without the Python CLI toolkit — no availability check is made', async () => {

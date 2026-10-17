@@ -985,6 +985,34 @@ describe('StatusBar', () => {
     expect(screen.queryByTestId('status-commit-push')).not.toBeInTheDocument()
   })
 
+  it('shows the platform shortcut on the settings and zoom labels', async () => {
+    const originalUserAgent = navigator.userAgent
+    Object.defineProperty(window.navigator, 'userAgent', {
+      configurable: true,
+      value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7)',
+    })
+    try {
+      render(
+        <StatusBar
+          noteCount={100}
+          vaultPath="/Users/mock/Vault"
+          vaults={vaults}
+          onSwitchVault={vi.fn()}
+          onOpenSettings={vi.fn()}
+          zoomLevel={125}
+          onZoomReset={vi.fn()}
+        />,
+      )
+      await expectTooltip(screen.getByTestId('status-settings'), 'Open settings', '⌘,')
+      await expectTooltip(screen.getByTestId('status-zoom'), 'Reset the zoom level', '⌘0')
+    } finally {
+      Object.defineProperty(window.navigator, 'userAgent', {
+        configurable: true,
+        value: originalUserAgent,
+      })
+    }
+  })
+
   it('does not render the legacy Claude Code badge in the status bar', () => {
     render(<StatusBar noteCount={100} vaultPath="/Users/mock/Vault" vaults={vaults} onSwitchVault={vi.fn()} />)
     expect(screen.queryByTestId('status-claude-code')).not.toBeInTheDocument()

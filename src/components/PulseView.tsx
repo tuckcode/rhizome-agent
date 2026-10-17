@@ -447,9 +447,10 @@ export const PulseView = memo(function PulseView({
     setHasMore(true)
     try {
       const result = await tauriCall<PulseCommit[]>('get_vault_pulse', { vaultPath, limit: PAGE_SIZE, skip: 0 })
-      setCommits(result)
-      setHasMore(result.length >= PAGE_SIZE)
-      setSkip(result.length)
+      const page = Array.isArray(result) ? result : []
+      setCommits(page)
+      setHasMore(page.length >= PAGE_SIZE)
+      setSkip(page.length)
     } catch (err) {
       const msg = typeof err === 'string' ? err : translate(locale, 'pulse.loadError')
       setError(msg)
@@ -464,9 +465,10 @@ export const PulseView = memo(function PulseView({
     setLoadingMore(true)
     try {
       const result = await tauriCall<PulseCommit[]>('get_vault_pulse', { vaultPath, limit: PAGE_SIZE, skip })
-      setCommits((prev) => [...prev, ...result])
-      setHasMore(result.length >= PAGE_SIZE)
-      setSkip((s) => s + result.length)
+      const page = Array.isArray(result) ? result : []
+      setCommits((prev) => [...prev, ...page])
+      setHasMore(page.length >= PAGE_SIZE)
+      setSkip((s) => s + page.length)
     } catch {
       // silently fail for pagination — user can scroll up/retry
     } finally {
