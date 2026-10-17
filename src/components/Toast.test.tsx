@@ -44,7 +44,7 @@ describe('Toast', () => {
     expect(onDismiss).toHaveBeenCalledOnce()
   })
 
-  it('a toast with actions stays until one is chosen', () => {
+  it('the save-conflict toast stays until one action is chosen', () => {
     vi.useFakeTimers()
     const onDismiss = vi.fn()
     render(
@@ -55,11 +55,30 @@ describe('Toast', () => {
         secondaryActionLabel="Reload"
         onSecondaryAction={vi.fn()}
         onDismiss={onDismiss}
+        sticky
       />,
     )
     act(() => { vi.advanceTimersByTime(6000) })
     expect(onDismiss).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: 'Keep mine' })).toBeInTheDocument()
+    vi.useRealTimers()
+  })
+
+  it('a toast with an Open button dismisses after 6 seconds', () => {
+    vi.useFakeTimers()
+    const onDismiss = vi.fn()
+    render(
+      <Toast
+        message='Saved “Kernel notes” to raw/inbox'
+        actionLabel="Open"
+        onAction={vi.fn()}
+        onDismiss={onDismiss}
+      />,
+    )
+    act(() => { vi.advanceTimersByTime(5999) })
+    expect(onDismiss).not.toHaveBeenCalled()
+    act(() => { vi.advanceTimersByTime(1) })
+    expect(onDismiss).toHaveBeenCalledOnce()
     vi.useRealTimers()
   })
 

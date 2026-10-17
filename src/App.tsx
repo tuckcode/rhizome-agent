@@ -165,6 +165,7 @@ import {
 } from './utils/workspaces'
 import { notePathsMatch } from './utils/notePathIdentity'
 import { clearStashedConflict, overwriteNoteContent, subscribeSaveConflicts } from './hooks/useSaveNote'
+import { finishConflictChoice, keepMineAfterHold } from './hooks/saveConflictChoice'
 import { activeGitRepositories } from './utils/gitRepositories'
 import { isMarkdownEntry } from './utils/typeDefinitions'
 import { resolveTypeDeleteRequest, typeDeleteBlockedMessageKey } from './utils/typeDeletion'
@@ -237,6 +238,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     label: string
     onClick: () => void
     secondary?: { label: string; onClick: () => void }
+    sticky?: boolean
   } | null>(null)
   const setToastMessage = useCallback((message: string | null) => {
     setToastMessageState(message)
@@ -971,32 +973,39 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   }, [appSave.flushBeforeAction])
   const holdPendingSave = appSave.holdPendingSave
   // A save conflict moved the editor's text to a "(conflict)" copy.
-  // Keep mine writes the editor text at click time, after any autosave
-  // already in flight has finished. Reload takes the note from disk.
+  // Keep mine writes the editor text after any autosave in flight.
+  // Reload takes the note from disk only while that note is still active.
   useEffect(() => subscribeSaveConflicts((conflict) => {
     const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path
     const settle = () => {
-      clearStashedConflict(conflict.path)
-      clearVaultUnsaved(conflict.path)
-      const tab = noteTabsRef.current.find((t) => notePathsMatch(t.entry.path, conflict.path))
-      if (tab) void handleReplaceActiveTab(tab.entry)
+      finishConflictChoice({
+        activePath: notes.activeTabPathRef.current,
+        conflictPath: conflict.path,
+        clearStash: () => clearStashedConflict(conflict.path),
+        clearUnsaved: () => clearVaultUnsaved(conflict.path),
+        reloadActive: () => {
+          const tab = noteTabsRef.current.find((t) => notePathsMatch(t.entry.path, conflict.path))
+          if (tab) void handleReplaceActiveTab(tab.entry)
+        },
+      })
     }
     setToastMessage(`${fileName(conflict.path)} changed on disk. Your edits are in ${fileName(conflict.copyPath)}.`)
     setToastAction({
       label: 'Keep mine',
+      sticky: true,
       onClick: () => {
-        const live = noteTabsRef.current.find((t) => notePathsMatch(t.entry.path, conflict.path))?.content
-        const content = live ?? conflict.content
-        void holdPendingSave(conflict.path).then(
-          () => overwriteNoteContent(conflict.path, content),
-          () => overwriteNoteContent(conflict.path, content),
-        ).then(settle, (error: unknown) => {
+        void keepMineAfterHold({
+          hold: () => holdPendingSave(conflict.path),
+          readLive: () => noteTabsRef.current.find((t) => notePathsMatch(t.entry.path, conflict.path))?.content,
+          snapshot: conflict.content,
+          write: (content) => overwriteNoteContent(conflict.path, content),
+        }).then(settle, (error: unknown) => {
           setToastMessage(`Could not keep your edits: ${error instanceof Error ? error.message : String(error)}`)
         })
       },
       secondary: { label: 'Reload', onClick: settle },
     })
-  }), [clearVaultUnsaved, handleReplaceActiveTab, holdPendingSave, setToastMessage])
+  }), [clearVaultUnsaved, handleReplaceActiveTab, holdPendingSave, notes, setToastMessage])
 
   const handleChangeWorkspace = useCallback(async (entry: VaultEntry, workspace: WorkspaceIdentity) => {
     const sourceVaultPath = vaultPathForEntry(entry, resolvedPath)
@@ -2665,6 +2674,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           onAction={toastAction?.onClick}
           secondaryActionLabel={toastAction?.secondary?.label}
           onSecondaryAction={toastAction?.secondary?.onClick}
+          sticky={toastAction?.sticky}
           onDismiss={() => {
             setToastMessage(null)
             setToastAction(null)

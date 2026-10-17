@@ -10,6 +10,8 @@ interface ToastProps {
   onAction?: () => void
   secondaryActionLabel?: string
   onSecondaryAction?: () => void
+  /** Save-conflict only. Other toasts, including ones with a button, dismiss on their own. */
+  sticky?: boolean
 }
 
 function ToastAction({ label, onClick, onDismiss }: { label: string; onClick: () => void; onDismiss: () => void }) {
@@ -29,16 +31,16 @@ function ToastAction({ label, onClick, onDismiss }: { label: string; onClick: ()
   )
 }
 
-export function Toast({ message, onDismiss, actionLabel, onAction, secondaryActionLabel, onSecondaryAction }: ToastProps) {
+export function Toast({ message, onDismiss, actionLabel, onAction, secondaryActionLabel, onSecondaryAction, sticky = false }: ToastProps) {
   const hasPrimary = Boolean(actionLabel && onAction)
   const hasSecondary = Boolean(secondaryActionLabel && onSecondaryAction)
   const hasAction = hasPrimary || hasSecondary
 
   useEffect(() => {
-    if (!message || hasAction) return
-    const timer = setTimeout(onDismiss, 2000)
+    if (!message || sticky) return
+    const timer = setTimeout(onDismiss, hasAction ? 6000 : 2000)
     return () => clearTimeout(timer)
-  }, [hasAction, message, onDismiss])
+  }, [hasAction, message, onDismiss, sticky])
 
   if (!message) return null
 
