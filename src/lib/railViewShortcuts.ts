@@ -1,3 +1,4 @@
+import { platformShortcutLabel } from './platformShortcutLabel'
 import { isMac } from '../utils/platform'
 import type { AppCommandShortcutCombo } from '../hooks/appCommandCatalog'
 import { RAIL_VIEWS, type RailViewId } from './railViews'
@@ -32,7 +33,10 @@ export function viewShortcutPolicy(): ViewShortcutPolicy {
 }
 
 export function railViewShortcutDisplay(shortcutNumber: 1 | 2 | 3 | 4): string {
-  return `${viewShortcutPolicy().displayPrefix}${shortcutNumber}`
+  return platformShortcutLabel(
+    `${MAC_VIEW_SHORTCUT_POLICY.displayPrefix}${shortcutNumber}`,
+    `${OTHER_VIEW_SHORTCUT_POLICY.displayPrefix}${shortcutNumber}`,
+  )
 }
 
 export function railViewShortcutAria(shortcutNumber: 1 | 2 | 3 | 4): string {

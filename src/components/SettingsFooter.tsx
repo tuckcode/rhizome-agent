@@ -19,7 +19,7 @@ export function SettingsFooter({
       style={{ height: 56, padding: '0 24px', borderTop: '1px solid var(--border)' }}
     >
       <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
-        {getAppCommandShortcutDisplay(APP_COMMAND_IDS.appSettings)} to open settings
+        Open settings {getAppCommandShortcutDisplay(APP_COMMAND_IDS.appSettings)}
       </span>
       <div className="flex gap-2">
         <Button variant="outline" size="sm" onClick={onClose}>

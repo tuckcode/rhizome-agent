@@ -910,6 +910,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
       {
         id: '01a0252e-c4d1-7fa2-9b10-77c1de904ab3',
         path: '/mock/sessions/01a0252e-c4d1-7fa2-9b10-77c1de904ab3.jsonl',
+        title: 'Draft the release notes',
         cwd: '/private/tmp',
         mtimeMs: minutes(60 * 26),
         hasConversation: true,

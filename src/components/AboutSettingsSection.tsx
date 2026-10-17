@@ -1,9 +1,14 @@
 import { BookOpen, Megaphone } from '@phosphor-icons/react'
 import rhizomeOrganicHero from '../assets/brand/rhizome-organic-hero.png'
+import { RHIZOME_DOCS_URL } from '../constants/feedback'
 import type { createTranslator } from '../lib/i18n'
 import { rememberFeedbackDialogOpener } from '../lib/feedbackDialogOpener'
+import { openExternalUrl } from '../utils/url'
 import { Button } from './ui/button'
 import { SectionHeading, SettingsGroup, SettingsGroupItem } from './SettingsControls'
+
+const RHIZOME_LICENSE_URL = `${RHIZOME_DOCS_URL}/blob/main/LICENSE`
+const TOLARIA_SOURCE_URL = 'https://github.com/refactoringhq/tolaria'
 
 type Translate = ReturnType<typeof createTranslator>
 
@@ -77,6 +82,41 @@ export function AboutSettingsSection({
             </div>
           </SettingsGroupItem>
         ) : null}
+        <SettingsGroupItem testId="settings-about-legal">
+          <div className="space-y-1">
+            <p className="text-xs leading-5 text-muted-foreground">{t('settings.about.legalNotice')}</p>
+            <p className="text-xs leading-5 text-muted-foreground">{t('settings.about.tolariaCredit')}</p>
+            <div className="flex flex-wrap gap-x-3 gap-y-1">
+              <Button
+                type="button"
+                variant="link"
+                size="xs"
+                className="h-auto px-0 py-0 text-xs"
+                onClick={() => void openExternalUrl(RHIZOME_DOCS_URL)}
+              >
+                {t('settings.about.sourceLink')}
+              </Button>
+              <Button
+                type="button"
+                variant="link"
+                size="xs"
+                className="h-auto px-0 py-0 text-xs"
+                onClick={() => void openExternalUrl(RHIZOME_LICENSE_URL)}
+              >
+                {t('settings.about.licenseLink')}
+              </Button>
+              <Button
+                type="button"
+                variant="link"
+                size="xs"
+                className="h-auto px-0 py-0 text-xs"
+                onClick={() => void openExternalUrl(TOLARIA_SOURCE_URL)}
+              >
+                {t('settings.about.tolariaLink')}
+              </Button>
+            </div>
+          </div>
+        </SettingsGroupItem>
       </SettingsGroup>
     </>
   )
