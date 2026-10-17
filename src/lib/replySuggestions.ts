@@ -54,6 +54,12 @@ const MAX_OPTION_LENGTH = 40
 export function suggestReply(agentMessage: string): ReplySuggestion | null {
   const trimmed = agentMessage.trim()
 
+  // A consent offer split across lines or bullets is not a closed choice.
+  // The ghost grammar also rejects that shape; do not turn it into pills.
+  if (/\b(?:want me to|shall i|should i)\b/i.test(trimmed) && /[\n\r]/.test(trimmed)) {
+    return null
+  }
+
   // Closed-question pills win when both could apply. Never both.
   if (trimmed.match(/\?+!*$/)) {
     const withoutQuestion = trimmed.replace(/[?!]+$/, '').trim()

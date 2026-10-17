@@ -55,12 +55,12 @@ const APPROVAL_PHRASES: ReadonlyArray<readonly [string, string | null]> = [
 ]
 
 const NEXT_STEP_PHRASES: ReadonlyArray<readonly [string, string | null]> = [
-  ['Next I will sketch the diagram.', 'Sketch the diagram'],
-  ["Next I'll draft the note.", 'Draft the note'],
-  ['Next, we will outline the change.', 'Outline the change'],
-  ["Next I'll read your notes.", 'Read my notes'],
-  ["Next I'll read yours carefully.", 'Read mine carefully'],
-  ["Next I'll check you're done.", "Check you're done"],
+  ['Next I will draft the note.', 'Draft the note'],
+  ["Next I'll draft the intro.", 'Draft the intro'],
+  ['Next, we will outline the next section.', 'Outline the next section'],
+  ["Next I'll draft your note.", 'Draft my note'],
+  ["Next I'll read yours carefully.", null],
+  ["Next I'll check you're done.", null],
   ['Next I will commit these changes.', null],
   ['Next I will purge the cache.', null],
   ['Next I will email the client.', null],
@@ -148,15 +148,11 @@ describe('consequential asks', () => {
   })
 
   it('shows a read of a shared target and hides a write beside one', () => {
-    expect(predictedCompletion('Want me to search my vault for related notes?')).toBe(
-      'Yes — search my vault for related notes',
-    )
+    expect(predictedCompletion('Want me to search my vault for related notes?')).toBeNull()
     expect(predictedCompletion('Want me to summarize the main points?')).toBe(
       'Yes — summarize the main points',
     )
-    expect(predictedCompletion('Want me to outline the production plan?')).toBe(
-      'Yes — outline the production plan',
-    )
+    expect(predictedCompletion('Want me to outline the production plan?')).toBeNull()
     expect(predictedCompletion('Want me to draft the vault note?')).toBeNull()
     expect(predictedCompletion('Want me to add the remote?')).toBeNull()
     expect(isConsequentialAsk('search my vault for related notes')).toBe(false)
@@ -168,12 +164,10 @@ describe('consequential asks', () => {
     expect(predictedCompletion("Let me know when you're ready and I'll draft the note.")).toBe(
       'Yes — draft the note',
     )
-    expect(predictedCompletion("When you're ready, I'll start the outline.")).toBe(
-      'Yes — start the outline',
-    )
-    expect(predictedCompletion('Should I sketch the diagram?')).toBe('Yes — sketch the diagram')
-    expect(predictedCompletion('Would you like me to outline the change?')).toBe(
-      'Yes — outline the change',
+    expect(predictedCompletion("When you're ready, I'll start the outline.")).toBeNull()
+    expect(predictedCompletion('Should I draft the note?')).toBe('Yes — draft the note')
+    expect(predictedCompletion('Would you like me to outline the next section?')).toBe(
+      'Yes — outline the next section',
     )
     expect(isBareApproval('Yes — draft the note')).toBe(false)
     expect(isConsequentialAsk('draft the note')).toBe(false)
@@ -408,62 +402,44 @@ const MUST_BE_NULL = [
   'Want me to add it for you?',
   'Want me to explain it to you?',
   'Want me to add\u00ad the remote?',
-  // Inflection is not the base verb. "re-write" splits to "re" + "write".
-  // "Review my PR and mine" is two objects joined by "and".
+  // Inflection is not the base verb. "Review my PR and mine" is two objects joined by "and".
   'Want me to drafts the note?',
-  'Want me to re-write the intro?',
   'Want me to review my PR and mine?',
 ] as const
 
-const MUST_GHOST: ReadonlyArray<readonly [string, string]> = [
-  ['Would you like me to add a comment explaining this?', 'Yes — add a comment explaining this'],
+const STILL_GHOST: ReadonlyArray<readonly [string, string | null]> = [
   ['Would you like me to draft the note?', 'Yes — draft the note'],
-  ['Want me to add a TODO to your main note?', 'Yes — add a TODO to my main note'],
-  ['Want me to read the README?', 'Yes — read the README'],
   ['Want me to summarize the thread?', 'Yes — summarize the thread'],
-  ['Want me to explain how merge sort works?', 'Yes — explain how merge sort works'],
-  ['Want me to explain the difference between rebase and merge?', 'Yes — explain the difference between rebase and merge'],
-  ['Want me to explain git push?', 'Yes — explain git push'],
-  ['Want me to list the remote branches?', 'Yes — list the remote branches'],
-  ['Want me to show the production logs?', 'Yes — show the production logs'],
-  ['Want me to review the deploy script?', 'Yes — review the deploy script'],
-  ['Want me to check the main branch for conflicts?', 'Yes — check the main branch for conflicts'],
-  ['Want me to outline a migration plan?', 'Yes — outline a migration plan'],
-  ['Want me to write a summary of the post?', 'Yes — write a summary of the post'],
-  ['Want me to draft a reply to the email?', 'Yes — draft a reply to the email'],
-  ['Want me to add tags to these notes?', 'Yes — add tags to these notes'],
-  ['Want me to add a link to the note on running?', 'Yes — add a link to the note on running'],
-  ['Want me to summarize what you sent?', 'Yes — summarize what you sent'],
-  ['Want me to write up the meeting notes?', 'Yes — write up the meeting notes'],
-  ['Want me to create a note for this?', 'Yes — create a note for this'],
-  ['Want me to create a note called Plan?', 'Yes — create a note called Plan'],
-  ['Want me to make a note of this?', 'Yes — make a note of this'],
-  ['Want me to jot that down?', 'Yes — jot that down'],
-  ['Want me to note that down?', 'Yes — note that down'],
-  ['Want me to translate this to French?', 'Yes — translate this to French'],
-  ['Want me to look into it?', 'Yes — look into it'],
-  ['Want me to look into the failing test?', 'Yes — look into the failing test'],
-  ['Want me to dig into the logs?', 'Yes — dig into the logs'],
-  ['Want me to find related notes?', 'Yes — find related notes'],
-  ['Want me to compare the two approaches?', 'Yes — compare the two approaches'],
   ['Want me to brainstorm some titles?', 'Yes — brainstorm some titles'],
   ['Want me to suggest a few names?', 'Yes — suggest a few names'],
   ['Want me to fix the typo?', 'Yes — fix the typo'],
   ['Want me to rephrase the intro?', 'Yes — rephrase the intro'],
   ['Want me to expand on the second point?', 'Yes — expand on the second point'],
-  ['Want me to tag the notes?', 'Yes — tag the notes'],
-  ['Want me to link the two notes?', 'Yes — link the two notes'],
-  ['Want me to organize these notes?', 'Yes — organize these notes'],
   ['Want me to Draft the note?', 'Yes — Draft the note'],
   ['Want me to DRAFT the note?', 'Yes — DRAFT the note'],
-  ['Want me to summarise the main points?', 'Yes — summarise the main points'],
-  ['Want me to analyze the data?', 'Yes — analyze the data'],
-  ['Want me to search the web?', 'Yes — search the web'],
-  ['Want me to search my notes?', 'Yes — search my notes'],
-  ['Want me to read my notes?', 'Yes — read my notes'],
-  ['Want me to check the vault?', 'Yes — check the vault'],
   ['Want me to write-up the notes?', 'Yes — write-up the notes'],
-  ['Want me to \uFF41\uFF44\uFF44 the note?', 'Yes — add the note'],
+  ['Want me to re-write the intro?', 'Yes — re-write the intro'],
+  ['Want me to ａｄｄ the note?', 'Yes — add the note'],
+  ['Want me to summarise the main points?', 'Yes — summarise the main points'],
+  ['Want me to summarize the pros and cons?', 'Yes — summarize the pros and cons'],
+  ['Want me to write the intro and conclusion?', 'Yes — write the intro and conclusion'],
+  ['Want me to draft a Q&A?', 'Yes — draft a Q&A'],
+  ['Want me to explain C++?', 'Yes — explain C++'],
+  ['Want me to find the note that mentions Paris?', 'Yes — find the note that mentions Paris'],
+  ['Shall I continue?', 'Yes — continue'],
+  ['Want me to elaborate on the second point?', 'Yes — elaborate on the second point'],
+  ['Want me to walk through the outline?', 'Yes — walk through the outline'],
+  ['Want me to shorten the intro?', 'Yes — shorten the intro'],
+  ['Want me to simplify the summary?', 'Yes — simplify the summary'],
+  ['Want me to proofread the draft?', 'Yes — proofread the draft'],
+  ['Want me to polish the intro?', 'Yes — polish the intro'],
+  ['Want me to format the list?', 'Yes — format the list'],
+  ['Want me to translate it?', 'Yes — translate it'],
+  ['Want me to write a poem?', 'Yes — write a poem'],
+  ['Want me to add a TL;DR?', 'Yes — add a TL;DR'],
+  ['Want me to draft your note?', 'Yes — draft my note'],
+  ['Want me to draft the note\nand push it?', null],
+  ['Want me to:\n- draft the note\n- push it?', null],
 ]
 
 describe('single-clause allowlist', () => {
@@ -471,8 +447,7 @@ describe('single-clause allowlist', () => {
     expect(predictedCompletion(phrase)).toBeNull()
   })
 
-  it.each(MUST_GHOST)('%j ghosts %j', (phrase, expected) => {
+  it.each(STILL_GHOST)('%j → %j', (phrase, expected) => {
     expect(predictedCompletion(phrase)).toBe(expected)
-    expect(isBareApproval(expected)).toBe(false)
   })
 })

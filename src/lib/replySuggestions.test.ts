@@ -50,9 +50,9 @@ describe('suggestReply', () => {
      * silent — never a bare "Yes, go ahead".
      */
     it('want_me_to_names_a_safe_action_and_stays_silent_when_consequential', () => {
-      expect(suggestReply('Want me to sketch the diagram?')).toEqual({
+      expect(suggestReply('Want me to draft the note?')).toEqual({
         kind: 'completion',
-        text: 'Yes — sketch the diagram',
+        text: 'Yes — draft the note',
       })
       expect(suggestReply('Want me to run it now instead?')).toBeNull()
     })
@@ -294,15 +294,12 @@ describe('suggestReply', () => {
 
   describe('Tab completions', () => {
     it('names_a_safe_consent_and_refuses_a_bare_or_consequential_one', () => {
-      expect(suggestReply('I can sketch the diagram if you would like.')).toEqual({
+      expect(suggestReply('I can draft the note if you would like.')).toEqual({
         kind: 'completion',
-        text: 'Yes — sketch the diagram',
+        text: 'Yes — draft the note',
       })
       expect(suggestReply('Shall I start the rebuild?')).toBeNull()
-      expect(suggestReply('Shall I start the outline?')).toEqual({
-        kind: 'completion',
-        text: 'Yes — start the outline',
-      })
+      expect(suggestReply('Shall I start the outline?')).toBeNull()
       expect(suggestReply('I can run the tests if you would like.')).toBeNull()
       expect(suggestReply('Shall I proceed?')).toBeNull()
     })
@@ -312,14 +309,11 @@ describe('suggestReply', () => {
         kind: 'completion',
         text: 'Yes — draft the note',
       })
-      expect(suggestReply("I'll sketch the outline when you're ready.")).toEqual({
+      expect(suggestReply("I'll draft the outline when you're ready.")).toEqual({
         kind: 'completion',
-        text: 'Yes — sketch the outline',
+        text: 'Yes — draft the outline',
       })
-      expect(suggestReply("When you're ready, I'll start the outline.")).toEqual({
-        kind: 'completion',
-        text: 'Yes — start the outline',
-      })
+      expect(suggestReply("When you're ready, I'll start the outline.")).toBeNull()
       expect(suggestReply("Let me know when you're ready and I'll wipe the vault.")).toBeNull()
       expect(suggestReply('Let me know when you are ready.')).toBeNull()
     })
@@ -331,24 +325,26 @@ describe('suggestReply', () => {
         kind: 'completion',
         text: 'Yes — draft the note',
       })
-      expect(suggestReply('Would you like me to sketch the diagram?')).toEqual({
+      expect(suggestReply('Would you like me to draft the note?')).toEqual({
         kind: 'completion',
-        text: 'Yes — sketch the diagram',
+        text: 'Yes — draft the note',
       })
+      expect(suggestReply('Want me to draft the note\nand push it?')).toBeNull()
+      expect(suggestReply('Want me to:\n- draft the note\n- push it?')).toBeNull()
     })
 
     it('echoes_a_harmless_next_step', () => {
-      expect(suggestReply('Next I will sketch the diagram.')).toEqual({
+      expect(suggestReply('Next I will draft the note.')).toEqual({
         kind: 'completion',
-        text: 'Sketch the diagram',
+        text: 'Draft the note',
       })
     })
 
     it.each([
-      ['Next I will sketch the diagram.', 'Sketch the diagram'],
-      ["Next I'll draft the note.", 'Draft the note'],
-      ['Next, we will outline the change.', 'Outline the change'],
-      ["Next I'll read your notes.", 'Read my notes'],
+      ['Next I will draft the note.', 'Draft the note'],
+      ["Next I'll draft the intro.", 'Draft the intro'],
+      ['Next, we will outline the next section.', 'Outline the next section'],
+      ["Next I'll draft your note.", 'Draft my note'],
       ["Next I'll force-push to main.", null],
       ['Next I will run the tests.', null],
       ['The next step is to wipe the vault.', null],
