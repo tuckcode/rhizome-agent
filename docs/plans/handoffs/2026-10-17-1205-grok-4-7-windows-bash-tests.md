@@ -25,9 +25,8 @@ commits: local
   the unused `Error` import in `windows_job`. The test module's
   `AtomicBool` / `Arc` imports stay because the cancel test uses them.
 
-The edit-preview fixture compare is not in this branch. #207 keeps
-LF on the Windows checkout. Until that merges, Rust Tests (Windows)
-can still fail `review_shot_fixtures_match_unified`.
+The edit-preview fixture compare is not in this branch. #207 has
+merged. It keeps LF on the Windows checkout.
 
 Output caps, the hidden-line marker, timeouts, and approval are
 unchanged.

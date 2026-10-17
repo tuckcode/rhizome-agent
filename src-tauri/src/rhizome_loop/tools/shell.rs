@@ -1879,10 +1879,17 @@ mod tests {
         assert_eq!(value["stopped"], false, "{output}");
         assert!(value["exit_code"].is_null(), "{output}");
         let stdout = value["stdout"].as_str().unwrap();
-        assert!(stdout.contains("Reply from 127.0.0.1"), "{output}");
+        assert!(stdout.contains("127.0.0.1"), "{output}");
+        // "Ping statistics" is the English summary. The address is in
+        // that line too, so it cannot mark a finished ping.
         assert!(
             !stdout.contains("Ping statistics"),
             "ping finished instead of being killed: {output}"
+        );
+        // A child that outlived cmd would still hold the pipe.
+        assert!(
+            !value["stderr"].as_str().unwrap().contains(DETACHED_NOTE),
+            "{output}"
         );
     }
 
@@ -1931,10 +1938,14 @@ mod tests {
         assert_eq!(value["timed_out"], false, "{output}");
         assert!(value["exit_code"].is_null(), "{output}");
         let leader = value["stdout"].as_str().unwrap();
+        // "Ping statistics" is the English summary. The address is in
+        // that line too, so it cannot mark a finished ping.
         assert!(
             !leader.contains("Ping statistics"),
             "leader ping finished: {output}"
         );
+        // TerminateJobObject returns before every child has exited.
+        thread::sleep(Duration::from_millis(250));
         let child = std::fs::read_to_string(&child_path)
             .unwrap_or_else(|error| panic!("missing child ping output: {error}"));
         let replies = child.matches("reply").count();
