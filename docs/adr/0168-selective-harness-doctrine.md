@@ -12,6 +12,8 @@ supersedes the Prime-only execution lock and the ban on a Rhizome-owned
 loop. Borrow-care (no second memory authority, no blind transplant)
 still holds.
 
+**Amended 2026-10-16:** [ADR-0187](0187-native-is-the-only-chat-engine.md) supersedes the remaining "Prime is the only execution core" lock.
+
 ## Context
 
 Rhizome Agent sits next to several serious agent harnesses: Prime Agent (the
