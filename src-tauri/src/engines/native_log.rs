@@ -607,15 +607,11 @@ fn write_line_limited(
             .and_then(|_| file.sync_all()),
     };
     if let Err(error) = result {
-        if let Err(truncate_error) = file.set_len(good_len) {
-            log::warn!(
-                "native session log truncate to {good_len} bytes failed after a partial write: {truncate_error}"
-            );
+        if file.set_len(good_len).is_err() {
+            log::warn!("native session log truncate failed after a partial write");
         }
-        if let Err(seek_error) = file.seek(SeekFrom::Start(good_len)) {
-            log::warn!(
-                "native session log seek to {good_len} bytes failed after a partial write: {seek_error}"
-            );
+        if file.seek(SeekFrom::Start(good_len)).is_err() {
+            log::warn!("native session log seek failed after a partial write");
         }
         return Err(format!("flush native session line: {error}"));
     }

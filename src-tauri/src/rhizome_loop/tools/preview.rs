@@ -653,6 +653,9 @@ mod tests {
             ),
         ];
         for (name, diff, fixture) in cases {
+            // Windows checkout rewrites the fixture to CRLF. The unified
+            // diff is built with `\n`, so compare the logical text.
+            let fixture = fixture.replace("\r\n", "\n");
             assert_eq!(
                 diff.trim_end(),
                 fixture.trim_end(),

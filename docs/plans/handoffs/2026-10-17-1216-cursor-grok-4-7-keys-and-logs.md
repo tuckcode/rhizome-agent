@@ -33,3 +33,12 @@ is logged and skipped.
 
 Session search index, secret regex, `create_note`, `shell.rs`, and the
 chat engine default.
+
+## CI follow-up
+
+CodeQL `rust/cleartext-logging` flagged the new truncate and seek
+warnings, and the poisoned-mutex asserts that printed the reopened
+events. Those messages are now static. The Windows lane compared edit
+preview fixtures with CRLF after checkout. The test compares the
+logical text. The search-index "Access is denied" failure is not in
+this diff.

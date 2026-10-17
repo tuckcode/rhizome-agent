@@ -527,15 +527,13 @@ mod tests {
                     .events
                     .iter()
                     .any(|event| matches!(event, DurableEvent::User { text } if text == "hi")),
-                "logging must continue after the mutex is poisoned: {:?}",
-                opened.events
+                "logging must continue after the mutex is poisoned"
             );
             assert!(
                 opened.events.iter().any(
                     |event| matches!(event, DurableEvent::Assistant { text } if text == "hello")
                 ),
-                "the reply must be stored after the mutex is poisoned: {:?}",
-                opened.events
+                "the reply must be stored after the mutex is poisoned"
             );
         });
     }
