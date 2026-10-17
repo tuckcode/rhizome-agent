@@ -379,27 +379,41 @@ fn leader_exited_unreaped(pid: u32) -> bool {
     if pid <= 0 {
         return false;
     }
-    // macOS `waitpid` ignores `WNOWAIT` and reaps (xnu `wait4_nocancel`).
-    // `waitid` honors `WNOWAIT` on Linux and on xnu, so the zombie stays
-    // until the `wait` below. nix has no `waitid` on Apple.
-    let mut info = unsafe { std::mem::zeroed::<libc::siginfo_t>() };
-    // SAFETY: `info` is a zeroed `siginfo_t` this function owns. `P_PID`
-    // plus this pid names the leader. `WNOWAIT` reports the zombie without
-    // reaping it. `si_pid` reads the pid `waitid` stored; 0 means `WNOHANG`
-    // found no status. The later `child.wait` reaps exactly once.
-    let reported = unsafe {
-        let rc = libc::waitid(
-            libc::P_PID,
-            pid as libc::id_t,
-            &mut info,
-            libc::WEXITED | libc::WNOHANG | libc::WNOWAIT,
-        );
-        if rc != 0 {
-            return false;
+    unix_ffi::leader_exited_unreaped(pid)
+}
+
+/// libc `waitid` and the non-blocking pipe flag. Callers stay in safe code.
+/// nix has no `waitid` on Apple, and macOS `waitpid` ignores `WNOWAIT`.
+#[cfg(unix)]
+mod unix_ffi {
+    pub(super) fn set_nonblocking(pipe: &impl std::os::fd::AsFd) {
+        use nix::fcntl::{fcntl, FcntlArg, OFlag};
+        let Ok(bits) = fcntl(pipe, FcntlArg::F_GETFL) else {
+            return;
+        };
+        let flags = OFlag::from_bits_truncate(bits) | OFlag::O_NONBLOCK;
+        let _ = fcntl(pipe, FcntlArg::F_SETFL(flags));
+    }
+
+    /// True when `pid` is a zombie. Does not reap it.
+    pub(super) fn leader_exited_unreaped(pid: i32) -> bool {
+        let mut info = std::mem::MaybeUninit::<libc::siginfo_t>::zeroed();
+        // SAFETY: `info` is a zeroed `siginfo_t` this function owns. `P_PID`
+        // plus this pid names the leader. `WNOWAIT` reports the zombie
+        // without reaping it on Linux and on xnu. `si_pid` reads the pid
+        // `waitid` stored; 0 means `WNOHANG` found no status. The caller
+        // reaps exactly once later.
+        unsafe {
+            let info = info.assume_init_mut();
+            let rc = libc::waitid(
+                libc::P_PID,
+                pid as libc::id_t,
+                info,
+                libc::WEXITED | libc::WNOHANG | libc::WNOWAIT,
+            );
+            rc == 0 && info.si_pid() == pid
         }
-        info.si_pid()
-    };
-    reported == pid
+    }
 }
 
 struct PipeReader {
@@ -417,21 +431,9 @@ enum ReadPoll {
 #[cfg(unix)]
 fn spawn_reader<R>(pipe: Option<R>) -> PipeReader
 where
-    R: Read + std::os::fd::AsRawFd + Send + 'static,
+    R: Read + std::os::fd::AsFd + Send + 'static,
 {
-    spawn_reader_with(pipe, |pipe| {
-        let fd = pipe.as_raw_fd();
-        // SAFETY: `fd` is the stdout or stderr pipe this thread owns.
-        // `F_GETFL` / `F_SETFL` only change that descriptor's status flags.
-        // `O_NONBLOCK` makes `read` return `WouldBlock` while a detached
-        // child still holds the write end, so the stop flag can end the thread.
-        unsafe {
-            let flags = libc::fcntl(fd, libc::F_GETFL);
-            if flags >= 0 {
-                let _ = libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK);
-            }
-        }
-    })
+    spawn_reader_with(pipe, |pipe| unix_ffi::set_nonblocking(pipe))
 }
 
 #[cfg(windows)]
@@ -527,21 +529,14 @@ where
 {
     use std::os::windows::io::AsRawHandle;
     use windows::Win32::Foundation::HANDLE;
-    use windows::Win32::System::Pipes::PeekNamedPipe;
 
     let handle = HANDLE(pipe.as_raw_handle() as _);
-    let mut available = 0u32;
-    // SAFETY: `handle` is the read end this thread owns. PeekNamedPipe
-    // does not consume bytes. A zero count means the pipe is empty, so
-    // this thread sleeps and can observe the stop flag. Failure means
-    // the write end is gone (ERROR_BROKEN_PIPE).
-    let peeked = unsafe { PeekNamedPipe(handle, None, 0, None, Some(&mut available), None) };
-    if peeked.is_err() {
+    let Some(available) = win_ffi::bytes_available(handle) else {
         return match pipe.read(buf) {
             Ok(n) if n > 0 => ReadPoll::Data(n),
             _ => ReadPoll::Eof,
         };
-    }
+    };
     if available == 0 {
         return ReadPoll::Pending;
     }
@@ -819,14 +814,12 @@ fn pop_front_char(tail: &mut VecDeque<u8>) -> u64 {
     newlines
 }
 
+/// One safe wrapper per Win32 call the job and the pipe reader need.
 #[cfg(windows)]
-mod windows_job {
+mod win_ffi {
     use std::io::{Error, Result};
-    use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
-    use std::os::windows::process::CommandExt;
-    use std::process::{Child, Command, ExitStatus};
+    use std::os::windows::io::{FromRawHandle, OwnedHandle};
 
-    use process_wrap::std::{StdChildWrapper, StdCommandWrap, StdCommandWrapper};
     use windows::Win32::Foundation::{CloseHandle, HANDLE};
     use windows::Win32::System::Diagnostics::ToolHelp::{
         CreateToolhelp32Snapshot, Thread32First, Thread32Next, TH32CS_SNAPTHREAD, THREADENTRY32,
@@ -836,10 +829,128 @@ mod windows_job {
         SetInformationJobObject, TerminateJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
         JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
     };
+    use windows::Win32::System::Pipes::PeekNamedPipe;
     use windows::Win32::System::Threading::{
-        GetProcessId, OpenThread, ResumeThread, CREATE_NO_WINDOW, CREATE_SUSPENDED,
-        THREAD_SUSPEND_RESUME,
+        GetProcessId, OpenThread, ResumeThread, THREAD_SUSPEND_RESUME,
     };
+
+    /// Bytes waiting on a pipe read end. `None` means the write end is gone.
+    pub(super) fn bytes_available(handle: HANDLE) -> Option<u32> {
+        let mut available = 0u32;
+        // SAFETY: `handle` is the read end the caller owns. PeekNamedPipe
+        // does not consume bytes. A zero count means the pipe is empty.
+        let peeked = unsafe { PeekNamedPipe(handle, None, 0, None, Some(&mut available), None) };
+        peeked.is_ok().then_some(available)
+    }
+
+    pub(super) fn terminate_job(job: HANDLE) -> Result<()> {
+        // SAFETY: `job` is a Job Object the caller owns. TerminateJobObject
+        // ends every process in it and does not close the handle.
+        unsafe { TerminateJobObject(job, 1) }.map_err(Error::other)
+    }
+
+    pub(super) fn terminate_process(process: HANDLE) {
+        use windows::Win32::System::Threading::TerminateProcess;
+        // SAFETY: `process` is the suspended child. TerminateProcess ends it
+        // if job setup failed before the process was resumed.
+        unsafe { TerminateProcess(process, 1) }.ok();
+    }
+
+    pub(super) fn create_job() -> Result<HANDLE> {
+        // SAFETY: a null name creates a new job this process owns.
+        unsafe { CreateJobObjectW(None, None) }.map_err(Error::other)
+    }
+
+    pub(super) fn set_kill_on_close(job: HANDLE) -> Result<()> {
+        let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        // SAFETY: `job` is the object just created. `info` is a valid
+        // extended-limit struct, and the length is its size. This sets
+        // kill-on-close and does not free the handle.
+        unsafe {
+            SetInformationJobObject(
+                job,
+                JobObjectExtendedLimitInformation,
+                &info as *const _ as _,
+                std::mem::size_of_val(&info)
+                    .try_into()
+                    .expect("job info fits in u32"),
+            )
+        }
+        .map_err(Error::other)
+    }
+
+    pub(super) fn assign_process(job: HANDLE, process: HANDLE) -> Result<()> {
+        // SAFETY: `job` is the new job and `process` is the suspended child.
+        // AssignProcessToJobObject puts the child in the job.
+        unsafe { AssignProcessToJobObject(job, process) }.map_err(Error::other)
+    }
+
+    pub(super) fn close_handle(handle: HANDLE) -> Result<()> {
+        // SAFETY: `handle` is an owned kernel object the caller is releasing
+        // exactly once.
+        unsafe { CloseHandle(handle) }.map_err(Error::other)
+    }
+
+    pub(super) fn own_handle(handle: HANDLE) -> OwnedHandle {
+        // SAFETY: `handle` is an owned kernel object. `OwnedHandle` closes
+        // it exactly once on drop.
+        unsafe { OwnedHandle::from_raw_handle(handle.0 as *mut std::ffi::c_void) }
+    }
+
+    pub(super) fn process_id(process: HANDLE) -> u32 {
+        // SAFETY: `process` is the child. GetProcessId reads its pid and
+        // does not close the handle.
+        unsafe { GetProcessId(process) }
+    }
+
+    pub(super) fn thread_snapshot() -> Result<HANDLE> {
+        // SAFETY: CreateToolhelp32Snapshot returns an owned snapshot.
+        // The caller closes it.
+        unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0) }.map_err(Error::other)
+    }
+
+    /// Resume every thread of `pid` in this snapshot.
+    pub(super) fn resume_suspended(pid: u32, snapshot: HANDLE) -> Result<()> {
+        // SAFETY: `snapshot` is a thread snapshot the caller owns.
+        // Thread32First / Thread32Next walk it. OpenThread returns a handle
+        // that is closed before the next thread. ResumeThread continues a
+        // thread created with CREATE_SUSPENDED.
+        unsafe {
+            let mut entry = THREADENTRY32 {
+                dwSize: std::mem::size_of::<THREADENTRY32>() as u32,
+                ..THREADENTRY32::default()
+            };
+            let mut more = Thread32First(snapshot, &mut entry);
+            while more.is_ok() {
+                if entry.th32OwnerProcessID == pid {
+                    let thread = OpenThread(THREAD_SUSPEND_RESUME, false, entry.th32ThreadID)?;
+                    if ResumeThread(thread) == u32::MAX {
+                        let error = Error::last_os_error();
+                        CloseHandle(thread).ok();
+                        return Err(error);
+                    }
+                    CloseHandle(thread).ok();
+                }
+                more = Thread32Next(snapshot, &mut entry);
+            }
+            Ok(())
+        }
+    }
+}
+
+#[cfg(windows)]
+mod windows_job {
+    use std::io::{Error, Result};
+    use std::os::windows::io::{AsRawHandle, OwnedHandle};
+    use std::os::windows::process::CommandExt;
+    use std::process::{Child, Command, ExitStatus};
+
+    use process_wrap::std::{StdChildWrapper, StdCommandWrap, StdCommandWrapper};
+    use windows::Win32::Foundation::HANDLE;
+    use windows::Win32::System::Threading::{CREATE_NO_WINDOW, CREATE_SUSPENDED};
+
+    use super::win_ffi;
 
     #[derive(Clone, Copy, Debug)]
     pub struct KillOnCloseJob;
@@ -865,10 +976,7 @@ mod windows_job {
             };
             if let Err(error) = resume_threads(handle) {
                 let raw = sys_handle(&job);
-                // SAFETY: `raw` is the job just created, and the suspended
-                // process is assigned to it. TerminateJobObject kills that
-                // process. Dropping `job` then closes the handle.
-                unsafe { TerminateJobObject(raw, 1) }.ok();
+                win_ffi::terminate_job(raw).ok();
                 drop(job);
                 kill_suspended(inner.as_ref());
                 return Err(error);
@@ -910,11 +1018,7 @@ mod windows_job {
             inner.into_inner()
         }
         fn start_kill(&mut self) -> Result<()> {
-            let job = sys_handle(&self.job);
-            // SAFETY: `job` is the Job Object this wrapper owns.
-            // TerminateJobObject ends every process assigned to it.
-            // The handle stays open until `OwnedHandle` drops.
-            unsafe { TerminateJobObject(job, 1) }.map_err(Error::other)
+            win_ffi::terminate_job(sys_handle(&self.job))
         }
         fn try_wait(&mut self) -> Result<Option<ExitStatus>> {
             self.inner.try_wait()
@@ -928,87 +1032,26 @@ mod windows_job {
         HANDLE(job.as_raw_handle() as _)
     }
 
-    fn own_handle(handle: HANDLE) -> OwnedHandle {
-        // SAFETY: `handle` is an owned kernel object this process created
-        // or opened. `OwnedHandle` closes it exactly once on drop.
-        unsafe { OwnedHandle::from_raw_handle(handle.0 as *mut std::ffi::c_void) }
-    }
-
     fn kill_suspended(inner: &dyn StdChildWrapper) {
-        use windows::Win32::System::Threading::TerminateProcess;
         let handle = HANDLE(inner.inner().as_raw_handle() as _);
-        // SAFETY: `handle` is the suspended child process. TerminateProcess
-        // ends it if job setup failed before the process was resumed.
-        unsafe { TerminateProcess(handle, 1) }.ok();
+        win_ffi::terminate_process(handle);
     }
 
     fn make_job(process: HANDLE) -> Result<OwnedHandle> {
-        // SAFETY: CreateJobObjectW with a null name returns a new job
-        // this process owns. The handle is wrapped in `OwnedHandle` below.
-        let job = unsafe { CreateJobObjectW(None, None) }.map_err(Error::other)?;
-        let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
-        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
-        // SAFETY: `job` is the object just created. `info` is a valid
-        // extended-limit struct, and the length is its size. This sets
-        // kill-on-close and does not free the handle.
-        unsafe {
-            SetInformationJobObject(
-                job,
-                JobObjectExtendedLimitInformation,
-                &info as *const _ as _,
-                std::mem::size_of_val(&info)
-                    .try_into()
-                    .expect("job info fits in u32"),
-            )
+        let job = win_ffi::create_job()?;
+        win_ffi::set_kill_on_close(job)?;
+        if let Err(error) = win_ffi::assign_process(job, process) {
+            win_ffi::close_handle(job).ok();
+            return Err(error);
         }
-        .map_err(Error::other)?;
-        // SAFETY: `job` is that object and `process` is the suspended
-        // child. AssignProcessToJobObject puts the child in the job.
-        if let Err(error) = unsafe { AssignProcessToJobObject(job, process) } {
-            // SAFETY: assignment failed, so the job has no processes.
-            // CloseHandle releases the object we created.
-            unsafe { CloseHandle(job) }.ok();
-            return Err(Error::other(error));
-        }
-        Ok(own_handle(job))
+        Ok(win_ffi::own_handle(job))
     }
 
     fn resume_threads(child_process: HANDLE) -> Result<()> {
-        // SAFETY: `snapshot` is a thread snapshot this function owns.
-        // Thread32First / Thread32Next walk it. OpenThread returns a
-        // thread handle that is closed before the next iteration.
-        // ResumeThread continues a thread created with CREATE_SUSPENDED.
-        unsafe fn resume(pid: u32, snapshot: HANDLE) -> Result<()> {
-            let mut entry = THREADENTRY32 {
-                dwSize: std::mem::size_of::<THREADENTRY32>() as u32,
-                ..THREADENTRY32::default()
-            };
-            let mut more = Thread32First(snapshot, &mut entry);
-            while more.is_ok() {
-                if entry.th32OwnerProcessID == pid {
-                    let thread = OpenThread(THREAD_SUSPEND_RESUME, false, entry.th32ThreadID)?;
-                    if ResumeThread(thread) == u32::MAX {
-                        let error = Error::last_os_error();
-                        CloseHandle(thread).ok();
-                        return Err(error);
-                    }
-                    CloseHandle(thread).ok();
-                }
-                more = Thread32Next(snapshot, &mut entry);
-            }
-            Ok(())
-        }
-
-        // SAFETY: `child_process` is the suspended child. GetProcessId
-        // reads its pid and does not close the handle.
-        let pid = unsafe { GetProcessId(child_process) };
-        // SAFETY: CreateToolhelp32Snapshot returns an owned snapshot.
-        // It is closed after the walk.
-        let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0) }?;
-        let resumed = unsafe { resume(pid, snapshot) };
-        // SAFETY: `snapshot` is the handle just created. CloseHandle
-        // releases it exactly once.
-        unsafe { CloseHandle(snapshot) }.map_err(Error::other)?;
+        let pid = win_ffi::process_id(child_process);
+        let snapshot = win_ffi::thread_snapshot()?;
+        let resumed = win_ffi::resume_suspended(pid, snapshot);
+        win_ffi::close_handle(snapshot)?;
         resumed
     }
 }

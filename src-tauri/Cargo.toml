@@ -106,10 +106,11 @@ keyring = { version = "3.6.3", features = ["sync-secret-service", "crypto-rust"]
 # (Finder tags / quarantine on macOS). MIT OR Apache-2.0.
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
-# killpg is `signal`; wait status types used beside libc::waitid are `process`.
-# Apache-2.0 OR MIT. process-wrap already uses 0.30. Declare both features
-# here so this crate does not depend on process-wrap enabling them.
-nix = { version = "0.30", default-features = false, features = ["process", "signal"] }
+# `signal` is killpg. `process` is the wait-status types beside libc::waitid.
+# `fs` is the safe fcntl that sets O_NONBLOCK. Apache-2.0 OR MIT.
+# process-wrap already uses 0.30. Features are declared here so this crate
+# does not depend on process-wrap enabling them.
+nix = { version = "0.30", default-features = false, features = ["fs", "process", "signal"] }
 xattr = "1"
 
 [dev-dependencies]
