@@ -7,10 +7,12 @@ type Translate = ReturnType<typeof createTranslator>
 export function SettingsFooter({
   onClose,
   onSave,
+  saveDisabled = false,
   t,
 }: {
   onClose: () => void
   onSave: () => void
+  saveDisabled?: boolean
   t: Translate
 }) {
   return (
@@ -25,7 +27,7 @@ export function SettingsFooter({
         <Button variant="outline" size="sm" onClick={onClose}>
           {t('settings.cancel')}
         </Button>
-        <Button size="sm" onClick={onSave} data-testid="settings-save">
+        <Button size="sm" onClick={onSave} data-testid="settings-save" disabled={saveDisabled}>
           {t('settings.save')}
         </Button>
       </div>

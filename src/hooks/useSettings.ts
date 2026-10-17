@@ -139,7 +139,11 @@ function effectiveAccentColor(settings: Settings): string {
 }
 
 function loadErrorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
+  const text = err instanceof Error ? err.message : String(err)
+  const located = text.match(/\bline (\d+) column (\d+)/i)
+  if (located) return `parse error at line ${located[1]} column ${located[2]}`
+  if (/parse|serde|json|expected/i.test(text)) return 'parse error'
+  return 'load failed'
 }
 
 export function useSettings() {
@@ -150,6 +154,7 @@ export function useSettings() {
   const loadOkRef = useRef(false)
   const loadedRef = useRef(false)
   const loadEpoch = useRef(0)
+  const retryInFlight = useRef(false)
 
   const loadSettings = useCallback(async (): Promise<Settings | null> => {
     const epoch = ++loadEpoch.current
@@ -173,8 +178,9 @@ export function useSettings() {
       }
       return normalized
     } catch (err) {
-      console.warn('Failed to load settings:', err)
-      if (epoch === loadEpoch.current) setLoadError(loadErrorMessage(err))
+      const detail = loadErrorMessage(err)
+      console.warn('Failed to load settings:', detail)
+      if (epoch === loadEpoch.current) setLoadError(detail)
       return null
     } finally {
       loadedRef.current = true
@@ -189,8 +195,11 @@ export function useSettings() {
   useEffect(() => {
     if (typeof window === 'undefined') return
     const retryFailedLoad = () => {
-      if (loadOkRef.current || !loadedRef.current) return
-      void loadSettings()
+      if (loadOkRef.current || !loadedRef.current || retryInFlight.current) return
+      retryInFlight.current = true
+      void loadSettings().finally(() => {
+        retryInFlight.current = false
+      })
     }
     const onVisibility = () => {
       if (document.visibilityState === 'visible') retryFailedLoad()

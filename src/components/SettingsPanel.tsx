@@ -132,6 +132,8 @@ interface SettingsPanelProps {
   locale?: AppLocale
   systemLocale?: AppLocale
   onSave: (settings: Settings) => void
+  onSavePatch?: (patch: Partial<Settings>) => void
+  loadError?: string | null
   onCopyMcpConfig?: () => void
   vaults?: VaultOption[]
   activeVaultPath?: string | null
@@ -391,6 +393,29 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
   return settingsWithAllNotesFileVisibility(nextSettings, draft.allNotesFileVisibility)
 }
 
+function assignSettingsPatch<K extends keyof Settings>(patch: Partial<Settings>, key: K, value: Settings[K]) {
+  patch[key] = value
+}
+
+/** Settings keys whose draft values differ. Other keys stay on the object already in memory. */
+function settingsPatchFromDraft(
+  baseline: SettingsDraft,
+  draft: SettingsDraft,
+  settings: Settings,
+): Partial<Settings> {
+  const before = buildSettingsFromDraft(settings, baseline)
+  const after = buildSettingsFromDraft(settings, draft)
+  const patch: Partial<Settings> = {}
+  const keys = new Set<keyof Settings>([
+    ...(Object.keys(before) as Array<keyof Settings>),
+    ...(Object.keys(after) as Array<keyof Settings>),
+  ])
+  keys.forEach((key) => {
+    if (!Object.is(before[key], after[key])) assignSettingsPatch(patch, key, after[key])
+  })
+  return patch
+}
+
 function sanitizePositiveInteger(value: number | null | undefined, fallback: number): number {
   if (value === null || value === undefined || !Number.isFinite(value) || value < 1) return fallback
   return Math.round(value)
@@ -426,6 +451,8 @@ export function SettingsPanel({
   locale = 'en',
   systemLocale = locale,
   onSave,
+  onSavePatch,
+  loadError = null,
   onCopyMcpConfig,
   vaults = [],
   activeVaultPath = null,
@@ -454,6 +481,8 @@ export function SettingsPanel({
       locale={locale}
       systemLocale={systemLocale}
       onSave={onSave}
+      onSavePatch={onSavePatch}
+      loadError={loadError}
       onCopyMcpConfig={onCopyMcpConfig}
       vaults={vaults}
       activeVaultPath={activeVaultPath}
@@ -490,6 +519,8 @@ function SettingsPanelInner({
   initialSectionId,
   systemLocale,
   onSave,
+  onSavePatch,
+  loadError = null,
   onCopyMcpConfig,
   vaults,
   activeVaultPath,
@@ -505,7 +536,9 @@ function SettingsPanelInner({
   onOpenDocs,
   onClose,
 }: SettingsPanelInnerProps) {
-  const [draft, setDraft] = useState(() => createSettingsDraft(settings, explicitOrganizationEnabled, inboxAutomationEnabled))
+  const initialDraft = createSettingsDraft(settings, explicitOrganizationEnabled, inboxAutomationEnabled)
+  const [draft, setDraft] = useState(initialDraft)
+  const [baseline, setBaseline] = useState(initialDraft)
   const backdropRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const draftLocale = resolveEffectiveLocale(draft.uiLanguage, [systemLocale])
@@ -519,20 +552,31 @@ function SettingsPanelInner({
   const [adoptedSettings, setAdoptedSettings] = useState(settings)
   const [adoptedExplicitOrganization, setAdoptedExplicitOrganization] = useState(explicitOrganizationEnabled)
   const [adoptedInboxAutomation, setAdoptedInboxAutomation] = useState(inboxAutomationEnabled)
+  const [adoptedLoadError, setAdoptedLoadError] = useState(loadError)
 
   const settingsSourceChanged =
     adoptedSettings !== settings ||
     adoptedExplicitOrganization !== explicitOrganizationEnabled ||
     adoptedInboxAutomation !== inboxAutomationEnabled
+  const loadRecovered = adoptedLoadError != null && loadError == null
 
-  if (settingsSourceChanged) {
+  if (settingsSourceChanged || adoptedLoadError !== loadError) {
     setAdoptedSettings(settings)
     setAdoptedExplicitOrganization(explicitOrganizationEnabled)
     setAdoptedInboxAutomation(inboxAutomationEnabled)
-    if (!draftDirty) {
-      setDraft(createSettingsDraft(settings, explicitOrganizationEnabled, inboxAutomationEnabled))
+    setAdoptedLoadError(loadError)
+    if (!draftDirty || loadRecovered) {
+      const nextDraft = createSettingsDraft(settings, explicitOrganizationEnabled, inboxAutomationEnabled)
+      setDraft(nextDraft)
+      setBaseline(nextDraft)
+      if (loadRecovered) setDraftDirty(false)
     }
   }
+
+  const savesBlocked = loadError != null
+  const warnSavesBlocked = useCallback(() => {
+    console.warn('[settings] Did not save settings. The settings file still failed to load.')
+  }, [])
 
   useSettingsPanelAutofocus(panelRef, open)
   useSettingsPanelFocusTrap(panelRef, open)
@@ -568,60 +612,108 @@ function SettingsPanelInner({
     [],
   )
 
+  const persistPatch = useCallback((patch: Partial<Settings>) => {
+    if (savesBlocked) {
+      warnSavesBlocked()
+      return
+    }
+    if (onSavePatch) {
+      onSavePatch(patch)
+      return
+    }
+    onSave({ ...settings, ...patch })
+  }, [onSave, onSavePatch, savesBlocked, settings, warnSavesBlocked])
+
   const handleGitignoredVisibilityChange = useCallback((value: boolean) => {
+    if (savesBlocked) {
+      warnSavesBlocked()
+      return
+    }
     updateDraft('hideGitignoredFiles', value)
-    onSave({ ...settings, hide_gitignored_files: value })
-  }, [onSave, settings, updateDraft])
+    persistPatch({ hide_gitignored_files: value })
+  }, [persistPatch, savesBlocked, updateDraft, warnSavesBlocked])
 
   const handleAllNotesFileVisibilityChange = useCallback((value: AllNotesFileVisibility) => {
+    if (savesBlocked) {
+      warnSavesBlocked()
+      return
+    }
     trackAllNotesVisibilityChanged(draft.allNotesFileVisibility, value)
     updateDraft('allNotesFileVisibility', value)
-    onSave(settingsWithAllNotesFileVisibility(settings, value))
-  }, [draft.allNotesFileVisibility, onSave, settings, updateDraft])
+    const next = settingsWithAllNotesFileVisibility(settings, value)
+    persistPatch({
+      all_notes_show_pdfs: next.all_notes_show_pdfs,
+      all_notes_show_images: next.all_notes_show_images,
+      all_notes_show_unsupported: next.all_notes_show_unsupported,
+    })
+  }, [draft.allNotesFileVisibility, persistPatch, savesBlocked, settings, updateDraft, warnSavesBlocked])
 
   const handleThemeModeChange = useCallback((value: ThemeMode) => {
+    if (savesBlocked) {
+      warnSavesBlocked()
+      return
+    }
     updateDraft('themeMode', value)
     updateDraft('colorTheme', '')
     applyAppearanceSelection(value, '', draft.accentColor)
-    onSave({ ...settings, theme_mode: value, color_theme: null })
-  }, [draft.accentColor, onSave, settings, updateDraft])
+    persistPatch({ theme_mode: value, color_theme: null })
+  }, [draft.accentColor, persistPatch, savesBlocked, updateDraft, warnSavesBlocked])
 
   const handleColorThemeChange = useCallback((value: string, mode?: ThemeMode) => {
+    if (savesBlocked) {
+      warnSavesBlocked()
+      return
+    }
     const nextMode = mode ?? draft.themeMode
     const persistColor = persistableColorTheme(value, nextMode)
     if (mode) updateDraft('themeMode', mode)
     updateDraft('colorTheme', persistColor ?? '')
     applyAppearanceSelection(nextMode, persistColor ?? '', draft.accentColor)
-    onSave({
-      ...settings,
+    persistPatch({
       color_theme: persistColor,
       ...(mode ? { theme_mode: mode } : {}),
     })
-  }, [draft.accentColor, draft.themeMode, onSave, settings, updateDraft])
+  }, [draft.accentColor, draft.themeMode, persistPatch, savesBlocked, updateDraft, warnSavesBlocked])
 
   const handleAccentColorChange = useCallback((value: AccentColor) => {
+    if (savesBlocked) {
+      warnSavesBlocked()
+      return
+    }
     updateDraft('accentColor', value)
     applyAppearanceSelection(draft.themeMode, draft.colorTheme, value)
-    onSave({ ...settings, accent_color: value })
-  }, [draft.colorTheme, draft.themeMode, onSave, settings, updateDraft])
+    persistPatch({ accent_color: value })
+  }, [draft.colorTheme, draft.themeMode, persistPatch, savesBlocked, updateDraft, warnSavesBlocked])
 
   const handleAiModelProvidersChange = useCallback((value: AiModelProvider[]) => {
+    if (savesBlocked) {
+      warnSavesBlocked()
+      return
+    }
     resetListProviderModelsCache()
     updateDraft('aiModelProviders', value)
-    onSave({
-      ...settings,
+    persistPatch({
       ai_model_providers: value.length > 0 ? value : null,
     })
-  }, [onSave, settings, updateDraft])
+  }, [persistPatch, savesBlocked, updateDraft, warnSavesBlocked])
 
   const handleSave = useCallback(() => {
+    if (savesBlocked) {
+      warnSavesBlocked()
+      return
+    }
     trackTelemetryConsentChange(settings.analytics_enabled === true, draft.analytics)
     trackSettingsPreferenceChanges(settings, draft)
-    onSave(buildSettingsFromDraft(settings, draft))
+    if (onSavePatch) {
+      const patch = settingsPatchFromDraft(baseline, draft, settings)
+      if (Object.keys(patch).length > 0) onSavePatch(patch)
+    } else {
+      onSave(buildSettingsFromDraft(settings, draft))
+    }
     onSaveExplicitOrganization?.(draft.explicitOrganization)
     onSaveInboxAutomation?.(draft.inboxAutomationEnabled)
     onClose()
-  }, [draft, onClose, onSave, onSaveExplicitOrganization, onSaveInboxAutomation, settings])
+  }, [baseline, draft, onClose, onSave, onSaveExplicitOrganization, onSaveInboxAutomation, onSavePatch, savesBlocked, settings, warnSavesBlocked])
 
   useEffect(() => {
     if (!open) return
@@ -700,7 +792,7 @@ function SettingsPanelInner({
           initialSectionId={initialSectionId}
           onClose={onClose}
         />
-        <SettingsFooter onClose={onClose} onSave={handleSave} t={t} />
+        <SettingsFooter onClose={onClose} onSave={handleSave} saveDisabled={savesBlocked} t={t} />
       </div>
     </div>
   )

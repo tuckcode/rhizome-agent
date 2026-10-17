@@ -533,7 +533,7 @@ describe('useSettings', () => {
     await waitFor(() => {
       expect(result.current.loaded).toBe(true)
     })
-    expect(result.current.loadError).toBe('disk')
+    expect(result.current.loadError).toBe('load failed')
 
     await act(async () => {
       await result.current.saveSettings(declineTelemetry(result.current.settings))
@@ -579,7 +579,7 @@ describe('useSettings', () => {
     await waitFor(() => {
       expect(result.current.loaded).toBe(true)
     })
-    expect(result.current.loadError).toBe('disk')
+    expect(result.current.loadError).toBe('load failed')
 
     getSettingsFails = false
     await act(async () => {
@@ -609,7 +609,7 @@ describe('useSettings', () => {
 
     const { result } = renderHook(() => useSettings())
     await waitFor(() => {
-      expect(result.current.loadError).toBe('disk')
+      expect(result.current.loadError).toBe('load failed')
     })
 
     getSettingsFails = false
@@ -705,7 +705,7 @@ describe('useSettings', () => {
 
     const { result } = renderHook(() => useSettings())
     await waitFor(() => {
-      expect(result.current.loadError).toBe('disk')
+      expect(result.current.loadError).toBe('load failed')
     })
 
     getSettingsFails = false
@@ -758,7 +758,7 @@ describe('useSettings', () => {
 
     const { result } = renderHook(() => useSettings())
     await waitFor(() => {
-      expect(result.current.loadError).toBe('disk')
+      expect(result.current.loadError).toBe('load failed')
     })
 
     getSettingsFails = false
@@ -785,7 +785,7 @@ describe('useSettings', () => {
 
     const { result } = renderHook(() => useSettings())
     await waitFor(() => {
-      expect(result.current.loadError).toBe('disk')
+      expect(result.current.loadError).toBe('load failed')
     })
 
     getSettingsFails = false
@@ -799,6 +799,57 @@ describe('useSettings', () => {
     expect(result.current.settings.theme_mode).toBe('dark')
     expect(result.current.settings.native_chat_target).toBe('openai/gpt-4.1-mini')
     expect(saveSettingsCalls()).toHaveLength(0)
+    warnSpy.mockRestore()
+  })
+
+  it('logs a parse location without the raw settings text', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mockInvokeFn.mockImplementation((cmd: string) => {
+      if (cmd === 'get_settings') {
+        return Promise.reject(new Error('Failed to parse settings at line 4 column 8: secret "sk-live-token"'))
+      }
+      return Promise.resolve(null)
+    })
+
+    const { result } = renderHook(() => useSettings())
+    await waitFor(() => {
+      expect(result.current.loadError).toBe('parse error at line 4 column 8')
+    })
+
+    expect(warnSpy).toHaveBeenCalledWith('Failed to load settings:', 'parse error at line 4 column 8')
+    expect(warnSpy.mock.calls.flat().join(' ')).not.toContain('sk-live-token')
+    warnSpy.mockRestore()
+  })
+
+  it('reloads once when focus and visibility change together', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mockSettingsStore = savedChatTarget()
+    let reads = 0
+    mockInvokeFn.mockImplementation((cmd: string, args?: Record<string, unknown>) => {
+      if (cmd === 'get_settings') {
+        reads += 1
+        if (reads === 1) return Promise.reject(new Error('parse error at line 2 column 1'))
+        return settingsInvoke(cmd, args)
+      }
+      return settingsInvoke(cmd, args)
+    })
+
+    const { result } = renderHook(() => useSettings())
+    await waitFor(() => {
+      expect(result.current.loadError).toBe('parse error at line 2 column 1')
+    })
+    const readsAfterFailure = reads
+
+    act(() => {
+      window.dispatchEvent(new Event('focus'))
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+    await waitFor(() => {
+      expect(result.current.loadError).toBeNull()
+    })
+
+    expect(reads - readsAfterFailure).toBe(1)
+    expect(result.current.settings.theme_mode).toBe('dark')
     warnSpy.mockRestore()
   })
 })
