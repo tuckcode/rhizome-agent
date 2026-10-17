@@ -35,7 +35,9 @@ import { cn } from '@/lib/utils'
 import { composerIsMultiline } from '../lib/composerMultiline'
 import { requestMcpSetupToggle } from '../hooks/useMcpSetupDialogController'
 import { expandReplyQuotes } from '../lib/replyQuote'
+import { allowPredictedCompletion } from '../lib/consequentialAsk'
 import { suggestReply } from '../lib/replySuggestions'
+import type { AiTargetKind } from '../lib/aiTargets'
 import { latestAssistantMessageIndex } from '../lib/latestAssistantMessage'
 import { useDragRegion } from '../hooks/useDragRegion'
 import { useComposerPromptHistory } from '../hooks/useComposerPromptHistory'
@@ -130,6 +132,13 @@ interface AiPanelComposerProps {
   onCommandAction?: (action: CommandMenuAction, nextValue: string) => void
   /** The last agent message in the conversation, used to compute reply suggestions. */
   lastAgentMessage?: string | null
+  /**
+   * Chat target kind. A CLI agent (`agent`) shows no predicted completion:
+   * accepting it with Tab would send an approval the CLI may not ask again.
+   */
+  targetKind?: AiTargetKind
+  /** Power User shows no predicted completion. */
+  permissionMode?: AiAgentPermissionMode
   /** Open this chat in Mycelium. Absent until the session has a path. */
   sessionPath?: string | null
   onOpenMycelium?: (sessionPath: string) => void
@@ -1018,6 +1027,8 @@ export function AiPanelComposer({
   commandInstantLabel,
   onCommandAction,
   lastAgentMessage,
+  targetKind,
+  permissionMode,
   skillsLabel,
   skills,
   onPickSkill,
@@ -1028,11 +1039,15 @@ export function AiPanelComposer({
   const { recordSent, browse } = useComposerPromptHistory(onChange)
   const [dismissedCompletionFor, setDismissedCompletionFor] = useState<string | null>(null)
   const replySuggestion = !isActive && lastAgentMessage ? suggestReply(lastAgentMessage) : null
+  const offeredCompletion = replySuggestion?.kind === 'completion' ? replySuggestion.text : null
+  // Codex uses --ask-for-approval never in Power User (codex_cli.rs). A CLI
+  // agent, and Power User on any target, get no predicted completion.
   const completionText =
-    replySuggestion?.kind === 'completion'
+    offeredCompletion
+    && allowPredictedCompletion({ text: offeredCompletion, targetKind, permissionMode })
     && input.trim().length === 0
     && dismissedCompletionFor !== lastAgentMessage
-      ? replySuggestion.text
+      ? offeredCompletion
       : null
 
   useEffect(() => {

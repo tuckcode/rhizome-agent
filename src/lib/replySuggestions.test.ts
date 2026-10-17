@@ -45,12 +45,16 @@ describe('suggestReply', () => {
     })
 
     /**
-     * "Want me to…?" is a consent offer, not a closed choice. Pills would
-     * echo the question; Tab fills a named continuation instead of bare "yes".
+     * "Want me to…?" is a consent offer, not a closed choice. Tab names the
+     * action when that action is safe. A consequential verb ("run") stays
+     * silent — never a bare "Yes, go ahead".
      */
-    it('want_me_to_returns_named_completion', () => {
-      const result = suggestReply('Want me to run it now instead?')
-      expect(result).toEqual({ kind: 'completion', text: 'Yes, go ahead' })
+    it('want_me_to_names_a_safe_action_and_stays_silent_when_consequential', () => {
+      expect(suggestReply('Want me to sketch the diagram?')).toEqual({
+        kind: 'completion',
+        text: 'Yes — sketch the diagram',
+      })
+      expect(suggestReply('Want me to run it now instead?')).toBeNull()
     })
 
     /**
@@ -289,29 +293,57 @@ describe('suggestReply', () => {
   })
 
   describe('Tab completions', () => {
-    it('soft_consent_is_yes_go_ahead_not_bare_yes', () => {
-      expect(suggestReply('I can run the tests if you would like.')).toEqual({
+    it('names_a_safe_consent_and_refuses_a_bare_or_consequential_one', () => {
+      expect(suggestReply('I can sketch the diagram if you would like.')).toEqual({
         kind: 'completion',
-        text: 'Yes, go ahead',
+        text: 'Yes — sketch the diagram',
       })
       expect(suggestReply('Shall I start the rebuild?')).toEqual({
         kind: 'completion',
-        text: 'Yes, go ahead',
+        text: 'Yes — start the rebuild',
+      })
+      expect(suggestReply('I can run the tests if you would like.')).toBeNull()
+      expect(suggestReply('Shall I proceed?')).toBeNull()
+    })
+
+    it('ready_path_names_the_action_or_stays_silent', () => {
+      expect(suggestReply("Let me know when you're ready and I'll draft the note.")).toEqual({
+        kind: 'completion',
+        text: 'Ready — draft the note',
+      })
+      expect(suggestReply("I'll sketch the outline when you're ready.")).toEqual({
+        kind: 'completion',
+        text: 'Ready — sketch the outline',
+      })
+      expect(suggestReply("Let me know when you're ready and I'll wipe the vault.")).toBeNull()
+      expect(suggestReply('Let me know when you are ready.')).toBeNull()
+    })
+
+    it('echoes_a_harmless_next_step', () => {
+      expect(suggestReply('Next I will sketch the diagram.')).toEqual({
+        kind: 'completion',
+        text: 'Sketch the diagram',
       })
     })
 
-    it('ready_when_you_are_does_not_need_a_question_mark', () => {
-      expect(suggestReply('Let me know when you are ready.')).toEqual({
-        kind: 'completion',
-        text: 'Ready — proceed',
-      })
-    })
-
-    it('echoes_a_stated_next_step', () => {
-      expect(suggestReply('Next I will run the tests.')).toEqual({
-        kind: 'completion',
-        text: 'Run the tests',
-      })
+    it.each([
+      ['Next I will sketch the diagram.', 'Sketch the diagram'],
+      ["Next I'll draft the note.", 'Draft the note'],
+      ['Next, we will outline the change.', 'Outline the change'],
+      ['The next step is to summarize the diff.', 'Summarize the diff'],
+      ["Next I'll force-push main.", null],
+      ['Next I will run the tests.', null],
+      ['The next step is to wipe the vault.', null],
+      ['Next, I will delete the branch.', null],
+      ['The next step is to clean up the repo.', null],
+      ['Next I will ship it to prod.', null],
+      ['The next step is to rm -rf build/.', null],
+    ] as const)('next step echo %j → %j', (message, expected) => {
+      if (expected === null) {
+        expect(suggestReply(message)).toBeNull()
+        return
+      }
+      expect(suggestReply(message)).toEqual({ kind: 'completion', text: expected })
     })
 
     it('open_questions_still_return_null', () => {

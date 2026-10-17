@@ -18,6 +18,8 @@
  * reading a question the agent already asked.
  */
 
+import { predictedCompletion } from './consequentialAsk'
+
 /** One pill. */
 export interface ReplyOption {
   /**
@@ -95,41 +97,9 @@ function lastSentenceOf(text: string): string {
 }
 
 function tryExtractCompletion(text: string): ReplySuggestion | null {
-  const last = lastSentenceOf(text)
-
-  if (
-    /let me know when you(?:'re| are) ready/i.test(last)
-    || /when you(?:'re| are) ready\.?$/i.test(last)
-  ) {
-    return { kind: 'completion', text: 'Ready — proceed' }
-  }
-
-  if (
-    /\bwant me to\b/i.test(last)
-    || /\bshall i\b/i.test(last)
-    || /\bi can\b[\s\S]+\bif you(?:'d| would) like/i.test(last)
-  ) {
-    return { kind: 'completion', text: 'Yes, go ahead' }
-  }
-
-  const nextStep = last.replace(/[?!]+$/, '').trim().match(
-    /^(?:next[,:]?\s+(?:i(?:'ll| will)|we(?:'ll| will))\s+|the next step is to\s+)(.+)$/i,
-  )
-  if (nextStep) {
-    const echo = nextStep[1].replace(/[.]+$/, '').trim()
-    if (
-      echo.length >= 3
-      && echo.length <= 80
-      && !/^(what|how|why|when|where|who|which)\b/i.test(echo)
-    ) {
-      return {
-        kind: 'completion',
-        text: echo.charAt(0).toUpperCase() + echo.slice(1),
-      }
-    }
-  }
-
-  return null
+  const completion = predictedCompletion(lastSentenceOf(text))
+  if (!completion) return null
+  return { kind: 'completion', text: completion }
 }
 
 /**
