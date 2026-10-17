@@ -51,12 +51,14 @@ function createVersionInfo(version: string): UpdateVersionInfo {
   }
 }
 
-const IN_APP_UPDATES_UNAVAILABLE = "In-app updates aren't available yet."
-
 function updateCheckDetail(error: unknown): string {
   if (error instanceof Error) return error.message.trim()
   if (typeof error === 'string') return error.trim()
   return ''
+}
+
+function looksLikeTransportOrPluginFailure(detail: string): boolean {
+  return /release json|network|reqwest|timed out|os error|status code|econn|dns/i.test(detail)
 }
 
 function buildUpdateCheckErrorMessage(error: unknown): string {
@@ -66,7 +68,9 @@ function buildUpdateCheckErrorMessage(error: unknown): string {
   } else {
     console.warn('[updater] Failed to check for updates')
   }
-  if (detail === IN_APP_UPDATES_UNAVAILABLE) return detail
+  // The unavailable sentence lives in app_updater.rs. Show that text as-is.
+  // Hide transport and plugin wording.
+  if (detail && !looksLikeTransportOrPluginFailure(detail)) return detail
   return 'Could not check for updates'
 }
 

@@ -114,3 +114,6 @@ nix = { version = "0.30", default-features = false, features = ["fs", "process",
 xattr = "1"
 
 [dev-dependencies]
+# Unlocks `tauri::test` for the updater placeholder-config test. The feature
+# itself is empty; it only compiles the mock runtime.
+tauri = { version = "2.10.0", features = ["test"] }

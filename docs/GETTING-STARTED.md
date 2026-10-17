@@ -73,7 +73,7 @@ Release validation verifies that the Linux job produced an AppImage and at least
 
 The app checks for updates on startup, and from the existing Check for updates control. Alpha reads `https://github.com/tuckcode/rhizome-agent/releases/download/alpha-latest/alpha-latest.json`. Stable reads the same kind of URL on the `stable-latest` tag. Those tags are prereleases on purpose: GitHub's `releases/latest/download` URL does not serve alpha releases. Update now downloads and installs through the Tauri updater. Restart uses the existing Restart control. While `plugins.updater.pubkey` is still `PLACEHOLDER_KNISPO_TAURI_UPDATER_PUBKEY`, check and install stop before any network call and say that in-app updates are not available yet.
 
-`plugins.updater.endpoints` stays in `src-tauri/tauri.conf.json` even though Rust always passes the channel URL at runtime. Tauri ignores a runtime endpoint list when the config list is empty, so the app would never request the feed. The checked-in URL is the alpha feed. Rust replaces it with the stable feed unless the release channel is alpha.
+Rust always passes the channel URL. The `plugins.updater.endpoints` entry in `src-tauri/tauri.conf.json` stays as an unused fallback. In tauri-plugin-updater 2.10.0, `UpdaterBuilder::endpoints` replaces that list. `build()` uses the config list only when no runtime list was given, and it errors only when both are empty. The checked-in URL is the alpha feed. Rust passes the stable feed unless the release channel is alpha.
 
 Generate the minisign key outside this repo:
 

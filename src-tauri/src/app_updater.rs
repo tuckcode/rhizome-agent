@@ -3,6 +3,9 @@ use serde::Serialize;
 use tauri::{ipc::Channel, AppHandle, Runtime};
 use tauri_plugin_updater::UpdaterExt;
 
+#[cfg(test)]
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 /// Moving alpha manifest. Alpha GitHub Releases are prereleases, so
 /// `releases/latest/download` does not serve them. The release workflow
 /// republishes `alpha-latest.json` onto the `alpha-latest` tag.
@@ -57,9 +60,11 @@ pub fn endpoint_for_release_channel(release_channel: Option<&str>) -> &'static s
 /// Shown for check and install while `plugins.updater.pubkey` is still the placeholder.
 pub const IN_APP_UPDATES_UNAVAILABLE: &str = "In-app updates aren't available yet.";
 
-/// Stop before any feed request. A placeholder key cannot verify a download.
+/// Stop before any feed request. A placeholder, empty, or whitespace-only
+/// key cannot verify a download.
 pub fn refuse_placeholder_pubkey(pubkey: &str) -> Result<(), String> {
-    if pubkey == UPDATER_PUBKEY_PLACEHOLDER {
+    let trimmed = pubkey.trim();
+    if trimmed.is_empty() || trimmed == UPDATER_PUBKEY_PLACEHOLDER {
         Err(IN_APP_UPDATES_UNAVAILABLE.into())
     } else {
         Ok(())
@@ -69,13 +74,13 @@ pub fn refuse_placeholder_pubkey(pubkey: &str) -> Result<(), String> {
 /// Read the feed ourselves. The updater plugin reports every failed status as
 /// `ReleaseNotFound`, which would look like "up to date".
 ///
-/// `Ok(None)` is only HTTP 404. 403, 429, and 5xx are errors. A 2xx body that
-/// is not a JSON object is an error.
+/// `Ok(None)` is HTTP 404 or 204. 204 matches the plugin's no-update status.
+/// 403, 429, and 5xx are errors. A 2xx body that is not a JSON object is an error.
 pub fn interpret_feed_response(
     status: u16,
     body: &str,
 ) -> Result<Option<serde_json::Value>, String> {
-    if status == 404 {
+    if status == 404 || status == 204 {
         return Ok(None);
     }
     if !(200..300).contains(&status) {
@@ -113,7 +118,13 @@ fn configured_updater_pubkey<R: Runtime>(app_handle: &AppHandle<R>) -> String {
         .to_string()
 }
 
+#[cfg(test)]
+static FEED_FETCHES: AtomicUsize = AtomicUsize::new(0);
+
 fn fetch_feed(endpoint: &str) -> Result<Option<serde_json::Value>, String> {
+    #[cfg(test)]
+    FEED_FETCHES.fetch_add(1, Ordering::SeqCst);
+
     let response = reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(20))
         .build()
@@ -236,11 +247,13 @@ pub async fn download_and_install_app_update<R: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::{
-        endpoint_for_release_channel, ensure_expected_version, interpret_feed_response,
-        refuse_placeholder_pubkey, AppUpdateDownloadEvent, AppUpdateMetadata, ALPHA_UPDATE_FEED,
-        IN_APP_UPDATES_UNAVAILABLE, STABLE_UPDATE_FEED, UPDATER_PUBKEY_PLACEHOLDER,
+        endpoint_for_release_channel, ensure_expected_version, find_update,
+        interpret_feed_response, refuse_placeholder_pubkey, AppUpdateDownloadEvent,
+        AppUpdateMetadata, ALPHA_UPDATE_FEED, FEED_FETCHES, IN_APP_UPDATES_UNAVAILABLE,
+        STABLE_UPDATE_FEED, UPDATER_PUBKEY_PLACEHOLDER,
     };
     use serde_json::json;
+    use std::sync::atomic::Ordering;
 
     #[test]
     fn alpha_channel_uses_the_moving_alpha_tag() {
@@ -271,17 +284,54 @@ mod tests {
     }
 
     #[test]
-    fn find_update_stops_before_the_network_when_the_pubkey_is_a_placeholder() {
-        assert_eq!(
-            refuse_placeholder_pubkey(UPDATER_PUBKEY_PLACEHOLDER).unwrap_err(),
-            IN_APP_UPDATES_UNAVAILABLE
-        );
+    fn empty_and_whitespace_pubkeys_match_the_placeholder() {
+        for pubkey in [
+            UPDATER_PUBKEY_PLACEHOLDER,
+            "",
+            "   ",
+            "\n\t",
+            "  PLACEHOLDER_KNISPO_TAURI_UPDATER_PUBKEY  ",
+        ] {
+            assert_eq!(
+                refuse_placeholder_pubkey(pubkey).unwrap_err(),
+                IN_APP_UPDATES_UNAVAILABLE,
+                "pubkey {pubkey:?} must refuse before a request"
+            );
+        }
         assert!(refuse_placeholder_pubkey("dW50cnVzdGVkIGNvbW1lbnQ").is_ok());
     }
 
+    #[tokio::test]
+    async fn find_update_refuses_a_placeholder_config_before_any_request() {
+        FEED_FETCHES.store(0, Ordering::SeqCst);
+        let app = tauri::test::mock_builder()
+            .build(tauri::generate_context!(
+                "fixtures/tauri.conf.json",
+                test = true
+            ))
+            .expect("updater placeholder app");
+        let pubkey = app
+            .config()
+            .plugins
+            .0
+            .get("updater")
+            .and_then(|value| value.get("pubkey"))
+            .and_then(|value| value.as_str())
+            .unwrap_or("");
+        assert_eq!(pubkey, UPDATER_PUBKEY_PLACEHOLDER);
+
+        let error = match find_update(app.handle(), Some("stable")).await {
+            Err(error) => error,
+            Ok(_) => panic!("placeholder config must not check the feed"),
+        };
+        assert_eq!(error, IN_APP_UPDATES_UNAVAILABLE);
+        assert_eq!(FEED_FETCHES.load(Ordering::SeqCst), 0);
+    }
+
     #[test]
-    fn find_update_treats_only_404_as_no_update() {
+    fn find_update_treats_only_404_and_204_as_no_update() {
         assert!(interpret_feed_response(404, "missing").unwrap().is_none());
+        assert!(interpret_feed_response(204, "").unwrap().is_none());
         for status in [403, 429, 500, 502] {
             assert!(
                 interpret_feed_response(status, "nope").is_err(),
