@@ -195,6 +195,38 @@ export function Shot() {
     })
   }, [])
 
+  useEffect(() => {
+    if (state !== 'topbar-loading') return
+    const placeholder = document.querySelector<HTMLElement>('[data-testid="topbar-before"] [data-chat-top-bar="placeholder"]')
+    const ready = document.querySelector<HTMLElement>('[data-testid="topbar-after"] [data-chat-top-bar="ready"]')
+    const narrow = document.querySelector<HTMLElement>('[data-testid="topbar-narrow"] [data-chat-top-bar="ready"]')
+    const placeholderHeight = placeholder?.getBoundingClientRect().height ?? Number.NaN
+    const readyHeight = ready?.getBoundingClientRect().height ?? Number.NaN
+    const narrowHeight = narrow?.getBoundingClientRect().height ?? Number.NaN
+    console.log(`placeholder height: ${placeholderHeight}`)
+    console.log(`ready height: ${readyHeight}`)
+    console.log(`narrow height: ${narrowHeight}`)
+    if (Math.abs(placeholderHeight - readyHeight) > 0.5) {
+      throw new Error(`top bar heights differ: placeholder ${placeholderHeight} vs ready ${readyHeight}`)
+    }
+    if (Math.abs(readyHeight - narrowHeight) > 0.5) {
+      throw new Error(`narrow top bar height differs: ${narrowHeight} vs ready ${readyHeight}`)
+    }
+    if (ready && ready.scrollHeight > ready.clientHeight + 0.5) {
+      throw new Error(`ready bar clipped: scroll ${ready.scrollHeight} client ${ready.clientHeight}`)
+    }
+    if (narrow && narrow.scrollHeight > narrow.clientHeight + 0.5) {
+      throw new Error(`narrow bar clipped: scroll ${narrow.scrollHeight} client ${narrow.clientHeight}`)
+    }
+    const root = document.querySelector('[data-testid="audit-chat-shot"]')
+    root?.setAttribute('data-placeholder-height', String(placeholderHeight))
+    root?.setAttribute('data-ready-height', String(readyHeight))
+    const caption = document.querySelector('[data-testid="topbar-height-caption"]')
+    if (caption) {
+      caption.textContent = `Same height · ${placeholderHeight.toFixed(1)}px / ${readyHeight.toFixed(1)}px`
+    }
+  }, [])
+
   const nativeBar = (
     <PrimeSessionSubhead
       live={false}
@@ -361,9 +393,10 @@ export function Shot() {
   }
 
   if (state === 'topbar-loading') {
-    const pane = (label: string, bar: ReactNode, caption: string) => (
+    const pane = (label: string, bar: ReactNode, caption: string, testId: string, captionTestId?: string) => (
       <div
         className="overflow-hidden rounded-xl border border-border shadow-sm"
+        data-testid={testId}
         style={{ background: 'var(--surface-app)' }}
       >
         {bar}
@@ -373,7 +406,10 @@ export function Shot() {
             {' · '}
             {label}
           </p>
-          <div className="flex h-36 items-center justify-center text-[13px] text-muted-foreground">
+          <div
+            className="flex h-36 items-center justify-center text-[13px] text-muted-foreground"
+            data-testid={captionTestId}
+          >
             {caption}
           </div>
         </div>
@@ -385,12 +421,25 @@ export function Shot() {
           data-testid="audit-chat-shot"
           data-theme={theme}
           data-state={state}
-          className="flex min-h-screen items-start justify-center p-8"
+          className="relative flex min-h-screen items-start justify-center p-8"
           style={{ background: 'var(--surface-app)' }}
         >
-          <div className="flex w-[720px] flex-col gap-6">
-            {pane('Before settle', loadingBar, 'Settings still loading · New chat hidden')}
-            {pane('After settle', nativeBar, 'Same height · New chat available')}
+          <div
+            className="pointer-events-none absolute left-[-999px] w-[280px]"
+            data-testid="topbar-narrow"
+            aria-hidden="true"
+          >
+            <PrimeSessionSubhead
+              live={false}
+              showSessionStatus={false}
+              sessionTitle={LONG_HEADER_TITLE}
+              onNewChat={() => {}}
+              onOpenCommandPalette={() => {}}
+            />
+          </div>
+          <div className="flex w-[720px] flex-col gap-6" data-testid="topbar-frames">
+            {pane('Before settle', loadingBar, 'Settings still loading · New chat hidden', 'topbar-before')}
+            {pane('After settle', nativeBar, 'Same height · measuring', 'topbar-after', 'topbar-height-caption')}
           </div>
         </div>
       </TooltipProvider>

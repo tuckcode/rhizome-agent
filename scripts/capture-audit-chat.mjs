@@ -56,8 +56,18 @@ for (const [theme, state] of shots) {
     await page.waitForTimeout(200)
   }
   await page.waitForTimeout(200)
+  if (state === 'topbar-loading') {
+    await page.locator('[data-placeholder-height]').waitFor()
+    const heights = await page.locator('[data-testid="audit-chat-shot"]').evaluate((root) => ({
+      placeholder: root.getAttribute('data-placeholder-height'),
+      ready: root.getAttribute('data-ready-height'),
+    }))
+    console.log(`${theme} topbar-loading heights`, heights)
+  }
   const file = path.join(outDir, `${theme}-${state}.png`)
-  const frame = page.locator('[data-testid="audit-chat-shot"] > div')
+  const frame = state === 'topbar-loading'
+    ? page.locator('[data-testid="topbar-frames"]')
+    : page.locator('[data-testid="audit-chat-shot"] > div')
   await frame.screenshot({ path: file })
   console.log(file)
 }

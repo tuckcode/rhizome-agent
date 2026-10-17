@@ -15,8 +15,13 @@ import {
   tildeVaultPath,
 } from '../lib/primeSubheadLabels'
 
+// New chat / Command Palette are h-[32px]. Band padding is pb-1.5 (6px at
+// a 16px rem, 5.25px at this app's 14px root). The title band paints a 1px
+// bottom border. box-border height = 32 + 6 + 1 so the buttons still fit
+// when rem is 16px, and have slack at 14px. Both the placeholder and the
+// real strip use this class, so they match by definition.
 export const CHAT_TOP_BAR_BAND_CLASS = [
-  'app-titlebar-band flex min-h-[30px] shrink-0 items-center gap-2.5 pb-1.5 pr-3',
+  'app-titlebar-band box-border flex h-[39px] min-h-[39px] shrink-0 items-center gap-2.5 pb-1.5 pr-3',
   'select-none',
   'pl-[var(--subhead-traffic-light-inset,0.75rem)]',
 ].join(' ')

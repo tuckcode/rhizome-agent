@@ -93,6 +93,7 @@ vi.mock('../hooks/usePrimeActiveSessionTitle', () => ({
 }))
 
 import ChatHome from './ChatHome'
+import { CHAT_TOP_BAR_BAND_CLASS } from './PrimeSessionSubhead'
 import { loadChatNoteContent } from '../utils/loadChatNoteContent'
 
 function livePrimeHost() {
@@ -176,6 +177,8 @@ describe('ChatHome', () => {
   })
 
   it('reserves the Chat top bar height before the engine settles', () => {
+    expect(CHAT_TOP_BAR_BAND_CLASS).toContain('h-[39px]')
+    expect(CHAT_TOP_BAR_BAND_CLASS).toContain('box-border')
     const props = {
       locale: 'en' as const,
       defaultAiAgent: 'prime' as const,
@@ -192,7 +195,7 @@ describe('ChatHome', () => {
     expect(placeholder).toHaveAttribute('data-chat-top-bar', 'placeholder')
     expect(placeholder).toHaveAttribute('aria-hidden', 'true')
     expect(placeholder).toHaveAttribute('data-sheet-offset-band', 'content')
-    expect(placeholder).toHaveClass('app-titlebar-band', 'min-h-[30px]')
+    expect(placeholder).toHaveClass('app-titlebar-band', 'box-border', 'h-[39px]')
     expect(placeholder.querySelector('button')).toBeNull()
     expect(screen.queryByRole('button', { name: 'New chat' })).toBeNull()
 
@@ -200,7 +203,7 @@ describe('ChatHome', () => {
     const ready = screen.getByTestId('prime-session-subhead')
     expect(ready).toHaveAttribute('data-chat-top-bar', 'ready')
     expect(ready).toHaveAttribute('data-sheet-offset-band', 'content')
-    expect(ready).toHaveClass('app-titlebar-band', 'min-h-[30px]')
+    expect(ready).toHaveClass('app-titlebar-band', 'box-border', 'h-[39px]')
     expect(screen.queryByTestId('chat-top-bar')).toBeNull()
     expect(screen.getByRole('button', { name: 'New chat' })).toBeTruthy()
   })
@@ -617,6 +620,7 @@ describe('ChatHome composer wiring', () => {
     expect(chatHomeSource).toContain(
       'const showChatTopBarPlaceholder = !engineChromeReady && showChatTopBarSlot',
     )
+    expect(chatHomeSource).toContain('onMouseDown={onDragRegionMouseDown}')
     expect(chatHomeSource).toContain('onSessionHeader={handleSessionHeader}')
     expect(chatHomeSource).toContain('forkTargetsPrimeEntry={panelEngine === \'prime\'}')
   })

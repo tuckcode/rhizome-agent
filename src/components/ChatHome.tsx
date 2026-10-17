@@ -3,6 +3,7 @@ import { AiPanel } from './AiPanel'
 import { CHAT_TOP_BAR_BAND_CLASS, PrimeSessionSubhead } from './PrimeSessionSubhead'
 import { overlayTitleBarBandStyle } from '../utils/trafficLights'
 import { SHEET_OFFSET_BAND_ATTR } from '../hooks/useNotesSheetOffset'
+import { useDragRegion } from '../hooks/useDragRegion'
 import { AgentActivityBand } from './AgentActivityBand'
 import { RlmFamilyBand } from './RlmFamilyBand'
 import { ChatComposerDeck } from './ChatComposerDeck'
@@ -196,6 +197,7 @@ export default function ChatHome({
     sessionTitleRefreshKey(primeHost?.isStreaming, sessionPath),
   )
   const sessionTitle = listedTitle ?? sessionMeta.title
+  const { onMouseDown: onDragRegionMouseDown } = useDragRegion<HTMLDivElement>()
   const newChatRef = useRef<(() => void) | null>(null)
   const [openNote, setOpenNote] = useState<{ path: string; label: string } | null>(null)
   // One read of the open note, shared by the pane and the agent. Chat used to
@@ -243,6 +245,7 @@ export default function ChatHome({
           data-testid="chat-top-bar"
           {...{ [SHEET_OFFSET_BAND_ATTR]: 'content' }}
           style={overlayTitleBarBandStyle(railLayoutWidth)}
+          onMouseDown={onDragRegionMouseDown}
         >
           <span className="h-[13px] w-24 max-w-[40%] rounded-sm bg-muted-foreground/20" />
         </div>
