@@ -12,7 +12,7 @@ const mockFolders: FolderNode[] = [
     name: 'projects',
     path: 'projects',
     children: [
-      { name: 'laputa', path: 'projects/laputa', children: [] },
+      { name: 'alpha', path: 'projects/alpha', children: [] },
       { name: 'portfolio', path: 'projects/portfolio', children: [] },
     ],
   },
@@ -21,7 +21,7 @@ const mockFolders: FolderNode[] = [
 ]
 
 const defaultSelection: SidebarSelection = { kind: 'filter', filter: 'all' }
-const vaultRootPath = '/Users/luca/Laputa'
+const vaultRootPath = '/Users/mock/Vault'
 
 function renderTree(props: Partial<ComponentProps<typeof FolderTree>> = {}) {
   const onSelect = props.onSelect ?? vi.fn()
@@ -75,8 +75,8 @@ describe('FolderTree', () => {
       />,
     )
 
-    expect(screen.getByText('Laputa')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Laputa' })).toBeInTheDocument()
+    expect(screen.getByText('Vault')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Vault' })).toBeInTheDocument()
     expect(screen.getByText('projects')).toBeInTheDocument()
     expect(screen.getByText('areas')).toBeInTheDocument()
     expect(screen.getByText('journal')).toBeInTheDocument()
@@ -92,7 +92,7 @@ describe('FolderTree', () => {
       />,
     )
 
-    expect(screen.getByText('Laputa')).toBeInTheDocument()
+    expect(screen.getByText('Vault')).toBeInTheDocument()
   })
 
   it('renders one scoped root per mounted workspace and selects folders inside that root', () => {
@@ -162,12 +162,12 @@ describe('FolderTree', () => {
   it('expands children when clicking a folder row', () => {
     vi.useFakeTimers()
     render(<FolderTree folders={mockFolders} selection={defaultSelection} onSelect={vi.fn()} />)
-    expect(screen.queryByText('laputa')).not.toBeInTheDocument()
+    expect(screen.queryByText('alpha')).not.toBeInTheDocument()
     fireEvent.click(screen.getByTestId('folder-row:projects'))
     act(() => {
       vi.advanceTimersByTime(FOLDER_ROW_SINGLE_CLICK_DELAY_MS)
     })
-    expect(screen.getByText('laputa')).toBeInTheDocument()
+    expect(screen.getByText('alpha')).toBeInTheDocument()
     expect(screen.getByText('portfolio')).toBeInTheDocument()
     vi.useRealTimers()
   })
@@ -208,7 +208,7 @@ describe('FolderTree', () => {
       vi.advanceTimersByTime(FOLDER_ROW_SINGLE_CLICK_DELAY_MS)
     })
 
-    expect(screen.getByText('laputa')).toBeInTheDocument()
+    expect(screen.getByText('alpha')).toBeInTheDocument()
     expect(screen.getByText('portfolio')).toBeInTheDocument()
 
     fireEvent.click(screen.getByTestId('folder-row:projects'))
@@ -216,7 +216,7 @@ describe('FolderTree', () => {
       vi.advanceTimersByTime(FOLDER_ROW_SINGLE_CLICK_DELAY_MS)
     })
 
-    expect(screen.queryByText('laputa')).not.toBeInTheDocument()
+    expect(screen.queryByText('alpha')).not.toBeInTheDocument()
     vi.useRealTimers()
   })
 
@@ -254,10 +254,10 @@ describe('FolderTree', () => {
       vaultRootPath,
     })
 
-    await submitNewFolder('laputa')
+    await submitNewFolder('alpha')
 
     await vi.waitFor(() => {
-      expect(onCreateFolder).toHaveBeenCalledWith('laputa', {
+      expect(onCreateFolder).toHaveBeenCalledWith('alpha', {
         path: 'projects',
         rootPath: vaultRootPath,
       })
@@ -325,7 +325,7 @@ describe('FolderTree', () => {
     // itself, so 'projects' starts collapsed.
     expect(screen.getByRole('button', { name: 'projects' })).toHaveAttribute('aria-expanded', 'false')
 
-    await submitNewFolder('laputa')
+    await submitNewFolder('alpha')
 
     await vi.waitFor(() => {
       expect(onCreateFolder).toHaveBeenCalled()
@@ -346,7 +346,7 @@ describe('FolderTree', () => {
       />,
     )
 
-    await submitNewFolder('laputa')
+    await submitNewFolder('alpha')
 
     await vi.waitFor(() => {
       expect(onCreateFolder).toHaveBeenCalled()
@@ -456,13 +456,13 @@ describe('FolderTree', () => {
       />,
     )
 
-    const wasExpanded = screen.queryByText('laputa') !== null
+    const wasExpanded = screen.queryByText('alpha') !== null
     fireEvent.click(screen.getByTestId('folder-row:projects'))
     act(() => {
       vi.advanceTimersByTime(FOLDER_ROW_SINGLE_CLICK_DELAY_MS)
     })
 
-    expect(screen.queryByText('laputa') !== null).toBe(!wasExpanded)
+    expect(screen.queryByText('alpha') !== null).toBe(!wasExpanded)
     vi.useRealTimers()
   })
 
@@ -496,14 +496,14 @@ describe('FolderTree', () => {
       expect(renameSpy).toHaveBeenCalledWith('projects', 'projects')
     })
     expect(screen.queryByTestId('rename-folder-input')).not.toBeInTheDocument()
-    expect(screen.queryByText('laputa')).not.toBeInTheDocument()
+    expect(screen.queryByText('alpha')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByTestId('folder-row:projects'))
     act(() => {
       vi.advanceTimersByTime(FOLDER_ROW_SINGLE_CLICK_DELAY_MS)
     })
 
-    expect(screen.getByText('laputa')).toBeInTheDocument()
+    expect(screen.getByText('alpha')).toBeInTheDocument()
     vi.useRealTimers()
   })
 
@@ -646,7 +646,7 @@ describe('FolderTree', () => {
     expect(screen.queryByTestId('rename-folder-btn:')).not.toBeInTheDocument()
     expect(screen.queryByTestId('delete-folder-btn:')).not.toBeInTheDocument()
 
-    fireEvent.contextMenu(screen.getByText('Laputa'))
+    fireEvent.contextMenu(screen.getByText('Vault'))
 
     expect(screen.getByTestId('reveal-folder-menu-item')).toBeInTheDocument()
     expect(screen.getByTestId('copy-folder-path-menu-item')).toBeInTheDocument()

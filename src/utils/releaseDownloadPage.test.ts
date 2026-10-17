@@ -45,8 +45,8 @@ describe('release workflow macOS artifact names', () => {
     expect(stableWorkflow).not.toContain(
       'Rhizome_${{ needs.version.outputs.version }}_macOS_Intel.dmg',
     )
-    expect(alphaWorkflow).not.toContain('Tolaria_')
-    expect(stableWorkflow).not.toContain('Tolaria_')
+    expect(alphaWorkflow).not.toContain('Rhizome_')
+    expect(stableWorkflow).not.toContain('Rhizome_')
     expect(alphaWorkflow).toContain('name: Rhizome ${{ needs.version.outputs.display_version }}')
     expect(stableWorkflow).toContain('name: Rhizome ${{ needs.version.outputs.display_version }}')
     expect(artifactWorkflow).toContain('fail-fast: false')
@@ -112,35 +112,35 @@ describe('extractStableDownloadTargets', () => {
       extractStableDownloadTargets({
         platforms: {
           'darwin-aarch64': {
-            download_url: 'https://example.com/Tolaria-aarch64.dmg',
+            download_url: 'https://example.com/Rhizome-aarch64.dmg',
           },
           'darwin-x86_64': {
-            download_url: 'https://example.com/Tolaria-x64.dmg',
+            download_url: 'https://example.com/Rhizome-x64.dmg',
           },
           'linux-x86_64': {
-            download_url: 'https://example.com/Tolaria.AppImage',
+            download_url: 'https://example.com/Rhizome.AppImage',
           },
           'windows-x86_64': {
-            url: 'https://example.com/Tolaria-setup.exe',
+            url: 'https://example.com/Rhizome-setup.exe',
           },
         },
       }),
     ).toMatchObject({
       'darwin-aarch64': {
         label: 'macOS Apple Silicon',
-        url: 'https://example.com/Tolaria-aarch64.dmg',
+        url: 'https://example.com/Rhizome-aarch64.dmg',
       },
       'darwin-x86_64': {
         label: 'macOS Intel',
-        url: 'https://example.com/Tolaria-x64.dmg',
+        url: 'https://example.com/Rhizome-x64.dmg',
       },
       'linux-x86_64': {
         label: 'Linux AppImage',
-        url: 'https://example.com/Tolaria.AppImage',
+        url: 'https://example.com/Rhizome.AppImage',
       },
       'windows-x86_64': {
         label: 'Windows',
-        url: 'https://example.com/Tolaria-setup.exe',
+        url: 'https://example.com/Rhizome-setup.exe',
       },
     })
   })
@@ -152,17 +152,17 @@ describe('buildStableDownloadRedirectPage', () => {
       'darwin-aarch64': {
         buttonLabel: 'Download Rhizome for macOS Apple Silicon',
         label: 'macOS Apple Silicon',
-        url: 'https://example.com/Tolaria-aarch64.dmg',
+        url: 'https://example.com/Rhizome-aarch64.dmg',
       },
       'darwin-x86_64': {
         buttonLabel: 'Download Rhizome for Intel Mac',
         label: 'macOS Intel',
-        url: 'https://example.com/Tolaria-x64.dmg',
+        url: 'https://example.com/Rhizome-x64.dmg',
       },
       'windows-x86_64': {
         buttonLabel: 'Download Rhizome for Windows',
         label: 'Windows',
-        url: 'https://example.com/Tolaria-setup.exe',
+        url: 'https://example.com/Rhizome-setup.exe',
       },
     })
 
@@ -176,7 +176,7 @@ describe('buildStableDownloadRedirectPage', () => {
     expect(html).toContain('hasMultipleMacDownloads')
     expect(html).toContain('Choose the Apple Silicon or Intel Mac download below.')
     expect(html).toContain('requiresWindowsInstallChoice')
-    expect(html).toContain('tolaria-download-frame')
+    expect(html).toContain('rhizome-download-frame')
     expect(html).toContain('color-scheme: light dark')
     expect(html).toContain('@media (prefers-color-scheme: dark)')
     expect(html).toContain('background: var(--download-surface-page)')
@@ -187,12 +187,12 @@ describe('buildStableDownloadRedirectPage', () => {
       'windows-x86_64': {
         buttonLabel: 'Download Rhizome for Windows',
         label: 'Windows',
-        url: 'https://example.com/Tolaria-setup.exe',
+        url: 'https://example.com/Rhizome-setup.exe',
       },
     })
 
-    expect(html).toContain('name="tolaria-download-frame"')
-    expect(html).toContain('target="tolaria-download-frame"')
+    expect(html).toContain('name="rhizome-download-frame"')
+    expect(html).toContain('target="rhizome-download-frame"')
     expect(html).toContain('sandbox="allow-downloads"')
     expect(html).toContain('startDownload(target)')
     expect(html).toContain('Company-managed devices may require IT approval')
@@ -215,7 +215,7 @@ describe('resolveStableDownloadTargets', () => {
     const latestPayload = {
       platforms: {
         'darwin-aarch64': {
-          download_url: 'https://example.com/Tolaria-aarch64.dmg',
+          download_url: 'https://example.com/Rhizome-aarch64.dmg',
         },
       },
     }
@@ -224,20 +224,20 @@ describe('resolveStableDownloadTargets', () => {
         prerelease: false,
         assets: [
           {
-            name: 'Tolaria_x64.dmg',
-            browser_download_url: 'https://example.com/Tolaria-x64.dmg',
+            name: 'Rhizome_x64.dmg',
+            browser_download_url: 'https://example.com/Rhizome-x64.dmg',
           },
           {
-            name: 'Tolaria-setup.exe',
-            browser_download_url: 'https://example.com/Tolaria-setup.exe',
+            name: 'Rhizome-setup.exe',
+            browser_download_url: 'https://example.com/Rhizome-setup.exe',
           },
           {
-            name: 'Tolaria.AppImage',
-            browser_download_url: 'https://example.com/Tolaria.AppImage',
+            name: 'Rhizome.AppImage',
+            browser_download_url: 'https://example.com/Rhizome.AppImage',
           },
           {
-            name: 'Tolaria.rpm',
-            browser_download_url: 'https://example.com/Tolaria.rpm',
+            name: 'Rhizome.rpm',
+            browser_download_url: 'https://example.com/Rhizome.rpm',
           },
         ],
       },
@@ -245,35 +245,35 @@ describe('resolveStableDownloadTargets', () => {
 
     expect(extractStableDownloadTargetsFromReleases(releasesPayload)).toMatchObject({
       'darwin-x86_64': {
-        url: 'https://example.com/Tolaria-x64.dmg',
+        url: 'https://example.com/Rhizome-x64.dmg',
       },
       'linux-x86_64': {
-        url: 'https://example.com/Tolaria.AppImage',
+        url: 'https://example.com/Rhizome.AppImage',
       },
       'linux-x86_64-rpm': {
         label: 'Linux RPM',
-        url: 'https://example.com/Tolaria.rpm',
+        url: 'https://example.com/Rhizome.rpm',
       },
       'windows-x86_64': {
-        url: 'https://example.com/Tolaria-setup.exe',
+        url: 'https://example.com/Rhizome-setup.exe',
       },
     })
     expect(resolveStableDownloadTargets(latestPayload, releasesPayload)).toMatchObject({
       'darwin-aarch64': {
-        url: 'https://example.com/Tolaria-aarch64.dmg',
+        url: 'https://example.com/Rhizome-aarch64.dmg',
       },
       'darwin-x86_64': {
-        url: 'https://example.com/Tolaria-x64.dmg',
+        url: 'https://example.com/Rhizome-x64.dmg',
       },
       'linux-x86_64': {
-        url: 'https://example.com/Tolaria.AppImage',
+        url: 'https://example.com/Rhizome.AppImage',
       },
       'linux-x86_64-rpm': {
         label: 'Linux RPM',
-        url: 'https://example.com/Tolaria.rpm',
+        url: 'https://example.com/Rhizome.rpm',
       },
       'windows-x86_64': {
-        url: 'https://example.com/Tolaria-setup.exe',
+        url: 'https://example.com/Rhizome-setup.exe',
       },
     })
   })
@@ -283,12 +283,12 @@ describe('resolveStableDownloadTargets', () => {
       'linux-x86_64': {
         buttonLabel: 'Download Rhizome AppImage for Linux',
         label: 'Linux AppImage',
-        url: 'https://example.com/Tolaria.AppImage',
+        url: 'https://example.com/Rhizome.AppImage',
       },
       'linux-x86_64-rpm': {
         buttonLabel: 'Download Rhizome RPM for Linux',
         label: 'Linux RPM',
-        url: 'https://example.com/Tolaria.rpm',
+        url: 'https://example.com/Rhizome.rpm',
       },
     })
 

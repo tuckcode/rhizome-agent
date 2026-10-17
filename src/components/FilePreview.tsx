@@ -48,7 +48,7 @@ function appendPdfPreviewLoadKey(assetSrc: string, loadKey: string): string {
   const baseSrc = hashIndex === -1 ? assetSrc : assetSrc.slice(0, hashIndex)
   const hash = hashIndex === -1 ? '' : assetSrc.slice(hashIndex)
   const separator = baseSrc.includes('?') ? '&' : '?'
-  return `${baseSrc}${separator}tolaria_pdf_preview=${encodeURIComponent(loadKey)}${hash}`
+  return `${baseSrc}${separator}rhizome_pdf_preview=${encodeURIComponent(loadKey)}${hash}`
 }
 
 function filePreviewPath(path: unknown): string | null {

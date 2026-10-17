@@ -4,7 +4,7 @@ import type { VaultEntry } from '../types'
 import { createCrossWindowPersistedStore } from './crossWindowPersistedStore'
 
 const STORAGE_KEY = 'tolaria:ai-workspace-window-context:v1'
-const BROADCAST_CHANNEL = 'tolaria-ai-workspace-window-context'
+const BROADCAST_CHANNEL = 'rhizome-ai-workspace-window-context'
 
 export interface AiWorkspaceWindowSharedContext extends AiWorkspaceWindowContext {
   activeEntry?: VaultEntry | null

@@ -39,7 +39,7 @@ function parsePreprocessedParagraph(markdown: string) {
 }
 
 function attachmentTokenCount(markdown: string): number {
-  return markdown.match(/@@TOLARIA_FILE_ATTACHMENT:/gu)?.length ?? 0
+  return markdown.match(/@@RHIZOME_FILE_ATTACHMENT:/gu)?.length ?? 0
 }
 
 describe('file attachment Markdown roundtrip', () => {
@@ -126,5 +126,24 @@ describe('file attachment Markdown roundtrip', () => {
     expect(preprocessed).toContain('[inside.pdf](attachments/inside.pdf)')
     expect(preprocessed).toContain('[still-inside.pdf](attachments/still-inside.pdf)')
     expect(preprocessed).not.toContain('[outside.pdf](attachments/outside.pdf)')
+  })
+
+  it('still rebuilds file blocks from the previous token prefix', () => {
+    const encoded = encodeURIComponent(JSON.stringify({
+      name: 'report.pdf',
+      url: 'attachments/report.pdf',
+    }))
+
+    expect(injectDurableEditorMarkdownBlocks(parsePreprocessedParagraph(
+      `@@TOLARIA_FILE_ATTACHMENT:${encoded}@@`,
+    ))).toEqual([
+      expect.objectContaining({
+        type: 'file',
+        props: expect.objectContaining({
+          name: 'report.pdf',
+          url: 'attachments/report.pdf',
+        }),
+      }),
+    ])
   })
 })

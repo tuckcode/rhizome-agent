@@ -4,10 +4,10 @@ import { resolveChatOpenNote } from './resolveChatOpenNote'
 describe('resolveChatOpenNote', () => {
   it('keeps chat on the conversation and labels the note relative to the vault', () => {
     expect(resolveChatOpenNote(
-      '/Users/jdoe/Documents/Laputa/wiki/decisions/memory-loop.md',
-      '/Users/jdoe/Documents/Laputa',
+      '/Users/jdoe/Documents/Vault/wiki/decisions/memory-loop.md',
+      '/Users/jdoe/Documents/Vault',
     )).toEqual({
-      path: '/Users/jdoe/Documents/Laputa/wiki/decisions/memory-loop.md',
+      path: '/Users/jdoe/Documents/Vault/wiki/decisions/memory-loop.md',
       label: 'wiki/decisions/memory-loop.md',
     })
   })
@@ -17,7 +17,7 @@ describe('resolveChatOpenNote', () => {
   })
 
   it('keeps a vault-relative path as the label', () => {
-    expect(resolveChatOpenNote('wiki/decisions/memory-loop.md', '/Users/jdoe/Documents/Laputa')).toEqual({
+    expect(resolveChatOpenNote('wiki/decisions/memory-loop.md', '/Users/jdoe/Documents/Vault')).toEqual({
       path: 'wiki/decisions/memory-loop.md',
       label: 'wiki/decisions/memory-loop.md',
     })

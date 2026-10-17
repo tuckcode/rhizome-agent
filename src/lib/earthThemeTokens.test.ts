@@ -880,7 +880,7 @@ describe('Earth theme tokens', () => {
     ).toBeGreaterThanOrEqual(3)
   })
 
-  it('replaces leftover Tolaria blues on sheet selection and block reorder with Earth tokens', () => {
+  it('replaces leftover Rhizome blues on sheet selection and block reorder with Earth tokens', () => {
     expect(sheetSelectionChrome).toContain("SHEET_SELECTION_ACCENT_FALLBACK = '#2C6A4D'")
     expect(sheetSelectionChrome).not.toContain('#155DFF')
     expect(blockReorder).not.toContain('21, 93, 255')

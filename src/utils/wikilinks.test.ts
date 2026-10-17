@@ -720,9 +720,9 @@ describe('extractSnippet', () => {
   it('extracts snippet from project-template note with body text', () => {
     const content = [
       '---', 'type: Project', 'status: Active', '---', '',
-      '# Ship MVP of Tolaria', '',
+      '# Ship MVP of Rhizome', '',
       '## Objective', '',
-      'Ship the minimum viable product for Tolaria marketplace.', '',
+      'Ship the minimum viable product for Rhizome marketplace.', '',
       '## Key Results', '',
       '- 100 beta users signed up',
     ].join('\n')

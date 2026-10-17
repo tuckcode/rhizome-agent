@@ -69,7 +69,7 @@ describe('PrimeSessionSubhead — status control', () => {
       <PrimeSessionSubhead
         live
         sessionId="019fe641-61fa-73e9-82ef-91fc90097aab"
-        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPath="/Users/jdoe/Documents/Vault"
         startedAt="2026-08-15T09:00:00.000Z"
       />,
     )
@@ -78,17 +78,17 @@ describe('PrimeSessionSubhead — status control', () => {
 
     expect(screen.getByTestId('prime-subhead-connection')).toHaveTextContent('Prime session live')
     expect(screen.getByTestId('prime-subhead-session')).toHaveTextContent('7aab')
-    expect(screen.getByTestId('prime-subhead-vault')).toHaveTextContent('~/Documents/Laputa')
+    expect(screen.getByTestId('prime-subhead-vault')).toHaveTextContent('~/Documents/Vault')
     expect(screen.getByTestId('prime-subhead-uptime')).toHaveTextContent('2h 30m')
     vi.useRealTimers()
   })
 
   it('never shows the absolute home path in the popover', () => {
-    render(<PrimeSessionSubhead live vaultPath="/Users/jdoe/Documents/Laputa" />)
+    render(<PrimeSessionSubhead live vaultPath="/Users/jdoe/Documents/Vault" />)
 
     openStatus()
 
-    expect(screen.queryByText('/Users/jdoe/Documents/Laputa')).not.toBeInTheDocument()
+    expect(screen.queryByText('/Users/jdoe/Documents/Vault')).not.toBeInTheDocument()
   })
 
   it('omits popover segments it has no value for', () => {

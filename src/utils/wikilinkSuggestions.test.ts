@@ -8,7 +8,7 @@ function makeItem(title: string, aliases: string[] = [], group = 'Note', path?: 
 
 describe('preFilterWikilinks', () => {
   const items: WikilinkBaseItem[] = [
-    makeItem('Build Laputa App', ['laputa-app'], 'Project'),
+    makeItem('Build Rhizome App', ['rhizome-app'], 'Project'),
     makeItem('Quarterly Review', ['q1-review'], 'Responsibility'),
     makeItem('TypeScript Tips', ['ts-tips']),
     makeItem('Café Notes', ['café']),
@@ -23,7 +23,7 @@ describe('preFilterWikilinks', () => {
   it('returns matches for query of exactly MIN_QUERY_LENGTH', () => {
     const result = preFilterWikilinks(items, 'la')
     expect(result.length).toBeGreaterThan(0)
-    expect(result.some(r => r.title === 'Build Laputa App')).toBe(true)
+    expect(result.some(r => r.title === 'Build Rhizome App')).toBe(true)
   })
 
   it('matches on title (case-insensitive)', () => {
@@ -41,7 +41,7 @@ describe('preFilterWikilinks', () => {
   it('matches on group', () => {
     const result = preFilterWikilinks(items, 'Project')
     expect(result).toHaveLength(1)
-    expect(result[0].title).toBe('Build Laputa App')
+    expect(result[0].title).toBe('Build Rhizome App')
   })
 
   it('handles accented characters', () => {
@@ -61,7 +61,7 @@ describe('preFilterWikilinks', () => {
   })
 
   it('returns all matches when multiple items match', () => {
-    // Both "Build Laputa App" and "React Hooks Deep-Dive" contain 'e'
+    // Both "Build Rhizome App" and "React Hooks Deep-Dive" contain 'e'
     // but query must be >= 2 chars, so use a longer shared substring
     const result = preFilterWikilinks(items, 'No') // "Note" group + "Café Notes"
     expect(result.length).toBeGreaterThan(1)

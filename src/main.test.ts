@@ -191,7 +191,7 @@ describe('main entrypoint', () => {
     rootOptions().onCaughtError?.(error, { componentStack: '\n    in App' })
 
     expect(mocks.sentryHandler).not.toHaveBeenCalled()
-    expect(document.getElementById('tolaria-fatal-render-error')).toBeNull()
+    expect(document.getElementById('rhizome-fatal-render-error')).toBeNull()
   })
 
   it('suppresses recovered BlockNote missing-id render errors from Sentry', async () => {
@@ -216,7 +216,7 @@ describe('main entrypoint', () => {
 
     rootOptions().onCaughtError?.(error, {})
     expect(mocks.sentryHandler).not.toHaveBeenCalled()
-    expect(document.getElementById('tolaria-fatal-render-error')).toBeNull()
+    expect(document.getElementById('rhizome-fatal-render-error')).toBeNull()
 
     rootOptions().onUncaughtError?.(error, {})
     expect(mocks.sentryHandler).toHaveBeenCalledWith(error, { componentStack: '' })
@@ -234,7 +234,7 @@ describe('main entrypoint', () => {
     })
 
     expect(mocks.sentryHandler).not.toHaveBeenCalled()
-    expect(document.getElementById('tolaria-fatal-render-error')).toBeNull()
+    expect(document.getElementById('rhizome-fatal-render-error')).toBeNull()
   })
 
   it('suppresses recovered action tooltip render errors from Sentry', async () => {
@@ -249,7 +249,7 @@ describe('main entrypoint', () => {
     rootOptions().onCaughtError?.(error, { componentStack })
 
     expect(mocks.sentryHandler).not.toHaveBeenCalled()
-    expect(document.getElementById('tolaria-fatal-render-error')).toBeNull()
+    expect(document.getElementById('rhizome-fatal-render-error')).toBeNull()
   })
 
   it('mounts a frontend readiness marker after the app shell', async () => {

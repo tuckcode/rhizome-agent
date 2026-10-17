@@ -101,7 +101,7 @@ describe('BreadcrumbBar filename visibility', () => {
 
     expect(sheetRule).toContain('overflow: hidden;')
     expect(sheetRule).toContain('contain: layout paint;')
-    expect(sheetRule).not.toContain('--tolaria-overlay-zoom-inverse')
+    expect(sheetRule).not.toContain('--rhizome-overlay-zoom-inverse')
     expect(sheetRule).not.toContain('flex: 0 0')
   })
 })

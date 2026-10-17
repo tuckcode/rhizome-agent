@@ -99,7 +99,7 @@ window.__rhizomeTest = {
     }
 
     if (!window.__rhizomeTest?.dispatchBrowserMenuCommand) {
-      throw new Error('Tolaria test bridge is missing dispatchBrowserMenuCommand')
+      throw new Error('Rhizome test bridge is missing dispatchBrowserMenuCommand')
     }
 
     window.__rhizomeTest.dispatchBrowserMenuCommand(id)
@@ -131,9 +131,9 @@ function showFatalRenderError(
   error: unknown,
   errorInfo: { componentStack?: string },
 ): void {
-  const existing = document.getElementById('tolaria-fatal-render-error')
+  const existing = document.getElementById('rhizome-fatal-render-error')
   const overlay = existing ?? document.createElement('pre')
-  overlay.id = 'tolaria-fatal-render-error'
+  overlay.id = 'rhizome-fatal-render-error'
   overlay.style.cssText = [
     'position:fixed',
     'inset:24px',
