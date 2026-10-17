@@ -39,7 +39,7 @@ pnpm tauri dev
 Chat runs on one of two engines. You can switch at any time with **Chat engine** in Settings → AI Agents.
 
 - **Prime Agent (default).** Prime runs Chat. Set it up below.
-- **Rhizome's own engine.** Turn **Chat engine** on. It doesn't need Prime. Add a provider key, or use **Free tier (auto)**. See [Set up models and keys](../guides/configure-ai-models.md).
+- **Rhizome's own engine.** Turn **Chat engine** on. It doesn't need Prime. Add a provider key, or use **Taproot**. See [Set up models and keys](../guides/configure-ai-models.md).
 
 ## Set up Prime
 

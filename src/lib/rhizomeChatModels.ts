@@ -8,7 +8,7 @@ import {
 import { callHost } from './callHost'
 
 const FREE_TIER_AUTO_TARGET = 'free_tier_auto'
-const FREE_TIER_AUTO_LABEL = 'Free tier (auto)'
+const FREE_TIER_AUTO_LABEL = 'Taproot'
 
 export const REMOVED_PROVIDER_LABEL = 'Provider removed'
 export const REMOVED_PROVIDER_ERROR =

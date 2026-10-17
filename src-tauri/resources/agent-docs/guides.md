@@ -85,7 +85,7 @@ Rhizome doesn't run Claude Code inside Chat. Keep using Claude Code in the termi
 | Memory writes you approve | **Save to vault** is an explicit click. It writes straight away, so review the note after, or undo with Git |
 | Observable, interruptible runs | Stop any run; with Prime, send a follow-up while it works; see a Prime run's file footprint in [Mycelium](../concepts/mycelium.md) |
 | Skills | Prime packages (Settings → Packages) when Prime is the engine. Rhizome's own plugin system is planned |
-| Your choice of provider | Your own providers, local models or **Free tier (auto)**. Keys live in the system keychain |
+| Your choice of provider | Your own providers, local models or **Taproot**. Keys live in the system keychain |
 
 ## From Cursor
 
@@ -94,7 +94,7 @@ Rhizome doesn't run Claude Code inside Chat. Keep using Claude Code in the termi
 | Agent chat beside your files | Chat with notes beside it (⌘2 shows Notes) |
 | Cursor's MCP settings | **Set Up External AI Tools…** (⌘K) writes Rhizome's MCP entry into `~/.cursor/mcp.json`, so Cursor's agent can use your vault |
 | Rules files | The vault's `AGENTS.md` |
-| Model picker | Prime's models, your own providers, or **Free tier (auto)** |
+| Model picker | Prime's models, your own providers, or **Taproot** |
 
 Rhizome isn't a code editor. Keep Cursor for code, and use Rhizome as the place where what you and your agents learn is kept, reviewed and found again.
 
@@ -111,7 +111,7 @@ What Rhizome adds is the vault: Save to vault, recall with its source, Git histo
 
 ## Bring your own model
 
-To skip Prime, turn on **Chat engine** in Settings → AI Agents and add a provider, or use **Free tier (auto)**. Rhizome's engine works without Prime installed. It's early: it can create notes, but can't read, search or edit files, or search the vault, yet. See [Set up models and keys](configure-ai-models.md).
+To skip Prime, turn on **Chat engine** in Settings → AI Agents and add a provider, or use **Taproot**. Rhizome's engine works without Prime installed. It's early: it can create notes, but can't read, search or edit files, or search the vault, yet. See [Set up models and keys](configure-ai-models.md).
 
 ## Plugins
 
@@ -166,7 +166,7 @@ Choose which models Chat can use, store their API keys safely, and check that th
 
 ## Add a provider
 
-Settings → AI Agents has three tabs. **Local model** is for models on your computer. **API model** is for hosted models and holds **Free tier (auto)**.
+Settings → AI Agents has three tabs. **Local model** is for models on your computer. **API model** is for hosted models and holds **Taproot**.
 
 | Kind | Examples | Needs |
 |---|---|---|
@@ -192,11 +192,11 @@ Click **Test model** on the provider. It sends one short request with no tools. 
 
 ## Use free models
 
-**Free tier (auto)**, on the **API model** tab, lets Rhizome pick free hosted models for you and move on when one runs out. Each free provider needs its own key. See [Free models and routing](../concepts/free-models-and-routing.md).
+**Taproot**, the free automatic router on the **API model** tab, lets Rhizome pick free hosted models for you and move on when one runs out. Each free provider needs its own key. See [Free models and routing](../concepts/free-models-and-routing.md).
 
 ## Pick the model for Chat
 
-Choose a model, or **Free tier (auto)**, in the picker. The choice is saved with your settings.
+Choose a model, or **Taproot**, in the picker. The choice is saved with your settings.
 
 ## If it doesn't connect
 

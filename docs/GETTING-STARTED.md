@@ -11,7 +11,7 @@ How to navigate the **Rhizome** codebase, run the app, and find what you need.
 User-facing name is **Rhizome**. The bundle is still `ai.rhizome.agent` / `Rhizome.app`.
 
 - Rhizome owns the agent loop (ADR-0180). Native chat works without Prime. Settings still starts Chat on Prime until you switch **Chat engine**. Hermes is not a usable engine in the app today.
-- Free-tier routing appears as **Free tier (auto)**. The name Taproot is not on main.
+- **Taproot** is the free automatic router in the model picker (stored target id `free_tier_auto` is unchanged).
 - Graphite is the default theme. Dark is Graphite, Light is Earth light, and System follows the OS between those two. Earth dark, Loam, and Mycelium are color skins.
 - Left rail Views are Research, Graph, Mycelium, and History (Ctrl+Cmd+1–4 on Mac, Ctrl+Shift+1–4 on Windows). Changes sits next to Notes.
 - You read and diff notes in the vault. Mycelium replays builds. The agent cannot search the vault or old Mycelium sessions yet.
