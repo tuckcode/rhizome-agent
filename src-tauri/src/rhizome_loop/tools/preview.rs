@@ -653,6 +653,9 @@ mod tests {
             ),
         ];
         for (name, diff, fixture) in cases {
+            // Git on Windows checks these fixtures out as CRLF. The
+            // generator emits LF. Compare the logical text.
+            let fixture = fixture.replace("\r\n", "\n");
             assert_eq!(
                 diff.trim_end(),
                 fixture.trim_end(),
