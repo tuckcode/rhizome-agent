@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render as rtlRender, screen, fireEvent, act, within } from '@testing-library/react'
+import { render as rtlRender, screen, fireEvent, act, within, waitFor } from '@testing-library/react'
 import { DynamicRelationshipsPanel, BacklinksPanel, ReferencedByPanel, GitHistoryPanel, InstancesPanel } from './InspectorPanels'
 import { TooltipProvider } from './ui/tooltip'
 import type { ReferencedByItem } from './InspectorPanels'
@@ -780,6 +780,37 @@ describe('GitHistoryPanel', () => {
     render(<GitHistoryPanel commits={commits} onViewCommitDiff={onViewCommitDiff} />)
     fireEvent.click(screen.getByText('abc1234'))
     expect(onViewCommitDiff).toHaveBeenCalledWith('abc1234567890')
+  })
+
+  it('exposes a truncated commit subject on hover without hiding view-diff', async () => {
+    const longSubject = 'Update project notes and add a very long experiment title that must stay readable'
+    const commits: GitCommit[] = [
+      {
+        hash: 'abc1234567890',
+        shortHash: 'abc1234',
+        message: `${longSubject}\n\nBody that belongs below the subject.`,
+        author: 'luca',
+        date: Math.floor(Date.now() / 1000) - 3600,
+      },
+    ]
+
+    render(<GitHistoryPanel commits={commits} onViewCommitDiff={onViewCommitDiff} />)
+
+    const row = screen.getByRole('button', { name: `${longSubject}. View diff for abc1234` })
+    expect(row).toHaveClass('truncate')
+    expect(row).toHaveAccessibleName(`${longSubject}. View diff for abc1234`)
+    expect(row).not.toHaveAttribute('title', 'View diff for abc1234')
+
+    fireEvent.focus(row)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(longSubject)
+
+    fireEvent.blur(row)
+    await waitFor(() => {
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    })
+
+    fireEvent.pointerMove(row)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(longSubject)
   })
 
   it('displays relative dates correctly', () => {

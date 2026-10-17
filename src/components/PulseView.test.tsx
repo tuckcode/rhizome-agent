@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { PulseView } from './PulseView'
+import { TooltipProvider } from './ui/tooltip'
 import type { PulseCommit } from '../types'
 
 const openExternalUrl = vi.fn()
@@ -305,6 +306,41 @@ describe('PulseView', () => {
     fireEvent.keyDown(fileButton, { key: 'Enter' })
 
     expect(onOpenNote).toHaveBeenCalledWith('project/my-project.md', 'abc123def456')
+  })
+
+  it('exposes a truncated commit subject on hover, focus, and to assistive tech', async () => {
+    const longSubject = 'Update project notes and add a very long experiment title that must stay readable'
+    mockInvokeFn.mockResolvedValue([
+      {
+        ...mockCommits[0],
+        message: `${longSubject}\n\nBody that belongs below the subject.`,
+      },
+    ])
+
+    render(
+      <TooltipProvider>
+        <PulseView vaultPath="/test/vault" />
+      </TooltipProvider>,
+    )
+
+    const row = await screen.findByRole('button', { name: longSubject })
+    const title = row.querySelector('.truncate')
+
+    expect(title).not.toBeNull()
+    expect(title).toHaveClass('truncate')
+    expect(title).toHaveTextContent(longSubject)
+    expect(row).toHaveAccessibleName(longSubject)
+
+    fireEvent.focus(row)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(longSubject)
+
+    fireEvent.blur(row)
+    await waitFor(() => {
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    })
+
+    fireEvent.pointerMove(row)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(longSubject)
   })
 
   it('renders History header', async () => {

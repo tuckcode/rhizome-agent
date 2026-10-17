@@ -12,6 +12,8 @@ import {
 } from '../utils/trafficLights'
 import { getLocaleDateLocale, translate, type AppLocale } from '../lib/i18n'
 import { GitRepositorySelect } from './GitRepositorySelect'
+import { CommitSubjectTooltip } from './CommitSubjectTooltip'
+import { commitSubject } from '../utils/commitSubject'
 import type { GitRepositoryOption } from '../utils/gitRepositories'
 import {
   Plus, Minus, PencilSimple, GitCommit, ArrowSquareOut,
@@ -154,36 +156,40 @@ function CommitCard({
   const Chevron = expanded ? CaretDown : CaretRight
   const toggleExpanded = useCallback(() => setExpanded((value) => !value), [])
   const commitUrl = commit.githubUrl
+  const subject = commitSubject(commit.message)
 
   return (
     <div className="border-b border-border px-4 py-2">
       <div className="flex items-start" style={{ gap: 8 }}>
-        <button
-          type="button"
-          className={cn(
-            'flex min-w-0 flex-1 items-start justify-between border-none bg-transparent py-2 text-left transition-colors',
-            PULSE_ROW_FOCUS_CLASS_NAME,
-            PULSE_EDGE_TO_EDGE_ROW_CLASS_NAME,
-            expanded ? 'bg-accent/40' : 'hover:bg-accent/40 focus-visible:bg-accent/40',
-          )}
-          style={{ gap: 8 }}
-          onClick={toggleExpanded}
-          onKeyDown={(event) => handleActivationKey(event, toggleExpanded)}
-        >
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center" style={{ gap: 6, marginBottom: 2 }}>
-              <GitCommit size={13} className="text-muted-foreground" style={{ flexShrink: 0 }} />
-              <span className="truncate text-[13px] font-medium text-foreground">{commit.message}</span>
+        <CommitSubjectTooltip subject={subject}>
+          <button
+            type="button"
+            className={cn(
+              'flex min-w-0 flex-1 items-start justify-between border-none bg-transparent py-2 text-left transition-colors',
+              PULSE_ROW_FOCUS_CLASS_NAME,
+              PULSE_EDGE_TO_EDGE_ROW_CLASS_NAME,
+              expanded ? 'bg-accent/40' : 'hover:bg-accent/40 focus-visible:bg-accent/40',
+            )}
+            style={{ gap: 8 }}
+            onClick={toggleExpanded}
+            onKeyDown={(event) => handleActivationKey(event, toggleExpanded)}
+            aria-label={subject}
+          >
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center" style={{ gap: 6, marginBottom: 2 }}>
+                <GitCommit size={13} className="text-muted-foreground" style={{ flexShrink: 0 }} />
+                <span className="truncate text-[13px] font-medium text-foreground">{subject}</span>
+              </div>
+              <div className="flex items-center" style={{ gap: 8 }}>
+                <span className="text-[11px] text-muted-foreground">{relativeDate(commit.date)}</span>
+                {!commitUrl && (
+                  <span className="text-[11px] font-mono text-muted-foreground">{commit.shortHash}</span>
+                )}
+                <SummaryBadges added={commit.added} modified={commit.modified} deleted={commit.deleted} />
+              </div>
             </div>
-            <div className="flex items-center" style={{ gap: 8 }}>
-              <span className="text-[11px] text-muted-foreground">{relativeDate(commit.date)}</span>
-              {!commitUrl && (
-                <span className="text-[11px] font-mono text-muted-foreground">{commit.shortHash}</span>
-              )}
-              <SummaryBadges added={commit.added} modified={commit.modified} deleted={commit.deleted} />
-            </div>
-          </div>
-        </button>
+          </button>
+        </CommitSubjectTooltip>
         {commitUrl && (
           <a
             className="mt-2 flex shrink-0 items-center text-[11px] font-mono text-primary no-underline hover:underline"
