@@ -224,3 +224,4 @@ proposed → active → superseded
 | [0185](0185-provider-keys-in-the-os-keychain.md) | Provider keys live in the OS keychain through the keyring crate | active |
 | [0186](0186-rhizome-sign-in-storage-and-provider-sign-in.md) | Rhizome keeps its own sign-in storage; provider browser sign-in follows each provider's terms | active |
 | [0187](0187-native-is-the-only-chat-engine.md) | Native is the only chat engine; Prime and Hermes are optional ACP engines; core tool policy | active |
+| [0188](0188-rhizome-builds-its-own-kanban-board.md) | Rhizome builds its own Kanban board; the Kanban park is lifted | active |
