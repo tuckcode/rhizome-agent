@@ -9,8 +9,10 @@ Choose which models Chat can use, store their API keys safely, and check that th
 
 **Chat engine** in Settings → AI Agents decides who runs Chat:
 
-- **Off (default):** Prime handles its own provider login. Sign in from Settings → AI Agents → Local agent, or run `prime-agent` in a terminal and use `/login`.
-- **On:** Rhizome's own engine runs new chats with the models you set up below. It doesn't need Prime.
+- **On (default):** Rhizome's own engine runs new chats with the models you set up below. It doesn't need Prime.
+- **Off:** Prime handles its own provider login. Sign in from Settings → AI Agents → Local agent, or run `prime-agent` in a terminal and use `/login`. If Prime isn't installed, a new Prime-targeted chat falls back to Rhizome's engine after the host status says so.
+
+An open chat keeps the engine it started with.
 
 ## Add a provider
 

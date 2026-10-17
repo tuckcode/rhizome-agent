@@ -29,9 +29,9 @@ If the vault is a Git repository, every change to it can be committed, including
 
 ## Rhizome runs its own loop
 
-An **agent loop** is the cycle that sends your message to a model, runs the tools the model asks for, and repeats until the answer is done. Rhizome has its own. You can also use an **engine**: another harness that runs the loop instead. Prime Agent is the default engine today. The vault, the permissions and the memory stay with Rhizome whichever one runs.
+An **agent loop** is the cycle that sends your message to a model, runs the tools the model asks for, and repeats until the answer is done. Rhizome has its own, and that is the Chat default. You can also switch to an **engine**: another harness that runs the loop instead, such as Prime Agent. The vault, the permissions and the memory stay with Rhizome whichever one runs.
 
-Rhizome's own engine is new. Today it can create notes, and not much else. It can't read, search or edit files yet, and it can't search the vault. [Agents, engines and models](../concepts/ai.md)
+Rhizome's own engine can read, search, edit and create notes in the open vault. In Power User it can run one approved shell command in the vault folder. Anthropic models still need Prime. [Agents, engines and models](../concepts/ai.md)
 
 ## What will feel familiar
 
@@ -45,7 +45,7 @@ If you've used Claude Code, Hermes Agent, Cursor or Prime, most of the basics ca
 | `CLAUDE.md` / `AGENTS.md` | A vault `AGENTS.md`, with `CLAUDE.md` kept as a compatibility file |
 | MCP | Rhizome runs an MCP server, so other apps can read and write your vault |
 | Past chat history | Import Claude Code chats into the vault |
-| Extensions | Prime packages from Settings → Packages when Prime is the engine. Rhizome's own plugin system is planned |
+| Extensions | Prime CLI packages when Prime is the engine. Rhizome's own plugin system is planned |
 | An editor | A rich Markdown editor with a raw mode, plus PDF and image previews, sheets, diagrams and whiteboards |
 | A graph | The Wiki Graph: notes as nodes, links as edges |
 
@@ -53,4 +53,4 @@ If you've used Claude Code, Hermes Agent, Cursor or Prime, most of the basics ca
 
 ## What it isn't yet
 
-Rhizome is a macOS developer preview. You build it from source; there is no signed download or in-app updater. The install script fetches Prime Agent because Prime is still the default engine, but Rhizome's own engine works without it.
+Rhizome is a macOS developer preview. You build it from source; there is no signed download or in-app updater. Rhizome's own engine is the Chat default and works without Prime. The install script still fetches Prime Agent so you can switch to that engine later.

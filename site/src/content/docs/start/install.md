@@ -19,7 +19,7 @@ You need:
 4. Rust `1.77.2` or newer
 5. git
 
-Prime Agent is optional. You need it only if you keep Prime as the Chat engine, which is the default.
+Prime Agent is optional. You need it only if you turn **Chat engine** off. Rhizome's own engine is the default.
 
 ## Build and run
 
@@ -30,16 +30,16 @@ cd rhizome-agent
 pnpm tauri dev
 ```
 
-`./install.sh` installs the project's dependencies. If Prime Agent isn't on the machine, it also downloads Prime's command-line tool, because Prime is still the default Chat engine. Rhizome doesn't include a copy of Prime or Node.
+`./install.sh` installs the project's dependencies. If Prime Agent isn't on the machine, it also downloads Prime's command-line tool so you can switch to that engine later. Rhizome doesn't include a copy of Prime or Node. Chat starts on Rhizome's own engine.
 
 `pnpm tauri dev` builds the app and opens it.
 
 ## Pick an engine
 
-Chat runs on one of two engines. You can switch at any time with **Chat engine** in Settings → AI Agents.
+Chat runs on one of two engines. You can switch new chats with **Chat engine** in Settings → AI Agents. An open chat keeps the engine it started with.
 
-- **Prime Agent (default).** Prime runs Chat. Set it up below.
-- **Rhizome's own engine.** Turn **Chat engine** on. It doesn't need Prime. Add a provider key, or use **Taproot**. See [Set up models and keys](../guides/configure-ai-models.md).
+- **Rhizome's own engine (default).** The switch is on. It doesn't need Prime. Add a provider key, or use **Taproot**. See [Set up models and keys](../guides/configure-ai-models.md).
+- **Prime Agent.** Turn **Chat engine** off. Set Prime up below.
 
 ## Set up Prime
 

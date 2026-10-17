@@ -1,36 +1,48 @@
 ---
 title: Agents, engines and models
-description: The agent loop, Chat engines (Prime and Rhizome's own), models, tools and permission modes.
+description: The agent loop, Chat engines (Rhizome's own and Prime), models, tools and permission modes.
 ---
 
-Rhizome lets you choose what runs Chat: Prime Agent or Rhizome's own engine. Whichever you use, the vault, the permissions and the saved memory stay the same.
+Chat runs on Rhizome's own engine by default. You can switch new chats to Prime Agent. Whichever you use, the vault, the permissions and the saved memory stay the same.
 
 ## Terms on this page
 
 - **Agent loop:** the cycle that sends your message to a model, runs the tools the model asks for, and repeats until the answer is done.
 - **Engine:** what runs that loop for Chat.
 - **Model:** the language model the engine talks to, hosted or running locally.
-- **Tool:** an action the agent can take, such as creating a note or running a command.
+- **Tool:** an action the agent can take, such as reading a note or running a command.
 
 ## Engines for Chat
 
 | Engine | What it is | Good for |
 |---|---|---|
-| **Prime Agent** (default) | A separate harness Rhizome connects to. It runs sessions, tools, skills and provider login | Real agent work today: reading, searching and editing files, long runs, Prime packages |
-| **Rhizome's engine** | Rhizome's own loop, built into the app. It doesn't need Prime | Choosing your own providers, including free models. Early: it can create notes, but can't read, search or edit files yet |
+| **Rhizome's engine** (default) | Rhizome's own loop, built into the app. It doesn't need Prime | Your own providers, **Taproot**, and vault tools: read, search, edit, create notes, and (in Power User) a shell command |
+| **Prime Agent** | A separate harness Rhizome connects to. It runs sessions, tools, skills and provider login | Long Prime runs, Prime skills, and Prime's own model catalog (including Anthropic) |
 
-Switch with **Chat engine** in Settings → AI Agents. When it's on, new chats use Rhizome's engine and never call Prime, even if Prime isn't installed. The switch is only in Settings, not in the message box.
+**Chat engine** in Settings → AI Agents is on for Rhizome's engine. Turn it off to send new chats to Prime. The switch is only in Settings, not in the message box. An open chat keeps the engine it started with. If you asked for Prime and Prime isn't installed, a new Prime-targeted chat falls back to Rhizome's engine after the host status says so.
 
 ### Rhizome's engine
 
 - **Models:** pick a catalog model, or **Taproot**. See [Free models and routing](free-models-and-routing.md). Anthropic models aren't offered here yet.
-- **Tools:** `echo` and `create_note`. Power User adds `bash`. Rhizome asks you to approve each `bash` call, but `bash` doesn't run a shell yet. There are no tools to read, search or edit files, and the agent can't search the vault or old sessions.
+- **Tools:** see the table below. Read and search tools run without asking. Edits and shell commands ask first.
 - **Saved chats:** each chat is saved as it goes and can be reopened after you quit. Chats get a title automatically from the first exchange.
 - **Errors:** a problem that doesn't stop the turn shows as a notice in the chat. A problem that does stop it, such as a missing key, ends the turn with a message that says what to fix.
 
+| Tool | What it does | When it runs |
+|---|---|---|
+| `read_file`, `list_dir`, `grep`, `glob` | Read and search files in the open vault and workspace | Auto in both permission modes. Paths outside those roots are refused |
+| `edit_file`, `write_file` | Change or create a file in those same roots | Asks every time unless you already allowed that tool and path for the session |
+| `create_note` | Create a new Markdown note without overwriting | Asks in Limited tools. Auto in Power User |
+| `bash` | Run one shell command with the vault as the working directory | Power User only. Asks every time. There is no session grant |
+| `echo` | Return its arguments | Auto |
+
+`bash` really runs the command (`sh -c` on macOS and Linux, `cmd /S /C` on Windows). Default timeout is 60 seconds, capped at 300. The working directory cannot be chosen by the model. stdin is closed. Output is capped. See the Chat **Run command** card for the full command, then stdout and stderr after it finishes.
+
+Secret files (`.env*` except `.env.example`, `.git/`, key material) are blocked on the file tools. That denylist does not cover `bash`. Settings → AI Agents → Safety can turn the denylist off for **reads** only.
+
 ### Prime Agent
 
-Prime runs as a background service (a daemon) that Rhizome connects to. Prime owns its sessions (`~/.prime/agent/sessions/`) and its packages (Settings → Packages). Packages can use the whole machine; a vault isn't a sandbox for them.
+Prime runs as a background service (a daemon) that Rhizome connects to. Prime owns its sessions (`~/.prime/agent/sessions/`). Prime packages you install from the Prime CLI can use the whole machine; a vault isn't a sandbox for them. There is no in-app Packages marketplace. Settings → AI Agents → **Advanced Prime engine** shows whether Prime is installed and lets you copy MCP config.
 
 Prime handles its own provider login. Sign in from Settings → AI Agents → Local agent, where each provider card (Anthropic, OpenAI Codex, xAI, DeepSeek and others) has a **Sign in** or **Reconnect** button. Or run `prime-agent` in a terminal and use `/login`. Prime's model list includes Anthropic models.
 
@@ -42,20 +54,20 @@ A **permission mode** decides what the agent may do without asking. It's set per
 
 | Mode | Rhizome's engine |
 |---|---|
-| **Limited tools** | `echo` and `create_note`. Asks before each note it creates |
-| **Power User** | Creates notes without asking. Adds `bash`, which asks every time and doesn't run a shell yet |
+| **Limited tools** | Read and search auto-run. `create_note` asks. Edits ask. No `bash` |
+| **Power User** | Read, search, and `create_note` auto-run. Edits still ask unless a session grant covers that path. `bash` is offered and asks every time |
 
-Prime has no sandbox, so Prime chats always run as Power User. While Prime is the default AI target, chats on Rhizome's engine also run as Power User.
+Prime has no sandbox, so Prime chats always run as Power User.
 
 ## Plugins
 
-Rhizome will have its own plugin system: add a tool, hook into a turn, or block a tool call. It's planned, not shipped. Today, Prime packages extend Prime, and MCP lets other apps use your vault.
+Rhizome will have its own plugin system: add a tool, hook into a turn, or block a tool call. It's planned, not shipped. Today, Prime CLI packages extend Prime, and MCP lets other apps use your vault.
 
 ## Let other apps use your vault (MCP)
 
 **MCP** (Model Context Protocol) lets other AI apps call Rhizome's tools. With it, an MCP client such as Claude Code or Cursor can read and write your vault.
 
-Run **Set Up External AI Tools…** from the command palette (⌘K). Rhizome shows which config files it will change (for example `~/.claude.json` and `~/.cursor/mcp.json`) and writes nothing until you confirm. It needs Node.js 18 or newer, or Bun, on your `PATH`. To paste the entry yourself, use **Copy MCP config** in Settings → AI Agents → Local agent.
+Run **Set Up External AI Tools…** from the command palette (⌘K). Rhizome shows which config files it will change (for example `~/.claude.json` and `~/.cursor/mcp.json`) and writes nothing until you confirm. It needs Node.js 18 or newer, or Bun, on your `PATH`. To paste the entry yourself, use **Copy MCP config** in Settings → AI Agents → **Advanced Prime engine**.
 
 ## Review what the agent changed
 

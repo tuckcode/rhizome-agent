@@ -586,10 +586,10 @@ chat until the new one arrives — that is the bug.
 **Settings pinwheel.** `get_available_prime_models` is hundreds of
 models. Opening Settings used to fetch it immediately, plus
 `get_prime_provider_status`. Both wait until Agents is visible
-(`loadModelCatalog`). Packages search waits until Packages
-(`loadExtensionCatalog`). Chat and Settings share
-`loadPrimeModelCatalog`; a failed “host is not running” answer is not
-cached.
+(`loadModelCatalog`). There is no Packages catalog and no
+`loadExtensionCatalog`. Old Packages section ids open Advanced Prime
+engine. Chat and Settings share `loadPrimeModelCatalog`; a failed
+“host is not running” answer is not cached.
 
 ## 21. Red X quits unless Keep in taskbar (ADR-0179)
 
@@ -684,3 +684,31 @@ older briefing (including closed drafts #66–#68):
   read must not invent finishes. Do not close #52 from units.
 - **Blank window.** `main.tsx` lazy-loads `App` behind `BootSplash`.
   `Suspense fallback={null}` is the defect C75 removed. Do not restore it.
+
+## 27. Native Chat is the default; vault tools are real (2026-10-17)
+
+**Origin:** docs automation · 2026-10-17 · verified against
+`src/lib/chatEngine.ts`, `src/lib/effectiveChatEngine.ts`,
+`src-tauri/src/rhizome_loop/tools/mod.rs`, `SettingsPanel.tsx`.
+
+Do not restore these claims from older briefings or from
+`docs/plans/2026-10-10-harness-remaining-threads.md` ground truth:
+
+1. **Chat starts on Prime until you switch.** False. `readChatEngine`
+   treats anything but stored `prime` as native. The Settings switch is
+   on for native.
+2. **Native tools are `echo` and `create_note`, and `bash` does not run
+   a process.** False. The registry also offers `read_file`, `list_dir`,
+   `grep`, `glob`, `edit_file`, and `write_file`. Power User `bash` runs
+   one command in the vault root (`shell.rs`). Limited tools never offer
+   it.
+3. **Settings → Packages / Browse packages.** Removed. Do not add
+   `setLoadExtensionCatalog`. Old ids open **Advanced Prime engine**.
+4. **The agent cannot search the vault.** Native read tools auto-run
+   inside canonical vault and workspace roots. Secret-path blocking is a
+   safety net on those file tools only; `bash` is not covered.
+5. **Kanban is a hard no.** ADR-0188 lifted the park. There is still no
+   board UI and still no `kanban.db`. Do not copy Hermes kanban files.
+
+Open chats keep the engine they started on. Prime-targeted new chats
+fall back to native only after host status says Prime is not installed.

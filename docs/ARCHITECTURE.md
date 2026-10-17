@@ -498,12 +498,16 @@ worker expires after Prime's reconnect grace. Active close asks, with
 as an agent still working. ADR-0180 is the identity: Rhizome owns the loop.
 `src-tauri/src/engines/` holds the Phase 5 trait and the native / Prime /
 Hermes wrappers. Settings `chat_engine` chooses Prime or the native engine.
-Absent means Prime, so Chat stays on Prime until that switch is on.
-A native-engine chat can send when Prime is not installed. A Prime-targeted
-chat still shows the install-Prime guidance until Prime is present.
-Cmd+K uses the same native-or-ready gate. Native mode does not poll Prime
-or show Prime chrome. Native no-key errors point at Settings → AI Agents
-→ API models.
+Absent or any value other than `prime` means native (`readChatEngine` in
+`src/lib/chatEngine.ts`). The Settings switch is on for native. Stored
+`prime` is the only way new chats stay on Prime. A native-engine chat
+can send when Prime is not installed. A Prime-targeted chat still shows
+the install-Prime guidance until the host status is known; if that
+status says Prime is missing, new chats fall back to native
+(`resolveEffectiveChatEngine`). An already-open chat keeps the engine it
+started on. Cmd+K uses the same native-or-ready gate. Native mode does
+not poll Prime or show Prime chrome. Native no-key errors point at
+Settings → AI Agents → API models.
 `commands/native_chat.rs` is the backend for that toggle: start / send /
 cancel / approval_reply / end / list / open / delete, events on
 `native-chat:<session_id>`. Native `Error` events carry `fatal`: log-save
@@ -517,8 +521,8 @@ every line, 100 MiB / 1 MiB caps, owner-only file, known-credential
 scrub, reopen as cancelled with no restored grants. The id is a UUID.
 An OS file lock covers a second process and dies with it. Both windows
 may display a chat; only one turn runs. Damage and a full log keep the
-original and continue in a new session. With the Settings switch on,
-new chats call `native_chat_start` and pick a catalog model or Taproot.
+original and continue in a new session. New native chats call
+`native_chat_start` and pick a catalog model or Taproot.
 `rhizome_provider_model.rs` is the native loop's OpenAI-compatible `Model`.
 The loop registry (`rhizome_loop/tools`) offers `echo`, read-only file tools
 (`read_file`, `list_dir`, `grep`, `glob`), mutate file tools (`edit_file`,

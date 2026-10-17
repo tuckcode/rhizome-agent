@@ -10,11 +10,11 @@ How to navigate the **Rhizome** codebase, run the app, and find what you need.
 
 User-facing name is **Rhizome**. The bundle is still `ai.rhizome.agent` / `Rhizome.app`.
 
-- Rhizome owns the agent loop (ADR-0180). Native chat works without Prime. Settings still starts Chat on Prime until you switch **Chat engine**. Hermes is not a usable engine in the app today.
+- Rhizome owns the agent loop (ADR-0180). Chat starts on the native engine. Prime is optional: Settings **Chat engine** off. Hermes is not a usable engine in the app today.
 - **Taproot** is the free automatic router in the model picker (stored target id `free_tier_auto` is unchanged).
 - Graphite is the default theme. Dark is Graphite, Light is Earth light, and System follows the OS between those two. Earth dark, Loam, and Mycelium are color skins.
 - Left rail Views are Research, Graph, Mycelium, and History (Ctrl+Cmd+1–4 on Mac, Ctrl+Shift+1–4 on Windows). Changes sits next to Notes.
-- You read and diff notes in the vault. Mycelium replays builds. The agent cannot search the vault or old Mycelium sessions yet.
+- You read and diff notes in the vault. The native engine can search that vault (`grep`, `read_file`, `list_dir`, `glob`). Mycelium replays builds. The agent cannot search old Mycelium sessions.
 - Provider keys live in the system keychain. A leftover `ai-provider-secrets.json` migrates on first read. Do not tell a user to edit that file.
 
 ## Prerequisites
@@ -22,7 +22,7 @@ User-facing name is **Rhizome**. The bundle is still `ai.rhizome.agent` / `Rhizo
 - **Node.js** `^20.19.0` or `>=22.12.0` (Vite 7) and **pnpm**
 - **Rust** 1.77.2+ (for the Tauri backend)
 - **git** CLI (required by the git integration features)
-- **Prime Agent** on `PATH` only if Chat stays on the Prime engine. Native chat does not need it. `./install.sh` still fetches Prime because Settings still defaults to that engine. Not vendored.
+- **Prime Agent** on `PATH` only if you turn **Chat engine** off. Native chat does not need it. `./install.sh` still fetches Prime as an optional engine. Not vendored.
 
 ### Linux system dependencies
 
@@ -511,6 +511,11 @@ Verified against source 2026-09-14. Longer landmine list:
   32px hit target). Inbox toggles; it does not mount Graph. Beside an open
   note folds Sessions/Notes — do not restore hover-collapse on that pane
   (`App.layout-edges.test.ts`). ADR-0173.
+- **Notes panel modes.** After Notes is shown, the column is Auto (46px,
+  hover-expands), Rail (46px pinned), or Open (in-flow, resizable). Default
+  stored mode is Open (`NOTES_PANEL_DEFAULT_MODE`). Cycle with ⌘⇧. on Mac
+  or Ctrl+Shift+. elsewhere (`notesPanelMode.ts`). A fresh Chat vault still
+  starts with Notes shut; the stored mode applies when you show the panel.
 - **Rail Views are Research, Graph, Mycelium, and History.** Order and
   labels live in `src/lib/railViews.ts`. Shortcuts are Ctrl+Cmd+1–4 on Mac
   and Ctrl+Shift+1–4 elsewhere (`src/lib/railViewShortcuts.ts`). Do not
@@ -530,12 +535,18 @@ Verified against source 2026-09-14. Longer landmine list:
   of ensure is still required when the host is down. The click must clear the
   transcript immediately; leaving the old messages up is the beachball.
 - **Settings catalog is lazy.** Do not fetch `get_available_prime_models` or
-  `get_prime_provider_status` until Agents is visible. Do not search the
-  Packages catalog until Advanced Prime engine is expanded and **Browse
-  packages** is opened. Do not cache a failed “host is not running” catalog.
-- **Chat default stays Prime.** Settings must not present Prime as an
-  optional local-agent alternative. An API-model default must say it
-  skips Prime sessions and vault tools.
+  `get_prime_provider_status` until Agents is visible. There is no Packages
+  marketplace. Old section ids `packages` and `settings-section-extensions`
+  open **Advanced Prime engine** (install status and Copy MCP config). Do
+  not restore `setLoadExtensionCatalog` or **Browse packages**. Do not
+  cache a failed “host is not running” catalog.
+- **Chat engine default is native.** Absent `chat_engine` reads as native
+  (`src/lib/chatEngine.ts`). The Settings switch is on for native. Stored
+  `prime` is the only way new chats stay on Prime. If Settings asked for
+  Prime and the host later says Prime is missing, a new Prime-targeted chat
+  falls back to native (`effectiveChatEngine.ts`). An open chat keeps the
+  engine it started on. ChatHome still must not strip Prime chrome when the
+  default AI *agent* is Prime and the default *target* is an API model.
 - **Red X quits unless Keep in taskbar.** Default close exits and
   `release_helpers_on_quit` stops the app-owned MCP bridge, Mindwalk,
   and a Prime daemon this process spawned (ADR-0179). Keep in taskbar
@@ -673,6 +684,7 @@ BASE_URL="http://localhost:5202" npx playwright test tests/smoke/<slug>.spec.ts
 5. **Shared CLI runtime behavior**: Edit `src-tauri/src/cli_agent_runtime.rs` for process lifecycle, prompt wrapping, version probing, and common Rhizome MCP path handling.
 6. **Agent-specific arguments/events**: Edit the per-agent adapter modules (`claude_cli.rs`, `codex_cli.rs`, `opencode_*`, `pi_*`, `antigravity_*`, `kiro_*`). Keep Codex Safe on `read-only` + `untrusted` and Codex Power User on active-vault `workspace-write` + `never`, keep Pi, Antigravity, and Kiro on transient MCP config, and do not use dangerous permission bypasses unless an ADR explicitly designs a new mode. Pi's transient agent directory must be seeded from the user's existing Pi agent directory before Rhizome MCP is merged so standalone provider/auth setup keeps working. Antigravity Safe uses sandboxed `proceed-in-sandbox`, Power User uses `always-proceed` without `--dangerously-skip-permissions`, and workspace MCP config lives in `.agents/mcp_config.json`. Kiro receives prompt content over stdin and writes Rhizome MCP config into `.kiro/settings/mcp.json` in the active vault.
 7. **Availability probing**: Edit `src/hooks/useAiAgentsStatus.ts` and `src-tauri/src/ai_agents.rs` for AI-agent install/status detection. Keep renderer probing deferred until after first paint, skip it when AI features or AI surfaces are unavailable, and keep backend per-agent CLI checks parallel so missing tools do not serialize shell startup cost.
+8. **Native Chat tools**: Edit `src-tauri/src/rhizome_loop/tools/` (registry and policy) and `src-tauri/src/commands/native_chat.rs` (start / send / cancel / approval). Read-only file tools auto-run. `edit_file` / `write_file` ask in both modes. Power User `bash` runs in the vault root after approval. Do not restore a stub that only echoes args.
 
 ### Work with external MCP setup
 

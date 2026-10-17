@@ -34,7 +34,8 @@ It is **not** Rhizome Desktop (`knispo/rhizome`). Do not “fix branding
 back to Desktop.” Details: [`IDENTITY.md`](IDENTITY.md).
 
 **Rhizome is the harness and durable memory. Prime is an optional engine.**
-Chat first, vault on purpose. Memory is gated; execution is not. Settings still starts Chat on Prime until you switch.
+Chat first, vault on purpose. Memory is gated; execution is not. Chat starts
+on Rhizome's own engine. Settings **Chat engine** off keeps new chats on Prime.
 
 If Prime already has a mechanism, use Prime’s. Do not build a Rhizome
 twin beside it. Vault knowledge still lands as markdown — Prime’s
@@ -54,7 +55,7 @@ with `pnpm prime:surface` / `pnpm prime:surface:github`. Snapshot:
 / ADR-0170 / ADR-0171. The 2026-08-26 “Graph replaces Chat” map is stale.
 
 ```
-rail | sessions | CHAT | Notes (default open; 46px rail when shut)
+rail | sessions | CHAT | Notes (fresh Chat vault: shut; then Auto / Rail / Open)
 Changes only:          | Graph / Mycelium under Notes
 Research:              | still a center-canvas pane (not Chat)
 ```
@@ -66,12 +67,12 @@ longer open the way the ADR text still sounds.
 | Question | Now |
 |---|---|
 | ⌘1 / ⌘2 / ⌘3 / ⌘4 | **Settled 2026-09-19 (ADR-0173).** ⌘1 Chat. ⌘2 Notes. ⌘3 Workbench. ⌘4 Read. Reset layout returns to Chat and default widths. Stored `viewMode` values remain compatibility mirrors (`editor-only` / `editor-list` / `all`). Fresh vaults default to Chat. Inbox stays the folder. Source only until rebuild; packaged app is still **`35f217f`**. |
-| Right panel | **Settled 2026-08-25, refined 2026-09-12.** One Notes panel. Compact nav above the selected list. Rail control is **Notes** (Inbox is a folder in the list). Shut Notes leaves a 46px restore rail. No Inbox/Notes tabs, no second right column. |
+| Right panel | **Settled 2026-08-25, refined 2026-10-12.** One Notes panel. Compact nav above the selected list. Rail control is **Notes** (Inbox is a folder in the list). After you show Notes: Auto (46px, hover-expands), Rail (46px pinned), or Open (in-flow). Default stored mode is Open. ⌘⇧. / Ctrl+Shift+. cycles. A fresh Chat vault still starts with Notes shut. No Inbox/Notes tabs, no second right column. |
 | Canvas destinations | **Corrected 2026-09-07.** Chat stays the centre. Graph/Mycelium are a Changes-only cell under Notes (ADR-0171), not a place you go instead of chatting (`App.layout-edges.test.ts` 14:33). Research is still a centre pane (Chat `display: none`, not an overlay). #39 (graph as an *agent tool*) is still open. |
 | Open note vs Chat | **Shipped 2026-09-12.** Notes header **On top / Beside**. Beside folds Sessions/Notes. Hover must not collapse the note. Highlight → Copy, or **Ask Chat about this** (same thread; `App.layout-edges.test.ts` 14:00). Right-click a list row → **Ask the agent about this note** keeps Chat and opens that note (`App.test.tsx` 13:50). Note lock is ephemeral and per-note — locked notes are read-only (`EditorContentLayout.test.tsx` 13:51). Not vault `editor_mode`. |
 | Latest reply | Green start marker on the newest assistant turn. Moves when a newer reply starts. |
 | Session click | Transcript **clears on the click**, then rehydrates. Leaving the old chat up is the switch beachball. |
-| Settings cost | Model catalog and provider status wait until **Agents** is visible. Packages catalog waits until **Packages**. |
+| Settings cost | Model catalog and provider status wait until **Agents** is visible. There is no Packages catalog. Old Packages section ids open **Advanced Prime engine**. |
 | Hide vs quit | Red X quits unless Keep in taskbar (ADR-0179). Default quit stops ws-bridge, Mindwalk, and a spawned Prime. Keep in taskbar restores C22 hide; **C75** then leaves spawned Prime warm. Keep working leaves that daemon so the grant can live. Never Prime `shutdown` (0163, kept by 0180). A Rhizome-owned turn that is not using Prime is not a Prime helper. |
 
 **Do not** make nav and the note list exclusive. Claude tried; it broke
@@ -168,12 +169,24 @@ are **closed** on GitHub (2026-08-29). Do not redesign the strip again.
   copy, save to vault, fork).
 - Command argument hints were already in the slash menu.
 
-### Packages hub (2026-09-12)
+### Packages hub (removed 2026-10-16)
 
-Settings → **Packages** (nav label, not "Extensions") is the Pi catalog.
-Install is `prime-agent package install`, then reload. The daemon has no
-install command. Confirm full system access once. Chat is the fallback
-when the CLI is missing.
+There is no Settings → **Packages** marketplace and no **Browse packages**
+button. Old section ids (`packages`, `settings-section-extensions`) open
+**Advanced Prime engine** (install status and Copy MCP config). Do not
+restore `setLoadExtensionCatalog`. Prime CLI install (`prime-agent package
+install`) still exists outside the app.
+
+### Native Chat default and vault tools (2026-10-16)
+
+New chats use Rhizome's engine unless Settings stores `chat_engine: prime`.
+Native tools: `echo`; read-only `read_file`, `list_dir`, `grep`, `glob`
+(auto-run inside vault and workspace roots); `edit_file` / `write_file`
+(ask in both modes unless a session grant covers that tool and path);
+`create_note` (asks in Limited tools; auto in Power User); Power User
+`bash` (asks every call, then runs in the vault root). ADR-0187 is the
+identity. ADR-0187's "Power User edits auto-run" line does not match the
+code: mutate tools still ask.
 
 ### Prime verbs that landed in Chat
 
