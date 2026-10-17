@@ -67,20 +67,6 @@ export function trackFilePreviewFailed(previewKind: FilePreviewKind): void {
 }
 
 /**
- * The reasoning level was changed from the composer (#9 / #35).
- *
- * The level id is a fixed, non-identifying enum from Prime's own list, so it
- * is safe to record as-is. `source` says whether it came from the model menu
- * or the composer thinking pill.
- */
-export function trackPrimeThinkingLevelChanged(
-  level: string,
-  source: 'menu' | 'pill' | 'toggle' = 'menu',
-): void {
-  trackEvent('prime_thinking_level_changed', { level, source })
-}
-
-/**
  * A composer control strip pill was opened (#38). Which pill, never the
  * vault path, skill name, or model id — those are user content.
  */

@@ -5,7 +5,6 @@ import { ChatComposerDeck } from './ChatComposerDeck'
 vi.mock('../lib/productAnalytics', () => ({
   trackComposerPillOpened: vi.fn(),
   trackPrimeModelChanged: vi.fn(),
-  trackPrimeThinkingLevelChanged: vi.fn(),
   trackPrimeModelsFreeOnly: vi.fn(),
   trackRhizomeModelChanged: vi.fn(),
 }))
@@ -21,10 +20,9 @@ describe('ChatComposerDeck', () => {
     expect(screen.getByTestId('chat-composer-deck')).toHaveTextContent('ctx · memory-loop.md')
   })
 
-  it('puts the native model chip and thinking on the composer strip (#38 / #9 / #35)', () => {
+  it('puts the native model chip on the composer strip (#38 / #9)', () => {
     render(
       <ChatComposerDeck
-        thinkingLevel="off"
         nativeTarget="open_ai/gpt-4.1-mini"
         onNativeTargetChange={vi.fn()}
       />,
@@ -32,8 +30,7 @@ describe('ChatComposerDeck', () => {
 
     expect(screen.getByTestId('native-chat-model-picker')).toBeInTheDocument()
     expect(screen.getByTestId('native-chat-model-trigger').tagName).toBe('BUTTON')
-    expect(screen.getByTestId('prime-thinking-toggle')).toHaveTextContent('Off')
-    expect(screen.getByTestId('prime-thinking-toggle').tagName).toBe('BUTTON')
+    expect(screen.queryByTestId('prime-thinking-toggle')).not.toBeInTheDocument()
     expect(screen.queryByTestId('prime-model-chip')).not.toBeInTheDocument()
   })
 
@@ -75,7 +72,6 @@ describe('ChatComposerDeck', () => {
     render(
       <ChatComposerDeck
         catalog="prime"
-        thinkingLevel="high"
         nativeTarget="open_ai/gpt-4o"
         onNativeTargetChange={vi.fn()}
       />,
@@ -83,20 +79,17 @@ describe('ChatComposerDeck', () => {
 
     expect(screen.getByTestId('native-chat-model-picker')).toBeInTheDocument()
     expect(screen.getByTestId('native-chat-model-picker')).toHaveAttribute('data-engine', 'prime')
-    expect(screen.getByTestId('prime-thinking-toggle')).toHaveTextContent('High')
+    expect(screen.queryByTestId('prime-thinking-toggle')).not.toBeInTheDocument()
     expect(screen.queryByTestId('prime-model-chip')).not.toBeInTheDocument()
   })
 
-  it('hosts the agent activity pill next to thinking', () => {
+  it('hosts the agent activity pill on the composer row', () => {
     render(
       <ChatComposerDeck
-        thinkingLevel="off"
         activity={<span data-testid="status-agents-pill">Agents idle</span>}
       />,
     )
 
-    const thinking = screen.getByTestId('prime-thinking-toggle')
-    const agents = screen.getByTestId('status-agents-pill')
-    expect(thinking.compareDocumentPosition(agents) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByTestId('status-agents-pill')).toBeInTheDocument()
   })
 })
