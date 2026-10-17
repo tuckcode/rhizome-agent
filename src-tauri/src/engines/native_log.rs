@@ -25,6 +25,9 @@ const COMPLETION_RESERVE: u64 = 4096;
 /// User-facing notice when a mid-turn log append fails. The turn continues.
 pub const LOG_SAVE_NOTICE: &str =
     "This part of the chat couldn't be saved, so it won't be there after a restart.";
+/// Shown once when the writer can no longer append at all.
+pub const LOG_SAVE_STOPPED: &str =
+    "Saving has stopped for this chat, so later messages won't be there after a restart.";
 
 /// ADR-0183 reopen warning, exact wording.
 pub const REOPEN_WARNING: &str =
@@ -112,6 +115,8 @@ pub struct NativeSessionWriter {
     fail_io: bool,
     /// Truncate, rewind, or sync failed. Later appends must not write.
     poisoned: bool,
+    /// The user has already been told that saving stopped.
+    stop_announced: bool,
     /// Test hook: write this many bytes of the next line, then fail.
     #[cfg(test)]
     partial_write_limit: Option<usize>,
@@ -557,6 +562,7 @@ pub fn create_session_log(header: &SessionHeader) -> Result<NativeSessionWriter,
         header: header.clone(),
         fail_io: false,
         poisoned: false,
+        stop_announced: false,
         #[cfg(test)]
         partial_write_limit: None,
         #[cfg(test)]
@@ -584,6 +590,7 @@ pub fn open_session_writer(session_id: &str, next_seq: u64) -> Result<NativeSess
         header,
         fail_io: false,
         poisoned: false,
+        stop_announced: false,
         #[cfg(test)]
         partial_write_limit: None,
         #[cfg(test)]
@@ -785,7 +792,17 @@ pub fn append_or_roll(
                 "This chat reached its 100 MiB log. Rhizome continued in a new session.".into(),
             ))
         }
-        Err(AppendError::Io(_)) => Err(LOG_SAVE_NOTICE.to_string()),
+        Err(AppendError::Io(detail)) => {
+            if writer.poisoned {
+                if writer.stop_announced {
+                    return Ok(None);
+                }
+                writer.stop_announced = true;
+                log::warn!("Native session log saving stopped: {detail}");
+                return Err(LOG_SAVE_STOPPED.to_string());
+            }
+            Err(LOG_SAVE_NOTICE.to_string())
+        }
     }
 }
 
@@ -1272,9 +1289,12 @@ mod tests {
         writer.fail_after_partial_write(1);
         writer.fail_repair(1);
         let first = append_or_roll(&mut writer, &user_event("torn")).expect_err("short write");
-        assert_eq!(first, LOG_SAVE_NOTICE);
-        let later = append_or_roll(&mut writer, &user_event("after")).expect_err("poisoned");
-        assert_eq!(later, LOG_SAVE_NOTICE);
+        assert_eq!(first, LOG_SAVE_STOPPED);
+        assert_eq!(
+            append_or_roll(&mut writer, &user_event("after")).unwrap(),
+            None,
+            "a poisoned writer announces the stop once"
+        );
         let bytes = std::fs::read(writer.path()).unwrap();
         assert!(
             !bytes.windows(5).any(|window| window == b"after"),
@@ -1294,7 +1314,7 @@ mod tests {
         writer.fail_repair(2);
         assert_eq!(
             append_or_roll(&mut writer, &user_event("torn")).unwrap_err(),
-            LOG_SAVE_NOTICE
+            LOG_SAVE_STOPPED
         );
         assert_eq!(
             std::fs::metadata(writer.path()).unwrap().len(),
@@ -1302,8 +1322,8 @@ mod tests {
             "truncate already succeeded"
         );
         assert_eq!(
-            append_or_roll(&mut writer, &user_event("after")).unwrap_err(),
-            LOG_SAVE_NOTICE
+            append_or_roll(&mut writer, &user_event("after")).unwrap(),
+            None
         );
         assert_eq!(
             std::fs::metadata(writer.path()).unwrap().len(),
@@ -1323,11 +1343,11 @@ mod tests {
         writer.fail_repair(3);
         assert_eq!(
             append_or_roll(&mut writer, &user_event("torn")).unwrap_err(),
-            LOG_SAVE_NOTICE
+            LOG_SAVE_STOPPED
         );
         assert_eq!(
-            append_or_roll(&mut writer, &user_event("after")).unwrap_err(),
-            LOG_SAVE_NOTICE
+            append_or_roll(&mut writer, &user_event("after")).unwrap(),
+            None
         );
         drop(writer);
         assert_eq!(user_texts(&id), ["a"]);

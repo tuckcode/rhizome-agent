@@ -41,6 +41,13 @@ pub trait SecretBackend: Send + Sync {
     fn set(&self, account: &str, value: &str) -> Result<(), String>;
     /// Deleting an account that does not exist is not an error.
     fn delete(&self, account: &str) -> Result<(), String>;
+    /// Counts a save, delete, or restore on this store. The process-wide
+    /// cache bump is separate; this one is per backend so a test can see
+    /// exactly how many times its own store changed.
+    fn note_change(&self) {}
+    fn change_count(&self) -> u64 {
+        0
+    }
 }
 
 /// The legacy file shape: `{ "provider_api_keys": { "<id>": "<key>" } }`.
@@ -134,14 +141,14 @@ impl ProviderKeys {
             }
         };
         self.backend.set(&id, key)?;
-        keys_changed();
+        self.bump_keys();
         if keychain_holds(&self.backend.get(&id), Some(key)) {
-            return self.legacy.remove(&id);
+            return self.drop_legacy_copy(&id);
         }
         let outcome = self.restore_after_mismatch(&id, &previous);
         // A try_credential between the first set and this restore can cache
         // the unverified value. Bump again so that cache entry is dropped.
-        keys_changed();
+        self.bump_keys();
         Err(read_back_message(&id, outcome))
     }
 
@@ -152,7 +159,7 @@ impl ProviderKeys {
             },
             Previous::Known(Some(old)) => {
                 if self.backend.set(id, old).is_err() {
-                    return ReadBack::NotRestored;
+                    return ReadBack::NotRestored { had_previous: true };
                 }
                 if keychain_holds(&self.backend.get(id), Some(old.as_str())) {
                     ReadBack::RestoredPrevious
@@ -164,7 +171,9 @@ impl ProviderKeys {
             }
             Previous::Known(None) => {
                 if self.backend.delete(id).is_err() {
-                    return ReadBack::NotRestored;
+                    return ReadBack::NotRestored {
+                        had_previous: false,
+                    };
                 }
                 if keychain_holds(&self.backend.get(id), None) {
                     ReadBack::RemovedNew
@@ -186,8 +195,30 @@ impl ProviderKeys {
         if !id.ends_with(ACCOUNT_SUFFIX) {
             self.backend.delete(&format!("{id}{ACCOUNT_SUFFIX}"))?;
         }
+        self.bump_keys();
+        self.drop_legacy_copy(&id)
+    }
+
+    /// Drops the file copy after the keychain write already stuck. A file
+    /// that cannot be read is logged and left in place; the keychain copy
+    /// is the one the user just saved or deleted.
+    fn drop_legacy_copy(&self, id: &str) -> Result<(), String> {
+        match self.legacy.remove(id) {
+            Ok(()) => Ok(()),
+            Err(error)
+                if error.starts_with("Failed to parse the legacy key file")
+                    || error.starts_with("Failed to read the legacy key file") =>
+            {
+                note_legacy(id, &error);
+                Ok(())
+            }
+            Err(error) => Err(error),
+        }
+    }
+
+    fn bump_keys(&self) {
         keys_changed();
-        self.legacy.remove(&id)
+        self.backend.note_change();
     }
 
     /// Reads one credential without the cache. A keychain that cannot be
@@ -389,7 +420,9 @@ enum ReadBack {
         previous_unknown: bool,
     },
     /// The restore write itself failed.
-    NotRestored,
+    NotRestored {
+        had_previous: bool,
+    },
 }
 
 /// The read-back failed after the keychain write. The wording matches what
@@ -407,8 +440,13 @@ fn read_back_message(id: &str, outcome: ReadBack) -> String {
             };
             format!("{lead}{unread} The keychain may hold the new key or the old one.")
         }
-        ReadBack::NotRestored => {
+        ReadBack::NotRestored { had_previous: true } => {
             format!("{lead} The keychain value was replaced and could not be restored.")
+        }
+        ReadBack::NotRestored {
+            had_previous: false,
+        } => {
+            format!("{lead} The new key was added and could not be removed.")
         }
     }
 }
@@ -673,8 +711,10 @@ mod tests {
         fail_read_on: Option<usize>,
         /// 0-based `set` index that fails.
         fail_set_on: Option<usize>,
+        fail_delete: bool,
         reads: std::sync::Arc<std::sync::atomic::AtomicUsize>,
         sets: std::sync::atomic::AtomicUsize,
+        changes: std::sync::atomic::AtomicU64,
     }
 
     impl SecretBackend for MemoryBackend {
@@ -710,8 +750,19 @@ mod tests {
         }
 
         fn delete(&self, account: &str) -> Result<(), String> {
+            if self.fail_delete {
+                return Err(format!("keychain refused delete for {account}"));
+            }
             self.values.lock().unwrap().remove(account);
             Ok(())
+        }
+
+        fn note_change(&self) {
+            self.changes.fetch_add(1, Ordering::SeqCst);
+        }
+
+        fn change_count(&self) -> u64 {
+            self.changes.load(Ordering::SeqCst)
         }
     }
 
@@ -958,7 +1009,6 @@ mod tests {
     #[test]
     fn an_unread_previous_key_is_named_when_the_new_key_does_not_read_back() {
         let fixture = Fixture::with_file(&[]);
-        let before = KEY_GENERATION.load(Ordering::SeqCst);
         let keys = fixture.keys(MemoryBackend {
             fail_read_on: Some(0),
             mismatch_on_read: Some(1),
@@ -974,8 +1024,9 @@ mod tests {
         );
         assert!(!error.contains("could not be restored"), "{error}");
         assert!(!error.contains("gsk-new"), "a key value leaked: {error}");
-        assert!(
-            KEY_GENERATION.load(Ordering::SeqCst) >= before + 2,
+        assert_eq!(
+            keys.backend.change_count(),
+            2,
             "the unverified value must not stay cached"
         );
     }
@@ -983,7 +1034,6 @@ mod tests {
     #[test]
     fn a_failed_restore_write_says_the_key_could_not_be_restored() {
         let fixture = Fixture::with_file(&[]);
-        let before = KEY_GENERATION.load(Ordering::SeqCst);
         let keys = fixture.keys(MemoryBackend {
             mismatch_on_read: Some(1),
             fail_set_on: Some(1),
@@ -993,14 +1043,31 @@ mod tests {
         let error = keys.save("groq", "gsk-new").unwrap_err();
 
         assert!(error.contains("could not be restored"), "{error}");
+        assert!(error.contains("replaced"), "{error}");
         assert!(!error.contains("may hold"), "{error}");
-        assert!(KEY_GENERATION.load(Ordering::SeqCst) >= before + 2);
+        assert_eq!(keys.backend.change_count(), 2);
+    }
+
+    #[test]
+    fn a_new_key_that_cannot_be_removed_is_not_called_replaced() {
+        let fixture = Fixture::with_file(&[]);
+        let keys = fixture.keys(MemoryBackend {
+            mismatch_on_read: Some(1),
+            fail_delete: true,
+            ..Default::default()
+        });
+
+        let error = keys.save("groq", "gsk-new").unwrap_err();
+
+        assert!(error.contains("added"), "{error}");
+        assert!(error.contains("could not be removed"), "{error}");
+        assert!(!error.contains("replaced"), "{error}");
+        assert_eq!(keys.backend.change_count(), 2);
     }
 
     #[test]
     fn a_restore_that_does_not_read_back_does_not_claim_failure() {
         let fixture = Fixture::with_file(&[]);
-        let before = KEY_GENERATION.load(Ordering::SeqCst);
         let keys = fixture.keys(MemoryBackend {
             mismatch_on_read: Some(1),
             fail_read_on: Some(2),
@@ -1015,7 +1082,33 @@ mod tests {
         );
         assert!(!error.contains("could not be restored"), "{error}");
         assert!(!error.contains("previous key could not be read"), "{error}");
-        assert!(KEY_GENERATION.load(Ordering::SeqCst) >= before + 2);
+        assert_eq!(keys.backend.change_count(), 2);
+    }
+
+    #[test]
+    fn a_corrupt_legacy_file_does_not_fail_a_key_that_was_saved() {
+        let fixture = Fixture::with_file(&[]);
+        std::fs::write(&fixture.file, "not json").unwrap();
+        let keys = fixture.keys(MemoryBackend::default());
+
+        keys.save("groq", "gsk-new").unwrap();
+
+        assert_eq!(keys.get("groq").unwrap().as_deref(), Some("gsk-new"));
+        assert!(
+            fixture.file.exists(),
+            "a file that cannot be parsed stays on disk"
+        );
+    }
+
+    #[test]
+    fn an_empty_legacy_file_does_not_fail_a_key_that_was_deleted() {
+        let fixture = Fixture::with_file(&[]);
+        std::fs::write(&fixture.file, "").unwrap();
+        let keys = fixture.keys(MemoryBackend::with(&[("groq", "gsk-old")]));
+
+        keys.delete("groq").unwrap();
+
+        assert_eq!(keys.get("groq").unwrap(), None);
     }
 
     #[test]
