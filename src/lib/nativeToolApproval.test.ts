@@ -29,13 +29,23 @@ describe('native tool approval helpers', () => {
     expect(isBashTool('bash_like')).toBe(false)
   })
 
-  it('matches an approval by call id when the prompt has one', () => {
+  it('matches an approval by call_id when the prompt has one', () => {
     const actions = [
       { tool: 'bash', toolId: 'call_old', status: 'pending' },
       { tool: 'bash', toolId: 'call_2', status: 'pending' },
     ]
     expect(matchPendingApprovalAction(actions, { tool: 'bash', callId: 'call_2' })?.toolId).toBe('call_2')
-    expect(matchPendingApprovalAction(actions, { tool: 'bash' })?.toolId).toBe('call_2')
+    expect(matchPendingApprovalAction(actions, { tool: 'bash', call_id: 'call_2' })?.toolId).toBe('call_2')
+  })
+
+  it('falls back to the last pending action of the same tool when call_id is absent', () => {
+    const actions = [
+      { tool: 'edit_file', toolId: 'call_edit', status: 'pending' },
+      { tool: 'bash', toolId: 'call_old', status: 'pending' },
+      { tool: 'bash', toolId: 'call_new', status: 'pending' },
+    ]
+    expect(matchPendingApprovalAction(actions, { tool: 'bash' })?.toolId).toBe('call_new')
+    expect(matchPendingApprovalAction(actions, { tool: 'edit_file' })?.toolId).toBe('call_edit')
   })
 
   it('reads the command and timeout from bash args', () => {

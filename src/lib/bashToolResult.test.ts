@@ -83,6 +83,26 @@ describe('bashResultRowStatus', () => {
       danger: false,
     })
   })
+
+  it('reads the runner timeout and cancel bodies with a null exit_code', () => {
+    const timed = parseBashToolResult(result({ timed_out: true, exit_code: null }))
+    expect(timed.structured).toBe(true)
+    expect(timed.timedOut).toBe(true)
+    expect(timed.exitCode).toBeUndefined()
+    expect(bashResultRowStatus('done', timed).extra).toMatchObject({
+      kind: 'timed-out',
+      text: 'timed out',
+      danger: true,
+    })
+    const stopped = parseBashToolResult(result({ stopped: true, exit_code: null }))
+    expect(stopped.structured).toBe(true)
+    expect(stopped.stopped).toBe(true)
+    expect(bashResultRowStatus('done', stopped).extra).toMatchObject({
+      kind: 'stopped',
+      text: 'stopped',
+      danger: false,
+    })
+  })
 })
 
 describe('timeout and trim copy', () => {

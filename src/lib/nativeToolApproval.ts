@@ -13,7 +13,10 @@ export interface NativeApprovalPrompt {
   promptId: string
   tool: string
   args: string
-  /** Tool-call id from the engine. Optional until the shell runner PR sends it. */
+  /**
+   * Tool-call id. Mapped from EngineEvent::ApprovalRequested.call_id
+   * (shell runner PR). Optional on main until that event field ships.
+   */
   callId?: string
   options: NativeApprovalOption[]
   path?: string
@@ -32,19 +35,27 @@ export interface ApprovalMatchAction {
   approval?: unknown
 }
 
+export function approvalCallId(
+  prompt: { callId?: string; call_id?: string },
+): string | undefined {
+  return prompt.callId ?? prompt.call_id
+}
+
 /**
  * Match an approval prompt to a pending tool action.
- * TODO: call_id is coming from the shell runner PR. Until then we match
- * the last pending action of the same tool that has no approval yet.
+ * Prefer EngineEvent::ApprovalRequested.call_id (mapped to callId).
+ * On main the event has no call_id yet, so fall back to the last pending
+ * action of the same tool that has no approval.
  */
 export function matchPendingApprovalAction<T extends ApprovalMatchAction>(
   actions: T[],
-  prompt: Pick<NativeApprovalPrompt, 'tool' | 'callId'>,
+  prompt: Pick<NativeApprovalPrompt, 'tool'> & { callId?: string; call_id?: string },
 ): T | undefined {
-  if (prompt.callId) {
+  const callId = approvalCallId(prompt)
+  if (callId) {
     return [...actions].reverse().find((action) => (
       action.status === 'pending'
-      && action.toolId === prompt.callId
+      && action.toolId === callId
       && !action.approval
     ))
   }

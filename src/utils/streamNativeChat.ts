@@ -82,7 +82,7 @@ export function applyNativeEvent(event: NativeEngineEvent, callbacks: AgentStrea
         promptId: event.prompt_id ?? '',
         tool: event.tool ?? event.name ?? 'tool',
         args: event.args ?? '',
-        callId: event.call_id ?? event.id,
+        callId: event.call_id,
         options: event.options ?? [],
         path: event.path,
         preview: event.preview,

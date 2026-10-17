@@ -54,6 +54,8 @@ export interface AiActionApproval {
   path?: string
   created?: boolean
   overwrite?: boolean
+  /** Mapped from ApprovalRequested.call_id when the shell runner sends it. */
+  callId?: string
   busy?: boolean
   onReply?: (choice: NativeApprovalChoice) => void
 }

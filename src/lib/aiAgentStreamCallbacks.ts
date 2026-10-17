@@ -364,6 +364,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
           path,
           created: prompt.created,
           overwrite: prompt.overwrite,
+          callId: prompt.callId,
           onReply: (choice: Parameters<NativeApprovalPrompt['reply']>[0]) => {
             updateMessage(setMessages, activeMessageId, (current) => ({
               ...current,

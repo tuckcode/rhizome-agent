@@ -933,5 +933,44 @@ describe('aiAgentStreamCallbacks', () => {
     expect(actions[0]?.approval).toBeUndefined()
     expect(actions[1]?.approval?.promptId).toBe('prompt_2')
     expect(actions[1]?.approval?.args).toBe('{"command":"ls"}')
+    expect(actions[1]?.approval?.callId).toBe('call_2')
+  })
+
+  it('falls back to the last pending action of the same tool when call_id is absent', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'run',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const callbacks = createStreamCallbacks({
+      agent: 'prime',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: createStatusStore().setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef: { current: '' },
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+    callbacks.onToolStart('edit_file', 'call_edit', '{"path":"a.md","old_string":"x","new_string":"y"}')
+    callbacks.onToolStart('bash', 'call_old', '{"command":"pwd"}')
+    callbacks.onToolStart('bash', 'call_new', '{"command":"ls"}')
+    callbacks.onApprovalRequested?.({
+      promptId: 'prompt_fallback',
+      tool: 'bash',
+      args: '{"command":"ls"}',
+      options: [{ id: 'allow_once', label: 'Allow once' }],
+      reply: vi.fn(),
+    })
+    const actions = messages.getMessages()[0]?.actions ?? []
+    expect(actions[0]?.approval).toBeUndefined()
+    expect(actions[1]?.approval).toBeUndefined()
+    expect(actions[2]?.approval?.promptId).toBe('prompt_fallback')
+    expect(actions[2]?.approval?.args).toBe('{"command":"ls"}')
+    expect(actions[2]?.approval?.callId).toBeUndefined()
   })
 })

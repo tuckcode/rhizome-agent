@@ -1,7 +1,13 @@
 export const BASH_RESULT_KIND = 'bash_result'
 export const BASH_DEFAULT_TIMEOUT_SECS = 60
 
-/** JSON body the native bash runner returns. Keep in lockstep with the shell PR. */
+/**
+ * JSON body from the native bash runner (`BashResult` in the shell PR).
+ * Field names are the serde keys: kind, exit_code, timed_out, stopped,
+ * stdout, stderr, stdout_truncated, stderr_truncated, and optional
+ * stdout_lines_hidden / stderr_lines_hidden. exit_code is null on
+ * timeout or cancel.
+ */
 export interface NativeBashToolResult {
   kind: typeof BASH_RESULT_KIND
   exit_code: number | null

@@ -534,9 +534,14 @@ shows the path and a unified-style preview computed once with `similar`
 `real.md via link.md`. Power User `bash` uses Allow once and Deny on the Chat card in v1 (the
 UI hides Allow for session even if the loop still offers it). The card
 title is Run command and the body is the command, not a diff. Hidden
-control characters are shown as `\u{XXXX}` badges. After the tool
-finishes, Chat shows one row per call with the command and exit status,
-expandable to stdout and stderr. There is no live streaming in this view.
+control characters are shown as `\u{XXXX}` badges. The card matches a
+pending call on `ApprovalRequested.call_id` when that field is present
+and falls back to the tool name on main until the shell runner ships it.
+Structured output is `{kind:"bash_result", exit_code, timed_out, stopped,
+stdout, stderr, stdout_truncated, stderr_truncated, stdout_lines_hidden?,
+stderr_lines_hidden?}`. After the tool finishes, Chat shows one row per
+call with the command and exit status, expandable to stdout and stderr.
+There is no live streaming in this view.
 Secret-path blocking (`.env*` except `.env.example`, `.git/`, `*.pem` /
 `*.key` / `*.p12` / `*.pfx`, known private-key basenames and their
 backups) is a safety net, not a wall. It covers the native file tools
