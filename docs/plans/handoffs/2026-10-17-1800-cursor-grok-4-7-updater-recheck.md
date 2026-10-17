@@ -14,7 +14,8 @@ commits: this slice
 `UpdaterBuilder::endpoints` replaces the config list. The checked-in
 endpoint stays as an unused fallback. `find_update` reads the pubkey
 from a mock app and returns before `fetch_feed` when it is the
-placeholder. An empty or whitespace-only pubkey does the same. HTTP 204
+placeholder. That mock runtime is not compiled into the Windows test
+binary, because it makes the process exit before any test runs. An empty or whitespace-only pubkey does the same. HTTP 204
 is no update, same as 404.
 
 The extra feed probe stays. The plugin reports 404, 403, and 5xx as the

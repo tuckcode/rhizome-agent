@@ -301,7 +301,11 @@ mod tests {
         assert!(refuse_placeholder_pubkey("dW50cnVzdGVkIGNvbW1lbnQ").is_ok());
     }
 
+    // Tauri's `test` feature compiles its mock runtime into the lib test
+    // binary. On Windows that binary exits with STATUS_ENTRYPOINT_NOT_FOUND
+    // before any test runs, so this mock app stays off that target.
     #[tokio::test]
+    #[cfg(not(windows))]
     async fn find_update_refuses_a_placeholder_config_before_any_request() {
         FEED_FETCHES.store(0, Ordering::SeqCst);
         let app = tauri::test::mock_builder()

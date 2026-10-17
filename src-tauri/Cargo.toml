@@ -113,7 +113,9 @@ libc = "0.2"
 nix = { version = "0.30", default-features = false, features = ["fs", "process", "signal"] }
 xattr = "1"
 
-[dev-dependencies]
 # Unlocks `tauri::test` for the updater placeholder-config test. The feature
-# itself is empty; it only compiles the mock runtime.
+# itself is empty; it only compiles the mock runtime. On Windows that runtime
+# makes the whole lib test process exit with STATUS_ENTRYPOINT_NOT_FOUND
+# before any test runs, so the mock app stays off that target.
+[target.'cfg(not(windows))'.dev-dependencies]
 tauri = { version = "2.10.0", features = ["test"] }
