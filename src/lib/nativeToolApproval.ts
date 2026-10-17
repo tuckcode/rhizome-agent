@@ -1,4 +1,5 @@
-import { BASH_DEFAULT_TIMEOUT_SECS, bashTimeoutSecs } from './bashToolResult'
+import { bashTimeoutFromJsonLiteral } from './bashToolResult'
+import { topLevelJsonValueLiterals } from './jsonTopLevelObject'
 
 export type NativeApprovalChoice = 'allow_once' | 'allow_session' | 'deny'
 
@@ -119,79 +120,10 @@ function isCommandObject(value: unknown): value is { command: string } {
 
 export function timeoutSecsFromToolArgs(args?: string): number | undefined {
   if (!args?.trim()) return undefined
-  try {
-    const parsed = JSON.parse(args) as { timeout_secs?: unknown; timeoutSecs?: unknown }
-    if (!parsed || typeof parsed !== 'object') return undefined
-    if (parsed.timeout_secs === undefined && parsed.timeoutSecs === undefined) return undefined
-    const literal = jsonFieldLiteral(args, 'timeout_secs') ?? jsonFieldLiteral(args, 'timeoutSecs')
-    if (literal !== undefined && !isJsonU64WholeNumberLiteral(literal)) {
-      return BASH_DEFAULT_TIMEOUT_SECS
-    }
-    return bashTimeoutSecs(parsed.timeout_secs ?? parsed.timeoutSecs)
-  } catch {
-    return undefined
-  }
-}
-
-/** JSON whole-number token the runner would pass to `as_u64`. */
-function isJsonU64WholeNumberLiteral(token: string): boolean {
-  return /^(?:0|[1-9]\d*)$/u.test(token)
-}
-
-function jsonFieldLiteral(raw: string, key: string): string | undefined {
-  const needle = `"${key}"`
-  let inString = false
-  let escape = false
-  for (let i = 0; i < raw.length; i += 1) {
-    const ch = raw[i]
-    if (inString) {
-      if (escape) {
-        escape = false
-        continue
-      }
-      if (ch === '\\') {
-        escape = true
-        continue
-      }
-      if (ch === '"') inString = false
-      continue
-    }
-    if (ch !== '"') continue
-    if (!raw.startsWith(needle, i)) {
-      inString = true
-      continue
-    }
-    let cursor = i + needle.length
-    while (cursor < raw.length && /\s/u.test(raw[cursor] ?? '')) cursor += 1
-    if (raw[cursor] === ':') return jsonValueLiteral(raw.slice(cursor + 1))
-    inString = true
-  }
-  return undefined
-}
-
-function jsonValueLiteral(raw: string): string | undefined {
-  const text = raw.trimStart()
-  if (!text) return undefined
-  if (text.startsWith('"')) {
-    let escape = false
-    for (let i = 1; i < text.length; i += 1) {
-      const ch = text[i]
-      if (escape) {
-        escape = false
-        continue
-      }
-      if (ch === '\\') {
-        escape = true
-        continue
-      }
-      if (ch === '"') return text.slice(0, i + 1)
-    }
-    return text
-  }
-  if (text.startsWith('true')) return 'true'
-  if (text.startsWith('false')) return 'false'
-  if (text.startsWith('null')) return 'null'
-  return /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?/u.exec(text)?.[0]
+  const fields = topLevelJsonValueLiterals(args)
+  if (!fields) return undefined
+  if (fields.timeout_secs === undefined) return undefined
+  return bashTimeoutFromJsonLiteral(fields.timeout_secs)
 }
 
 export function approvalTitle(tool: string, created: boolean): string {

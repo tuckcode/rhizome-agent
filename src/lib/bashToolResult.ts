@@ -1,3 +1,5 @@
+import { commandHasHiddenChars } from './visibleCommand'
+
 export const BASH_RESULT_KIND = 'bash_result'
 export const BASH_DEFAULT_TIMEOUT_SECS = 60
 export const BASH_MAX_TIMEOUT_SECS = 300
@@ -48,7 +50,8 @@ export interface BashRowStatus {
   }
 }
 
-const DEFAULT_COMMAND_MAX = 48
+export const DEFAULT_COMMAND_MAX = 48
+const U64_MAX = 18446744073709551615n
 
 export function parseBashToolResult(output?: string): ParsedBashToolResult {
   const unstructured: ParsedBashToolResult = {
@@ -145,17 +148,26 @@ export function bashResultRowStatus(
 }
 
 /**
- * Match the runner at f413535 (`timeout_from_args`): only a JSON whole
- * number that fits u64. Strings, floats, 0, negatives, booleans, and
- * missing values fall back to 60. Values over 300 clamp to 300.
- *
- * After JSON.parse, a `7.0` literal cannot be told apart from `7`.
- * Callers with the raw JSON text must reject frac/exp tokens first.
+ * Match the runner at 6ed615a (`timeout_from_args` in shell.rs): only a
+ * JSON whole number that `as_u64` accepts. Strings, floats, 7.0, 0,
+ * negatives, booleans, and missing values fall back to 60. Values over
+ * 300 clamp to 300. Integers from 2^53 through u64 max clamp to 300;
+ * above u64 max stays 60. Decide from the raw digit token, not
+ * Number.isSafeInteger.
  */
 export function bashTimeoutSecs(value?: unknown): number {
   const n = coerceTimeout(value)
   if (n === undefined || n <= 0) return BASH_DEFAULT_TIMEOUT_SECS
   return Math.min(n, BASH_MAX_TIMEOUT_SECS)
+}
+
+/** Whole-number JSON token → seconds, matching serde_json `Number::as_u64`. */
+export function bashTimeoutFromJsonLiteral(token: string): number {
+  if (!/^(?:0|[1-9]\d*)$/u.test(token)) return BASH_DEFAULT_TIMEOUT_SECS
+  const value = BigInt(token)
+  if (value <= 0n || value > U64_MAX) return BASH_DEFAULT_TIMEOUT_SECS
+  if (value > BigInt(BASH_MAX_TIMEOUT_SECS)) return BASH_MAX_TIMEOUT_SECS
+  return Number(value)
 }
 
 export function bashTimeoutLabel(timeoutSecs?: unknown): string {
@@ -169,10 +181,29 @@ export function trimmedOutputNote(hiddenLines?: number): string {
   return 'Output trimmed (start and end shown)'
 }
 
+export interface CutCommand {
+  text: string
+  truncated: boolean
+  hiddenPastCut: boolean
+}
+
 export function truncateCommand(command: string, max = DEFAULT_COMMAND_MAX): string {
-  const collapsed = command.replace(/[ \n]+/gu, ' ').replace(/^ +| +$/gu, '')
-  if (collapsed.length <= max) return collapsed
-  return `${collapsed.slice(0, Math.max(0, max - 1))}…`
+  return cutCommand(command, max).text
+}
+
+export function cutCommand(command: string, max = DEFAULT_COMMAND_MAX): CutCommand {
+  const collapsed = command.replace(/ {2,}/gu, ' ').replace(/^ +| +$/gu, '')
+  const chars = [...collapsed]
+  if (chars.length <= max) {
+    return { text: collapsed, truncated: false, hiddenPastCut: false }
+  }
+  const kept = chars.slice(0, Math.max(0, max - 1))
+  const rest = chars.slice(kept.length).join('')
+  return {
+    text: `${kept.join('')}…`,
+    truncated: true,
+    hiddenPastCut: commandHasHiddenChars(rest),
+  }
 }
 
 function isStructuredBashResult(record: Record<string, unknown>): boolean {

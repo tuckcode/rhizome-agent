@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { bashTimeoutLabel } from './bashToolResult'
 import {
   approvalTitle,
   bashApprovalCommand,
@@ -64,6 +65,15 @@ describe('native tool approval helpers', () => {
     expect(timeoutSecsFromToolArgs('{"command":"ls","timeout_secs":301}')).toBe(300)
     expect(timeoutSecsFromToolArgs('{"command":"ls","timeout_secs":500}')).toBe(300)
     expect(timeoutSecsFromToolArgs('{"command":"echo \\"timeout_secs\\": 7.0","timeout_secs":30}')).toBe(30)
+    expect(timeoutSecsFromToolArgs('{"timeoutSecs":7}')).toBeUndefined()
+    expect(bashTimeoutLabel(timeoutSecsFromToolArgs('{"timeoutSecs":7}'))).toBe('Stops after 60 seconds.')
+    expect(timeoutSecsFromToolArgs('{"x":{"timeout_secs":7.5},"timeout_secs":30}')).toBe(30)
+    expect(timeoutSecsFromToolArgs('{"timeout_secs":7,"timeout_secs":30}')).toBe(30)
+    expect(timeoutSecsFromToolArgs('{"timeout_secs":30,"timeout_secs":7.5}')).toBe(60)
+    expect(timeoutSecsFromToolArgs('{"timeout\\u005fsecs":12}')).toBe(12)
+    expect(timeoutSecsFromToolArgs('{"timeout_secs":9007199254740992}')).toBe(300)
+    expect(timeoutSecsFromToolArgs('{"timeout_secs":18446744073709551615}')).toBe(300)
+    expect(timeoutSecsFromToolArgs('{"timeout_secs":18446744073709551616}')).toBe(60)
   })
 
   it('uses a raw ApprovalRequested command as-is, including surrounding whitespace', () => {

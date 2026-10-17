@@ -2,9 +2,9 @@ import { CaretDown, CaretRight } from '@phosphor-icons/react'
 import type { AiActionStatus } from './AiActionCard'
 import {
   bashResultRowStatus,
+  cutCommand,
   parseBashToolResult,
   trimmedOutputNote,
-  truncateCommand,
 } from '../lib/bashToolResult'
 import { VisibleCommand } from './VisibleCommand'
 
@@ -65,6 +65,7 @@ function BashResultSummary({
   command,
   expanded,
   extra,
+  hiddenPastCut,
   onToggle,
   verb,
   verbDanger,
@@ -72,6 +73,7 @@ function BashResultSummary({
   command: string
   expanded: boolean
   extra?: { kind: string; text: string; danger: boolean }
+  hiddenPastCut: boolean
   onToggle: () => void
   verb: string
   verbDanger: boolean
@@ -93,6 +95,15 @@ function BashResultSummary({
         <code className="rounded-sm bg-[var(--syntax-monospace-bg)] px-0.5 font-mono text-[12px]">
           <VisibleCommand command={command} />
         </code>
+        {hiddenPastCut ? (
+          <span
+            className="text-[var(--danger-text)]"
+            data-testid="bash-result-hidden-past-cut"
+          >
+            {' '}
+            hidden characters
+          </span>
+        ) : null}
         {extra ? (
           <>
             {' · '}
@@ -110,6 +121,7 @@ function BashResultSummary({
 }
 
 function BashResultDetails({
+  command,
   stderr,
   stderrHidden,
   stderrTruncated,
@@ -117,6 +129,7 @@ function BashResultDetails({
   stdoutHidden,
   stdoutTruncated,
 }: {
+  command?: string
   stderr: string
   stderrHidden?: number
   stderrTruncated: boolean
@@ -124,9 +137,25 @@ function BashResultDetails({
   stdoutHidden?: number
   stdoutTruncated: boolean
 }) {
-  const empty = !stdout && !stderr && !stdoutTruncated && !stderrTruncated
+  const empty = !stdout && !stderr && !stdoutTruncated && !stderrTruncated && !command
   return (
     <div className="border-t border-border bg-muted/40 px-3 py-2" data-testid="bash-result-details">
+      {command ? (
+        <div className="mt-1.5 first:mt-0">
+          <div
+            className="mb-0.5 text-[11px] font-medium text-muted-foreground"
+            data-testid="bash-result-command-label"
+          >
+            command
+          </div>
+          <pre
+            className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-md border border-border bg-[var(--editor-code-block-background)] px-1.5 py-1 font-mono text-[11px] leading-4 text-[var(--editor-code-block-text)]"
+            data-testid="bash-result-command"
+          >
+            <VisibleCommand command={command} />
+          </pre>
+        </div>
+      ) : null}
       <OutputBlock
         content={stdout}
         hiddenLines={stdoutHidden}
@@ -159,7 +188,7 @@ export function BashResultCard({
 }: BashResultCardProps) {
   const result = parseBashToolResult(output)
   const row = bashResultRowStatus(status, result, { denied, superseded })
-  const displayCommand = command ? truncateCommand(command) : 'command'
+  const cut = cutCommand(command ?? 'command')
 
   return (
     <div
@@ -167,15 +196,17 @@ export function BashResultCard({
       data-testid="bash-result-card"
     >
       <BashResultSummary
-        command={displayCommand}
+        command={cut.text}
         expanded={expanded}
         extra={row.extra}
+        hiddenPastCut={cut.hiddenPastCut}
         onToggle={onToggle}
         verb={row.verb}
         verbDanger={row.verbDanger}
       />
       {expanded ? (
         <BashResultDetails
+          command={command}
           stderr={result.stderr}
           stderrHidden={result.stderrLinesHidden}
           stderrTruncated={result.stderrTruncated}
