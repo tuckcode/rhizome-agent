@@ -77,7 +77,7 @@
       "icons/icon.ico"
     ],
     "shortDescription": "Chat shell powered by Prime Agent",
-    "longDescription": "Rhizome is a separate app from Rhizome Desktop. It embeds a chat UI on Rhizome's own harness, with Prime Agent as an optional engine, and uses Rhizome MCP for vault tools."
+    "longDescription": "Rhizome is a separate app from Rhizome Desktop. It is its own harness with its own agent loop, and uses Rhizome MCP for vault tools."
   },
   "plugins": {
     "deep-link": {

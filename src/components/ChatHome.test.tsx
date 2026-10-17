@@ -34,6 +34,8 @@ vi.mock('./AiPanel', () => ({
     defaultAiTarget,
     composerControls,
     composerDeck,
+    chatEngine,
+    defaultAiAgentReadiness,
   }: {
     newChatRef?: MutableRefObject<(() => void) | null>
     onOpenNote?: (path: string) => void
@@ -44,6 +46,8 @@ vi.mock('./AiPanel', () => ({
     defaultAiTarget?: { kind: string; label?: string; agent?: string }
     composerControls?: React.ReactNode
     composerDeck?: React.ReactNode
+    chatEngine?: string
+    defaultAiAgentReadiness?: string
   }) => {
     if (newChatRef) newChatRef.current = startNewChat
     return (
@@ -53,6 +57,8 @@ vi.mock('./AiPanel', () => ({
         <span data-testid="agent-target-kind">{defaultAiTarget?.kind ?? 'none'}</span>
         <span data-testid="composer-controls">{composerControls ? 'yes' : 'no'}</span>
         <span data-testid="composer-deck-mounted">{composerDeck ? 'yes' : 'no'}</span>
+        <span data-testid="panel-chat-engine">{chatEngine ?? 'none'}</span>
+        <span data-testid="panel-readiness">{defaultAiAgentReadiness ?? 'none'}</span>
         <button type="button" onClick={() => onOpenNote?.('/Users/jdoe/Documents/Laputa/wiki/decisions/memory-loop.md')}>
           Open
         </button>
@@ -96,10 +102,70 @@ describe('ChatHome', () => {
     livePrimeHost()
   })
 
+  it('uses the native engine when the prop is omitted', () => {
+    render(
+      <ChatHome
+        locale="en"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="ready"
+        defaultAiAgentReady
+        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPaths={['/Users/jdoe/Documents/Laputa']}
+        entries={[]}
+        onExit={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
+    expect(screen.getByTestId('panel-chat-engine')).toHaveTextContent('native')
+  })
+
+  it('holds send and engine chrome until the chat engine has settled', () => {
+    const { rerender } = render(
+      <ChatHome
+        locale="en"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="ready"
+        defaultAiAgentReady
+        chatEngine="prime"
+        chatEngineSettled={false}
+        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPaths={['/Users/jdoe/Documents/Laputa']}
+        entries={[]}
+        onExit={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'pending')
+    expect(screen.getByTestId('panel-chat-engine')).toHaveTextContent('none')
+    expect(screen.getByTestId('panel-readiness')).toHaveTextContent('checking')
+    expect(screen.getByTestId('composer-deck-mounted')).toHaveTextContent('no')
+    expect(screen.queryByRole('button', { name: 'New chat' })).toBeNull()
+    expect(primeHostMock.enabled).toBe(false)
+
+    rerender(
+      <ChatHome
+        locale="en"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="ready"
+        defaultAiAgentReady
+        chatEngine="prime"
+        chatEngineSettled
+        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPaths={['/Users/jdoe/Documents/Laputa']}
+        entries={[]}
+        onExit={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
+    expect(screen.getByTestId('panel-chat-engine')).toHaveTextContent('prime')
+    expect(screen.getByTestId('panel-readiness')).toHaveTextContent('ready')
+    expect(screen.getByRole('button', { name: 'New chat' })).toBeTruthy()
+  })
+
   it('starts a new chat from the Frame A subhead', () => {
     startNewChat.mockClear()
     render(
       <ChatHome
+        chatEngine="prime"
         locale="en"
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"
@@ -118,6 +184,7 @@ describe('ChatHome', () => {
   it('keeps Prime chat chrome when settings picked a direct API model', () => {
     render(
       <ChatHome
+        chatEngine="prime"
         locale="en"
         defaultAiAgent="prime"
         defaultAiTarget={{
@@ -151,6 +218,7 @@ describe('ChatHome', () => {
     const onOpenNote = vi.fn()
     render(
       <ChatHome
+        chatEngine="prime"
         locale="en"
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"
@@ -183,6 +251,7 @@ describe('ChatHome', () => {
     const onShowNotes = vi.fn()
     render(
       <ChatHome
+        chatEngine="prime"
         locale="en"
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"
@@ -238,6 +307,7 @@ describe('ChatHome — the agent sees the note you have open', () => {
   function openTheNote() {
     render(
       <ChatHome
+        chatEngine="prime"
         locale="en"
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"
@@ -254,6 +324,7 @@ describe('ChatHome — the agent sees the note you have open', () => {
   it('hands the agent no note until one is open', () => {
     render(
       <ChatHome
+        chatEngine="prime"
         locale="en"
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"
@@ -317,6 +388,7 @@ describe('ChatHome — a note handed in from the vault', () => {
   function renderWith(requestedNote: { path: string; label: string; requestId: number } | null) {
     return render(
       <ChatHome
+        chatEngine="prime"
         locale="en"
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"
@@ -362,6 +434,7 @@ describe('ChatHome — a note handed in from the vault', () => {
 
     rerender(
       <ChatHome
+        chatEngine="prime"
         locale="en"
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"
@@ -390,7 +463,7 @@ describe('ChatHome composer wiring', () => {
   it('does not mount the native model picker as its own row above chat', () => {
     expect(chatHomeSource).not.toContain('<NativeChatModelPicker')
     expect(chatHomeSource).toContain('<ChatComposerDeck')
-    expect(chatHomeSource).toContain('const showComposerDeck = isPrimeChat && (showPrimeChrome || rhizomeCatalog)')
+    expect(chatHomeSource).toContain('const showComposerDeck = engineChromeReady && isPrimeChat && (showPrimeChrome || rhizomeCatalog)')
     expect(chatHomeSource).toContain('showComposerDeck ? (')
   })
 
@@ -435,6 +508,7 @@ describe('ChatHome composer wiring', () => {
   it('sends Prime-targeted chats through Prime when the host is live', () => {
     render(
       <ChatHome
+        chatEngine="prime"
         locale="en"
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"
@@ -470,6 +544,7 @@ describe('ChatHome composer wiring', () => {
   it('does not send Codex through the native engine', () => {
     render(
       <ChatHome
+        chatEngine="prime"
         locale="en"
         defaultAiAgent="codex"
         defaultAiAgentReadiness="ready"
@@ -493,6 +568,7 @@ describe('ChatHome composer wiring', () => {
     }
     render(
       <ChatHome
+        chatEngine="prime"
         locale="en"
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"
@@ -516,6 +592,7 @@ describe('ChatHome composer wiring', () => {
     }
     render(
       <ChatHome
+        chatEngine="prime"
         locale="en"
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"
@@ -539,6 +616,7 @@ describe('ChatHome composer wiring', () => {
     }
     render(
       <ChatHome
+        chatEngine="prime"
         locale="en"
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"
@@ -570,7 +648,7 @@ describe('ChatHome composer wiring', () => {
       entries: [],
       onExit: vi.fn(),
     }
-    const { rerender } = render(<ChatHome {...props} />)
+    const { rerender } = render(<ChatHome chatEngine="prime" {...props} />)
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
 
     primeHostMock.status = {
@@ -580,7 +658,7 @@ describe('ChatHome composer wiring', () => {
       running: false,
       problem: { code: 'not_installed' },
     }
-    rerender(<ChatHome {...props} />)
+    rerender(<ChatHome chatEngine="prime" {...props} />)
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
   })
 
@@ -659,6 +737,7 @@ describe('ChatHome composer wiring', () => {
     }
     render(
       <ChatHome
+        chatEngine="prime"
         locale="en"
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"
@@ -699,16 +778,17 @@ describe('ChatHome composer wiring', () => {
       entries: [],
       onExit: vi.fn(),
     }
-    const { rerender } = render(<ChatHome {...props} defaultAiAgent="prime" />)
+    const { rerender } = render(<ChatHome chatEngine="prime" {...props} defaultAiAgent="prime" />)
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
 
-    rerender(<ChatHome {...props} defaultAiAgent="codex" />)
+    rerender(<ChatHome chatEngine="prime" {...props} defaultAiAgent="codex" />)
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
   })
 
   it('keeps an already-open Prime chat on Prime when the host later says it is missing', () => {
     const { rerender } = render(
       <ChatHome
+        chatEngine="prime"
         locale="en"
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"
@@ -730,6 +810,7 @@ describe('ChatHome composer wiring', () => {
     }
     rerender(
       <ChatHome
+        chatEngine="prime"
         locale="en"
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"
@@ -754,7 +835,7 @@ describe('ChatHome composer wiring', () => {
       entries: [],
       onExit: vi.fn(),
     }
-    const { rerender } = render(<ChatHome {...props} />)
+    const { rerender } = render(<ChatHome chatEngine="prime" {...props} />)
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
 
     primeHostMock.status = {
@@ -766,7 +847,7 @@ describe('ChatHome composer wiring', () => {
       sessionPath: null,
       problem: { code: 'not_installed' },
     }
-    rerender(<ChatHome {...props} />)
+    rerender(<ChatHome chatEngine="prime" {...props} />)
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
   })
 
@@ -792,6 +873,7 @@ describe('ChatHome without a vault', () => {
   it('still mounts Chat when no vault is attached', () => {
     render(
       <ChatHome
+        chatEngine="prime"
         locale="en"
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"
@@ -810,6 +892,7 @@ describe('ChatHome without a vault', () => {
     startNewChat.mockClear()
     render(
       <ChatHome
+        chatEngine="prime"
         locale="en"
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"
@@ -828,6 +911,7 @@ describe('ChatHome without a vault', () => {
   it('still mounts Prime composer chrome when no vault is attached', () => {
     render(
       <ChatHome
+        chatEngine="prime"
         locale="en"
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"

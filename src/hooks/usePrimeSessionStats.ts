@@ -78,19 +78,29 @@ export function contextPressure(percent: number | null): 'ok' | 'warn' | 'high' 
 export function usePrimeSessionStats(enabled = true, refreshKey?: unknown): PrimeSessionStats {
   const [stats, setStats] = useState<PrimeSessionStats>(EMPTY)
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback((isCurrent: () => boolean) => {
+    const apply = (next: PrimeSessionStats) => {
+      // A late rejection can land after Vitest has torn jsdom down.
+      if (!isCurrent() || typeof window === 'undefined') return
+      setStats(next)
+    }
     void callHost<PrimeSessionStats>('get_prime_session_stats')
-      .then((next) => setStats(next ?? EMPTY))
+      .then((next) => apply(next ?? EMPTY))
       // No host, or Prime too old for the command — show nothing rather than
       // a stale meter from a previous session.
-      .catch(() => setStats(EMPTY))
+      .catch(() => apply(EMPTY))
   }, [])
 
   useEffect(() => {
     if (!enabled) return
-    refresh()
-    const id = window.setInterval(refresh, 15_000)
-    return () => window.clearInterval(id)
+    let current = true
+    const isCurrent = () => current
+    refresh(isCurrent)
+    const id = window.setInterval(() => refresh(isCurrent), 15_000)
+    return () => {
+      current = false
+      window.clearInterval(id)
+    }
   }, [enabled, refresh, refreshKey])
 
   // Derived rather than cleared in the effect: setting state synchronously

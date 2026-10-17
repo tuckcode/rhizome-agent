@@ -137,7 +137,7 @@ import { redactCredentialTokens } from './lib/sensitiveTextRedaction'
 import { areAutomaticUpdateChecksEnabled } from './lib/automaticUpdateChecks'
 import { composerAgentLabel, DEFAULT_AI_AGENT } from './lib/aiAgents'
 import { aiTargetReady, type AiTarget } from './lib/aiTargets'
-import { chatEngineFromSettings } from './lib/chatEngine'
+import { chatEngineAllowsSendWithoutPrime, chatEngineFromSettings } from './lib/chatEngine'
 import { areGitFeaturesEnabled } from './lib/gitSettings'
 import { useAppCommandAiActions } from './hooks/useAppCommandAiActions'
 import { RHIZOME_DOCS_URL } from './constants/feedback'
@@ -486,8 +486,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     settings,
     settingsLoaded,
   })
+  const chatEngine = chatEngineFromSettings(settings)
   const quickPromptTarget = lastAiWorkspaceTarget ?? aiAgentPreferences.defaultAiTarget
-  const quickPromptTargetReady = settings.chat_engine === 'native' || aiTargetReady(quickPromptTarget, aiAgentsStatus)
+  const quickPromptTargetReady = chatEngineAllowsSendWithoutPrime(chatEngine) || aiTargetReady(quickPromptTarget, aiAgentsStatus)
 
   useVaultOpenedTelemetry({
     entryCount: vault.entries.length,
@@ -2018,6 +2019,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       open={effectiveShowAIChat}
       aiAgentsStatus={aiAgentsStatus}
       aiModelProviders={settings.ai_model_providers ?? []}
+      chatEngine={settingsLoaded ? chatEngine : undefined}
+      nativeTarget={settingsLoaded ? settings.native_chat_target ?? undefined : undefined}
       conversationSettings={settings.ai_workspace_conversations ?? null}
       conversationSettingsReady={settingsLoaded}
       defaultAiAgent={aiAgentPreferences.defaultAiAgent}
@@ -2188,7 +2191,8 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         defaultAiTarget={aiAgentPreferences.defaultAiTarget}
         defaultAiAgentReadiness={aiAgentPreferences.defaultAiAgentReadiness}
         defaultAiAgentReady={aiAgentPreferences.defaultAiAgentReady}
-        chatEngine={settings.chat_engine === 'native' ? 'native' : 'prime'}
+        chatEngine={chatEngine}
+        chatEngineSettled={settingsLoaded}
         nativeTarget={settings.native_chat_target}
         onNativeTargetChange={(target) => saveSettings({ ...settings, native_chat_target: target })}
         aiModelProviders={settings.ai_model_providers}
@@ -2588,7 +2592,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           entries={visibleEntries}
           aiAgentReady={quickPromptTargetReady}
           aiAgentLabel={composerAgentLabel({
-            chatEngine: chatEngineFromSettings(settings),
+            chatEngine,
             agent: quickPromptTarget.kind === 'agent' ? quickPromptTarget.agent : DEFAULT_AI_AGENT,
             targetLabel: quickPromptTarget.label,
           })}

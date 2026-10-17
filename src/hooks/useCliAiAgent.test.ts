@@ -210,6 +210,7 @@ describe('useCliAiAgent', () => {
       agent: 'codex',
       agentReady: false,
       permissionMode: 'safe',
+      chatEngine: 'prime',
     }))
 
     await act(async () => {

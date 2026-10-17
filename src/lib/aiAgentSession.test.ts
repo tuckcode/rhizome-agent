@@ -239,6 +239,7 @@ describe('aiAgentSession', () => {
       ready: boolean
       vaultPath: string
       permissionMode: 'safe' | 'power_user'
+      chatEngine?: 'prime' | 'native'
     }
     prompt: { text: string; references?: [] }
     reason: 'agent_unavailable' | 'missing_vault'
@@ -301,7 +302,12 @@ describe('aiAgentSession', () => {
       },
       {
         messageId: 'msg-missing',
-        context: { agent: 'codex', ready: false, vaultPath: '/vault', permissionMode: 'safe' },
+        context: {
+          agent: 'codex',
+          ready: false,
+          vaultPath: '/vault',
+          permissionMode: 'safe',
+        },
         prompt: { text: 'Open a note', references: [] },
         reason: 'agent_unavailable',
         response:
@@ -312,6 +318,25 @@ describe('aiAgentSession', () => {
     for (const fallbackCase of fallbackCases) {
       await expectLocalResponse(fallbackCase)
     }
+  })
+
+  it('blocks a missing agent when no chat engine is passed', async () => {
+    nextMessageIdMock.mockReturnValue('msg-no-engine')
+    const { runtime, getMessages, getStatus } = createRuntime()
+
+    await sendAgentMessage({
+      runtime,
+      context: { agent: 'codex', ready: false, vaultPath: '/vault', permissionMode: 'safe' },
+      prompt: { text: 'Open a note' },
+    })
+
+    expect(streamAiAgentMock).not.toHaveBeenCalled()
+    expect(streamNativeChatMock).not.toHaveBeenCalled()
+    expect(getStatus()).not.toBe('thinking')
+    expect(getMessages()[0]?.isStreaming).not.toBe(true)
+    expect(getMessages()[0]?.response).toBe(
+      'Codex is not available on this machine. Install it or switch the default AI agent in Settings.',
+    )
   })
 
   it('starts a streaming session with formatted history and fresh refs', async () => {
@@ -442,7 +467,7 @@ describe('aiAgentSession', () => {
     })
   })
 
-  it('chat_default_engine_is_prime', async () => {
+  it('streams the selected agent when the chat engine is omitted', async () => {
     nextMessageIdMock.mockReturnValue('msg-prime')
     const session = createRuntime()
     await sendAgentMessage({
@@ -494,6 +519,7 @@ describe('aiAgentSession', () => {
         ready: false,
         vaultPath: '/vault',
         permissionMode: 'safe',
+        chatEngine: 'prime',
       },
       prompt: { text: 'Hello' },
     })
