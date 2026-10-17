@@ -143,7 +143,7 @@ pub struct ReasoningResolution {
     pub selected_level: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ResolveQuery<'a> {
     pub provider: &'a str,
     pub preset: Option<&'a str>,
@@ -153,6 +153,22 @@ pub struct ResolveQuery<'a> {
     pub api_key: Option<&'a str>,
     pub requested_level: Option<&'a str>,
     pub user_override: Option<ReasoningSupport>,
+}
+
+impl std::fmt::Debug for ResolveQuery<'_> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("ResolveQuery")
+            .field("provider", &self.provider)
+            .field("preset", &self.preset)
+            .field("base_url", &self.base_url)
+            .field("model_id", &self.model_id)
+            .field("account", &self.account)
+            .field("api_key", &self.api_key.as_ref().map(|_| "<redacted>"))
+            .field("requested_level", &self.requested_level)
+            .field("user_override", &self.user_override)
+            .finish()
+    }
 }
 
 /// Live lookup answers. `None` means that layer did not answer.
@@ -568,40 +584,48 @@ fn from_models_dev(family: &str, item: &Value) -> Option<ReasoningSupport> {
             None => None,
         };
     }
+    // Prefer effort when both are present. Live rows put toggle first
+    // (deepseek-v4-flash-vision-exp, nvidia moonshotai/kimi-k3, Cloudflare
+    // Nemotron), and stopping at toggle hid the effort list.
+    let mut effort: Option<&serde_json::Map<String, Value>> = None;
+    let mut toggle = false;
     let mut saw_option = false;
     for option in options {
         let Some(option) = option.as_object() else {
             continue;
         };
         saw_option = true;
-        let kind = option.get("type").and_then(Value::as_str).unwrap_or("");
-        if kind == "effort" {
-            let ids = string_list(option.get("values"));
-            if ids.is_empty() {
-                continue;
+        match option.get("type").and_then(Value::as_str) {
+            Some("effort") if effort.is_none() && !string_list(option.get("values")).is_empty() => {
+                effort = Some(option);
             }
-            let Some((name, send)) = effort_wire(family) else {
-                return Some(ReasoningSupport::Unknown);
-            };
-            let stated = option
-                .get("default")
-                .and_then(Value::as_str)
-                .filter(|id| ids.iter().any(|level| level == id));
-            return Some(effort_levels(
-                &ids.iter().map(String::as_str).collect::<Vec<_>>(),
-                stated,
-                name,
-                send,
-                source,
-                false,
-            ));
+            Some("toggle") => toggle = true,
+            _ => {}
         }
-        if kind == "toggle" {
-            let Some((name, send)) = toggle_wire(family) else {
-                return Some(ReasoningSupport::Unknown);
-            };
-            return Some(toggle_levels(name, send, source, false));
-        }
+    }
+    if let Some(option) = effort {
+        let ids = string_list(option.get("values"));
+        let Some((name, send)) = effort_wire(family) else {
+            return Some(ReasoningSupport::Unknown);
+        };
+        let stated = option
+            .get("default")
+            .and_then(Value::as_str)
+            .filter(|id| ids.iter().any(|level| level == id));
+        return Some(effort_levels(
+            &ids.iter().map(String::as_str).collect::<Vec<_>>(),
+            stated,
+            name,
+            send,
+            source,
+            false,
+        ));
+    }
+    if toggle {
+        let Some((name, send)) = toggle_wire(family) else {
+            return Some(ReasoningSupport::Unknown);
+        };
+        return Some(toggle_levels(name, send, source, false));
     }
     if saw_option {
         Some(ReasoningSupport::Unknown)
@@ -622,6 +646,8 @@ fn effort_wire(family: &str) -> Option<(&'static str, WireSend)> {
 }
 
 fn toggle_wire(family: &str) -> Option<(&'static str, WireSend)> {
+    // models.dev has no `ollama` provider (live api.json). This `think`
+    // mapping is only reached when another layer names the ollama family.
     match family {
         "ollama" => Some(("think", WireSend::Boolean)),
         _ => None,
@@ -953,20 +979,22 @@ fn build_overrides() -> Vec<OverrideRow> {
             ),
         });
     }
-    rows.push(OverrideRow {
-        providers: &["anthropic"],
-        presets: &["anthropic"],
-        hosts: &["api.anthropic.com"],
-        exact_model: Some("claude-opus-4-5"),
-        support: effort_levels(
-            &["low", "medium", "high"],
-            Some("high"),
-            "output_config.effort",
-            WireSend::NestedString,
-            ANTHROPIC,
-            false,
-        ),
-    });
+    for model in ["claude-opus-4-5", "claude-opus-4-5-20251101"] {
+        rows.push(OverrideRow {
+            providers: &["anthropic"],
+            presets: &["anthropic"],
+            hosts: &["api.anthropic.com"],
+            exact_model: Some(model),
+            support: effort_levels(
+                &["low", "medium", "high"],
+                Some("high"),
+                "output_config.effort",
+                WireSend::NestedString,
+                ANTHROPIC,
+                false,
+            ),
+        });
+    }
 
     let gemini = |model: &'static str,
                   ids: &'static [&'static str],
@@ -1012,15 +1040,21 @@ fn build_overrides() -> Vec<OverrideRow> {
         Some("high"),
     ));
     // OpenAI-compat endpoint: `none` disables thinking on 2.5 models except 2.5 Pro.
-    rows.push(gemini("gemini-2.5-pro", low_high, None));
+    // Compat doc maps `reasoning_effort: minimal` to a 2.5 thinking budget of
+    // 1,024. `none` stays off 2.5 Pro.
+    rows.push(gemini(
+        "gemini-2.5-pro",
+        &["minimal", "low", "medium", "high"],
+        None,
+    ));
     rows.push(gemini(
         "gemini-2.5-flash",
-        &["none", "low", "medium", "high"],
+        &["none", "minimal", "low", "medium", "high"],
         None,
     ));
     rows.push(gemini(
         "gemini-2.5-flash-lite",
-        &["none", "low", "medium", "high"],
+        &["none", "minimal", "low", "medium", "high"],
         None,
     ));
 
@@ -1963,6 +1997,14 @@ mod tests {
         let low = resolve(&query, &EmptySources, &mut ReasoningLookupCache::default());
         assert_eq!(low.selected_level.as_deref(), Some("low"));
         assert!(low.downgraded_from.is_none());
+        query.requested_level = Some("medium");
+        let medium = resolve(&query, &EmptySources, &mut ReasoningLookupCache::default());
+        assert_eq!(medium.selected_level.as_deref(), Some("low"));
+        assert_eq!(medium.downgraded_from.as_deref(), Some("medium"));
+        query.requested_level = Some("minimal");
+        let minimal = resolve(&query, &EmptySources, &mut ReasoningLookupCache::default());
+        assert_eq!(minimal.selected_level.as_deref(), Some("off"));
+        assert_eq!(minimal.downgraded_from.as_deref(), Some("minimal"));
     }
 
     #[test]
@@ -2010,6 +2052,16 @@ mod tests {
         ))
         .unwrap();
         assert!(ids(&flash).contains(&"none".to_string()));
+        assert!(ids(&flash).contains(&"minimal".to_string()));
+        let pro = rhizome_override(&query(
+            "gemini",
+            Some("gemini"),
+            "https://generativelanguage.googleapis.com/v1beta/openai",
+            "gemini-2.5-pro",
+        ))
+        .unwrap();
+        assert!(ids(&pro).contains(&"minimal".to_string()));
+        assert!(!ids(&pro).contains(&"none".to_string()));
         let opus = rhizome_override(&query(
             "anthropic",
             Some("anthropic"),
@@ -2063,5 +2115,36 @@ mod tests {
         assert_eq!(first, ReasoningSupport::Unknown);
         assert_eq!(second, first);
         reset_reasoning_state_for_test(None);
+    }
+
+    #[test]
+    fn models_dev_prefers_effort_when_toggle_is_listed_first() {
+        let support = from_models_dev(
+            "deepseek",
+            &json!({
+                "reasoning_options": [
+                    {"type": "toggle"},
+                    {"type": "effort", "values": ["low", "high", "max"]}
+                ]
+            }),
+        )
+        .expect("effort");
+        assert_eq!(
+            ids(&support),
+            vec!["low".to_string(), "high".to_string(), "max".to_string()]
+        );
+        match support {
+            ReasoningSupport::Levels(levels) => assert_eq!(levels.wire.name, "reasoning_effort"),
+            other => panic!("expected effort levels, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn debug_redacts_the_api_key() {
+        let mut query = query("openai", None, "https://api.openai.com/v1", "gpt-5.4");
+        query.api_key = Some("sk-test-secret-value");
+        let rendered = format!("{query:?}");
+        assert!(rendered.contains("<redacted>"));
+        assert!(!rendered.contains("sk-test-secret-value"));
     }
 }
