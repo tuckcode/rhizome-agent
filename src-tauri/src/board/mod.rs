@@ -224,6 +224,12 @@ pub fn splice_disk_status(disk: &str, buffer: &str, expected: &str) -> Option<St
     if set_status(expected, &status).ok()?.content != disk {
         return None;
     }
+    // Status changed in the editor as well, and not to the value on disk.
+    // Splicing would drop the user's value, so this is a conflict.
+    let buffer_status = read_status(buffer);
+    if buffer_status != read_status(expected) && buffer_status.as_deref() != Some(status.as_str()) {
+        return None;
+    }
     set_status(buffer, &status).ok().map(|edit| edit.content)
 }
 

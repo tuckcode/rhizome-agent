@@ -61,8 +61,10 @@ let activePrefetchRequests = 0
  * per path. A checked save sends it, so Rust can see a change on disk.
  * The preload cache above drops and replaces text at any time (reload,
  * eviction, a newer preload), so the baseline is kept apart from it.
- * Open, load, save, property edit, create and rename set it. Only close
- * and vault switch clear it.
+ * Open, load, save, property edit, create and rename set it. Close and
+ * vault switch clear it. A rename also refreshes every clean baseline,
+ * including notes that are not open, because a linked-note rewrite
+ * changes the bytes on disk.
  */
 const saveBaselines = new Map<string, string>()
 
@@ -85,6 +87,10 @@ export function clearSaveBaseline(path: string): void {
 
 export function clearSaveBaselines(): void {
   saveBaselines.clear()
+}
+
+export function saveBaselinePaths(): string[] {
+  return [...saveBaselines.keys()]
 }
 
 export function subscribeNoteContentResolved(listener: NoteContentResolvedListener): () => void {

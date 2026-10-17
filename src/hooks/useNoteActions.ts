@@ -119,6 +119,7 @@ interface TitleRenameDeps {
   setToastMessage: (msg: string | null) => void
   updateTabContent: (path: string, content: string) => void
   onInternalVaultWrite?: (path: string) => void
+  isPathDirty?: (path: string) => boolean
 }
 
 interface FrontmatterCallbackParams {
@@ -174,6 +175,7 @@ async function applyTitleRenamePathChange({
   await reloadTabsAfterRename({
     tabPaths: tabPathsExceptRenamed(deps.tabsRef.current, path, newPath),
     updateTabContent: deps.updateTabContent,
+    isPathDirty: deps.isPathDirty,
   })
 }
 
@@ -513,6 +515,7 @@ function useFrontmatterActionHandlers({
           setToastMessage,
           updateTabContent,
           onInternalVaultWrite: config.onInternalVaultWrite,
+          isPathDirty: (path) => config.unsavedPaths?.has(path) ?? false,
         },
         path: currentPath,
         key,
@@ -581,6 +584,7 @@ function useFrontmatterActionHandlers({
         setToastMessage,
         updateTabContent,
         onInternalVaultWrite: config.onInternalVaultWrite,
+        isPathDirty: (path) => config.unsavedPaths?.has(path) ?? false,
       },
       path: currentPath,
       key,
@@ -782,7 +786,13 @@ export function useNoteActions(config: NoteActionsConfig) {
 
   const creation = useNoteCreation(config, { openTabWithContent })
   const rename = useNoteRename(
-    { entries, setToastMessage, reloadVault: config.reloadVault, onPathRenamed: handlePathRenamed },
+    {
+      entries,
+      setToastMessage,
+      reloadVault: config.reloadVault,
+      onPathRenamed: handlePathRenamed,
+      isPathDirty: (path) => config.unsavedPaths?.has(path) ?? false,
+    },
     { tabs: tabMgmt.tabs, setTabs, activeTabPathRef, handleSwitchTab, updateTabContent },
   )
 

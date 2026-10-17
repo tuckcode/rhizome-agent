@@ -55,6 +55,23 @@ export function emitSaveConflict(conflict: SaveConflict): void {
   for (const listener of saveConflictListeners) listener(conflict)
 }
 
+/**
+ * A real conflict. The buffer goes to a "(conflict)" copy and listeners
+ * offer Keep mine and Reload. The caller can then drop the buffer so
+ * navigation continues. Any other error, or a failed copy, throws as
+ * before and the buffer stays pending.
+ */
+export async function stashSaveConflict(error: unknown, path: string, content: string): Promise<void> {
+  if (!isSaveConflictError(error)) throw error
+  try {
+    const copyPath = await stashConflictCopy(path, content)
+    emitSaveConflict({ path, content, copyPath })
+  } catch (stashError) {
+    console.error('Failed to stash conflicting edits:', stashError)
+    throw error
+  }
+}
+
 const MAX_CONFLICT_COPIES = 20
 
 /** `plan.md` -> `plan (conflict).md`, then `plan (conflict 2).md`. */

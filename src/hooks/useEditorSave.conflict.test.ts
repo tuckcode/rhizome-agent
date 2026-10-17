@@ -163,6 +163,38 @@ describe('useEditorSave with a board move', () => {
     expect(updateVaultContent).not.toHaveBeenCalledWith(PATH, SPLICED)
   })
 
+  it('Keep mine reads the pending text and cancels the autosave that would write over it', async () => {
+    invokeFn.mockResolvedValue({ contentHash: 'x', splicedContent: null })
+    const { result } = renderSave()
+    const typed = `${BUFFER}later\n`
+    act(() => { result.current.handleContentChange(PATH, typed) })
+    let live: string | null = null
+    await act(async () => { live = await result.current.holdPendingSave(PATH) })
+    expect(live).toBe(typed)
+    await act(async () => { await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS) })
+    expect(invokeFn).not.toHaveBeenCalled()
+  })
+
+  it('Keep mine waits out an in-flight autosave and keeps the newer text', async () => {
+    let finishSave: (value: unknown) => void = () => {}
+    invokeFn.mockImplementationOnce(() => new Promise((resolve) => { finishSave = resolve }))
+    const { result } = renderSave()
+    act(() => { result.current.handleContentChange(PATH, BUFFER) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS) })
+    const newer = `${BUFFER}more\n`
+    act(() => { result.current.handleContentChange(PATH, newer) })
+    let live: string | null = null
+    await act(async () => {
+      const pending = result.current.holdPendingSave(PATH)
+      finishSave({ contentHash: 'x', splicedContent: null })
+      live = await pending
+    })
+    expect(live).toBe(newer)
+    await act(async () => { await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS) })
+    expect(invokeFn.mock.calls.filter(([cmd]) => cmd === 'save_note_content_checked')).toHaveLength(1)
+    expect(savedArgs()).toEqual({ path: PATH, content: BUFFER, expectedContent: OPENED })
+  })
+
   describe('a real conflict', () => {
     const CONFLICT = new Error('Save conflict: /vault/plan.md changed on disk since the editor read it.')
     const COPY = '/vault/plan (conflict).md'
@@ -291,6 +323,13 @@ describe('edits typed during a spliced save', () => {
     const buffer = '---\nStatus: In progress\ntitle: A\n---\nbody 1\n'
     const newer = '---\nStatus: In progress\ntitle: Renamed\n---\nbody 1\n'
     const args = await inflight('---\nStatus: In progress\ntitle: A\n---\nbody\n', buffer, '---\nStatus: Done\ntitle: A\n---\nbody 1\n', newer)
+    expect(args).toEqual({ path: PATH, content: newer, expectedContent: buffer })
+  })
+
+  it('sends a user-edited Status with the baseline so Rust can refuse the splice', async () => {
+    const buffer = '---\nStatus: In progress\n---\nbody 1\n'
+    const newer = '---\nStatus: Blocked\n---\nbody 1\n'
+    const args = await inflight('---\nStatus: In progress\n---\nbody\n', buffer, '---\nStatus: Done\n---\nbody 1\n', newer)
     expect(args).toEqual({ path: PATH, content: newer, expectedContent: buffer })
   })
 

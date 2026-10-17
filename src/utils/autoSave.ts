@@ -1,5 +1,5 @@
 import { setSaveBaseline } from '../hooks/noteContentCache'
-import { persistContentChecked } from '../hooks/useSaveNote'
+import { persistContentChecked, stashSaveConflict } from '../hooks/useSaveNote'
 
 export interface FlushDeps {
   savePendingForPath: (path: string) => Promise<boolean>
@@ -24,9 +24,15 @@ export async function flushEditorContent(path: string, deps: FlushDeps): Promise
 
   if (deps.isUnsaved(path)) {
     // Same conflict check as the editor save, so a destructive action
-    // never writes over a newer note on disk.
-    const saved = await persistContentChecked(path, tabContent)
-    setSaveBaseline(path, saved)
-    deps.onSaved?.(path, saved)
+    // never writes over a newer note on disk. A conflict is stashed and
+    // the unsaved flag drops, so switching notes is not cancelled.
+    try {
+      const saved = await persistContentChecked(path, tabContent)
+      setSaveBaseline(path, saved)
+      deps.onSaved?.(path, saved)
+    } catch (error) {
+      await stashSaveConflict(error, path, tabContent)
+      deps.onSaved?.(path, tabContent)
+    }
   }
 }

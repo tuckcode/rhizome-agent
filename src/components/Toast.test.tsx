@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { UPDATER_USER_MESSAGES } from '../lib/updaterUserMessages'
 import { Toast } from './Toast'
@@ -42,6 +42,25 @@ describe('Toast', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open' }))
     expect(onAction).toHaveBeenCalledOnce()
     expect(onDismiss).toHaveBeenCalledOnce()
+  })
+
+  it('a toast with actions stays until one is chosen', () => {
+    vi.useFakeTimers()
+    const onDismiss = vi.fn()
+    render(
+      <Toast
+        message="plan.md changed on disk."
+        actionLabel="Keep mine"
+        onAction={vi.fn()}
+        secondaryActionLabel="Reload"
+        onSecondaryAction={vi.fn()}
+        onDismiss={onDismiss}
+      />,
+    )
+    act(() => { vi.advanceTimersByTime(6000) })
+    expect(onDismiss).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Keep mine' })).toBeInTheDocument()
+    vi.useRealTimers()
   })
 
   it('offers two actions for a save conflict', () => {

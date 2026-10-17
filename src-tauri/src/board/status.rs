@@ -114,10 +114,10 @@ fn frontmatter_end(lines: &[Line<'_>]) -> Result<Option<usize>, String> {
         .ok_or_else(|| "Frontmatter has no closing `---` line.".to_string())
 }
 
-/// Only `---` closes the block, the same as the vault's frontmatter
-/// parser. YAML's `...` document end does not.
+/// `---` closes the block, and so does YAML's `...` document end.
 fn is_close_fence(text: &str) -> bool {
-    text.trim_end() == FENCE
+    let text = text.trim_end();
+    text == FENCE || text == "..."
 }
 
 fn prepend_block(body: &str, status: &str) -> StatusEdit {

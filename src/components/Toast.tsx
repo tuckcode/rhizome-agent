@@ -30,11 +30,13 @@ function ToastAction({ label, onClick, onDismiss }: { label: string; onClick: ()
 }
 
 export function Toast({ message, onDismiss, actionLabel, onAction, secondaryActionLabel, onSecondaryAction }: ToastProps) {
-  const hasAction = Boolean(actionLabel && onAction)
+  const hasPrimary = Boolean(actionLabel && onAction)
+  const hasSecondary = Boolean(secondaryActionLabel && onSecondaryAction)
+  const hasAction = hasPrimary || hasSecondary
 
   useEffect(() => {
-    if (!message) return
-    const timer = setTimeout(onDismiss, hasAction ? 6000 : 2000)
+    if (!message || hasAction) return
+    const timer = setTimeout(onDismiss, 2000)
     return () => clearTimeout(timer)
   }, [hasAction, message, onDismiss])
 
@@ -52,10 +54,10 @@ export function Toast({ message, onDismiss, actionLabel, onAction, secondaryActi
       )}
     >
       <span>{renderUpdaterUserMessage(message, { linkReleasesPage: shouldLinkUpdaterReleasesPage(message) })}</span>
-      {hasAction && actionLabel && onAction ? (
+      {hasPrimary && actionLabel && onAction ? (
         <ToastAction label={actionLabel} onClick={onAction} onDismiss={onDismiss} />
       ) : null}
-      {hasAction && secondaryActionLabel && onSecondaryAction ? (
+      {hasSecondary && secondaryActionLabel && onSecondaryAction ? (
         <ToastAction label={secondaryActionLabel} onClick={onSecondaryAction} onDismiss={onDismiss} />
       ) : null}
     </div>

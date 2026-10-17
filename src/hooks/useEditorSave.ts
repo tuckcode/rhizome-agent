@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type MutableRefObject } from 'react'
 import type { SetStateAction } from 'react'
-import { emitSaveConflict, isSaveConflictError, stashConflictCopy, subscribeSaveConflicts, useSaveNote } from './useSaveNote'
+import { stashSaveConflict, subscribeSaveConflicts, useSaveNote } from './useSaveNote'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { canWritePathToVault } from '../utils/vaultPathContainment'
 import { setSaveBaseline } from './noteContentCache'
@@ -227,24 +227,6 @@ function reconcileSplicedSave({
   setSaveBaseline(targetPath, pending.content)
 }
 
-/**
- * A real save conflict. The buffer goes to a "(conflict)" copy, so the
- * caller can drop it and let navigation go ahead. Listeners (the app
- * toast) offer Keep mine and Reload. Any other error, or a failed copy,
- * throws as before and the buffer stays pending.
- */
-async function stashSaveConflict(error: unknown, path: string, content: string): Promise<void> {
-  if (!isSaveConflictError(error)) throw error
-  let copyPath: string
-  try {
-    copyPath = await stashConflictCopy(path, content)
-  } catch (stashError) {
-    console.error('Failed to stash conflicting edits:', stashError)
-    throw error
-  }
-  emitSaveConflict({ path, content, copyPath })
-}
-
 function applyTabContent(
   setTabs: EditorSaveConfig['setTabs'],
   path: string,
@@ -344,6 +326,7 @@ function useOnAfterSaveRef(onAfterSave: () => void) {
 
 function usePendingContentFlush({
   applySplicedContent,
+  inFlightSaveRef,
   pendingContentRef,
   saveNote,
   onBeforePersist,
@@ -354,6 +337,7 @@ function usePendingContentFlush({
   persistenceScopeRef,
 }: {
   applySplicedContent: ApplyPersistedContent
+  inFlightSaveRef: MutableRefObject<InFlightPendingSave | null>
   pendingContentRef: MutableRefObject<PendingContent | null>
   saveNote: SaveNote
   onBeforePersist?: EditorSaveConfig['onBeforePersist']
@@ -363,8 +347,6 @@ function usePendingContentFlush({
   canPersistRef: MutableRefObject<boolean>
   persistenceScopeRef: MutableRefObject<string | readonly string[] | undefined>
 }) {
-  const inFlightSaveRef = useRef<InFlightPendingSave | null>(null)
-
   return useCallback(async (pathFilter?: string): Promise<boolean> => {
     const pending = pendingContentRef.current
     if (!matchesPendingPath(pending, pathFilter, resolvePath)) return false
@@ -398,7 +380,36 @@ function usePendingContentFlush({
         inFlightSaveRef.current = null
       }
     }
-  }, [applySplicedContent, canPersistRef, onBeforePersist, onNotePersisted, pendingContentRef, persistenceScopeRef, resolvePath, resolvePathBeforeSave, saveNote])
+  }, [applySplicedContent, canPersistRef, inFlightSaveRef, onBeforePersist, onNotePersisted, pendingContentRef, persistenceScopeRef, resolvePath, resolvePathBeforeSave, saveNote])
+}
+
+/**
+ * Keep mine is about to write. Wait for an in-flight autosave, then drop
+ * the scheduled one, so neither writes over the text Keep mine sends.
+ * Returns the pending buffer when the note has one.
+ */
+function useHoldPendingSave({
+  cancelAutoSave,
+  inFlightSaveRef,
+  pendingContentRef,
+  resolvePath,
+}: {
+  cancelAutoSave: () => void
+  inFlightSaveRef: MutableRefObject<InFlightPendingSave | null>
+  pendingContentRef: MutableRefObject<PendingContent | null>
+  resolvePath?: EditorSaveConfig['resolvePath']
+}) {
+  return useCallback(async (path: string): Promise<string | null> => {
+    const pending = pendingContentRef.current
+    const live = matchesPendingPath(pending, path, resolvePath) ? pending.content : null
+    cancelAutoSave()
+    const inFlight = inFlightSaveRef.current
+    if (inFlight && matchesPendingPath(inFlight.pending, path, resolvePath)) {
+      await inFlight.promise.catch(() => undefined)
+    }
+    if (pending && pendingContentRef.current === pending) pendingContentRef.current = null
+    return live
+  }, [cancelAutoSave, inFlightSaveRef, pendingContentRef, resolvePath])
 }
 
 function useCancelAutoSave(autoSaveTimerRef: MutableRefObject<ReturnType<typeof setTimeout> | null>) {
@@ -670,8 +681,10 @@ function useEditorSaveCommands({
   disabledSaveMessage,
   t,
 }: EditorSaveCommandsParams) {
+  const inFlightSaveRef = useRef<InFlightPendingSave | null>(null)
   const flushPending = usePendingContentFlush({
     applySplicedContent,
+    inFlightSaveRef,
     pendingContentRef,
     saveNote,
     onBeforePersist,
@@ -682,6 +695,12 @@ function useEditorSaveCommands({
     persistenceScopeRef,
   })
   const cancelAutoSave = useCancelAutoSave(autoSaveTimerRef)
+  const holdPendingSave = useHoldPendingSave({
+    cancelAutoSave,
+    inFlightSaveRef,
+    pendingContentRef,
+    resolvePath,
+  })
   usePendingContentScopeReset({ cancelAutoSave, pendingContentRef, persistenceScope })
   const { handleSave, savePendingForPath, savePending } = useImmediateSaveCommands({
     pendingContentRef,
@@ -713,7 +732,7 @@ function useEditorSaveCommands({
     t,
   })
 
-  return { handleSave, handleContentChange, savePendingForPath, savePending }
+  return { handleSave, handleContentChange, holdPendingSave, savePendingForPath, savePending }
 }
 
 export function useEditorSave({

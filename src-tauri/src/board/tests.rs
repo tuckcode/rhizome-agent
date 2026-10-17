@@ -254,8 +254,9 @@ fn keeps_blank_lines_inside_a_block_scalar_status() {
 }
 
 #[test]
-fn only_dashes_close_the_frontmatter() {
-    assert!(set_status("---\nStatus: Done\n...\nbody\n", "Blocked").is_err());
+fn a_dot_fence_closes_the_frontmatter() {
+    let out = set_status("---\nStatus: Done\n...\nbody\n", "Blocked").unwrap();
+    assert_eq!(out.content, "---\nStatus: Blocked\n...\nbody\n");
 }
 
 #[test]
@@ -864,6 +865,16 @@ fn splice_replays_every_status_shape_a_move_writes() {
         assert_eq!(read_status(&spliced).as_deref(), Some("Done"), "{opened:?}");
         assert!(spliced.ends_with("typed\n"), "{opened:?} -> {spliced:?}");
     }
+}
+
+/// The editor and the board each wrote a different Status. Splicing would
+/// drop the editor's value, so the save is a conflict.
+#[test]
+fn splice_conflicts_when_both_sides_edit_status() {
+    let opened = "---\nStatus: Draft\n---\nbody\n";
+    let disk = set_status(opened, "Done").unwrap().content;
+    let buffer = "---\nStatus: Blocked\n---\nbody edited\n";
+    assert_eq!(splice_disk_status(&disk, buffer, opened), None);
 }
 
 /// Both sides set the same status and the buffer has other edits too.
