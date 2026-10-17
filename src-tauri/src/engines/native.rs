@@ -274,26 +274,10 @@ impl<M: Model> Engine for NativeEngine<M> {
         let drain_flag = Arc::clone(&stop_drain);
         let drain_rx = Arc::clone(&self.provider_rx);
         let notice_rx = self.reasoning_notice_rx.clone();
-        let notice_session = self
-            .log_meta
-            .as_ref()
-            .map(|header| header.session_id.clone());
-        let notice_log = self.session_log.clone();
         let drain_emit = emit.clone();
         let notice_emit = drain_emit.clone();
         let drain = thread::spawn(move || {
             let emit_notice = move |notice: crate::reasoning_levels::ReasoningLevelNotice| {
-                if notice.code == "downgraded" {
-                    if let Some(session_id) = notice_session.as_deref() {
-                        let _ =
-                            native_log::write_reasoning_sidecar(session_id, notice.to.as_deref());
-                    }
-                    if let Some(log) = &notice_log {
-                        if let Ok(mut writer) = log.lock() {
-                            writer.set_reasoning_level(notice.to.clone());
-                        }
-                    }
-                }
                 notice_emit(EngineEvent::ReasoningLevelNotice {
                     code: notice.code,
                     from: notice.from,

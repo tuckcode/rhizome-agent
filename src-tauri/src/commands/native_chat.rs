@@ -236,14 +236,14 @@ impl NativeChats {
 
     #[cfg(test)]
     pub fn send(&self, session_id: &str, text: &str) -> Result<(), String> {
-        self.send_with_reasoning(session_id, text, None)
+        self.send_with_reasoning(session_id, text, ReasoningLevelUpdate::Keep)
     }
 
     pub fn send_with_reasoning(
         &self,
         session_id: &str,
         text: &str,
-        reasoning_level: Option<String>,
+        reasoning_level: ReasoningLevelUpdate,
     ) -> Result<(), String> {
         if self
             .read_only
@@ -262,20 +262,34 @@ impl NativeChats {
         if session.read_only {
             return Err("native session is read-only".into());
         }
-        if let Some(level) = reasoning_level {
-            let normalized = normalize_reasoning_level(Some(level));
-            if let Some(slot) = self
-                .reasoning_slots
-                .lock()
-                .expect("reasoning slots")
-                .get(session_id)
-            {
-                *slot.lock().expect("reasoning level") = normalized.clone();
+        match reasoning_level {
+            ReasoningLevelUpdate::Keep => {}
+            ReasoningLevelUpdate::Clear => {
+                if let Some(slot) = self
+                    .reasoning_slots
+                    .lock()
+                    .expect("reasoning slots")
+                    .get(session_id)
+                {
+                    *slot.lock().expect("reasoning level") = None;
+                }
+                let _ = crate::engines::native_log::write_reasoning_sidecar(session_id, None);
             }
-            let _ = crate::engines::native_log::write_reasoning_sidecar(
-                session_id,
-                normalized.as_deref(),
-            );
+            ReasoningLevelUpdate::Set(level) => {
+                let normalized = normalize_reasoning_level(Some(level));
+                if let Some(slot) = self
+                    .reasoning_slots
+                    .lock()
+                    .expect("reasoning slots")
+                    .get(session_id)
+                {
+                    *slot.lock().expect("reasoning level") = normalized.clone();
+                }
+                let _ = crate::engines::native_log::write_reasoning_sidecar(
+                    session_id,
+                    normalized.as_deref(),
+                );
+            }
         }
         claim_turn(&session.turn_busy)?;
         if session.ops.send(ChatOp::Turn(text.to_string())).is_err() {
@@ -747,6 +761,7 @@ fn normalize_reasoning_level(level: Option<String>) -> Option<String> {
 struct UserReasoning {
     level: Option<String>,
     slot: crate::reasoning_levels::ReasoningLevelSlot,
+    notices_seen: std::sync::Arc<std::sync::Mutex<std::collections::HashSet<String>>>,
     notice_tx: mpsc::Sender<crate::reasoning_levels::ReasoningLevelNotice>,
     notice_rx: mpsc::Receiver<crate::reasoning_levels::ReasoningLevelNotice>,
 }
@@ -763,6 +778,7 @@ fn user_reasoning(chats: &NativeChats, session_id: &str, level: Option<String>) 
     UserReasoning {
         level,
         slot,
+        notices_seen: Arc::new(Mutex::new(std::collections::HashSet::new())),
         notice_tx,
         notice_rx,
     }
@@ -772,6 +788,48 @@ fn apply_catalog_reasoning(stream: &mut AiModelStreamRequest, reasoning: &UserRe
     stream.reasoning_level = reasoning.level.clone();
     stream.reasoning_slot = Some(Arc::clone(&reasoning.slot));
     stream.reasoning_notice_tx = Some(reasoning.notice_tx.clone());
+    stream.reasoning_notices_seen = Some(Arc::clone(&reasoning.notices_seen));
+}
+
+/// `native_chat_send`'s reasoning argument. A missing key keeps the saved
+/// level. JSON null clears it. A string sets it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReasoningLevelUpdate {
+    Keep,
+    Clear,
+    Set(String),
+}
+
+impl<'de, R: tauri::Runtime> tauri::ipc::CommandArg<'de, R> for ReasoningLevelUpdate {
+    fn from_command(
+        command: tauri::ipc::CommandItem<'de, R>,
+    ) -> Result<Self, tauri::ipc::InvokeError> {
+        let tauri::ipc::InvokeBody::Json(payload) = command.message.payload() else {
+            return Ok(Self::Keep);
+        };
+        Self::from_payload_value(payload.get(command.key)).map_err(|error| {
+            tauri::Error::InvalidArgs(command.name, command.key, serde::de::Error::custom(error))
+                .into()
+        })
+    }
+}
+
+impl ReasoningLevelUpdate {
+    fn from_payload_value(value: Option<&serde_json::Value>) -> Result<Self, String> {
+        match value {
+            None => Ok(Self::Keep),
+            Some(serde_json::Value::Null) => Ok(Self::Clear),
+            Some(serde_json::Value::String(level)) => {
+                let trimmed = level.trim();
+                if trimmed.is_empty() {
+                    Ok(Self::Clear)
+                } else {
+                    Ok(Self::Set(trimmed.to_string()))
+                }
+            }
+            Some(_) => Err("reasoningLevel must be a string or null".into()),
+        }
+    }
 }
 
 fn start_named_request(
@@ -796,7 +854,11 @@ fn start_named_request(
             let model = free_tier_routing_model(system.clone(), move |attempt| {
                 let _ = reporter.send(attempt);
             })?
-            .with_user_reasoning(Arc::clone(&reasoning.slot), reasoning.notice_tx.clone());
+            .with_user_reasoning(
+                Arc::clone(&reasoning.slot),
+                reasoning.notice_tx.clone(),
+                Arc::clone(&reasoning.notices_seen),
+            );
             let mut engine = NativeEngine::with_provider_pair(AgentLoop::new(), model, tx, rx);
             engine.set_vault(vault_path.clone(), vault_paths.clone());
             engine.set_permission_mode(mode);
@@ -829,6 +891,7 @@ fn start_named_request(
                 reasoning_level: None,
                 reasoning_slot: None,
                 reasoning_notice_tx: None,
+                reasoning_notices_seen: None,
             };
             apply_catalog_reasoning(&mut stream, &reasoning);
             let mut engine = NativeEngine::new(ProviderModel::new(stream, HttpLimits::STREAM));
@@ -855,7 +918,7 @@ pub fn native_chat_send(
     chats: tauri::State<NativeChats>,
     session_id: String,
     text: String,
-    reasoning_level: Option<String>,
+    reasoning_level: ReasoningLevelUpdate,
 ) -> Result<(), String> {
     chats.send_with_reasoning(&session_id, &text, reasoning_level)
 }
@@ -1014,8 +1077,11 @@ where
             let model = match free_tier_routing_model_with(keys, system.clone(), move |attempt| {
                 let _ = reporter.send(attempt);
             }) {
-                Ok(model) => model
-                    .with_user_reasoning(Arc::clone(&reasoning.slot), reasoning.notice_tx.clone()),
+                Ok(model) => model.with_user_reasoning(
+                    Arc::clone(&reasoning.slot),
+                    reasoning.notice_tx.clone(),
+                    Arc::clone(&reasoning.notices_seen),
+                ),
                 Err(error) => {
                     return Ok(NativeChatOpenResult {
                         error: Some(error),
@@ -1056,6 +1122,7 @@ where
                 reasoning_level: None,
                 reasoning_slot: None,
                 reasoning_notice_tx: None,
+                reasoning_notices_seen: None,
             };
             apply_catalog_reasoning(&mut stream, &reasoning);
             let mut engine =
@@ -2386,5 +2453,24 @@ mod tests {
             assert_eq!(opened.header.vault_paths, vec!["/extra".to_string()]);
             assert_eq!(opened.header.system_prompt.as_deref(), Some("Be brief"));
         });
+    }
+
+    #[test]
+    fn a_null_reasoning_level_clears_and_a_missing_one_keeps() {
+        assert_eq!(
+            ReasoningLevelUpdate::from_payload_value(None).unwrap(),
+            ReasoningLevelUpdate::Keep
+        );
+        assert_eq!(
+            ReasoningLevelUpdate::from_payload_value(Some(&serde_json::Value::Null)).unwrap(),
+            ReasoningLevelUpdate::Clear
+        );
+        assert_eq!(
+            ReasoningLevelUpdate::from_payload_value(Some(&serde_json::Value::String(
+                "high".into()
+            )))
+            .unwrap(),
+            ReasoningLevelUpdate::Set("high".into())
+        );
     }
 }

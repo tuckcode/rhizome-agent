@@ -152,11 +152,14 @@ export async function streamNativeChat(request: StreamNativeChatRequest): Promis
         },
       })
     if (request.sessionId) {
-      await invoke('native_chat_send', {
+      const send: { sessionId: string; text: string; reasoningLevel?: string | null } = {
         sessionId,
         text: request.message,
-        ...(request.reasoningLevel ? { reasoningLevel: request.reasoningLevel } : {}),
-      })
+      }
+      if (request.reasoningLevel !== undefined) {
+        send.reasoningLevel = request.reasoningLevel
+      }
+      await invoke('native_chat_send', send)
     }
     await new Promise<void>((resolve) => {
       let settled = false

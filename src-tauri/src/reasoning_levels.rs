@@ -136,6 +136,10 @@ pub struct ReasoningResolution {
     /// Set when the requested level was moved to a weaker one. The UI shows
     /// this. A move with this field empty is not produced.
     pub downgraded_from: Option<String>,
+    /// Set when the provider maps the request to a different level that is
+    /// not weaker. DeepSeek maps `medium` to `high`. The chat emits
+    /// `adjusted` and keeps the saved level.
+    pub adjusted_from: Option<String>,
     /// `"Default"` unless the winning row names a default.
     pub default_label: String,
     /// The level id to send, after a visible downgrade. Empty when the caller
@@ -730,7 +734,7 @@ fn from_probe(probe: LocalProbe) -> ReasoningSupport {
 fn map_known_level(
     requested: &str,
     levels: &ReasoningLevels,
-) -> Option<(Option<String>, Option<String>)> {
+) -> Option<(String, Option<String>, Option<String>)> {
     let ids: Vec<&str> = levels
         .levels
         .iter()
@@ -744,7 +748,7 @@ fn map_known_level(
             "on"
         };
         let notice = (selected != requested).then(|| requested.to_string());
-        return Some((Some(selected.to_string()), notice));
+        return Some((selected.to_string(), notice, None));
     }
     if matches!(levels.wire.send, WireSend::NimChatTemplate)
         && has("off")
@@ -758,7 +762,7 @@ fn map_known_level(
             _ => return None,
         };
         let notice = (selected != requested).then(|| requested.to_string());
-        return Some((Some(selected.to_string()), notice));
+        return Some((selected.to_string(), notice, None));
     }
     if matches!(levels.wire.send, WireSend::DeepSeekThinking) {
         let mapped = match requested {
@@ -779,21 +783,23 @@ fn map_known_level(
             (Some(requested_idx), Some(mapped_idx)) => mapped_idx < requested_idx,
             _ => false,
         };
-        let notice = weaker.then(|| requested.to_string());
-        return Some((Some(mapped.to_string()), notice));
+        let downgraded_from = weaker.then(|| requested.to_string());
+        let adjusted_from = (!weaker && mapped != requested).then(|| requested.to_string());
+        return Some((mapped.to_string(), downgraded_from, adjusted_from));
     }
     None
 }
 
 fn finish(support: ReasoningSupport, requested: Option<&str>) -> ReasoningResolution {
     let default_label = default_label_for(&support);
-    let (selected_level, downgraded_from) = match &support {
+    let (selected_level, downgraded_from, adjusted_from) = match &support {
         ReasoningSupport::Levels(levels) => select_level(requested, levels),
-        _ => (None, None),
+        _ => (None, None, None),
     };
     ReasoningResolution {
         support,
         downgraded_from,
+        adjusted_from,
         default_label,
         selected_level,
     }
@@ -802,19 +808,19 @@ fn finish(support: ReasoningSupport, requested: Option<&str>) -> ReasoningResolu
 fn select_level(
     requested: Option<&str>,
     levels: &ReasoningLevels,
-) -> (Option<String>, Option<String>) {
+) -> (Option<String>, Option<String>, Option<String>) {
     let Some(raw) = requested.map(str::trim).filter(|value| !value.is_empty()) else {
-        return (None, None);
+        return (None, None, None);
     };
     let requested = raw.to_lowercase();
     if let Some(level) = levels.levels.iter().find(|level| level.id == requested) {
-        return (Some(level.id.clone()), None);
+        return (Some(level.id.clone()), None, None);
     }
-    if let Some(mapped) = map_known_level(&requested, levels) {
-        return mapped;
+    if let Some((selected, downgraded_from, adjusted_from)) = map_known_level(&requested, levels) {
+        return (Some(selected), downgraded_from, adjusted_from);
     }
     if levels.levels.is_empty() {
-        return (None, None);
+        return (None, None, None);
     }
     let ids: Vec<&str> = levels
         .levels
@@ -825,7 +831,7 @@ fn select_level(
     if all_ladder {
         if let Some(clamped) = clamp_effort(Some(&requested), &ids, &[]) {
             if ids.contains(&clamped.as_str()) && clamped != requested {
-                return (Some(clamped), Some(requested));
+                return (Some(clamped), Some(requested), None);
             }
         }
     }
@@ -855,13 +861,13 @@ fn select_level(
                 .position(|id| *id == level.id)
                 .unwrap_or(0)
         }) {
-            return (Some(nearest.id.clone()), Some(requested));
+            return (Some(nearest.id.clone()), Some(requested), None);
         }
     }
     let weakest = pool
         .first()
         .expect("pool is non-empty when levels is non-empty");
-    (Some(weakest.id.clone()), Some(requested))
+    (Some(weakest.id.clone()), Some(requested), None)
 }
 
 fn is_openrouter(query: &ResolveQuery<'_>) -> bool {
@@ -1236,17 +1242,6 @@ fn write_json(path: &Path, value: &Value) -> Result<(), String> {
     fs::write(path, text).map_err(|error| error.to_string())
 }
 
-/// Output-token floor when a thinking level is sent.
-///
-/// Reasoning tokens count toward the completion limit. A cap that is used up
-/// by reasoning comes back as an empty message:
-/// <https://platform.openai.com/docs/guides/reasoning>
-///
-/// Anthropic counts `budget_tokens` (minimum 1024) inside `max_tokens`, so
-/// the cap has to be larger than the thinking budget:
-/// <https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking>
-pub const REASONING_OUTPUT_FLOOR: u32 = 16_384;
-
 /// Provider body fields for one user chat turn.
 ///
 /// `body` is empty when the model is unknown, has no reasoning, or the
@@ -1260,9 +1255,7 @@ pub struct ReasoningTargetRequest {
     pub system_prefix: Option<String>,
     pub selected_level: Option<String>,
     pub downgraded_from: Option<String>,
-    /// Set when the sent level spends completion tokens on reasoning.
-    /// `none` and `off` stay unset.
-    pub output_floor: Option<u32>,
+    pub adjusted_from: Option<String>,
 }
 
 /// Model plus level, as the provider request fields for one user chat turn.
@@ -1342,14 +1335,12 @@ fn fields_for_resolution(resolution: &ReasoningResolution) -> ReasoningTargetReq
             }
         }
     }
-    let thinking = !matches!(selected, "off" | "none" | "false" | "disabled");
-    let output_floor = thinking.then_some(REASONING_OUTPUT_FLOOR);
     ReasoningTargetRequest {
         body,
         system_prefix,
         selected_level: Some(selected.to_string()),
         downgraded_from: resolution.downgraded_from.clone(),
-        output_floor,
+        adjusted_from: resolution.adjusted_from.clone(),
     }
 }
 
@@ -1359,7 +1350,7 @@ fn empty_target() -> ReasoningTargetRequest {
         system_prefix: None,
         selected_level: None,
         downgraded_from: None,
-        output_floor: None,
+        adjusted_from: None,
     }
 }
 
@@ -2149,7 +2140,7 @@ mod tests {
         let ReasoningSupport::Levels(toggle) = toggle else {
             panic!("levels");
         };
-        let (selected, from) = select_level(Some("max"), &toggle);
+        let (selected, from, _) = select_level(Some("max"), &toggle);
         assert_eq!(selected.as_deref(), Some("on"));
         assert_eq!(from.as_deref(), Some("max"));
 
@@ -2178,7 +2169,7 @@ mod tests {
     }
 
     #[test]
-    fn deepseek_medium_maps_up_to_high_without_a_downgrade_notice() {
+    fn deepseek_medium_maps_up_to_high_and_records_an_adjusted_notice() {
         let mut query = query(
             "deepseek",
             Some("deepseek"),
@@ -2189,6 +2180,7 @@ mod tests {
         let resolved = resolve(&query, &EmptySources, &mut ReasoningLookupCache::default());
         assert_eq!(resolved.selected_level.as_deref(), Some("high"));
         assert!(resolved.downgraded_from.is_none());
+        assert_eq!(resolved.adjusted_from.as_deref(), Some("medium"));
         match resolved.support {
             ReasoningSupport::Levels(levels) => {
                 assert_eq!(levels.wire.send, WireSend::DeepSeekThinking);
@@ -2284,7 +2276,8 @@ mod tests {
         );
         assert_eq!(first, ReasoningSupport::Unknown);
         assert_eq!(second, first);
-        reset_reasoning_state_for_test(None);
+        let _catalog = tempfile::tempdir().unwrap();
+        reset_reasoning_state_for_test(Some(_catalog.path().to_path_buf()));
     }
 
     #[test]
@@ -2320,14 +2313,16 @@ mod tests {
 
     #[test]
     fn target_fields_follow_the_resolved_wire_shape() {
-        reset_reasoning_state_for_test(None);
+        let _catalog = tempfile::tempdir().unwrap();
+        reset_reasoning_state_for_test(Some(_catalog.path().to_path_buf()));
         let grok =
             reasoning_levels_for_target("xai", "https://api.x.ai/v1", "grok-4.7", Some("high"));
         assert_eq!(
             grok.body.get("reasoning_effort").and_then(Value::as_str),
             Some("high")
         );
-        assert_eq!(grok.output_floor, Some(REASONING_OUTPUT_FLOOR));
+        assert!(grok.body.get("max_tokens").is_none());
+        assert!(grok.body.get("max_completion_tokens").is_none());
         assert!(grok.downgraded_from.is_none());
 
         let gemini = reasoning_levels_for_target(
@@ -2355,6 +2350,7 @@ mod tests {
         );
         assert_eq!(deepseek_medium.selected_level.as_deref(), Some("high"));
         assert!(deepseek_medium.downgraded_from.is_none());
+        assert_eq!(deepseek_medium.adjusted_from.as_deref(), Some("medium"));
         assert_eq!(deepseek_medium.body["reasoning_effort"], json!("high"));
 
         let nemotron = reasoning_levels_for_target(
@@ -2403,7 +2399,8 @@ mod tests {
 
     #[test]
     fn an_unknown_model_sends_no_request_fields() {
-        reset_reasoning_state_for_test(None);
+        let _catalog = tempfile::tempdir().unwrap();
+        reset_reasoning_state_for_test(Some(_catalog.path().to_path_buf()));
         let unknown = reasoning_levels_for_target(
             "llm7",
             "https://api.llm7.io/v1",
@@ -2413,13 +2410,14 @@ mod tests {
         assert!(unknown.body.is_empty());
         assert!(unknown.system_prefix.is_none());
         assert!(unknown.selected_level.is_none());
-        assert!(unknown.output_floor.is_none());
+        assert!(unknown.adjusted_from.is_none());
         assert!(unknown.downgraded_from.is_none());
     }
 
     #[test]
     fn a_stronger_level_steps_down_and_names_the_old_one() {
-        reset_reasoning_state_for_test(None);
+        let _catalog = tempfile::tempdir().unwrap();
+        reset_reasoning_state_for_test(Some(_catalog.path().to_path_buf()));
         let stepped =
             reasoning_levels_for_target("xai", "https://api.x.ai/v1", "grok-4.7", Some("max"));
         assert_eq!(stepped.selected_level.as_deref(), Some("xhigh"));

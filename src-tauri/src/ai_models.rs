@@ -90,6 +90,10 @@ pub struct AiModelStreamRequest {
     #[serde(skip)]
     pub reasoning_notice_tx:
         Option<std::sync::mpsc::Sender<crate::reasoning_levels::ReasoningLevelNotice>>,
+    /// Notices already emitted for this chat. Shared across turns and routes.
+    #[serde(skip)]
+    pub reasoning_notices_seen:
+        Option<std::sync::Arc<std::sync::Mutex<std::collections::HashSet<String>>>>,
 }
 
 /// Shown instead of a blank assistant bubble when a thinking level comes back empty.
@@ -213,6 +217,7 @@ pub fn test_ai_model_provider(request: AiModelProviderTestRequest) -> Result<Str
         reasoning_level: None,
         reasoning_slot: None,
         reasoning_notice_tx: None,
+        reasoning_notices_seen: None,
     };
     complete_text(&request)
 }
@@ -358,6 +363,7 @@ pub fn discover_ai_model_ids_with(
         reasoning_level: None,
         reasoning_slot: None,
         reasoning_notice_tx: None,
+        reasoning_notices_seen: None,
     };
     let endpoint = format!("{}/models", rejected_on_err(normalized_base_url(&request))?);
     let client = http_client(limits)?;
@@ -512,8 +518,8 @@ fn apply_system_prefix(payload: &mut serde_json::Value, prefix: &str) {
 
 /// Body fields for the user chat turn. Empty unless this request carries a level.
 ///
-/// When the saved level is stronger than the model allows, the slot moves to
-/// the weaker level and a notice is sent. Unknown models send no fields.
+/// A saved level that the model cannot use is stepped down or adjusted for
+/// this request only. The saved level stays. Unknown models send no fields.
 pub(crate) fn user_turn_reasoning(request: &AiModelStreamRequest) -> (TurnExtras, bool) {
     let Some(level) = live_reasoning_level(request) else {
         return (TurnExtras::default(), false);
@@ -525,20 +531,29 @@ pub(crate) fn user_turn_reasoning(request: &AiModelStreamRequest) -> (TurnExtras
         &request.model_id,
         Some(&level),
     );
-    if let Some(from) = fields.downgraded_from.clone() {
-        if let Some(to) = fields.selected_level.clone() {
-            if let Some(slot) = &request.reasoning_slot {
-                *slot.lock().expect("reasoning level") = Some(to.clone());
-            }
-            send_reasoning_notice(
-                request,
-                crate::reasoning_levels::ReasoningLevelNotice {
-                    code: "downgraded".into(),
-                    from: Some(from),
-                    to: Some(to),
-                },
-            );
-        }
+    if let (Some(from), Some(to)) = (
+        fields.downgraded_from.clone(),
+        fields.selected_level.clone(),
+    ) {
+        send_reasoning_notice(
+            request,
+            crate::reasoning_levels::ReasoningLevelNotice {
+                code: "downgraded".into(),
+                from: Some(from),
+                to: Some(to),
+            },
+        );
+    } else if let (Some(from), Some(to)) =
+        (fields.adjusted_from.clone(), fields.selected_level.clone())
+    {
+        send_reasoning_notice(
+            request,
+            crate::reasoning_levels::ReasoningLevelNotice {
+                code: "adjusted".into(),
+                from: Some(from),
+                to: Some(to),
+            },
+        );
     } else if fields.selected_level.is_none() {
         send_reasoning_notice(
             request,
@@ -550,25 +565,55 @@ pub(crate) fn user_turn_reasoning(request: &AiModelStreamRequest) -> (TurnExtras
         );
     }
     let mut body = fields.body;
-    if let Some(floor) = fields.output_floor {
-        // Raise a short cap so reasoning tokens do not consume the whole reply.
-        // https://platform.openai.com/docs/guides/reasoning
-        // https://docs.anthropic.com/en/docs/build-with-claude/extended-thinking
-        let configured = u64::from(selected_max_tokens(request));
-        let floor = u64::from(floor);
-        let raised = configured.max(floor);
-        raise_token_cap(&mut body, "max_tokens", raised);
-        if body.contains_key("max_completion_tokens") {
-            raise_token_cap(&mut body, "max_completion_tokens", raised);
-        }
-    }
+    apply_configured_output_cap(request, &mut body);
+    let thinking = fields
+        .selected_level
+        .as_deref()
+        .is_some_and(|level| !matches!(level, "off" | "none" | "false" | "disabled"));
     (
         TurnExtras {
             body,
             system_prefix: fields.system_prefix,
         },
-        fields.output_floor.is_some(),
+        thinking,
     )
+}
+
+/// Send a token cap only when this model has one configured. Never invent or
+/// raise one. GPT-5 and later reject `max_tokens` on Chat Completions.
+fn apply_configured_output_cap(
+    request: &AiModelStreamRequest,
+    body: &mut serde_json::Map<String, serde_json::Value>,
+) {
+    let Some(limit) = request
+        .provider
+        .models
+        .iter()
+        .find(|model| model.id == request.model_id)
+        .and_then(|model| model.max_output_tokens)
+    else {
+        return;
+    };
+    let field = if openai_family_uses_completion_tokens(&request.model_id) {
+        "max_completion_tokens"
+    } else {
+        "max_tokens"
+    };
+    body.insert(field.to_string(), serde_json::json!(limit));
+}
+
+fn openai_family_uses_completion_tokens(model_id: &str) -> bool {
+    let bare = model_id
+        .rsplit('/')
+        .next()
+        .unwrap_or(model_id)
+        .trim()
+        .to_ascii_lowercase();
+    bare.starts_with("gpt-5")
+        || bare.starts_with("gpt-6")
+        || bare.starts_with("o1")
+        || bare.starts_with("o3")
+        || bare.starts_with("o4")
 }
 
 fn live_reasoning_level(request: &AiModelStreamRequest) -> Option<String> {
@@ -602,15 +647,21 @@ fn send_reasoning_notice(
     request: &AiModelStreamRequest,
     notice: crate::reasoning_levels::ReasoningLevelNotice,
 ) {
+    if let Some(seen) = &request.reasoning_notices_seen {
+        let key = format!(
+            "{}|{}|{}|{}",
+            notice.code,
+            request.model_id,
+            notice.from.as_deref().unwrap_or(""),
+            notice.to.as_deref().unwrap_or("")
+        );
+        let mut seen = seen.lock().expect("reasoning notices");
+        if !seen.insert(key) {
+            return;
+        }
+    }
     if let Some(tx) = &request.reasoning_notice_tx {
         let _ = tx.send(notice);
-    }
-}
-
-fn raise_token_cap(body: &mut serde_json::Map<String, serde_json::Value>, key: &str, floor: u64) {
-    let current = body.get(key).and_then(|value| value.as_u64()).unwrap_or(0);
-    if current < floor {
-        body.insert(key.to_string(), serde_json::json!(floor));
     }
 }
 
@@ -1073,6 +1124,7 @@ mod tests {
             reasoning_level: None,
             reasoning_slot: None,
             reasoning_notice_tx: None,
+            reasoning_notices_seen: None,
         }
     }
 

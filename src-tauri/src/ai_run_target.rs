@@ -125,6 +125,7 @@ where
                 reasoning_level: None,
                 reasoning_slot: None,
                 reasoning_notice_tx: None,
+                reasoning_notices_seen: None,
             };
             model_runner(request, &mut |event| {
                 accumulate(event, &mut response, on_line)

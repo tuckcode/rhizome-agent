@@ -159,18 +159,31 @@ pub fn reasoning_sidecar_path(session_id: &str) -> Result<PathBuf, String> {
     Ok(native_sessions_dir()?.join(format!("{session_id}.reasoning")))
 }
 
-/// `Ok(None)` when the sidecar was never written. `Ok(Some(None))` when it
-/// was cleared. The sidecar wins over the header on open.
+/// A level id is a short word. Anything longer is not a saved level.
+const REASONING_SIDECAR_CAP: usize = 64;
+
+/// `Ok(None)` when the sidecar was never written, cannot be read, or is not
+/// a short level id. `Ok(Some(None))` when it was cleared. The sidecar wins
+/// over the header on open. A bad sidecar does not make the chat unopenable.
 pub fn read_reasoning_sidecar(session_id: &str) -> Result<Option<Option<String>>, String> {
     let path = reasoning_sidecar_path(session_id)?;
     if !path.exists() {
         return Ok(None);
     }
-    let text =
-        fs::read_to_string(&path).map_err(|error| format!("read reasoning sidecar: {error}"))?;
+    let Ok(bytes) = fs::read(&path) else {
+        return Ok(None);
+    };
+    if bytes.len() > REASONING_SIDECAR_CAP {
+        return Ok(None);
+    }
+    let Ok(text) = String::from_utf8(bytes) else {
+        return Ok(None);
+    };
     let level = text.trim();
     if level.is_empty() {
         Ok(Some(None))
+    } else if level.len() > REASONING_SIDECAR_CAP {
+        Ok(None)
     } else {
         Ok(Some(Some(level.to_string())))
     }
@@ -184,9 +197,11 @@ pub fn write_reasoning_sidecar(session_id: &str, level: Option<&str>) -> Result<
                 fs::create_dir_all(parent)
                     .map_err(|error| format!("create native-sessions dir: {error}"))?;
             }
-            fs::write(&path, format!("{level}\n"))
+            let tmp = PathBuf::from(format!("{}.tmp", path.display()));
+            fs::write(&tmp, format!("{level}\n"))
                 .map_err(|error| format!("write reasoning sidecar: {error}"))?;
-            set_owner_only(&path)
+            set_owner_only(&tmp)?;
+            fs::rename(&tmp, &path).map_err(|error| format!("write reasoning sidecar: {error}"))
         }
         None => {
             if path.exists() {
@@ -1336,7 +1351,11 @@ pub fn create_session_log(header: &SessionHeader) -> Result<NativeSessionWriter,
     let header_json = serde_json::to_string(header)
         .map_err(|error| format!("serialize native session header: {error}"))?;
     write_line(&mut file, &header_json)?;
-    write_reasoning_sidecar(&header.session_id, header.reasoning_level.as_deref())?;
+    if let Err(error) =
+        write_reasoning_sidecar(&header.session_id, header.reasoning_level.as_deref())
+    {
+        log::warn!("reasoning level was not saved beside the chat log: {error}");
+    }
     let len = file.metadata().map(|meta| meta.len()).unwrap_or(0);
     Ok(NativeSessionWriter {
         file,
@@ -3310,5 +3329,31 @@ mod tests {
         let opened = open_session_log(&id).unwrap();
         assert_eq!(opened.header.reasoning_level, None);
         assert!(!reasoning_sidecar_path(&id).unwrap().exists());
+    }
+
+    #[test]
+    fn a_bad_reasoning_sidecar_does_not_block_open() {
+        let _home = temp_home();
+        let id = uuid::Uuid::new_v4().to_string();
+        let header = SessionHeader {
+            version: NATIVE_LOG_VERSION,
+            session_id: id.clone(),
+            created_at: "2026-10-10T00:00:00Z".into(),
+            target: "xai/grok-4.7".into(),
+            permission_mode: "safe".into(),
+            vault_path: None,
+            vault_paths: Vec::new(),
+            system_prompt: None,
+            reasoning_level: Some("high".into()),
+        };
+        write_session_events(&header, &[]).unwrap();
+        let path = reasoning_sidecar_path(&id).unwrap();
+        std::fs::write(&path, [0xff, 0xfe]).unwrap();
+        let opened = open_session_log(&id).unwrap();
+        assert_eq!(opened.header.reasoning_level.as_deref(), Some("high"));
+
+        std::fs::write(&path, "x".repeat(REASONING_SIDECAR_CAP + 8)).unwrap();
+        let opened = open_session_log(&id).unwrap();
+        assert_eq!(opened.header.reasoning_level.as_deref(), Some("high"));
     }
 }

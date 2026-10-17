@@ -334,4 +334,29 @@ describe('native stream listen', () => {
       reasoningLevel: 'low',
     })
   })
+
+  it('sends null to clear a reasoning level and omits the key when unset', async () => {
+    listenMock.mockImplementation(async (_name: string, handler: (event: { payload: unknown }) => void) => {
+      queueMicrotask(() => {
+        handler({ payload: { kind: 'turn_end' } })
+      })
+      return vi.fn()
+    })
+    invokeMock.mockResolvedValue(undefined)
+
+    await streamNativeChat({
+      target: 'xai/grok-4.7',
+      message: 'clear it',
+      vaultPath: '/vault',
+      sessionId: 'already-open',
+      reasoningLevel: null,
+      callbacks: callbacks(),
+    })
+
+    expect(invokeMock).toHaveBeenCalledWith('native_chat_send', {
+      sessionId: 'already-open',
+      text: 'clear it',
+      reasoningLevel: null,
+    })
+  })
 })

@@ -548,6 +548,7 @@ mod tests {
             reasoning_level: None,
             reasoning_slot: None,
             reasoning_notice_tx: None,
+            reasoning_notices_seen: None,
         }
     }
 
