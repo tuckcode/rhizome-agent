@@ -563,17 +563,14 @@ fn leftover_chat_engine_on_disk(raw: &str) -> bool {
 
 fn leftover_chat_engine_writeback_claimed(path: &Path) -> bool {
     static WRITTEN: OnceLock<Mutex<HashSet<PathBuf>>> = OnceLock::new();
-    let Ok(mut written) = WRITTEN
-        .get_or_init(|| Mutex::new(HashSet::new()))
-        .lock()
-    else {
+    let Ok(mut written) = WRITTEN.get_or_init(|| Mutex::new(HashSet::new())).lock() else {
         return false;
     };
     written.insert(path.to_path_buf())
 }
 
 fn persist_leftover_chat_engine_migration(
-    path: &PathBuf,
+    path: &Path,
     settings: &Settings,
     persist: impl FnOnce(&Path, Settings) -> Result<(), String>,
 ) {
@@ -900,10 +897,9 @@ mod tests {
         };
         fs::write(&path, serde_json::to_string(&leftover).unwrap()).unwrap();
 
-        let loaded = get_settings_at_with_persist(&path, |_, _| {
-            Err("antivirus lock on rename".into())
-        })
-        .unwrap();
+        let loaded =
+            get_settings_at_with_persist(&path, |_, _| Err("antivirus lock on rename".into()))
+                .unwrap();
         assert_eq!(loaded.chat_engine.as_deref(), Some("native"));
         let disk: serde_json::Value =
             serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
