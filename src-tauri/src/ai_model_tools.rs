@@ -115,9 +115,7 @@ pub(crate) fn chat_tools_reasoning(
     }
     if let Some((name, rest)) = bounded_family(&bare, CHAT_TOOLS_REASONING_NONE_PREFIXES) {
         if is_pro_suffix(rest) {
-            return ChatToolsReasoning::Refuse(format!(
-                "{name} Pro doesn't work in Rhizome chat yet. Pick GPT-6 Sol or Luna instead."
-            ));
+            return ChatToolsReasoning::Refuse(pro_refusal(name, rest));
         }
         return ChatToolsReasoning::None;
     }
@@ -164,6 +162,41 @@ fn bounded_family<'a>(
 /// `pro` as its own `-` segment, including after another suffix (`mini-pro`).
 fn is_pro_suffix(rest: &str) -> bool {
     rest.split('-').any(|part| part == "pro")
+}
+
+/// "GPT-6 Luna Mini Pro doesn't work…" when the segments before `pro` are
+/// known. Anything else falls back to a generic sentence.
+fn pro_refusal(base_name: &str, rest: &str) -> String {
+    let Some(display) = pro_display_name(base_name, rest) else {
+        return "This Pro model doesn't work in Rhizome chat yet.".into();
+    };
+    let pick = if base_name.starts_with("GPT-5") {
+        format!("Pick {base_name} instead.")
+    } else {
+        "Pick GPT-6 Sol or Luna instead.".into()
+    };
+    format!("{display} doesn't work in Rhizome chat yet. {pick}")
+}
+
+fn pro_display_name(base_name: &str, rest: &str) -> Option<String> {
+    let mut qualifiers = Vec::new();
+    for part in rest.split('-') {
+        if part == "pro" {
+            let mut name = base_name.to_string();
+            for qualifier in qualifiers {
+                name.push(' ');
+                name.push_str(qualifier);
+            }
+            name.push_str(" Pro");
+            return Some(name);
+        }
+        let qualifier = match part {
+            "mini" => "Mini",
+            _ => return None,
+        };
+        qualifiers.push(qualifier);
+    }
+    None
 }
 
 fn is_openrouter_base(base_url: Option<&str>) -> bool {
@@ -746,23 +779,42 @@ mod tests {
             );
         }
 
-        for (model_id, name) in [
-            ("gpt-6-luna-pro", "GPT-6 Luna"),
-            ("gpt-5.4-pro", "GPT-5.4"),
-            ("gpt-6-luna-mini-pro", "GPT-6 Luna"),
-            ("gpt-6-sol-mini-pro-2026-01-01", "GPT-6 Sol"),
+        for (model_id, message) in [
+            (
+                "gpt-6-luna-pro",
+                "GPT-6 Luna Pro doesn't work in Rhizome chat yet. Pick GPT-6 Sol or Luna instead.",
+            ),
+            (
+                "gpt-5.4-pro",
+                "GPT-5.4 Pro doesn't work in Rhizome chat yet. Pick GPT-5.4 instead.",
+            ),
+            (
+                "gpt-5.6-pro",
+                "GPT-5.6 Pro doesn't work in Rhizome chat yet. Pick GPT-5.6 instead.",
+            ),
+            (
+                "gpt-6-luna-mini-pro",
+                "GPT-6 Luna Mini Pro doesn't work in Rhizome chat yet. Pick GPT-6 Sol or Luna instead.",
+            ),
+            (
+                "gpt-6-sol-mini-pro-2026-01-01",
+                "GPT-6 Sol Mini Pro doesn't work in Rhizome chat yet. Pick GPT-6 Sol or Luna instead.",
+            ),
+            (
+                "gpt-6-luna-custom-pro",
+                "This Pro model doesn't work in Rhizome chat yet.",
+            ),
         ] {
             assert_eq!(
                 reasoning_for(model_id, AiModelProviderKind::OpenAi, None, true),
-                ChatToolsReasoning::Refuse(format!(
-                    "{name} Pro doesn't work in Rhizome chat yet. Pick GPT-6 Sol or Luna instead."
-                )),
+                ChatToolsReasoning::Refuse(message.into()),
                 "{model_id}"
             );
         }
 
         for base_url in [
             "https://openrouter.ai.evil.com/api/v1",
+            "https://evilopenrouter.ai/api/v1",
             "https://evil.com/openrouter.ai",
             "https://openrouter.ai@evil.com/api/v1",
             "openrouter.ai.evil.com",

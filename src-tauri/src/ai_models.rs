@@ -1290,22 +1290,25 @@ mod tests {
             );
         }
 
-        for (model_id, name) in [
-            ("gpt-6-luna-pro", "GPT-6 Luna"),
-            ("GPT-5.4-pro", "GPT-5.4"),
-            ("gpt-6-luna-mini-pro", "GPT-6 Luna"),
+        for (model_id, message) in [
+            (
+                "gpt-6-luna-pro",
+                "GPT-6 Luna Pro doesn't work in Rhizome chat yet. Pick GPT-6 Sol or Luna instead.",
+            ),
+            (
+                "GPT-5.4-pro",
+                "GPT-5.4 Pro doesn't work in Rhizome chat yet. Pick GPT-5.4 instead.",
+            ),
+            (
+                "gpt-6-luna-mini-pro",
+                "GPT-6 Luna Mini Pro doesn't work in Rhizome chat yet. Pick GPT-6 Sol or Luna instead.",
+            ),
         ] {
             let (events, requests) =
                 stream_tool_body(model_id, AiModelProviderKind::OpenAiCompatible, echo_tool());
             assert!(requests.is_empty(), "{model_id}");
             let error = only_error(&events);
-            assert_eq!(
-                error.message,
-                format!(
-                    "{name} Pro doesn't work in Rhizome chat yet. Pick GPT-6 Sol or Luna instead."
-                ),
-                "{model_id}"
-            );
+            assert_eq!(error.message, message, "{model_id}");
         }
     }
 
