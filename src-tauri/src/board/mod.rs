@@ -2,7 +2,7 @@
 //!
 //! A board is a saved view whose `presentation.type` is `board`. Its
 //! cards are the Markdown notes the view matches, grouped by `Status`
-//! into the view's `presentation.columns`. A move rewrites the `Status`
+//! into the view's columns (see `Presentation::as_board`). A move rewrites the `Status`
 //! line of one note and nothing else.
 //!
 //! No Tauri command calls this module yet. A live move needs the
@@ -47,8 +47,6 @@ pub const SUGGESTED_STATUSES: [&str; 8] = [
 pub const NO_STATUS_COLUMN: &str = "No status";
 /// Default number of cards returned per column.
 pub const DEFAULT_COLUMN_LIMIT: usize = 50;
-
-const BOARD_PRESENTATION: &str = "board";
 
 /// A saved view that shows as a board.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -99,7 +97,7 @@ pub enum Precondition {
     ContentHash(String),
 }
 
-/// Board settings read from a view's `presentation` block.
+/// Board settings for one view.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct BoardConfig {
     columns: Vec<String>,
@@ -110,7 +108,7 @@ pub fn list_boards(vault: &Path) -> Vec<BoardSummary> {
     scan_views(vault)
         .into_iter()
         .filter(|view| validate_view_filename(&view.filename).is_ok())
-        .filter(|view| board_config(vault, &view.filename).is_some())
+        .filter(|view| board_config(view).is_some())
         .map(|view| BoardSummary {
             filename: view.filename,
             name: view.definition.name,
@@ -209,48 +207,16 @@ fn find_board_view(vault: &Path, filename: &str) -> Result<(ViewFile, BoardConfi
         .into_iter()
         .find(|view| view.filename == filename)
         .ok_or_else(|| format!("Board view not found: {filename}"))?;
-    let config =
-        board_config(vault, filename).ok_or_else(|| format!("View is not a board: {filename}"))?;
+    let config = board_config(&view).ok_or_else(|| format!("View is not a board: {filename}"))?;
     Ok((view, config))
 }
 
-/// Reads `presentation` from the raw view YAML. `ViewDefinition` has no
-/// presentation field yet, so this read stays lenient. A view is a
-/// board when `type` is `board` and `groupBy`, if set, is `Status`.
-fn board_config(vault: &Path, filename: &str) -> Option<BoardConfig> {
-    let raw = fs::read_to_string(vault.join("views").join(filename)).ok()?;
-    let value = serde_yaml::from_str::<serde_yaml::Value>(&raw).ok()?;
-    let presentation = value.get("presentation")?;
-    let kind = presentation.get("type")?.as_str()?;
-    if !kind.trim().eq_ignore_ascii_case(BOARD_PRESENTATION) {
-        return None;
-    }
-    if let Some(group_by) = presentation.get("groupBy") {
-        if !matches!(group_by.as_str().map(str::trim), Some("Status" | "status")) {
-            return None;
-        }
-    }
+/// Board settings from the view's typed `presentation` field.
+fn board_config(view: &ViewFile) -> Option<BoardConfig> {
+    let board = view.definition.presentation.as_ref()?.as_board()?;
     Some(BoardConfig {
-        columns: board_columns(presentation.get("columns")),
+        columns: board.columns,
     })
-}
-
-/// `presentation.columns`, trimmed and deduped without regard to case.
-/// Missing, not a list, or empty after cleanup: [`SUGGESTED_STATUSES`].
-fn board_columns(raw: Option<&serde_yaml::Value>) -> Vec<String> {
-    let mut columns: Vec<String> = Vec::new();
-    if let Some(items) = raw.and_then(serde_yaml::Value::as_sequence) {
-        for name in items.iter().filter_map(serde_yaml::Value::as_str) {
-            let name = name.trim();
-            if !name.is_empty() && !columns.iter().any(|c| c.eq_ignore_ascii_case(name)) {
-                columns.push(name.to_string());
-            }
-        }
-    }
-    if columns.is_empty() {
-        columns = SUGGESTED_STATUSES.iter().map(|s| s.to_string()).collect();
-    }
-    columns
 }
 
 fn is_markdown_note(entry: &VaultEntry) -> bool {

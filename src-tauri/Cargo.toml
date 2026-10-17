@@ -30,6 +30,9 @@ serde = { version = "1.0", features = ["derive"] }
 # as a transitive dependency, so declaring it adds no new compiled code.
 sha2 = "0.10"
 serde_yaml = "0.9"
+# Saved views keep unknown keys in file order. Already in the tree via
+# serde_yaml, so declaring it adds no new compiled code.
+indexmap = { version = "2", features = ["serde"] }
 log = "0.4"
 notify = "6.1"
 tauri = { version = "2.10.0", features = ["macos-private-api", "protocol-asset", "devtools", "image-png", "tray-icon"] }

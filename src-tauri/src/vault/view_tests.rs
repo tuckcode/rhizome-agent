@@ -26,6 +26,8 @@ mod tests {
                 value: Some(serde_yaml::Value::String("Project".to_string())),
                 regex: false,
             })]),
+            presentation: None,
+            extra: Default::default(),
         }
     }
 
@@ -520,5 +522,175 @@ filters:
         let entries = vec![empty, has_content];
         let result = evaluate_view(&def, &entries);
         assert_eq!(result, vec![0]);
+    }
+}
+
+mod unknown_keys_and_presentation {
+    use super::*;
+    use crate::board::SUGGESTED_STATUSES;
+    use tempfile::TempDir;
+
+    const BOARD_WITH_EXTRAS: &str = "name: Work\nzeta: 1\nfilters:\n  all: []\npresentation:\n  type: board\n  groupBy: Status\n  columns:\n  - Done\n  - Review\n  cardSize: large\nalpha:\n  nested: [x, y]\nmiddle: keep\n";
+
+    fn parse(yaml: &str) -> ViewDefinition {
+        serde_yaml::from_str(yaml).unwrap()
+    }
+
+    fn extra_keys(definition: &ViewDefinition) -> Vec<&str> {
+        definition.extra.keys().map(String::as_str).collect()
+    }
+
+    fn save_and_reread(dir: &TempDir, definition: &ViewDefinition) -> ViewDefinition {
+        save_view(dir.path(), "work.yml", definition).unwrap();
+        let raw = fs::read_to_string(dir.path().join("views/work.yml")).unwrap();
+        parse(&raw)
+    }
+
+    #[test]
+    fn unknown_keys_survive_a_save_in_file_order() {
+        let dir = TempDir::new().unwrap();
+        let definition = parse(BOARD_WITH_EXTRAS);
+        assert_eq!(extra_keys(&definition), vec!["zeta", "alpha", "middle"]);
+        let reread = save_and_reread(&dir, &definition);
+        assert_eq!(extra_keys(&reread), vec!["zeta", "alpha", "middle"]);
+        assert_eq!(reread.extra, definition.extra);
+        assert_eq!(reread.presentation, definition.presentation);
+        let raw = fs::read_to_string(dir.path().join("views/work.yml")).unwrap();
+        assert!(raw.contains("cardSize: large"), "{raw}");
+    }
+
+    #[test]
+    fn reorder_keeps_unknown_keys() {
+        let dir = TempDir::new().unwrap();
+        let mut definition = parse(BOARD_WITH_EXTRAS);
+        definition.order = Some(3);
+        let reread = save_and_reread(&dir, &definition);
+        assert_eq!(reread.order, Some(3));
+        assert_eq!(reread.extra, parse(BOARD_WITH_EXTRAS).extra);
+        assert!(reread.presentation.unwrap().as_board().is_some());
+    }
+
+    #[test]
+    fn rename_keeps_unknown_keys() {
+        let dir = TempDir::new().unwrap();
+        let mut definition = parse(BOARD_WITH_EXTRAS);
+        definition.name = "Renamed".into();
+        let reread = save_and_reread(&dir, &definition);
+        assert_eq!(reread.name, "Renamed");
+        assert_eq!(extra_keys(&reread), vec!["zeta", "alpha", "middle"]);
+    }
+
+    /// The frontend sends the definition it read, spread with a patch.
+    /// This is the Rust half of that round trip: JSON in, YAML out.
+    #[test]
+    fn inline_update_from_the_frontend_keeps_unknown_keys() {
+        let dir = TempDir::new().unwrap();
+        let read = parse(BOARD_WITH_EXTRAS);
+        let mut json = serde_json::to_value(&read).unwrap();
+        assert_eq!(json["middle"], "keep");
+        assert_eq!(json["presentation"]["cardSize"], "large");
+        json["icon"] = serde_json::Value::from("star");
+        let patched: ViewDefinition = serde_json::from_value(json).unwrap();
+        let reread = save_and_reread(&dir, &patched);
+        assert_eq!(reread.icon.as_deref(), Some("star"));
+        assert_eq!(reread.extra, read.extra);
+        assert_eq!(reread.presentation, read.presentation);
+    }
+
+    #[test]
+    fn frozen_board_schema() {
+        let presentation = Presentation::board(&SUGGESTED_STATUSES[..4]);
+        assert_eq!(
+            serde_yaml::to_string(&presentation).unwrap(),
+            "type: board\ngroupBy: Status\ncolumns:\n- Not started\n- In progress\n- Active\n- Done\n"
+        );
+        assert_eq!(
+            presentation.as_board().unwrap().columns,
+            vec!["Not started", "In progress", "Active", "Done"]
+        );
+    }
+
+    #[test]
+    fn board_columns_default_and_clean_up() {
+        let columns = |yaml: &str| {
+            parse(&format!(
+                "name: W\nfilters:\n  all: []\npresentation:\n  type: board\n{yaml}"
+            ))
+            .presentation
+            .unwrap()
+            .as_board()
+            .unwrap()
+            .columns
+        };
+        let suggested: Vec<String> = SUGGESTED_STATUSES.iter().map(|s| s.to_string()).collect();
+        assert_eq!(columns(""), suggested);
+        assert_eq!(columns("  columns: Done\n"), suggested);
+        assert_eq!(columns("  columns: []\n"), suggested);
+        assert_eq!(
+            columns("  columns: [' Done ', done, 5, Review]\n"),
+            vec!["Done", "Review"]
+        );
+    }
+
+    #[test]
+    fn malformed_board_config_falls_back_to_list_and_survives_a_save() {
+        let dir = TempDir::new().unwrap();
+        for presentation in [
+            "presentation: board\n",
+            "presentation:\n  type: board\n  groupBy: Owner\n",
+            "presentation:\n  type: board\n  groupBy: [Status]\n",
+            "presentation:\n  type: [board]\n",
+            "presentation:\n  type: list\n  sort: title:asc\n",
+        ] {
+            let yaml = format!("name: W\nfilters:\n  all: []\n{presentation}");
+            let definition = parse(&yaml);
+            assert!(
+                definition
+                    .presentation
+                    .as_ref()
+                    .unwrap()
+                    .as_board()
+                    .is_none(),
+                "{presentation}"
+            );
+            let reread = save_and_reread(&dir, &definition);
+            assert_eq!(
+                reread.presentation, definition.presentation,
+                "{presentation}"
+            );
+        }
+    }
+
+    #[test]
+    fn corrupt_board_file_does_not_hide_other_views() {
+        let dir = TempDir::new().unwrap();
+        let views = dir.path().join("views");
+        fs::create_dir_all(&views).unwrap();
+        fs::write(views.join("good.yml"), BOARD_WITH_EXTRAS).unwrap();
+        let corrupt =
+            "name: Bad\npresentation:\n  type: board\n  columns: [Done\nfilters: {all: []}\n";
+        fs::write(views.join("bad.yml"), corrupt).unwrap();
+        fs::write(
+            views.join("odd.yml"),
+            "name: Odd\nfilters:\n  all: []\npresentation: 7\n",
+        )
+        .unwrap();
+        let names: Vec<String> = scan_views(dir.path())
+            .into_iter()
+            .map(|v| v.filename)
+            .collect();
+        assert_eq!(names, vec!["good.yml", "odd.yml"]);
+        assert_eq!(fs::read_to_string(views.join("bad.yml")).unwrap(), corrupt);
+    }
+
+    #[test]
+    fn a_view_with_no_presentation_writes_none() {
+        let dir = TempDir::new().unwrap();
+        let definition = parse("name: W\nfilters:\n  all: []\n");
+        assert!(definition.presentation.is_none());
+        assert!(definition.extra.is_empty());
+        save_view(dir.path(), "work.yml", &definition).unwrap();
+        let raw = fs::read_to_string(dir.path().join("views/work.yml")).unwrap();
+        assert!(!raw.contains("presentation"), "{raw}");
     }
 }
