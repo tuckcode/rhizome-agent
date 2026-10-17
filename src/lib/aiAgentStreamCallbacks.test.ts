@@ -612,7 +612,7 @@ describe('aiAgentStreamCallbacks', () => {
     expect(status.getStatus()).toBe('done')
     expect(messages.getMessages()[0].reasoning).toContain('simple arithmetic')
     expect(messages.getMessages()[0].response).toBe(
-      'Prime Agent finished without returning a reply.',
+      'Prime finished without returning a reply.',
     )
     expect(messages.getMessages()[0].response).not.toContain('rejected this request')
   })

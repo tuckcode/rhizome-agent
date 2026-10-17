@@ -7,7 +7,7 @@ import {
   updateToolAction,
   type ToolInvocation,
 } from './aiAgentMessageState'
-import { getAiAgentDefinition, type AiAgentId } from './aiAgents'
+import { composerAgentLabel, type AiAgentId } from './aiAgents'
 import {
   trackAiAgentResponseCompleted,
   trackAiAgentResponseFailed,
@@ -104,7 +104,7 @@ function finalResponseText(response: AssistantResponseText, agent: AiAgentId): A
     ].join(' ')
   }
 
-  return `${getAiAgentDefinition(agent).label} finished without returning a reply.`
+  return `${composerAgentLabel({ agent })} finished without returning a reply.`
 }
 
 function retainedToolOutput({ output }: ToolOutputInspection): ToolOutputText | undefined {

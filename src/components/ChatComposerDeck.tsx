@@ -13,7 +13,6 @@ import type { AiModelProvider } from '../lib/aiTargets'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { trackComposerPillOpened } from '../lib/productAnalytics'
 import { NativeChatModelPicker } from './NativeChatModelPicker'
-import { PrimeModelPicker } from './PrimeModelPicker'
 import { PrimeThinkingToggle } from './PrimeThinkingToggle'
 
 interface ChatComposerDeckProps {
@@ -22,14 +21,11 @@ interface ChatComposerDeckProps {
   contextLabel?: string | null
   /** Stop sending the open note. Without it the pill stays a plain label. */
   onCloseContext?: () => void
-  model?: string | null
   thinkingLevel?: string | null
   vaultPath?: string
-  /** True when Chat already has a live Prime host. */
-  hostReady?: boolean
   /** Agent activity — idle/working pill, sits next to thinking. */
   activity?: ReactNode
-  /** Prime catalog when the host is live; Rhizome catalog otherwise. */
+  /** Prime thinking stays on a Prime chat; the model chip is always Rhizome. */
   catalog?: 'prime' | 'rhizome'
   nativeTarget?: string | null
   onNativeTargetChange?: (target: string) => void
@@ -78,18 +74,15 @@ function Chip({
  * Live turn controls on the compact composer row (#38 / #9 / #35, native
  * audit 2026-09-26): model, thinking, active agents, the open note.
  *
- * The "Prime" label chip is gone — Chat is Prime-only and the header status
- * says whether it is live. The skill label moved into ChatComposerBar's Tools
- * menu. The vault switcher lives only in the status bar.
+ * The model chip is always NativeChatModelPicker. Prime stays an optional
+ * engine — thinking still lives next to the chip on a Prime chat.
  */
 export function ChatComposerDeck({
   locale = 'en',
   contextLabel,
   onCloseContext,
-  model,
   thinkingLevel,
   vaultPath,
-  hostReady = false,
   activity,
   catalog = 'prime',
   nativeTarget,
@@ -105,26 +98,16 @@ export function ChatComposerDeck({
       <span
         onPointerDown={() => trackComposerPillOpened('model')}
       >
-        {rhizome ? (
-          <NativeChatModelPicker
-            locale={locale}
-            value={nativeTarget}
-            onChange={(target) => onNativeTargetChange?.(target)}
-            providers={providers}
-            variant="chip"
-            onOpenProviders={onOpenProviders}
-          />
-        ) : (
-          <PrimeModelPicker
-            locale={locale}
-            label={model}
-            thinkingLevel={thinkingLevel}
-            side="top"
-            variant="chip"
-            vaultPath={vaultPath}
-            hostReady={hostReady}
-          />
-        )}
+        <NativeChatModelPicker
+          locale={locale}
+          engine={rhizome ? 'native' : 'prime'}
+          vaultPath={vaultPath}
+          value={nativeTarget}
+          onChange={(target) => onNativeTargetChange?.(target)}
+          providers={providers}
+          variant="chip"
+          onOpenProviders={onOpenProviders}
+        />
       </span>
 
       {rhizome ? null : (

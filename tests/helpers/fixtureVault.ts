@@ -535,22 +535,59 @@ async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo, folde
   })
 }
 
+/**
+ * Fresh Chat launch shows the Notes rail (#184), not the old Show Notes strip.
+ * Open mode still exists; the restore button is only the classic-shell fallback.
+ */
+function dockedVaultPanelIsOpen(): boolean {
+  return [...document.querySelectorAll('[data-testid="vault-panel"]')].some(
+    (el) => !el.closest('[data-testid="notes-panel-rail"]'),
+  )
+}
+
+export async function openNotesPanelFromClosedShell(
+  page: Page,
+  timeout = FIXTURE_VAULT_READY_TIMEOUT,
+): Promise<void> {
+  if (await page.evaluate(dockedVaultPanelIsOpen)) return
+
+  const restore = page.getByTestId('vault-panel-restore')
+  if (await restore.isVisible().catch(() => false)) {
+    await restore.click()
+  } else {
+    // The Notes rail hover-expands and unmounts the mode menu, so do not click
+    // it. Dispatch Notes (editor-list) the same way the View menu does.
+    await page.waitForFunction(() => window.__rhizomeFrontendReady === true, undefined, { timeout })
+    const deadline = Date.now() + timeout
+    while (Date.now() < deadline) {
+      await page.evaluate(() => {
+        window.dispatchEvent(new CustomEvent('laputa:dispatch-command', { detail: 'view-editor-list' }))
+      })
+      try {
+        await page.waitForFunction(dockedVaultPanelIsOpen, undefined, { timeout: 2_000 })
+        return
+      } catch {
+        // The command listener may not be attached on the first tick.
+      }
+    }
+  }
+  await page.waitForFunction(dockedVaultPanelIsOpen, undefined, { timeout })
+}
+
 async function waitForFixtureVaultReady({
   page,
   initialPanel,
 }: FixturePageArgs & { initialPanel: 'inbox' | 'notes' }): Promise<void> {
+  await page.setViewportSize({ width: 1400, height: 900 })
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   await page.waitForFunction(() => Boolean(window.__mockHandlers?.list_vault))
 
-  // Fresh launch is Chat (ADR-0173). Tests that need the list open it from
-  // Show Notes. Wait for Chat chrome first; only click restore if Notes never
-  // appears (stored editor-list still wins when one exists).
-  const vaultPanel = page.getByTestId('vault-panel')
+  // Fresh launch is Chat (ADR-0173). Open Notes from the rail when the list
+  // is not already visible (stored editor-list still wins when one exists).
   try {
-    await vaultPanel.waitFor({ state: 'visible', timeout: 5_000 })
+    await page.waitForFunction(dockedVaultPanelIsOpen, undefined, { timeout: 5_000 })
   } catch {
-    await page.getByTestId('vault-panel-restore').click()
-    await vaultPanel.waitFor({ state: 'visible', timeout: FIXTURE_VAULT_READY_TIMEOUT })
+    await openNotesPanelFromClosedShell(page)
   }
 
   const noteList = page.locator('[data-testid="note-list-container"]')
@@ -562,7 +599,9 @@ async function waitForFixtureVaultReady({
   // title: the virtualized list may legitimately keep that row off-DOM.
   const browseNav = page.getByTestId('vault-panel-navigation')
   if ((await browseNav.count()) === 0) {
-    await page.getByTestId('vault-panel-browse-toggle').click()
+    const browseToggle = page.getByTestId('vault-panel-browse-toggle')
+    await expect(browseToggle).toBeVisible({ timeout: FIXTURE_VAULT_READY_TIMEOUT })
+    await browseToggle.click()
     await expect(browseNav).toBeVisible({ timeout: FIXTURE_VAULT_READY_TIMEOUT })
   }
   await page.getByTestId('sidebar-top-nav').getByText('All Notes', { exact: true }).click()

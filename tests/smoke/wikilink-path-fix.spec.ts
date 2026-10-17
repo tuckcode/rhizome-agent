@@ -3,6 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import {
   openFixtureVault,
+  openNotesPanelFromClosedShell,
   pinNotesShellLaunch,
   createFixtureVaultCopy,
   removeFixtureVaultCopy,
@@ -118,13 +119,7 @@ test.describe('Wikilink insertion and navigation', () => {
     try {
       await vaultPanel.waitFor({ state: 'visible', timeout: 15_000 })
     } catch {
-      const restore = page.getByTestId('vault-panel-restore')
-      if (await restore.isVisible().catch(() => false)) {
-        await restore.click()
-      } else {
-        await page.getByTestId('vault-panel-restore').click()
-      }
-      await vaultPanel.waitFor({ state: 'visible', timeout: 15_000 })
+      await openNotesPanelFromClosedShell(page, 15_000)
     }
 
     await expect(page.getByTestId('note-list-container')).toBeVisible({ timeout: 15_000 })

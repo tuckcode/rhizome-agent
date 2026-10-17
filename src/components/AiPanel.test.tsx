@@ -208,7 +208,7 @@ describe('AiPanel', () => {
   it('renders panel with the default CLI agent header', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
     expect(screen.getByText('Prime')).toBeTruthy()
-    expect(screen.getByText('Prime Agent · Harness')).toBeTruthy()
+    expect(screen.getByText('Prime · Harness')).toBeTruthy()
     expect(screen.getByTestId('ai-harness-skills')).toBeTruthy()
     expect(screen.queryByTestId('ai-permission-mode-toggle')).toBeNull()
   })
@@ -216,7 +216,7 @@ describe('AiPanel', () => {
   it('starts Prime sessions in power user even when the vault still stores safe', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
 
-    expect(screen.getByText('Prime Agent · Harness')).toBeTruthy()
+    expect(screen.getByText('Prime · Harness')).toBeTruthy()
     expect(mockUseCliAiAgent).toHaveBeenCalledWith(
       '/tmp/vault',
       undefined,
@@ -257,7 +257,7 @@ describe('AiPanel', () => {
 
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
 
-    expect(screen.getByText('Prime Agent · working…')).toBeTruthy()
+    expect(screen.getByText('Prime · working…')).toBeTruthy()
     expect(screen.queryByTestId('ai-permission-mode-toggle')).toBeNull()
   })
 
@@ -337,7 +337,21 @@ describe('AiPanel', () => {
 
   it('renders empty state without context', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
-    expect(screen.getAllByText('Ask Prime Agent').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Ask Prime').length).toBeGreaterThan(0)
+  })
+
+  it('names a native-engine empty chat Rhizome', () => {
+    render(
+      <AiPanel
+        onClose={vi.fn()}
+        vaultPath="/tmp/vault"
+        defaultAiAgent="prime"
+        chatEngine="native"
+      />,
+    )
+    expect(screen.getAllByText('Ask Rhizome').length).toBeGreaterThan(0)
+    expect(screen.getByText(/Rhizome · /)).toBeTruthy()
+    expect(screen.getByTestId('agent-input')).toHaveAttribute('aria-placeholder', 'Ask Rhizome')
   })
 
   it('renders contextual empty state when active entry is provided', () => {
@@ -345,7 +359,7 @@ describe('AiPanel', () => {
     render(
       <AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" activeEntry={entry} entries={[entry]} />
     )
-    expect(screen.getByText('Ask Prime Agent about this note')).toBeTruthy()
+    expect(screen.getByText('Ask Prime about this note')).toBeTruthy()
   })
 
   it('does not render a context bar for the active entry', () => {
@@ -389,13 +403,13 @@ describe('AiPanel', () => {
       <AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" activeEntry={entry} entries={[entry]} />
     )
     const input = screen.getByTestId('agent-input')
-    expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime Agent')
+    expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime')
   })
 
   it('shows active agent placeholder when no active entry', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
     const input = screen.getByTestId('agent-input')
-    expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime Agent')
+    expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime')
   })
 
   it('uses the selected AI agent in the placeholder', () => {
@@ -427,7 +441,8 @@ describe('AiPanel', () => {
     fireEvent.input(input)
 
     expect(screen.getByTestId('agent-send')).toBeEnabled()
-    expect(screen.queryByText('Prime Agent is not available on this machine')).toBeNull()
+    expect(screen.queryByText('Prime is not available on this machine')).toBeNull()
+    expect(screen.getByTestId('agent-input')).toHaveAttribute('aria-placeholder', 'Ask Rhizome')
   })
 
   it('keeps Prime-targeted chat blocked and shows install guidance when Prime is missing', () => {
@@ -441,10 +456,10 @@ describe('AiPanel', () => {
       />,
     )
 
-    expect(screen.getByText('Prime Agent is not available on this machine')).toBeTruthy()
+    expect(screen.getByText('Prime is not available on this machine')).toBeTruthy()
     expect(screen.getByTestId('agent-input')).toHaveAttribute(
       'aria-placeholder',
-      'Prime Agent is not installed. Install prime-agent and log in once.',
+      'Prime is not installed. Install prime-agent and log in once.',
     )
 
     const input = screen.getByTestId('agent-input')
@@ -898,6 +913,23 @@ describe('the native composer deck', () => {
     expect(screen.queryByTestId('chat-composer-bar')).not.toBeInTheDocument()
   })
 
+  it('does not leave an empty composer footer on a Claude Code native chat', () => {
+    render(
+      <AiPanelView
+        controller={primeController()}
+        onClose={vi.fn()}
+        showHeader={false}
+        defaultAiAgent="claude_code"
+        defaultAiAgentReady
+        chatEngine="native"
+        composerDeck={<div data-testid="native-chat-model-picker">chip</div>}
+      />,
+    )
+
+    expect(screen.queryByTestId('chat-composer-bar')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('native-chat-model-picker')).not.toBeInTheDocument()
+  })
+
   it('renders no model chip on a Codex chat even if a deck is passed', () => {
     render(
       <AiPanelView
@@ -1126,6 +1158,13 @@ describe('AiPanel Prime permission toggle', () => {
     expect(aiPanelSource).toContain(
       "const isPrimeTarget = view.targetKind === 'agent' && view.defaultAiAgent === 'prime' && chatEngine !== 'native'",
     )
+  })
+
+  it('mounts the composer bar only for Prime chrome or a Prime native chat', () => {
+    expect(aiPanelSource).toContain(
+      "isPrimeTarget || (view.defaultAiAgent === 'prime' && chatEngine === 'native')",
+    )
+    expect(aiPanelSource).not.toContain('foot={(isPrimeTarget || chatEngine === \'native\')')
   })
 })
 

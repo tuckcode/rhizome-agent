@@ -145,6 +145,17 @@ export function getAiAgentDefinition(agent: AiAgentId): AiAgentDefinition {
   return AI_AGENT_DEFINITIONS.find((definition) => definition.id === agent) ?? AI_AGENT_DEFINITIONS[0]
 }
 
+/** Composer and Cmd+K copy: Prime chats say Prime; native chats say Rhizome. */
+export function composerAgentLabel(options: {
+  chatEngine?: 'prime' | 'native'
+  agent: AiAgentId
+  targetLabel?: string
+}): string {
+  if (options.chatEngine === 'native') return 'Rhizome'
+  if (options.agent === 'prime') return getAiAgentDefinition('prime').shortLabel
+  return options.targetLabel ?? getAiAgentDefinition(options.agent).label
+}
+
 function normalizeAvailability(
   agent: { installed?: boolean | null; version?: string | null } | null | undefined,
 ): AiAgentAvailability {

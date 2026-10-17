@@ -200,6 +200,8 @@ let mockSettings: Settings = {
   all_notes_show_unsupported: null,
   multi_workspace_enabled: null,
   agent_profile: null,
+  chat_engine: null,
+  native_chat_target: null,
 }
 
 const DEFAULT_MOCK_VAULT_PATH = '/Users/mock/demo-vault-v2'
@@ -1150,6 +1152,8 @@ export const mockHandlers: Record<string, (args: any) => any> = {
       all_notes_show_unsupported: s.all_notes_show_unsupported ?? null,
       multi_workspace_enabled: s.multi_workspace_enabled ?? null,
       agent_profile: s.agent_profile?.trim() || null,
+      chat_engine: s.chat_engine ?? null,
+      native_chat_target: s.native_chat_target ?? null,
     }
     return null
   },

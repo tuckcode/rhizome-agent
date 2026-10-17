@@ -17,6 +17,7 @@ import {
 } from "react-day-picker"
 
 import { cn } from "@/lib/utils"
+import { SETTINGS_NESTED_MENU_Z_CLASS } from "../../lib/settingsMenuLayer"
 import { Button, buttonVariants } from "@/components/ui/button"
 import {
   Select,
@@ -214,7 +215,7 @@ function CalendarDropdown({
       >
         <SelectValue />
       </SelectTrigger>
-      <SelectContent className="z-[13000] max-h-64">
+      <SelectContent className={cn(SETTINGS_NESTED_MENU_Z_CLASS, "max-h-64")}>
         <SelectGroup>
           {options?.map((option) => (
             <SelectItem

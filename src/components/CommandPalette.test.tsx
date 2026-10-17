@@ -515,6 +515,31 @@ describe('CommandPalette', () => {
     expect(onClose).toHaveBeenCalledOnce()
   })
 
+  it('names the AI-mode placeholder after the engine label', () => {
+    const { unmount } = render(
+      <CommandPalette
+        open={true}
+        commands={commands}
+        aiAgentLabel="Prime"
+        onClose={onClose}
+      />,
+    )
+    fireEvent.change(screen.getByPlaceholderText('Type a command...'), { target: { value: ' ' } })
+    expect(screen.getByTestId('command-palette-ai-input')).toHaveAttribute('aria-placeholder', 'Ask Prime')
+    unmount()
+
+    render(
+      <CommandPalette
+        open={true}
+        commands={commands}
+        aiAgentLabel="Rhizome"
+        onClose={onClose}
+      />,
+    )
+    fireEvent.change(screen.getByPlaceholderText('Type a command...'), { target: { value: ' ' } })
+    expect(screen.getByTestId('command-palette-ai-input')).toHaveAttribute('aria-placeholder', 'Ask Rhizome')
+  })
+
   it('queues AI prompts with the selected workspace target id', () => {
     render(
       <CommandPalette

@@ -616,8 +616,11 @@ Each answers "nothing", which is true of a host with no session.
   `PrimeScheduleDialog` (`heartbeat_set` / `cron_add`, #14 create),
   `PrimeSessionList` (the Command Rail's expanded history area; classic shell
   fallback is a Chat sidebar), `primeSessionMeta.ts` (row labels),
-  `PrimeModelPicker` + `primeModels.ts` (the chat model menu — see below),
-  `PrimeThinkingToggle` (composer reasoning menu — see below)
+  `NativeChatModelPicker` + `rhizomeChatModels.ts` (the composer model chip —
+  Rhizome catalog with live provider listing on the native engine; Prime
+  chats use Prime's catalog), `primeModels.ts` (Prime allow-list
+  and Settings catalog helpers),
+  `PrimeThinkingToggle` (composer reasoning menu on a Prime chat — see below)
 
 #### Thinking levels (composer pill)
 
@@ -688,12 +691,20 @@ message and offers **at most one** of:
 Case 2 (model-backed or app-state suggestions) is **not** built. Do not
 fire both mechanisms on the same turn.
 
-#### The chat model menu (#45)
+#### The chat model menu
 
-Prime publishes its whole catalog regardless of auth state — **501 models** on
-one measured machine, a fifth of them from a provider that account had never
-signed into — and exposes no price field. Four passes narrow it, in this
-order, and the order is load-bearing:
+The composer chip is `NativeChatModelPicker`. On the native engine it lists
+the Rhizome catalog from Settings, including live `list_ai_model_provider_models`
+rows. On a Prime chat it lists Prime's own catalog (`get_available_prime_models`)
+and does not fetch provider models live. Prime remains an optional engine;
+thinking still uses `PrimeThinkingToggle` next to the chip. Providers without
+a key stay out of the native list except the current pick, and the footer
+links to Settings.
+
+Prime still publishes its whole catalog to Settings regardless of auth state —
+**501 models** on one measured machine, a fifth of them from a provider that
+account had never signed into — and exposes no price field. Four passes narrow
+that Settings list, in this order, and the order is load-bearing:
 
 1. **Curation** — `partitionModelsByAllowList` against the user's shortlist in
    `settings.prime_model_allow_list` (`"provider/id"` keys, edited from the

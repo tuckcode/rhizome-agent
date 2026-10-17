@@ -1,10 +1,17 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AiModelProvider } from '../lib/aiTargets'
 import { NATIVE_CHAT_MODEL_CHIP_MAX_WIDTH_CLASS } from '../lib/composerMenuSide'
+import { resetPrimeHostStatus } from '../hooks/usePrimeHostStatus'
+import { resetPrimeModelCatalog } from '../lib/primeModelCatalog'
 import { resetListProviderModelsCache } from '../lib/listProviderModels'
+import { SETTINGS_MENU_Z_CLASS } from '../lib/settingsMenuLayer'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { NativeChatModelPicker } from './NativeChatModelPicker'
+
+const invoked = vi.hoisted(() => ({
+  calls: [] as Array<{ cmd: string; args?: Record<string, unknown> }>,
+}))
 
 const host = vi.hoisted(() => ({
   hold: null as Promise<void> | null,
@@ -13,19 +20,67 @@ const host = vi.hoisted(() => ({
 }))
 
 vi.mock('../lib/callHost', () => ({
-  callHost: vi.fn(async (cmd: string, args?: { provider?: { kind?: string; id?: string } }) => {
+  callHost: vi.fn(async (cmd: string, args?: Record<string, unknown>) => {
+    invoked.calls.push({ cmd, args })
     if (host.hold) await host.hold
     if (host.fail) throw new Error('provider offline')
+    if (cmd === 'get_available_prime_models') {
+      return [
+        { id: 'grok-4.5', name: 'Grok 4.5', provider: 'xai' },
+        { id: 'claude-opus-5', name: 'Claude Opus 5', provider: 'anthropic' },
+        { id: 'mock-model', name: 'Mock model', provider: 'mock' },
+        { id: 'hermes-4-405b', name: 'Hermes 4 405B', provider: 'nous-portal' },
+      ]
+    }
+    if (cmd === 'get_prime_session_host_status') {
+      return {
+        installed: true,
+        version: '1.0',
+        running: true,
+        sessionId: 's1',
+        isStreaming: false,
+        binaryPath: '/bin/prime',
+        modelProvider: 'xai',
+        modelId: 'grok-4.5',
+        modelName: 'Grok 4.5',
+      }
+    }
     if (cmd !== 'list_ai_model_provider_models' && cmd !== 'discover_ai_models') return []
-    if (args?.provider?.kind === 'ollama') return ['llama3.2', 'qwen2.5']
-    if (args?.provider?.id === 'work-openai') return ['gpt-4o', 'gpt-5']
+    const provider = args?.provider as { kind?: string; id?: string } | undefined
+    if (provider?.kind === 'ollama') return ['llama3.2', 'qwen2.5']
+    if (provider?.id === 'work-openai') return ['gpt-4o', 'gpt-5']
     return []
   }),
 }))
 
 vi.mock('../lib/productAnalytics', () => ({
   trackRhizomeModelChanged: vi.fn(),
+  trackPrimeModelChanged: vi.fn(),
 }))
+
+beforeEach(() => {
+  invoked.calls = []
+  host.hold = null
+  host.release = null
+  host.fail = false
+  resetPrimeModelCatalog()
+  resetPrimeHostStatus()
+  resetListProviderModelsCache()
+})
+
+afterEach(() => {
+  resetPrimeHostStatus()
+  resetPrimeModelCatalog()
+  resetListProviderModelsCache()
+})
+
+const capabilities = {
+  streaming: true,
+  tools: false,
+  vision: false,
+  json_mode: false,
+  reasoning: false,
+}
 
 const configured: AiModelProvider[] = [
   {
@@ -37,15 +92,28 @@ const configured: AiModelProvider[] = [
       {
         id: 'gpt-4o',
         display_name: 'GPT-4o',
-        capabilities: {
-          streaming: true,
-          tools: false,
-          vision: false,
-          json_mode: false,
-          reasoning: false,
-        },
+        capabilities,
       },
     ],
+  },
+]
+
+/** Every remote catalog kind except Gemini, so the footer counts one keyless provider. */
+const keyedExceptGemini: AiModelProvider[] = [
+  configured[0],
+  {
+    id: 'work-router',
+    name: 'Work OpenRouter',
+    kind: 'open_router',
+    api_key_storage: 'local_file',
+    models: [{ id: 'openai/gpt-4.1-mini', display_name: 'GPT-4.1 mini', capabilities }],
+  },
+  {
+    id: 'work-compat',
+    name: 'Work custom',
+    kind: 'open_ai_compatible',
+    api_key_storage: 'local_file',
+    models: [{ id: 'gpt-4.1-mini', display_name: 'GPT-4.1 mini', capabilities }],
   },
 ]
 
@@ -57,13 +125,6 @@ function openMenu(testId = 'native-chat-model-trigger') {
     new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
   )
 }
-
-beforeEach(() => {
-  host.hold = null
-  host.release = null
-  host.fail = false
-  resetListProviderModelsCache()
-})
 
 function mockTriggerBox(top: number, bottom: number, innerHeight = 640) {
   const trigger = screen.getByTestId('native-chat-model-trigger')
@@ -266,6 +327,7 @@ describe('NativeChatModelPicker', () => {
     const row = screen.getByTestId('native-chat-model-work-openai/anthropic-claude-opus-4-very-long-id')
     expect(row).toHaveTextContent('anthropic-claude-opus-4-very-long-id')
     expect(row.querySelector('.truncate')).not.toBeNull()
+    expect(row.querySelector('.truncate')).toHaveAttribute('title', 'anthropic-claude-opus-4-very-long-id')
   })
 
   it('styles the chip menu panel and lists model ids under sentence-case groups', async () => {
@@ -298,10 +360,13 @@ describe('NativeChatModelPicker', () => {
     expect(row).toHaveClass('h-8')
     expect(row).toHaveClass('rounded-md')
     expect(row).toHaveClass('text-[13px]')
-    expect(row).toHaveClass('focus:bg-accent')
-    expect(row).toHaveClass('data-[highlighted]:bg-accent')
-    expect(row).toHaveClass('focus:text-accent-foreground')
-    expect(row).toHaveClass('data-[highlighted]:text-accent-foreground')
+    expect(row).toHaveClass('focus:bg-[var(--state-menu-hover)]')
+    expect(row).toHaveClass('data-[highlighted]:bg-[var(--state-menu-hover)]')
+    expect(row).toHaveClass('data-[selected=true]:bg-[var(--state-menu-selected)]')
+    expect(row).toHaveClass('data-[highlighted]:shadow-[inset_2px_0_0_var(--accent-blue)]')
+    expect(row).toHaveClass('text-foreground')
+    expect(row).toHaveClass('focus:text-foreground')
+    expect(row).toHaveClass('data-[highlighted]:text-foreground')
     expect(row.className).not.toMatch(/bg-accent\/60/)
     expect(screen.getByTestId('native-chat-model-selected-check')).toHaveClass('text-foreground')
     expect(screen.getByTestId('native-chat-model-selected-check')).not.toHaveClass('text-primary')
@@ -313,6 +378,7 @@ describe('NativeChatModelPicker', () => {
     expect(menu).toHaveClass('overflow-hidden')
     expect(menu).toHaveClass('overflow-y-hidden')
     expect(screen.getByTestId('native-chat-model-filter-row')).toHaveClass('border-b')
+    expect(screen.getByTestId('native-chat-model-filter-row')).toHaveClass('border-border')
     expect(screen.getByTestId('native-chat-model-list').contains(screen.getByTestId('native-chat-model-filter'))).toBe(false)
     expect(screen.getByTestId('native-chat-model-list')).toHaveClass('overflow-y-auto')
     expect(screen.getByTestId('native-chat-model-filter')).toHaveFocus()
@@ -336,9 +402,15 @@ describe('NativeChatModelPicker', () => {
       expect(screen.getByTestId('native-chat-model-open-providers')).toHaveTextContent(
         'providers need a key · Open settings',
       )
+      expect(screen.getByTestId('native-chat-model-keyless-note').textContent).not.toMatch(
+        /1 providers/,
+      )
       expect(screen.getByTestId('native-chat-model-keyless-note')).toHaveClass('text-muted-foreground')
-      expect(screen.getByTestId('native-chat-model-open-settings')).toHaveClass('text-primary')
       expect(screen.getByTestId('native-chat-model-open-settings')).toHaveTextContent('Open settings')
+      expect(screen.getByTestId('native-chat-model-open-settings').tagName).toBe('BUTTON')
+      expect(screen.getByTestId('native-chat-model-open-settings')).toHaveClass('text-[var(--link-color)]')
+      expect(screen.getByTestId('native-chat-model-open-settings')).toHaveClass('hover:underline')
+      expect(screen.getByTestId('native-chat-model-open-settings').className).toMatch(/outline-2/)
     })
     await act(async () => {
       fireEvent.click(screen.getByTestId('native-chat-model-open-settings'))
@@ -356,6 +428,22 @@ describe('NativeChatModelPicker', () => {
     fireEvent.click(screen.getByTestId('native-chat-models-clear-filter'))
     expect(screen.getByTestId('native-chat-model-filter')).toHaveValue('')
     expect(screen.queryByTestId('native-chat-models-empty')).not.toBeInTheDocument()
+  })
+
+  it('says 1 provider needs a key when only one remote catalog kind is missing a key', async () => {
+    render(
+      <NativeChatModelPicker
+        variant="chip"
+        value={null}
+        onChange={vi.fn()}
+        providers={keyedExceptGemini}
+        onOpenProviders={vi.fn()}
+      />,
+    )
+    openMenu()
+    const note = await screen.findByTestId('native-chat-model-keyless-note')
+    expect(note).toHaveTextContent('1 provider needs a key')
+    expect(note.textContent).not.toMatch(/1 providers/)
   })
 
   it('caps the model list and pins the filter and footer', async () => {
@@ -453,7 +541,7 @@ describe('NativeChatModelPicker', () => {
     const link = screen.getByTestId('native-chat-model-open-settings')
     expect(note).toHaveClass('text-muted-foreground')
     expect(note).not.toHaveClass('text-primary')
-    expect(link).toHaveClass('text-primary')
+    expect(link).toHaveClass('text-[var(--link-color)]')
     expect(link.className).toMatch(/underline/)
   })
 
@@ -528,6 +616,28 @@ describe('NativeChatModelPicker', () => {
       )
     })
     expect(screen.getByTestId('native-chat-model-footer-sep')).toHaveClass('bg-[var(--border-input)]')
+  })
+
+  it('keeps the selected keyless model in the list, not only on the chip', async () => {
+    render(
+      <NativeChatModelPicker
+        variant="chip"
+        value="gemini/gemini-2.5-flash"
+        onChange={vi.fn()}
+        providers={[]}
+      />,
+    )
+
+    expect(screen.getByTestId('native-chat-model-trigger')).toHaveTextContent('gemini-2.5-flash')
+    openMenu()
+    await waitFor(() => {
+      expect(screen.getByTestId('native-chat-model-gemini/gemini-2.5-flash')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('native-chat-model-gemini/gemini-2.5-flash')).toHaveAttribute(
+      'data-selected',
+      'true',
+    )
+    expect(screen.queryByTestId('native-chat-model-open_ai/gpt-4.1-mini')).not.toBeInTheDocument()
   })
 
   it('opens the chip menu upward when there is room above', async () => {
@@ -784,7 +894,7 @@ describe('NativeChatModelPicker', () => {
 
     openMenu()
     const menu = await screen.findByTestId('native-chat-model-menu')
-    expect(menu).toHaveClass('z-[12000]')
+    expect(menu).toHaveClass(SETTINGS_MENU_Z_CLASS)
     expect(menu).toHaveAttribute('data-settings-panel-portal', 'true')
   })
 
@@ -801,7 +911,88 @@ describe('NativeChatModelPicker', () => {
     openMenu()
     const menu = await screen.findByTestId('native-chat-model-menu')
     expect(menu).not.toHaveAttribute('data-settings-panel-portal')
-    expect(menu).not.toHaveClass('z-[12000]')
+    expect(menu).not.toHaveClass(SETTINGS_MENU_Z_CLASS)
+  })
+
+  it('writes native_chat_target on the native engine and does not call set_prime_model', async () => {
+    const onChange = vi.fn()
+    render(
+      <NativeChatModelPicker
+        engine="native"
+        variant="chip"
+        value="open_ai/gpt-4o"
+        onChange={onChange}
+        providers={configured}
+      />,
+    )
+
+    expect(screen.getByTestId('native-chat-model-picker')).toHaveAttribute('data-engine', 'native')
+    openMenu()
+    await act(async () => {
+      fireEvent.click(await screen.findByTestId('native-chat-model-free_tier_auto'))
+    })
+    expect(onChange).toHaveBeenCalledWith('free_tier_auto')
+    expect(invoked.calls.some((call) => call.cmd === 'set_prime_model')).toBe(false)
+    expect(invoked.calls.some((call) => call.cmd === 'list_ai_model_provider_models')).toBe(true)
+  })
+
+  it('reads the Prime host model and writes set_prime_model on the Prime engine', async () => {
+    const onChange = vi.fn()
+    render(
+      <NativeChatModelPicker
+        engine="prime"
+        variant="chip"
+        vaultPath="/vault"
+        value="open_ai/gpt-4o"
+        onChange={onChange}
+        providers={configured}
+      />,
+    )
+
+    expect(screen.getByTestId('native-chat-model-picker')).toHaveAttribute('data-engine', 'prime')
+    await waitFor(() => {
+      expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveTextContent('Grok 4.5')
+    })
+
+    openMenu()
+    await waitFor(() => {
+      expect(screen.getByTestId('native-chat-model-anthropic/claude-opus-5')).toHaveTextContent('Claude Opus 5')
+    })
+    expect(screen.queryByTestId('native-chat-model-new-chats')).not.toBeInTheDocument()
+    expect(invoked.calls.some((call) => call.cmd === 'list_ai_model_provider_models')).toBe(false)
+    expect(invoked.calls.some((call) => call.cmd === 'get_available_prime_models')).toBe(true)
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('native-chat-model-anthropic/claude-opus-5'))
+    })
+    await waitFor(() => {
+      expect(invoked.calls).toContainEqual({
+        cmd: 'set_prime_model',
+        args: { provider: 'anthropic', modelId: 'claude-opus-5' },
+      })
+    })
+    expect(invoked.calls.some((call) => call.cmd === 'ensure_prime_session_host')).toBe(true)
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  it('shows Prime provider display names on chip menu group headers', async () => {
+    render(
+      <NativeChatModelPicker
+        engine="prime"
+        variant="chip"
+        vaultPath="/vault"
+        value={null}
+        onChange={vi.fn()}
+      />,
+    )
+
+    openMenu()
+    await waitFor(() => {
+      expect(screen.getByTestId('native-chat-model-nous-portal/hermes-4-405b')).toBeInTheDocument()
+    })
+
+    const headers = screen.getAllByTestId('native-chat-model-provider').map((el) => el.textContent)
+    expect(headers).toEqual(['Anthropic', 'Mock', 'Nous Portal', 'xAI (Grok)'])
   })
 })
 

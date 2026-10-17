@@ -8,4 +8,11 @@ describe('leftover native Cmd+K send gate', () => {
       "settings.chat_engine === 'native' || aiTargetReady(quickPromptTarget, aiAgentsStatus)",
     )
   })
+
+  it('names Cmd+K after the engine running Chat', () => {
+    const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+    const palette = readFileSync(`${process.cwd()}/src/components/CommandPaletteAiMode.tsx`, 'utf8')
+    expect(app).toContain('aiAgentLabel={composerAgentLabel({')
+    expect(palette).toContain("t('ai.panel.placeholder.ready', { agent: aiAgentLabel })")
+  })
 })

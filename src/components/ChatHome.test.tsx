@@ -390,8 +390,8 @@ describe('ChatHome composer wiring', () => {
   it('does not mount the native model picker as its own row above chat', () => {
     expect(chatHomeSource).not.toContain('<NativeChatModelPicker')
     expect(chatHomeSource).toContain('<ChatComposerDeck')
-    expect(chatHomeSource).toContain('isPrimeChat && (showPrimeChrome || rhizomeCatalog)')
-    expect(chatHomeSource).not.toMatch(/composerDeck=\{\s*showPrimeChrome \|\| rhizomeCatalog/)
+    expect(chatHomeSource).toContain('const showComposerDeck = isPrimeChat && (showPrimeChrome || rhizomeCatalog)')
+    expect(chatHomeSource).toContain('showComposerDeck ? (')
   })
 
   it('puts the Agents idle/working pill on the composer next to thinking', () => {

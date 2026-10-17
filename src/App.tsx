@@ -135,7 +135,9 @@ import { trackEvent } from './lib/telemetry'
 import { trackFocusedPaneSwitched, trackNotesFocusToggled, trackVaultCredentialsHandled } from './lib/productAnalytics'
 import { redactCredentialTokens } from './lib/sensitiveTextRedaction'
 import { areAutomaticUpdateChecksEnabled } from './lib/automaticUpdateChecks'
+import { composerAgentLabel, DEFAULT_AI_AGENT } from './lib/aiAgents'
 import { aiTargetReady, type AiTarget } from './lib/aiTargets'
+import { chatEngineFromSettings } from './lib/chatEngine'
 import { areGitFeaturesEnabled } from './lib/gitSettings'
 import { useAppCommandAiActions } from './hooks/useAppCommandAiActions'
 import { RHIZOME_DOCS_URL } from './constants/feedback'
@@ -2585,7 +2587,11 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           commands={commands}
           entries={visibleEntries}
           aiAgentReady={quickPromptTargetReady}
-          aiAgentLabel={quickPromptTarget.label}
+          aiAgentLabel={composerAgentLabel({
+            chatEngine: chatEngineFromSettings(settings),
+            agent: quickPromptTarget.kind === 'agent' ? quickPromptTarget.agent : DEFAULT_AI_AGENT,
+            targetLabel: quickPromptTarget.label,
+          })}
           aiPromptTargetId={quickPromptTarget.id}
           locale={appLocale}
           onClose={dialogs.closeCommandPalette}

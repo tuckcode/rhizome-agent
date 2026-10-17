@@ -2,6 +2,7 @@ import * as React from "react"
 import { Popover as PopoverPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
+import { SETTINGS_MENU_Z_CLASS } from "../../lib/settingsMenuLayer"
 
 function Popover({
   ...props
@@ -30,7 +31,8 @@ function PopoverContent({
         sideOffset={sideOffset}
         collisionPadding={collisionPadding}
         className={cn(
-          "bg-popover text-popover-foreground z-[12000] w-72 origin-(--radix-popover-content-transform-origin) rounded-md border p-4 shadow-md outline-hidden",
+          "bg-popover text-popover-foreground w-72 origin-(--radix-popover-content-transform-origin) rounded-md border p-4 shadow-md outline-hidden",
+          SETTINGS_MENU_Z_CLASS,
           className
         )}
         {...props}

@@ -121,7 +121,7 @@ describe('promoteChatToVault', () => {
   it('refuses to promote a turn that produced no assistant content', async () => {
     const persist = vi.fn()
     const result = await writePromoteNoteFromChat(
-      'Prime Agent finished without returning a reply.',
+      'Prime finished without returning a reply.',
       at,
       { pathExists: async () => false, persist },
     )

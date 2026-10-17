@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
 import { createFixtureVaultCopy, openFixtureVaultDesktopHarness, removeFixtureVaultCopy } from '../helpers/fixtureVault'
+import { expectBreadcrumbFilename } from './helpers'
 
 let tempVaultDir: string
 
@@ -50,9 +51,7 @@ test.describe('Multibyte note-list search', () => {
     await expect(noteList.getByText('Multibyte Search Boundary', { exact: true })).toBeVisible()
 
     await noteList.getByText('Multibyte Search Boundary', { exact: true }).click()
-    await expect(page.getByTestId('breadcrumb-filename-trigger')).toContainText(
-      'multibyte-search-boundary',
-    )
+    await expectBreadcrumbFilename(page, 'multibyte-search-boundary')
   })
 
   test('opening CRLF Chinese table content keeps the note searchable @smoke', async ({ page }) => {
@@ -66,7 +65,7 @@ test.describe('Multibyte note-list search', () => {
     await expect(noteList.getByText('上海复盘', { exact: true })).toBeVisible()
 
     await noteList.getByText('上海复盘', { exact: true }).click()
-    await expect(page.getByTestId('breadcrumb-filename-trigger')).toContainText('chinese-crlf-table')
+    await expectBreadcrumbFilename(page, 'chinese-crlf-table')
     await expect(page.locator('.editor-content-wrapper').getByText('指标')).toBeVisible()
   })
 })

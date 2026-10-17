@@ -7,8 +7,12 @@ describe('leftover reconnect / add key', () => {
       `${process.cwd()}/src/components/PrimeProviderStatusSection.tsx`,
       'utf8',
     )
-    expect(providers).toContain("anthropic: 'Anthropic'")
-    expect(providers).toContain("deepseek: 'DeepSeek'")
+    const labels = readFileSync(
+      `${process.cwd()}/src/lib/primeProviderLabels.ts`,
+      'utf8',
+    )
+    expect(labels).toContain("anthropic: 'Anthropic'")
+    expect(labels).toContain("deepseek: 'DeepSeek'")
     expect(providers).toContain("connected || provider.expired ? 'Reconnect' : 'Sign in'")
     expect(providers).toContain("return 'Add key'")
   })

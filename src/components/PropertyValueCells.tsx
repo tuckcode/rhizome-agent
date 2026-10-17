@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { SETTINGS_MENU_Z_CLASS } from '../lib/settingsMenuLayer'
 import { trackDatePropertyDirectEntrySaved } from '../lib/productAnalytics'
 import { translate, type AppLocale } from '../lib/i18n'
 import { isValidCssColor } from '../utils/colorUtils'
@@ -491,7 +492,7 @@ function DisplayModeMenu({
   return createPortal(
     <>
       <div
-        className="fixed inset-0 z-[12000]"
+        className={`fixed inset-0 ${SETTINGS_MENU_Z_CLASS}`}
         onClick={onClose}
       />
       <div

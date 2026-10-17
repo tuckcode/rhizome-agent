@@ -7,7 +7,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 vi.mock('../lib/productAnalytics', () => ({
   trackComposerPillOpened: vi.fn(),
 }))
-vi.mock('./PrimeModelPicker', () => ({ PrimeModelPicker: () => null }))
+vi.mock('./NativeChatModelPicker', () => ({ NativeChatModelPicker: () => null }))
 vi.mock('./PrimeThinkingToggle', () => ({ PrimeThinkingToggle: () => null }))
 
 /**

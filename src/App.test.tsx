@@ -1141,10 +1141,10 @@ describe('App', () => {
 
     const input = await screen.findByTestId('agent-input')
     await waitFor(() => {
-      expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime Agent')
+      expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime')
     })
     await waitFor(() => {
-      expect(screen.getByTestId('prime-model-chip')).toBeInTheDocument()
+      expect(screen.getByTestId('native-chat-model-picker')).toBeInTheDocument()
     })
 
     input.textContent = 'Summarize the active vault'
@@ -1190,7 +1190,7 @@ describe('App', () => {
 
     const input = await screen.findByTestId('agent-input')
     await waitFor(() => {
-      expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime Agent')
+      expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime')
     })
     input.textContent = 'Summarize the active vault'
     fireEvent.input(input)
@@ -1249,10 +1249,10 @@ describe('App', () => {
     })
 
     await waitFor(() => {
-      expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime Agent')
+      expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime')
     })
     await waitFor(() => {
-      expect(screen.getByTestId('prime-model-chip')).toBeInTheDocument()
+      expect(screen.getByTestId('native-chat-model-picker')).toBeInTheDocument()
     })
 
     input.textContent = 'Summarize the active vault'
