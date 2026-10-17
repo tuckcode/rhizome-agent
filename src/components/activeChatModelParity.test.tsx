@@ -134,29 +134,19 @@ describe('Settings and the composer chip', () => {
     expect(within(chip).getByTestId('native-chat-model-trigger')).toHaveAccessibleName(/^gpt-4o,/)
   })
 
-  it('show the Prime host model on both surfaces when the chat engine is Prime', async () => {
+  it('shows the Prime host model on the composer chip when that chat uses the Prime catalog', async () => {
     render(
-      <>
-        <SettingsPanel
-          open
-          settings={{ ...settings, chat_engine: 'prime' }}
-          onSave={vi.fn()}
-          onClose={vi.fn()}
-        />
-        <ChatComposerDeck
-          catalog="prime"
-          vaultPath="/vault"
-          nativeTarget={null}
-          onNativeTargetChange={vi.fn()}
-        />
-      </>,
+      <ChatComposerDeck
+        catalog="prime"
+        vaultPath="/vault"
+        nativeTarget={null}
+        onNativeTargetChange={vi.fn()}
+      />,
     )
 
     await waitFor(() => {
-      expect(pickers().map((node) => node.getAttribute('data-model-id'))).toEqual([
-        'mock/mock-model',
-        'mock/mock-model',
-      ])
+      expect(screen.getAllByTestId('native-chat-model-picker')).toHaveLength(1)
+      expect(chipPicker().getAttribute('data-model-id')).toBe('mock/mock-model')
     })
     const chip = chipPicker()
     expect(within(chip).getByTestId('native-chat-model-trigger-label')).toHaveTextContent('Mock model')

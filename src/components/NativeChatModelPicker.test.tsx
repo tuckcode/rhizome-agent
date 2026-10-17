@@ -255,7 +255,6 @@ describe('NativeChatModelPicker', () => {
     expect(tooltipId).toHaveClass('font-mono')
     expect(chip).toHaveClass('rounded-md')
     expect(chip).toHaveClass('h-6')
-    expect(chip).toHaveClass('font-sans')
     expect(chip).toHaveClass('text-[12px]')
     expect(chip).toHaveClass('self-center')
     expect(chip).toHaveClass('bg-transparent')

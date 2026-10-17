@@ -316,7 +316,7 @@ export function NativeChatModelPicker({
           setOpen(next)
         }}
       >
-        <Tooltip>
+        <Tooltip delayDuration={chip ? 300 : undefined}>
           <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>
               <button
@@ -328,7 +328,7 @@ export function NativeChatModelPicker({
                   chip
                     ? cn(
                         'h-6 max-w-full shrink self-center rounded-md border border-border bg-transparent px-2',
-                        'font-sans text-[12px] text-muted-foreground',
+                        'text-[12px] text-muted-foreground',
                         'hover:bg-accent/50 hover:text-foreground',
                         'data-[state=open]:bg-accent',
                         NATIVE_CHAT_MODEL_CHIP_MAX_WIDTH_CLASS,

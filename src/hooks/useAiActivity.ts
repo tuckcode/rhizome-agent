@@ -204,8 +204,11 @@ function useUiActionSocket(handleMessage: (event: MessageEvent) => void, clearHi
           }, HEALTHY_RESET_MS)
         }
         socket.onclose = () => {
-          if (ws === socket) ws = null
-          clearHealthyTimer()
+          const isCurrent = ws === socket
+          if (isCurrent) {
+            ws = null
+            clearHealthyTimer()
+          }
           if (!mounted) return
           // Only a socket that reached open spends the drop budget.
           // A refused retry during a restart does not.
@@ -230,8 +233,9 @@ function useUiActionSocket(handleMessage: (event: MessageEvent) => void, clearHi
 
     function wake() {
       if (!mounted || document.visibilityState === 'hidden') return
+      const wasGaveUp = gaveUp
       gaveUp = false
-      openedDrops = 0
+      if (wasGaveUp) openedDrops = 0
       attempt = 0
       if (reconnectTimer) clearTimeout(reconnectTimer)
       reconnectTimer = null
