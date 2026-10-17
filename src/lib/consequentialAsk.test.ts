@@ -47,7 +47,7 @@ const APPROVAL_PHRASES: ReadonlyArray<readonly [string, string | null]> = [
   ['…sync it up with origin?', null],
   ['Want me to clean up the repo?', null],
   ['…clean up the repo?', null],
-  ['Want me to take care of the remote?', 'Yes — take care of the remote'],
+  ['Want me to take care of the remote?', null],
   ['…take care of the remote?', null],
   ['Want me to pay the invoice?', null],
   ['…pay the invoice?', null],
@@ -58,7 +58,8 @@ const NEXT_STEP_PHRASES: ReadonlyArray<readonly [string, string | null]> = [
   ['Next I will sketch the diagram.', 'Sketch the diagram'],
   ["Next I'll draft the note.", 'Draft the note'],
   ['Next, we will outline the change.', 'Outline the change'],
-  ['The next step is to summarize the diff.', 'Summarize the diff'],
+  ["Next I'll read your notes.", 'Read my notes'],
+  ["Next I'll check you're done.", "Check you're done"],
   ["Next I'll force-push main", null],
   ['Next I will run the tests.', null],
   ['The next step is to wipe the vault.', null],
@@ -70,6 +71,23 @@ const NEXT_STEP_PHRASES: ReadonlyArray<readonly [string, string | null]> = [
   ['The next step is to pay the invoice.', null],
   ['Next we will merge the branch.', null],
 ]
+
+const REQUIRED_NULL = [
+  'Shall I proceed?',
+  '...with the merge?',
+  'apply the migration',
+  'ship it to prod',
+  'sync it up with origin',
+  'clean up the repo',
+  'take care of the remote',
+  'pay the invoice',
+  'Shall I run rm -rf build/?',
+  "...and I'll wipe the vault.",
+  "Let me know when you're ready.",
+  'push the 33 commits',
+  "Next I'll force-push to main.",
+  'run it now',
+] as const
 
 const BARE_APPROVALS = [
   'Yes',
@@ -87,6 +105,44 @@ const BARE_APPROVALS = [
 ]
 
 describe('consequential asks', () => {
+  it.each(REQUIRED_NULL)('%j is null', (row) => {
+    expect(predictedCompletion(row)).toBeNull()
+  })
+
+  it.each([
+    'with the merge',
+    'apply the migration',
+    'ship it to prod',
+    'sync it up with origin',
+    'clean up the repo',
+    'take care of the remote',
+    'pay the invoice',
+    'wipe the vault',
+    'push the 33 commits',
+    'force-push to main',
+    'run it now',
+    'do it',
+  ] as const)('denies clause %j', (clause) => {
+    expect(isConsequentialAsk(clause)).toBe(true)
+    expect(predictedCompletion(`Want me to ${clause}?`)).toBeNull()
+    expect(predictedCompletion(`Next I'll ${clause}.`)).toBeNull()
+  })
+
+  it.each(['origin', 'remote', 'prod', 'production', 'main', 'master', 'vault'] as const)(
+    'denies shared target %s whatever the verb',
+    (target) => {
+      expect(isConsequentialAsk(`sketch the ${target}`)).toBe(true)
+      expect(predictedCompletion(`Want me to sketch the ${target}?`)).toBeNull()
+    },
+  )
+
+  it('names one safe approval and keeps the ready path on Yes', () => {
+    expect(predictedCompletion("Let me know when you're ready and I'll draft the note.")).toBe(
+      'Yes — draft the note',
+    )
+    expect(isBareApproval('Yes — draft the note')).toBe(false)
+    expect(isConsequentialAsk('draft the note')).toBe(false)
+  })
   it.each(APPROVAL_PHRASES)('%j is null or a named safe approval', (phrase, expected) => {
     const result = predictedCompletion(phrase)
     expect(result).toBe(expected)
@@ -145,7 +201,6 @@ describe('consequential asks', () => {
 
   it('does not treat an unrelated word as a consequential verb', () => {
     expect(isConsequentialAsk('sketch the diagram')).toBe(false)
-    expect(isConsequentialAsk('take care of the remote')).toBe(false)
     expect(isConsequentialAsk('application of the patch')).toBe(false)
     expect(isConsequentialAsk('runtime notes')).toBe(false)
     expect(isConsequentialAsk('postpone the review')).toBe(false)
@@ -153,8 +208,7 @@ describe('consequential asks', () => {
 
   it('hides predicted completions for a CLI agent and for Power User', () => {
     const samples = [
-      'Yes — sketch the diagram',
-      'Ready — draft the note',
+      'Yes — draft the note',
       'Sketch the diagram',
     ]
     for (const text of samples) {

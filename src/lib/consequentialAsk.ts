@@ -51,6 +51,55 @@ const BARE_APPROVALS = new Set([
 
 const FILLER_CLAUSE = /^(?:proceed|continue|go ahead|go|do it|do that|yes|ok|okay|sure|ready)$/i
 
+/** A named place the action would touch. The verb does not matter. */
+const SHARED_TARGET = /\b(?:origin|remote|prod|production|main|master|vault)\b/
+
+const PRONOUNS = new Set([
+  'it',
+  'them',
+  'this',
+  'that',
+  'him',
+  'her',
+  'those',
+  'these',
+  'me',
+  'my',
+  'you',
+  'us',
+  'one',
+])
+
+/** Words that are not the object of the clause. */
+const OBJECT_SKIP = new Set([
+  'the',
+  'a',
+  'an',
+  'of',
+  'to',
+  'with',
+  'for',
+  'on',
+  'in',
+  'at',
+  'into',
+  'from',
+  'up',
+  'now',
+  'just',
+  'please',
+  'again',
+  'instead',
+  'quickly',
+  'immediately',
+  'ahead',
+  'out',
+  'over',
+  'off',
+  'then',
+  'too',
+])
+
 const NEXT_STEP = /^(?:next[,:]?\s+(?:i(?:'ll| will)|we(?:'ll| will))\s+|the next step is to\s+)(.+)$/i
 
 function straighten(text: string): string {
@@ -72,11 +121,28 @@ export function isBareApproval(text: string): boolean {
   return BARE_APPROVALS.has(normalizeWords(text))
 }
 
-/** True when the action names a destructive or consequential verb. */
+/**
+ * True when a predicted reply must stay silent: a consequential verb,
+ * a shared target (origin, remote, prod, production, main, master, vault),
+ * or a clause whose only object is a pronoun ("do it", "run it now").
+ */
 export function isConsequentialAsk(action: string): boolean {
-  const normalized = normalizeWords(action)
+  const normalized = normalizeWords(action.replace(/^(?:yes|ready)\s*[—–-]\s*/i, ''))
+  if (!normalized) return false
+  if (SHARED_TARGET.test(normalized)) return true
   if (/\bclean\s+up\b/.test(normalized)) return true
-  return CONSEQUENTIAL_VERBS.some((verb) => new RegExp(`\\b${verb}\\b`).test(normalized))
+  if (CONSEQUENTIAL_VERBS.some((verb) => new RegExp(`\\b${verb}\\b`).test(normalized))) {
+    return true
+  }
+  return pronounOnlyObject(normalized)
+}
+
+/** "do it" / "run it now": the object is only a pronoun. */
+function pronounOnlyObject(normalized: string): boolean {
+  const words = normalized.split(' ').filter((word) => word.length > 0)
+  if (words.length < 2) return false
+  const content = words.slice(1).filter((word) => !OBJECT_SKIP.has(word))
+  return content.length > 0 && content.every((word) => PRONOUNS.has(word))
 }
 
 function cleanClause(raw: string): string | null {
@@ -145,8 +211,7 @@ function approvalCompletionText(sentence: string): string | null | undefined {
   if (!found) return null
   const clause = cleanClause(found.clause)
   if (!clause || isConsequentialAsk(clause)) return null
-  const prefix = found.shape === 'ready' ? 'Ready' : 'Yes'
-  return `${prefix} — ${clause}`
+  return `Yes — ${clause}`
 }
 
 /** Harmless next-step echo, or null when the step is absent, unclean, or consequential. */
@@ -154,7 +219,10 @@ function nextStepCompletion(sentence: string): string | null {
   const text = straighten(sentence).replace(/[?!]+$/, '').trim()
   const match = text.match(NEXT_STEP)
   if (!match?.[1]) return null
-  const echo = match[1].replace(/[.]+$/, '').trim()
+  const echo = match[1]
+    .replace(/[.]+$/, '')
+    .trim()
+    .replace(/\byour\b(?!')/gi, (word) => (word[0] === 'Y' ? 'My' : 'my'))
   if (
     echo.length < 3
     || echo.length > 80

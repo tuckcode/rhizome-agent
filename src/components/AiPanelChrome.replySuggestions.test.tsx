@@ -315,7 +315,7 @@ describe('AiPanelComposer reply suggestions', () => {
   it('Escape dismisses ghost text until the next agent message', () => {
     vi.mocked(replySuggestionsLib.suggestReply).mockReturnValue({
       kind: 'completion',
-      text: 'Ready — draft the note',
+      text: 'Yes — draft the note',
     })
     const { rerender } = renderComposer({
       lastAgentMessage: "Let me know when you're ready and I'll draft the note.",

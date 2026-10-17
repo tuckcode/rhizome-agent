@@ -309,11 +309,11 @@ describe('suggestReply', () => {
     it('ready_path_names_the_action_or_stays_silent', () => {
       expect(suggestReply("Let me know when you're ready and I'll draft the note.")).toEqual({
         kind: 'completion',
-        text: 'Ready — draft the note',
+        text: 'Yes — draft the note',
       })
       expect(suggestReply("I'll sketch the outline when you're ready.")).toEqual({
         kind: 'completion',
-        text: 'Ready — sketch the outline',
+        text: 'Yes — sketch the outline',
       })
       expect(suggestReply("Let me know when you're ready and I'll wipe the vault.")).toBeNull()
       expect(suggestReply('Let me know when you are ready.')).toBeNull()
@@ -330,8 +330,8 @@ describe('suggestReply', () => {
       ['Next I will sketch the diagram.', 'Sketch the diagram'],
       ["Next I'll draft the note.", 'Draft the note'],
       ['Next, we will outline the change.', 'Outline the change'],
-      ['The next step is to summarize the diff.', 'Summarize the diff'],
-      ["Next I'll force-push main.", null],
+      ["Next I'll read your notes.", 'Read my notes'],
+      ["Next I'll force-push to main.", null],
       ['Next I will run the tests.', null],
       ['The next step is to wipe the vault.', null],
       ['Next, I will delete the branch.', null],
