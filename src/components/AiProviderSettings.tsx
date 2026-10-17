@@ -1,4 +1,5 @@
 import { useId, useState } from 'react'
+import { ArrowSquareOut } from '@phosphor-icons/react'
 import {
   DEFAULT_MODEL_CAPABILITIES,
   aiModelProviderCatalog,
@@ -11,7 +12,17 @@ import {
   type AiModelProviderKind,
 } from '../lib/aiTargets'
 import type { createTranslator } from '../lib/i18n'
+import {
+  CUSTOM_PROVIDER_PRESET_ID,
+  PROVIDER_PRESETS,
+  defaultApiProviderPreset,
+  draftPatchForCustomProvider,
+  draftPatchForProviderPreset,
+  providerPresetById,
+} from '../lib/providerPresets'
+import { trackEvent } from '../lib/telemetry'
 import { deleteAiModelProviderApiKey, saveAiModelProviderApiKey, testAiModelProvider } from '../utils/aiProviderSecrets'
+import { openExternalUrl } from '../utils/url'
 import { Button } from './ui/button'
 import { FreeTierSettings } from './FreeTierSettings'
 import {
@@ -43,6 +54,7 @@ interface AiProviderSettingsProps {
 }
 
 interface ProviderDraft {
+  presetId: string
   kind: AiModelProviderKind
   name: string
   baseUrl: string
@@ -59,6 +71,9 @@ function providerKindsForMode(mode: ProviderMode): AiModelProviderKind[] {
 }
 
 function initialDraft(mode: ProviderMode): ProviderDraft {
+  if (mode === 'api') {
+    return draftFromPreset(defaultApiProviderPreset())
+  }
   const [kind] = providerKindsForMode(mode)
   if (!kind) throw new Error(`No AI model providers are configured for ${mode} mode`)
   return draftFromProviderKind(kind)
@@ -67,6 +82,7 @@ function initialDraft(mode: ProviderMode): ProviderDraft {
 function draftFromProviderKind(kind: AiModelProviderKind): ProviderDraft {
   const defaults = aiModelProviderCatalogEntry(kind)
   return {
+    presetId: CUSTOM_PROVIDER_PRESET_ID,
     kind,
     name: defaults.name,
     baseUrl: defaults.base_url,
@@ -77,6 +93,13 @@ function draftFromProviderKind(kind: AiModelProviderKind): ProviderDraft {
   }
 }
 
+function draftFromPreset(preset: ReturnType<typeof defaultApiProviderPreset>): ProviderDraft {
+  return {
+    ...draftFromProviderKind(preset.apiStyle),
+    ...draftPatchForProviderPreset(preset),
+  }
+}
+
 function providerKindOptions(mode: ProviderMode, t: Translate): Array<{ value: AiModelProviderKind; label: string }> {
   return providerKindsForMode(mode).map((kind) => {
     const defaults = aiModelProviderCatalogEntry(kind)
@@ -84,9 +107,10 @@ function providerKindOptions(mode: ProviderMode, t: Translate): Array<{ value: A
   })
 }
 
-function providerPresetPatch(kind: AiModelProviderKind): Pick<ProviderDraft, 'kind' | 'name' | 'baseUrl' | 'apiKeyStorage' | 'apiKeyEnvVar'> {
+function providerKindPatch(kind: AiModelProviderKind): Pick<ProviderDraft, 'presetId' | 'kind' | 'name' | 'baseUrl' | 'apiKeyStorage' | 'apiKeyEnvVar'> {
   const defaults = draftFromProviderKind(kind)
   return {
+    presetId: defaults.presetId,
     kind,
     name: defaults.name,
     baseUrl: defaults.baseUrl,
@@ -173,17 +197,19 @@ function ProviderKindSelect({
   t,
   value,
   onChange,
+  label,
 }: {
   mode: ProviderMode
   t: Translate
   value: AiModelProviderKind
   onChange: (value: AiModelProviderKind) => void
+  label?: string
 }) {
   const triggerId = useId()
 
   return (
     <label htmlFor={triggerId} className="space-y-1.5 text-xs font-medium text-foreground">
-      <span>{t('settings.aiProviders.kind')}</span>
+      <span>{label ?? t('settings.aiProviders.kind')}</span>
       <Select value={value} onValueChange={(next) => onChange(next as AiModelProviderKind)}>
         <SelectTrigger id={triggerId} className={`h-9 ${editableInputClassName()}`}>
           <SelectValue />
@@ -195,6 +221,51 @@ function ProviderKindSelect({
         </SelectContent>
       </Select>
     </label>
+  )
+}
+
+function ProviderPresetSelect({
+  value,
+  onChange,
+}: {
+  value: string
+  onChange: (value: string) => void
+}) {
+  const triggerId = useId()
+
+  return (
+    <label htmlFor={triggerId} className="space-y-1.5 text-xs font-medium text-foreground">
+      <span>Provider</span>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger id={triggerId} className={`h-9 ${editableInputClassName()}`}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {PROVIDER_PRESETS.map((preset) => (
+            <SelectItem key={preset.id} value={preset.id}>{preset.label}</SelectItem>
+          ))}
+          <SelectItem value={CUSTOM_PROVIDER_PRESET_ID}>Custom</SelectItem>
+        </SelectContent>
+      </Select>
+    </label>
+  )
+}
+
+function GetApiKeyButton({ presetId, url }: { presetId: string; url: string }) {
+  return (
+    <Button
+      type="button"
+      variant="secondary"
+      size="sm"
+      data-testid="ai-provider-get-api-key"
+      onClick={() => {
+        trackEvent('provider_preset_get_api_key', { preset: presetId })
+        void openExternalUrl(url)
+      }}
+    >
+      Get API key
+      <ArrowSquareOut size={16} aria-hidden="true" />
+    </Button>
   )
 }
 
@@ -302,7 +373,16 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
     resetTest()
     updateDraft(patch)
   }
-  const updateKind = (kind: AiModelProviderKind) => updateForm(providerPresetPatch(kind))
+  const selectedPreset = providerPresetById(draft.presetId)
+  const updateKind = (kind: AiModelProviderKind) => updateForm(providerKindPatch(kind))
+  const updatePreset = (presetId: string) => {
+    if (presetId === CUSTOM_PROVIDER_PRESET_ID) {
+      updateForm(draftPatchForCustomProvider(draft.baseUrl))
+      return
+    }
+    const preset = providerPresetById(presetId)
+    if (preset) updateForm(draftPatchForProviderPreset(preset))
+  }
   const canSave = draft.name.trim() && draft.modelId.trim() && (draft.apiKeyStorage !== 'local_file' || draft.apiKey.trim())
   const apiKeyOverride = draft.apiKeyStorage === 'local_file' ? draft.apiKey : null
 
@@ -314,7 +394,12 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
         await saveAiModelProviderApiKey(providerId, draft.apiKey)
       }
       onChange(normalizeAiModelProviders([...providers, buildProvider(draft, providerId)]))
-      setDraft((current) => ({ ...draftFromProviderKind(current.kind), name: current.name, baseUrl: current.baseUrl }))
+      setDraft((current) => ({
+        ...draftFromProviderKind(current.kind),
+        presetId: current.presetId,
+        name: current.name,
+        baseUrl: current.baseUrl,
+      }))
       setTestState('idle')
     } catch (error) {
       setError(error instanceof Error ? error.message : String(error))
@@ -356,7 +441,7 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
   }
 
   return (
-    <div className="rounded-md border border-border bg-card p-3" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="rounded-md border border-border bg-card p-3" data-testid="ai-provider-settings" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div>
         <div className="text-sm font-medium text-foreground">{providerModeTitle(mode, t)}</div>
         <div className="mt-1 text-xs leading-5 text-muted-foreground">{providerModeDescription(mode, t)}</div>
@@ -395,11 +480,23 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
         </DialogContent>
       </Dialog>
       <div className="grid grid-cols-2 gap-3">
-        <ProviderKindSelect mode={mode} t={t} value={draft.kind} onChange={updateKind} />
+        {mode === 'api' ? (
+          <ProviderPresetSelect value={draft.presetId} onChange={updatePreset} />
+        ) : (
+          <ProviderKindSelect mode={mode} t={t} value={draft.kind} onChange={updateKind} />
+        )}
         <LabeledInput label={t('settings.aiProviders.name')} value={draft.name} onChange={(name) => updateForm({ name })} />
+        {mode === 'api' && draft.presetId === CUSTOM_PROVIDER_PRESET_ID ? (
+          <ProviderKindSelect mode={mode} t={t} value={draft.kind} onChange={updateKind} label="API style" />
+        ) : null}
         <LabeledInput label={t('settings.aiProviders.baseUrl')} value={draft.baseUrl} onChange={(baseUrl) => updateForm({ baseUrl })} />
         <LabeledInput label={t('settings.aiProviders.model')} value={draft.modelId} onChange={(modelId) => updateForm({ modelId })} placeholder={aiModelProviderCatalogEntry(draft.kind).default_model_id} />
         {mode === 'api' ? <ApiKeyStorageFields t={t} draft={draft} updateDraft={updateForm} /> : null}
+        {mode === 'api' && selectedPreset ? (
+          <div className="col-span-2">
+            <GetApiKeyButton presetId={selectedPreset.id} url={selectedPreset.keyPageUrl} />
+          </div>
+        ) : null}
       </div>
       <div className="text-xs leading-5 text-muted-foreground">
         {mode === 'api' ? t('settings.aiProviders.keySafetyLocal') : t('settings.aiProviders.localSafety')}

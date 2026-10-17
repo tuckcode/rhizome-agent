@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { AiProviderSettings } from './AiProviderSettings'
 import { createTranslator } from '../lib/i18n'
 import { DEFAULT_MODEL_CAPABILITIES, type AiModelProvider } from '../lib/aiTargets'
+import { PROVIDER_PRESETS, providerPresetById } from '../lib/providerPresets'
 
 const { deleteApiKeyMock, saveApiKeyMock, testProviderMock } = vi.hoisted(() => ({
   deleteApiKeyMock: vi.fn(),
@@ -15,6 +16,14 @@ vi.mock('../utils/aiProviderSecrets', () => ({
   saveAiModelProviderApiKey: saveApiKeyMock,
   testAiModelProvider: testProviderMock,
 }))
+
+vi.mock('../utils/url', () => ({
+  openExternalUrl: vi.fn().mockResolvedValue(undefined),
+}))
+
+const { openExternalUrl } = await import('../utils/url') as typeof import('../utils/url') & {
+  openExternalUrl: ReturnType<typeof vi.fn>
+}
 
 const t = createTranslator('en')
 
@@ -94,5 +103,62 @@ describe('AiProviderSettings removal', () => {
 
     expect(deleteApiKeyMock).not.toHaveBeenCalled()
     expect(onChange).not.toHaveBeenCalled()
+  })
+})
+
+function selectProviderPreset(label: string) {
+  fireEvent.click(screen.getByRole('combobox', { name: 'Provider' }))
+  fireEvent.click(screen.getByRole('option', { name: label }))
+}
+
+describe('AiProviderSettings presets', () => {
+  beforeEach(() => {
+    deleteApiKeyMock.mockReset().mockResolvedValue(undefined)
+    saveApiKeyMock.mockReset().mockResolvedValue(undefined)
+    testProviderMock.mockReset().mockResolvedValue(undefined)
+    openExternalUrl.mockReset().mockResolvedValue(undefined)
+  })
+
+  it('prefills the base URL when a popular provider is selected', () => {
+    renderProviders()
+
+    const baseUrl = screen.getByLabelText('Base URL')
+    expect(baseUrl).toHaveValue('https://api.openai.com/v1')
+
+    selectProviderPreset('Groq')
+
+    expect(baseUrl).toHaveValue('https://api.groq.com/openai/v1')
+    expect(screen.getByLabelText('Name')).toHaveValue('Groq')
+  })
+
+  it('keeps the base URL editable after a preset prefills it', () => {
+    renderProviders()
+    selectProviderPreset('Mistral')
+
+    const baseUrl = screen.getByLabelText('Base URL')
+    expect(baseUrl).toHaveValue('https://api.mistral.ai/v1')
+    fireEvent.change(baseUrl, { target: { value: 'https://lab.example/v1' } })
+    expect(baseUrl).toHaveValue('https://lab.example/v1')
+    expect(screen.getByLabelText('Name')).toHaveValue('Mistral')
+  })
+
+  it('opens the selected provider key page in the system browser', () => {
+    renderProviders()
+    selectProviderPreset('Anthropic')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Get API key' }))
+
+    expect(openExternalUrl).toHaveBeenCalledWith(providerPresetById('anthropic')?.keyPageUrl)
+    expect(openExternalUrl).toHaveBeenCalledWith(PROVIDER_PRESETS[0].keyPageUrl)
+  })
+
+  it('hides Get API key for a custom base URL', () => {
+    renderProviders()
+    selectProviderPreset('Custom')
+
+    expect(screen.queryByRole('button', { name: 'Get API key' })).not.toBeInTheDocument()
+    const baseUrl = screen.getByLabelText('Base URL')
+    fireEvent.change(baseUrl, { target: { value: 'https://lab.example/v1' } })
+    expect(baseUrl).toHaveValue('https://lab.example/v1')
   })
 })
