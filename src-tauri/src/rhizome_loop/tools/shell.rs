@@ -527,7 +527,6 @@ fn poll_pipe_windows<R>(pipe: &mut R, buf: &mut [u8]) -> ReadPoll
 where
     R: Read + std::os::windows::io::AsRawHandle,
 {
-    use std::os::windows::io::AsRawHandle;
     use windows::Win32::Foundation::HANDLE;
 
     let handle = HANDLE(pipe.as_raw_handle() as _);
@@ -954,7 +953,7 @@ mod win_ffi {
 
 #[cfg(windows)]
 mod windows_job {
-    use std::io::{Error, Result};
+    use std::io::Result;
     use std::os::windows::io::{AsRawHandle, OwnedHandle};
     use std::os::windows::process::CommandExt;
     use std::process::{Child, Command, ExitStatus};
@@ -1051,13 +1050,11 @@ mod windows_job {
     }
 
     fn make_job(process: HANDLE) -> Result<OwnedHandle> {
-        let job = win_ffi::create_job()?;
-        win_ffi::set_kill_on_close(job)?;
-        if let Err(error) = win_ffi::assign_process(job, process) {
-            win_ffi::close_handle(job).ok();
-            return Err(error);
-        }
-        Ok(win_ffi::own_handle(job))
+        // Own the handle first. A failed `set_kill_on_close` must still close it.
+        let job = win_ffi::own_handle(win_ffi::create_job()?);
+        win_ffi::set_kill_on_close(sys_handle(&job))?;
+        win_ffi::assign_process(sys_handle(&job), process)?;
+        Ok(job)
     }
 
     fn resume_threads(child_process: HANDLE) -> Result<()> {
@@ -1851,5 +1848,153 @@ mod tests {
                 nix::sys::signal::Signal::SIGKILL,
             );
         }
+    }
+
+    /// `ping -n 30` waits about 29 seconds. A short shell timeout must
+    /// kill that process and report a timeout.
+    #[cfg(windows)]
+    const HOLD_PING: &str = r#"$ErrorActionPreference = 'Stop'
+$child = Start-Process -FilePath ping.exe -ArgumentList '-n','30','127.0.0.1' -PassThru -WindowStyle Hidden
+Set-Content -LiteralPath 'ping.pid' -Value $child.Id -Encoding ascii
+Wait-Process -Id $child.Id
+"#;
+
+    /// cmd (parent) → powershell → ping. The job has to take all three.
+    #[cfg(windows)]
+    const TREE_PING: &str = r#"$ErrorActionPreference = 'Stop'
+$parent = (Get-CimInstance Win32_Process -Filter "ProcessId=$PID").ParentProcessId
+$child = Start-Process -FilePath ping.exe -ArgumentList '-n','30','127.0.0.1' -PassThru -WindowStyle Hidden
+Set-Content -LiteralPath 'tree.pids' -Value @($parent, $PID, $child.Id) -Encoding ascii
+Wait-Process -Id $child.Id
+"#;
+
+    #[cfg(windows)]
+    #[test]
+    fn echo_hi_returns_hi_and_exit_code_0() {
+        let (_dir, root) = root_dir();
+        let output = run_approved("echo hi", &root, Some(Duration::from_secs(5))).unwrap();
+        let value = bash_json(&output);
+        assert_eq!(value["kind"], "bash_result");
+        let stdout = value["stdout"].as_str().unwrap().replace("\r\n", "\n");
+        assert_eq!(stdout, "hi\n", "{output}");
+        assert_eq!(value["exit_code"], 0);
+        assert_eq!(value["timed_out"], false);
+        assert_eq!(value["stopped"], false);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn ping_past_the_timeout_is_killed() {
+        let (_dir, root) = root_dir();
+        let root_path = std::path::Path::new(&root);
+        std::fs::write(root_path.join("hold.ps1"), HOLD_PING).unwrap();
+        let started = Instant::now();
+        let output = run_approved(
+            "powershell -NoProfile -ExecutionPolicy Bypass -File hold.ps1",
+            &root,
+            Some(Duration::from_secs(12)),
+        )
+        .unwrap();
+        // `ping -n 30` takes about 29s. Returning inside 22s means the
+        // job kill did not wait for it.
+        assert!(started.elapsed() < Duration::from_secs(22), "{output}");
+        let value = bash_json(&output);
+        assert_eq!(value["timed_out"], true, "{output}");
+        assert_eq!(value["stopped"], false, "{output}");
+        assert!(value["exit_code"].is_null(), "{output}");
+        for pid in read_pids(&root_path.join("ping.pid")) {
+            assert_dead(pid);
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn cancel_mid_run_kills_the_process_tree() {
+        let (_dir, root) = root_dir();
+        let root_path = std::path::Path::new(&root);
+        let pids_path = root_path.join("tree.pids");
+        std::fs::write(root_path.join("tree.ps1"), TREE_PING).unwrap();
+        let command = "powershell -NoProfile -ExecutionPolicy Bypass -File tree.ps1";
+        let cancel = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&cancel);
+        let watch = pids_path.clone();
+        thread::spawn(move || {
+            for _ in 0..600 {
+                if let Ok(text) = std::fs::read_to_string(&watch) {
+                    if text.split_whitespace().count() >= 3 {
+                        flag.store(true, Ordering::SeqCst);
+                        return;
+                    }
+                }
+                thread::sleep(Duration::from_millis(50));
+            }
+        });
+        let stamp = approval_stamp("call-1", command);
+        let started = Instant::now();
+        let output = run_command(
+            command,
+            Some(&root),
+            "call-1",
+            Some(&stamp),
+            &|| cancel.load(Ordering::SeqCst),
+            Some(Duration::from_secs(45)),
+        )
+        .unwrap();
+        assert!(started.elapsed() < Duration::from_secs(40), "{output}");
+        let value = bash_json(&output);
+        assert_eq!(value["stopped"], true, "{output}");
+        assert_eq!(value["timed_out"], false, "{output}");
+        assert!(value["exit_code"].is_null(), "{output}");
+        let pids = read_pids(&pids_path);
+        assert!(pids.len() >= 3, "{pids:?}");
+        assert!(pids.iter().all(|pid| *pid > 0), "{pids:?}");
+        for pid in pids {
+            assert_dead(pid);
+        }
+    }
+
+    #[cfg(windows)]
+    fn read_pids(path: &std::path::Path) -> Vec<u32> {
+        let text = std::fs::read_to_string(path)
+            .unwrap_or_else(|error| panic!("missing pid file {}: {error}", path.display()));
+        let pids: Vec<u32> = text
+            .split_whitespace()
+            .map(|part| {
+                part.parse()
+                    .unwrap_or_else(|_| panic!("pid in {}: {text}", path.display()))
+            })
+            .collect();
+        assert!(!pids.is_empty(), "no pids in {}", path.display());
+        pids
+    }
+
+    #[cfg(windows)]
+    fn assert_dead(pid: u32) {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            if !process_alive(pid) {
+                return;
+            }
+            if Instant::now() >= deadline {
+                panic!("pid {pid} is still alive");
+            }
+            thread::sleep(Duration::from_millis(50));
+        }
+    }
+
+    #[cfg(windows)]
+    fn process_alive(pid: u32) -> bool {
+        let output = std::process::Command::new("tasklist")
+            .args(["/FI", &format!("PID eq {pid}"), "/FO", "CSV", "/NH"])
+            .output()
+            .unwrap_or_else(|error| panic!("tasklist: {error}"));
+        let text = String::from_utf8_lossy(&output.stdout);
+        text.lines().any(|line| {
+            let mut fields = line.split(',');
+            let _image = fields.next();
+            fields
+                .next()
+                .is_some_and(|field| field.trim().trim_matches('"') == pid.to_string())
+        })
     }
 }
