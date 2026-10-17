@@ -19,9 +19,12 @@ type ShotState =
   | 'approval-two'
   | 'approval-edit'
   | 'approval-overflow'
+  | 'approval-empty'
+  | 'approval-newline'
   | 'topbar-native'
   | 'header-title'
   | 'header-long'
+  | 'header-long-hover'
   | 'empty-before'
   | 'empty'
 
@@ -33,12 +36,20 @@ const STATES: ShotState[] = [
   'approval-two',
   'approval-edit',
   'approval-overflow',
+  'approval-empty',
+  'approval-newline',
   'topbar-native',
   'header-title',
   'header-long',
+  'header-long-hover',
   'empty-before',
   'empty',
 ]
+
+const LONG_HEADER_TITLE = [
+  'Plan the launch of a very long session title that should not fill the header',
+  'beside Command Palette and must keep going until this bar clips it with an ellipsis',
+].join(' ')
 
 const OPTIONS = [
   { id: 'allow_once', label: 'Allow once' },
@@ -166,6 +177,8 @@ export function Shot() {
       && state !== 'approval-two'
       && state !== 'approval-edit'
       && state !== 'approval-overflow'
+      && state !== 'approval-empty'
+      && state !== 'approval-newline'
     ) return
     document.querySelector<HTMLButtonElement>('[data-testid="tool-use-toggle"]')?.click()
     if (state !== 'approval-allow-focus') return
@@ -179,8 +192,8 @@ export function Shot() {
       live={false}
       showSessionStatus={false}
       sessionTitle={
-        state === 'header-long'
-          ? 'Plan the launch of a very long session title that should not fill the header'
+        state === 'header-long' || state === 'header-long-hover'
+          ? LONG_HEADER_TITLE
           : state === 'header-title'
             ? 'Plan the launch'
             : null
@@ -192,7 +205,17 @@ export function Shot() {
 
   let body: ReactNode
   let title = 'Chat'
-  let header: ReactNode = nativeBar
+  let header: ReactNode = state === 'header-long-hover' ? (
+    <div className="relative">
+      {nativeBar}
+      <div
+        className="absolute left-3 top-[34px] z-10 max-w-[28rem] rounded-md border border-border bg-popover px-2 py-1.5 text-[12px] leading-snug text-popover-foreground shadow-md"
+        data-testid="header-title-tooltip"
+      >
+        {LONG_HEADER_TITLE}
+      </div>
+    </div>
+  ) : nativeBar
 
   if (state === 'approval-collapsed-before') {
     title = 'Pending approval, collapsed (before)'
@@ -246,6 +269,22 @@ export function Shot() {
         actions={[pendingBash(`echo ${'A'.repeat(48)}`)]}
       />
     )
+  } else if (state === 'approval-empty') {
+    title = 'Collapsed empty bash approval'
+    body = (
+      <AiMessage
+        userMessage="Run a command"
+        actions={[pendingAction('bash', { args: '' })]}
+      />
+    )
+  } else if (state === 'approval-newline') {
+    title = 'Collapsed command with a newline'
+    body = (
+      <AiMessage
+        userMessage="Run two lines"
+        actions={[pendingBash('ls\nrm -rf ~')]}
+      />
+    )
   } else if (state === 'topbar-native') {
     title = 'Native engine top bar'
     body = (
@@ -253,13 +292,17 @@ export function Shot() {
         Rhizome native engine · header stays
       </div>
     )
-  } else if (state === 'header-title' || state === 'header-long') {
-    title = state === 'header-long'
-      ? 'Long session title next to Command Palette'
-      : 'Header after first message'
+  } else if (state === 'header-title' || state === 'header-long' || state === 'header-long-hover') {
+    title = state === 'header-title'
+      ? 'Header after first message'
+      : state === 'header-long-hover'
+        ? 'Long session title, hover shows the full title'
+        : 'Long session title next to Command Palette'
     body = (
       <div className="flex flex-1 items-center justify-center text-[13px] text-muted-foreground">
-        {state === 'header-long' ? 'Title truncates beside Command Palette' : 'First turn titled the session'}
+        {state === 'header-title'
+          ? 'First turn titled the session'
+          : 'Title truncates beside Command Palette'}
       </div>
     )
   } else if (state === 'empty-before') {

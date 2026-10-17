@@ -110,6 +110,18 @@ describe('usePrimeActiveSessionTitle', () => {
     expect(invoked.calls).toEqual(['native_chat_list'])
   })
 
+  it('bounds list calls when the caller passes a fresh inline array as the key', async () => {
+    // Without the setRead identity guard this loops (1287 host calls in 30ms).
+    invoked.sessions = [{ id: 'a', path: '/mock/sessions/a.jsonl', title: 'Plan the launch' }]
+    const { result } = renderHook(
+      () => usePrimeActiveSessionTitle('/mock/sessions/a.jsonl', [true, '/mock/sessions/a.jsonl']),
+    )
+    await waitFor(() => expect(result.current).toBe('Plan the launch'))
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(invoked.calls.length).toBeLessThanOrEqual(3)
+    expect(invoked.calls.every((command) => command === 'list_prime_session_summaries')).toBe(true)
+  })
+
   it('bounds list calls across re-renders and refetches only when the key changes', async () => {
     invoked.sessions = [{ id: 'a', path: '/mock/sessions/a.jsonl', title: 'Plan the launch' }]
     const { rerender } = renderHook(

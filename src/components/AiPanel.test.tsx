@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render as rtlRender, screen, fireEvent, act, waitFor, within } from '@testing-library/react'
 import { AiPanel, AiPanelView } from './AiPanel'
+import { sessionHeaderReport } from '../lib/sessionHeaderTitle'
 import { UNSUPPORTED_INLINE_PASTE_MESSAGE } from './InlineWikilinkInput'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { AiPanelController } from './useAiPanelController'
@@ -381,6 +382,18 @@ describe('AiPanel', () => {
           title: 'Plan the launch of a very long session title that should not…',
         }),
       )
+    })
+  })
+
+  it('does not title a new path from leftover messages before a native session exists', () => {
+    expect(sessionHeaderReport({
+      activeSessionPath: 'rhizome-native:new',
+      primeSessionPath: null,
+      nativeSessionId: null,
+      firstUserMessage: 'Explain this repo',
+    })).toEqual({
+      path: 'rhizome-native:new',
+      title: null,
     })
   })
 

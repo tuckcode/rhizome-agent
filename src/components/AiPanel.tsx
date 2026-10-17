@@ -411,6 +411,8 @@ export function AiPanelView({
   const firstUserMessage = agent.messages.find((message) => message.userMessage?.trim())?.userMessage ?? null
   useEffect(() => {
     if (!onSessionHeader) return
+    // sessionHeaderReport drops firstUserMessage when a new path is set
+    // before a native session id exists, so leftover turns do not title it.
     const report = sessionHeaderReport({
       activeSessionPath,
       primeSessionPath: primeHost.sessionPath,

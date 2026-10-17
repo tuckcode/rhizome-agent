@@ -6,8 +6,11 @@ import {
   CaretRight,
   CircleNotch,
   Copy,
+  File,
   FloppyDisk,
   GitFork,
+  NotePencil,
+  PencilSimple,
   SpeakerHigh,
   Square,
   Terminal,
@@ -19,7 +22,11 @@ import { AiActionCard, type AiActionStatus } from './AiActionCard'
 import { BashResultCard } from './BashResultCard'
 import { ToolApprovalCard } from './ToolApprovalCard'
 import { VisibleCommand } from './VisibleCommand'
-import { collapsedApprovalOverflow } from '../lib/collapsedApproval'
+import {
+  approvalAriaLabel,
+  collapsePathKeepFilename,
+  collapsedApprovalOverflow,
+} from '../lib/collapsedApproval'
 import {
   bashApprovalCommand,
   commandFromToolCallInput,
@@ -402,6 +409,28 @@ function pendingApprovalDisplay(action: AiAction): string {
   return action.approval?.path ?? action.path ?? ''
 }
 
+function isEditOrWriteTool(tool: string): boolean {
+  return tool === 'edit_file' || tool === 'write_file' || tool === 'Edit' || tool === 'Write'
+}
+
+function CollapsedApprovalIcon({ tool }: { tool: string }) {
+  const kind = isBashTool(tool)
+    ? 'bash'
+    : tool === 'edit_file' || tool === 'Edit'
+      ? 'edit'
+      : tool === 'write_file' || tool === 'Write'
+        ? 'write'
+        : 'file'
+  return (
+    <span aria-hidden="true" data-kind={kind} data-testid="tool-use-approval-icon">
+      {kind === 'bash' ? <Terminal size={14} /> : null}
+      {kind === 'edit' ? <NotePencil size={14} /> : null}
+      {kind === 'write' ? <PencilSimple size={14} /> : null}
+      {kind === 'file' ? <File size={14} /> : null}
+    </span>
+  )
+}
+
 function CollapsedApprovalRow({
   action,
   onReview,
@@ -411,62 +440,104 @@ function CollapsedApprovalRow({
 }) {
   const display = pendingApprovalDisplay(action)
   const overflow = collapsedApprovalOverflow(display)
+  const bash = isBashTool(action.tool)
+  const visiblePath = !bash && display ? collapsePathKeepFilename(display) : display
   const options = (action.approval?.options ?? []).filter((option) => (
     option.id === 'allow_once' || option.id === 'deny'
   ))
+  const allow = options.find((option) => option.id === 'allow_once')
+  const deny = options.find((option) => option.id === 'deny')
 
   return (
     <div
-      className="mt-1 flex flex-wrap items-center gap-2"
+      className="mt-1 flex items-center gap-2"
       data-testid="tool-use-approval-row"
       data-call-id={action.approval?.callId ?? action.toolId}
       onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => event.stopPropagation()}
     >
-      {display ? (
-        <code
-          className="min-w-0 truncate rounded-sm bg-[var(--syntax-monospace-bg)] px-0.5 font-mono text-[12px]"
-          data-testid="tool-use-approval-command"
-        >
-          <VisibleCommand command={display} wrap={false} />
-        </code>
-      ) : null}
-      {overflow.moreChars > 0 ? (
-        <span className="shrink-0 text-[11px] text-muted-foreground" data-testid="approval-more-chars">
-          {`${overflow.moreChars} more characters`}
-        </span>
-      ) : null}
-      <div className="flex shrink-0 items-center gap-1.5" data-testid="tool-use-approval-actions">
+      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        <CollapsedApprovalIcon tool={action.tool} />
+        {display && isEditOrWriteTool(action.tool) ? (
+          <span
+            className="min-w-0 font-sans text-[12px]"
+            data-testid="tool-use-approval-command"
+            title={display}
+          >
+            {'Edit '}
+            <code className="rounded-sm bg-[var(--syntax-monospace-bg)] px-0.5 font-mono text-[12px]">
+              {visiblePath}
+            </code>
+          </span>
+        ) : null}
+        {display && bash ? (
+          <code
+            className="min-w-0 truncate rounded-sm bg-[var(--syntax-monospace-bg)] px-0.5 font-mono text-[12px]"
+            data-testid="tool-use-approval-command"
+            title={display}
+          >
+            <VisibleCommand command={display} wrap={false} />
+          </code>
+        ) : null}
+        {display && !bash && !isEditOrWriteTool(action.tool) ? (
+          <code
+            className="min-w-0 rounded-sm bg-[var(--syntax-monospace-bg)] px-0.5 font-mono text-[12px]"
+            data-testid="tool-use-approval-command"
+            title={display}
+          >
+            {visiblePath}
+          </code>
+        ) : null}
+        {overflow.long || overflow.hasNewline ? (
+          <span className="shrink-0 text-[11px] text-muted-foreground" data-testid="approval-long-command">
+            Long command
+          </span>
+        ) : null}
+      </div>
+      <div
+        className="grid w-[15rem] shrink-0 grid-cols-2 items-center gap-1.5"
+        data-testid="tool-use-approval-actions"
+      >
         {overflow.review ? (
           <Button
             size="sm"
             type="button"
             variant="outline"
+            className="w-full"
             data-testid="approval-review"
-            aria-label={`Review: ${display}`}
+            aria-label={approvalAriaLabel('Review', display)}
             onClick={onReview}
           >
             Review
           </Button>
-        ) : null}
-        {options.map((option) => {
-          if (overflow.review && option.id === 'allow_once') return null
-          return (
-            <Button
-              key={`${action.toolId}-${option.id}`}
-              disabled={action.approval?.busy}
-              size="sm"
-              type="button"
-              variant={option.id === 'allow_once' ? 'default' : 'ghost'}
-              className={option.id === 'deny' ? 'text-destructive hover:text-destructive' : ''}
-              data-testid={`approval-${option.id}`}
-              aria-label={`${option.label}: ${display}`}
-              onClick={() => action.approval?.onReply?.(option.id as NativeApprovalChoice)}
-            >
-              {option.label}
-            </Button>
-          )
-        })}
+        ) : allow ? (
+          <Button
+            disabled={action.approval?.busy}
+            size="sm"
+            type="button"
+            variant="default"
+            className="w-full"
+            data-testid="approval-allow_once"
+            aria-label={approvalAriaLabel(allow.label, display)}
+            onClick={() => action.approval?.onReply?.(allow.id as NativeApprovalChoice)}
+          >
+            {allow.label}
+          </Button>
+        ) : <span />}
+        {deny ? (
+          <Button
+            disabled={action.approval?.busy}
+            size="sm"
+            type="button"
+            variant="ghost"
+            className={`w-full text-destructive hover:text-destructive`}
+            data-testid="approval-deny"
+            aria-label={approvalAriaLabel(deny.label, display)}
+            onClick={() => action.approval?.onReply?.(deny.id as NativeApprovalChoice)}
+          >
+            {deny.label}
+          </Button>
+        ) : <span />}
       </div>
     </div>
   )
