@@ -71,6 +71,8 @@ pub mod rhizome_loop;
 // call them until Phase 6.
 pub mod hermes_reasoning;
 pub mod provider_keys;
+#[cfg(test)]
+mod reasoning_chat;
 pub mod reasoning_levels;
 pub mod rhizome_provider_model;
 pub mod rhizome_routing;

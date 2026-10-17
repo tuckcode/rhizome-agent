@@ -112,6 +112,7 @@ const REMOVED_PROVIDER: &str = "This model's provider was removed. Pick another 
 pub struct NativeChats {
     sessions: Mutex<HashMap<String, LiveNativeChat>>,
     read_only: Mutex<HashMap<String, ()>>,
+    reasoning_slots: Mutex<HashMap<String, crate::reasoning_levels::ReasoningLevelSlot>>,
 }
 
 struct LiveNativeChat {
@@ -233,7 +234,17 @@ impl NativeChats {
         Ok(id)
     }
 
+    #[cfg(test)]
     pub fn send(&self, session_id: &str, text: &str) -> Result<(), String> {
+        self.send_with_reasoning(session_id, text, None)
+    }
+
+    pub fn send_with_reasoning(
+        &self,
+        session_id: &str,
+        text: &str,
+        reasoning_level: Option<String>,
+    ) -> Result<(), String> {
         if self
             .read_only
             .lock()
@@ -250,6 +261,21 @@ impl NativeChats {
             .ok_or_else(|| format!("unknown native session {session_id}"))?;
         if session.read_only {
             return Err("native session is read-only".into());
+        }
+        if let Some(level) = reasoning_level {
+            let normalized = normalize_reasoning_level(Some(level));
+            if let Some(slot) = self
+                .reasoning_slots
+                .lock()
+                .expect("reasoning slots")
+                .get(session_id)
+            {
+                *slot.lock().expect("reasoning level") = normalized.clone();
+            }
+            let _ = crate::engines::native_log::write_reasoning_sidecar(
+                session_id,
+                normalized.as_deref(),
+            );
         }
         claim_turn(&session.turn_busy)?;
         if session.ops.send(ChatOp::Turn(text.to_string())).is_err() {
@@ -566,6 +592,8 @@ pub struct NativeChatStartRequest {
     pub vault_paths: Vec<String>,
     #[serde(default)]
     pub permission_mode: AiAgentPermissionMode,
+    #[serde(default)]
+    pub reasoning_level: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -710,6 +738,42 @@ pub fn native_chat_start(
     })
 }
 
+fn normalize_reasoning_level(level: Option<String>) -> Option<String> {
+    level
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+struct UserReasoning {
+    level: Option<String>,
+    slot: crate::reasoning_levels::ReasoningLevelSlot,
+    notice_tx: mpsc::Sender<crate::reasoning_levels::ReasoningLevelNotice>,
+    notice_rx: mpsc::Receiver<crate::reasoning_levels::ReasoningLevelNotice>,
+}
+
+fn user_reasoning(chats: &NativeChats, session_id: &str, level: Option<String>) -> UserReasoning {
+    let level = normalize_reasoning_level(level);
+    let slot = Arc::new(Mutex::new(level.clone()));
+    chats
+        .reasoning_slots
+        .lock()
+        .expect("reasoning slots")
+        .insert(session_id.to_string(), Arc::clone(&slot));
+    let (notice_tx, notice_rx) = mpsc::channel();
+    UserReasoning {
+        level,
+        slot,
+        notice_tx,
+        notice_rx,
+    }
+}
+
+fn apply_catalog_reasoning(stream: &mut AiModelStreamRequest, reasoning: &UserReasoning) {
+    stream.reasoning_level = reasoning.level.clone();
+    stream.reasoning_slot = Some(Arc::clone(&reasoning.slot));
+    stream.reasoning_notice_tx = Some(reasoning.notice_tx.clone());
+}
+
 fn start_named_request(
     chats: &NativeChats,
     id: String,
@@ -724,16 +788,19 @@ fn start_named_request(
         .map(|path| crate::commands::expand_tilde(path).into_owned());
     let vault_paths = request.vault_paths.clone();
     let mode = request.permission_mode;
+    let reasoning = user_reasoning(chats, &id, request.reasoning_level.clone());
     match target {
         NativeChatTarget::FreeTier => {
             let (tx, rx) = mpsc::channel();
             let reporter = tx.clone();
             let model = free_tier_routing_model(system.clone(), move |attempt| {
                 let _ = reporter.send(attempt);
-            })?;
+            })?
+            .with_user_reasoning(Arc::clone(&reasoning.slot), reasoning.notice_tx.clone());
             let mut engine = NativeEngine::with_provider_pair(AgentLoop::new(), model, tx, rx);
             engine.set_vault(vault_path.clone(), vault_paths.clone());
             engine.set_permission_mode(mode);
+            engine.set_reasoning_notice_rx(reasoning.notice_rx);
             engine.set_log_meta(
                 &id,
                 FREE_TIER_TARGET,
@@ -742,6 +809,7 @@ fn start_named_request(
                 vault_paths.clone(),
                 system.clone(),
             );
+            engine.set_saved_reasoning_level(reasoning.level);
             chats.start_named(id, &request.prompt, engine, emit)
         }
         NativeChatTarget::Catalog {
@@ -749,7 +817,7 @@ fn start_named_request(
             provider_id,
             model_id,
         } => {
-            let stream = AiModelStreamRequest {
+            let mut stream = AiModelStreamRequest {
                 provider: catalog_provider(provider_kind, &provider_id)?,
                 model_id,
                 message: request.prompt.clone(),
@@ -758,10 +826,15 @@ fn start_named_request(
                 vault_paths: vault_paths.clone(),
                 api_key_override: None,
                 event_name: None,
+                reasoning_level: None,
+                reasoning_slot: None,
+                reasoning_notice_tx: None,
             };
+            apply_catalog_reasoning(&mut stream, &reasoning);
             let mut engine = NativeEngine::new(ProviderModel::new(stream, HttpLimits::STREAM));
             engine.set_vault(vault_path.clone(), vault_paths.clone());
             engine.set_permission_mode(mode);
+            engine.set_reasoning_notice_rx(reasoning.notice_rx);
             engine.set_log_meta(
                 &id,
                 &request.target,
@@ -770,6 +843,7 @@ fn start_named_request(
                 vault_paths.clone(),
                 system.clone(),
             );
+            engine.set_saved_reasoning_level(reasoning.level);
             chats.start_named(id, &request.prompt, engine, emit)
         }
     }
@@ -781,8 +855,9 @@ pub fn native_chat_send(
     chats: tauri::State<NativeChats>,
     session_id: String,
     text: String,
+    reasoning_level: Option<String>,
 ) -> Result<(), String> {
-    chats.send(&session_id, &text)
+    chats.send_with_reasoning(&session_id, &text, reasoning_level)
 }
 
 #[cfg(desktop)]
@@ -830,6 +905,7 @@ pub fn fork_native_session(request: NativeChatForkRequest) -> Result<String, Str
         vault_path: request.vault_path,
         vault_paths: request.vault_paths,
         system_prompt: request.system_prompt,
+        reasoning_level: None,
     };
     crate::engines::native_log::write_session_events(&header, &request.events)?;
     Ok(id)
@@ -893,6 +969,7 @@ where
                 vault_path: None,
                 vault_paths: Vec::new(),
                 system_prompt: None,
+                reasoning_level: None,
             },
             events: record.events.clone(),
             warning: record.warning.clone(),
@@ -911,6 +988,7 @@ where
             "power_user" => AiAgentPermissionMode::PowerUser,
             _ => AiAgentPermissionMode::Safe,
         },
+        reasoning_level: None,
     };
     let target = match resolve_native_target(&request.target) {
         Ok(target) => target,
@@ -928,6 +1006,7 @@ where
         .clone()
         .or_else(|| composed_system_prompt(None));
     let emit = emit_for(&live_id);
+    let reasoning = user_reasoning(chats, &live_id, opened.header.reasoning_level.clone());
     match target {
         NativeChatTarget::FreeTier => {
             let (tx, rx) = mpsc::channel();
@@ -935,7 +1014,8 @@ where
             let model = match free_tier_routing_model_with(keys, system.clone(), move |attempt| {
                 let _ = reporter.send(attempt);
             }) {
-                Ok(model) => model,
+                Ok(model) => model
+                    .with_user_reasoning(Arc::clone(&reasoning.slot), reasoning.notice_tx.clone()),
                 Err(error) => {
                     return Ok(NativeChatOpenResult {
                         error: Some(error),
@@ -947,6 +1027,7 @@ where
             let mut engine = NativeEngine::with_provider_pair(agent, model, tx, rx);
             engine.set_vault(request.vault_path.clone(), request.vault_paths.clone());
             engine.set_permission_mode(request.permission_mode);
+            engine.set_reasoning_notice_rx(reasoning.notice_rx);
             engine.set_log_meta(
                 &live_id,
                 FREE_TIER_TARGET,
@@ -955,6 +1036,7 @@ where
                 request.vault_paths.clone(),
                 request.system_prompt.clone(),
             );
+            engine.set_saved_reasoning_level(reasoning.level);
             chats.open_with_engine(live_id, engine, emit)?;
         }
         NativeChatTarget::Catalog {
@@ -962,7 +1044,7 @@ where
             provider_id,
             model_id,
         } => {
-            let stream = AiModelStreamRequest {
+            let mut stream = AiModelStreamRequest {
                 provider: catalog_provider(provider_kind, &provider_id)?,
                 model_id,
                 message: String::new(),
@@ -971,11 +1053,16 @@ where
                 vault_paths: request.vault_paths.clone(),
                 api_key_override: None,
                 event_name: None,
+                reasoning_level: None,
+                reasoning_slot: None,
+                reasoning_notice_tx: None,
             };
+            apply_catalog_reasoning(&mut stream, &reasoning);
             let mut engine =
                 NativeEngine::from_parts(agent, ProviderModel::new(stream, HttpLimits::STREAM));
             engine.set_vault(request.vault_path.clone(), request.vault_paths.clone());
             engine.set_permission_mode(request.permission_mode);
+            engine.set_reasoning_notice_rx(reasoning.notice_rx);
             engine.set_log_meta(
                 &live_id,
                 &request.target,
@@ -984,6 +1071,7 @@ where
                 request.vault_paths.clone(),
                 request.system_prompt.clone(),
             );
+            engine.set_saved_reasoning_level(reasoning.level);
             chats.open_with_engine(live_id, engine, emit)?;
         }
     }
@@ -1095,6 +1183,7 @@ mod tests {
                 vault_path: None,
                 vault_paths: Vec::new(),
                 permission_mode: AiAgentPermissionMode::default(),
+                reasoning_level: None,
             };
             let expected = composed_system_prompt(request.system_prompt.as_deref());
             assert!(
@@ -1734,6 +1823,7 @@ mod tests {
             vault_path: None,
             vault_paths: Vec::new(),
             system_prompt: None,
+            reasoning_level: None,
         };
         crate::engines::native_log::write_fixture(&header, &events, extra_lines).expect("fixture");
     }

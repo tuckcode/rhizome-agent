@@ -35,6 +35,8 @@ pub struct NativeEngine<M: Model> {
     events: Vec<EngineEvent>,
     session_log: Option<SharedWriter>,
     log_meta: Option<native_log::SessionHeader>,
+    reasoning_notice_rx:
+        Option<Arc<Mutex<mpsc::Receiver<crate::reasoning_levels::ReasoningLevelNotice>>>>,
 }
 
 #[cfg(test)]
@@ -86,7 +88,15 @@ impl<M: Model> NativeEngine<M> {
             events: Vec::new(),
             session_log: None,
             log_meta: None,
+            reasoning_notice_rx: None,
         }
+    }
+
+    pub fn set_reasoning_notice_rx(
+        &mut self,
+        rx: mpsc::Receiver<crate::reasoning_levels::ReasoningLevelNotice>,
+    ) {
+        self.reasoning_notice_rx = Some(Arc::new(Mutex::new(rx)));
     }
 
     pub fn set_log_meta(
@@ -107,7 +117,14 @@ impl<M: Model> NativeEngine<M> {
             vault_path,
             vault_paths,
             system_prompt,
+            reasoning_level: None,
         });
+    }
+
+    pub fn set_saved_reasoning_level(&mut self, level: Option<String>) {
+        if let Some(meta) = &mut self.log_meta {
+            meta.reasoning_level = level;
+        }
     }
 
     #[cfg(test)]
@@ -133,6 +150,7 @@ impl<M: Model> NativeEngine<M> {
                 vault_path: self.vault_path.clone(),
                 vault_paths: self.vault_paths.clone(),
                 system_prompt: None,
+                reasoning_level: None,
             });
         let path = native_log::session_log_path(session_id)?;
         let writer = if path.exists() {
@@ -255,11 +273,41 @@ impl<M: Model> Engine for NativeEngine<M> {
         let stop_drain = Arc::new(AtomicBool::new(false));
         let drain_flag = Arc::clone(&stop_drain);
         let drain_rx = Arc::clone(&self.provider_rx);
+        let notice_rx = self.reasoning_notice_rx.clone();
+        let notice_session = self
+            .log_meta
+            .as_ref()
+            .map(|header| header.session_id.clone());
+        let notice_log = self.session_log.clone();
         let drain_emit = emit.clone();
+        let notice_emit = drain_emit.clone();
         let drain = thread::spawn(move || {
+            let emit_notice = move |notice: crate::reasoning_levels::ReasoningLevelNotice| {
+                if notice.code == "downgraded" {
+                    if let Some(session_id) = notice_session.as_deref() {
+                        let _ =
+                            native_log::write_reasoning_sidecar(session_id, notice.to.as_deref());
+                    }
+                    if let Some(log) = &notice_log {
+                        if let Ok(mut writer) = log.lock() {
+                            writer.set_reasoning_level(notice.to.clone());
+                        }
+                    }
+                }
+                notice_emit(EngineEvent::ReasoningLevelNotice {
+                    code: notice.code,
+                    from: notice.from,
+                    to: notice.to,
+                });
+            };
             loop {
                 if drain_flag.load(Ordering::SeqCst) {
                     break;
+                }
+                if let Some(rx) = &notice_rx {
+                    while let Ok(notice) = rx.lock().expect("reasoning notice").try_recv() {
+                        emit_notice(notice);
+                    }
                 }
                 let attempt = drain_rx
                     .lock()
@@ -274,6 +322,11 @@ impl<M: Model> Engine for NativeEngine<M> {
             let rx = drain_rx.lock().expect("provider rx");
             while let Ok(attempt) = rx.try_recv() {
                 drain_emit(EngineEvent::Provider(attempt));
+            }
+            if let Some(rx) = &notice_rx {
+                while let Ok(notice) = rx.lock().expect("reasoning notice").try_recv() {
+                    emit_notice(notice);
+                }
             }
         });
 

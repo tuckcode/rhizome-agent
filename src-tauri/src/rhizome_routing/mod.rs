@@ -115,6 +115,9 @@ pub struct RoutingModel<K: KeyStore, C: Clock> {
     inner: Option<ProviderModel>,
     observer: Option<AttemptObserver>,
     system_prompt: Option<String>,
+    reasoning_slot: Option<crate::reasoning_levels::ReasoningLevelSlot>,
+    reasoning_notice_tx:
+        Option<std::sync::mpsc::Sender<crate::reasoning_levels::ReasoningLevelNotice>>,
 }
 
 impl<K: KeyStore, C: Clock> RoutingModel<K, C> {
@@ -130,7 +133,21 @@ impl<K: KeyStore, C: Clock> RoutingModel<K, C> {
             inner: None,
             observer: None,
             system_prompt: None,
+            reasoning_slot: None,
+            reasoning_notice_tx: None,
         }
+    }
+
+    /// Attach the open chat's reasoning level. Routing health checks that
+    /// build a `RoutingModel` without this send no reasoning fields.
+    pub fn with_user_reasoning(
+        mut self,
+        slot: crate::reasoning_levels::ReasoningLevelSlot,
+        notice_tx: std::sync::mpsc::Sender<crate::reasoning_levels::ReasoningLevelNotice>,
+    ) -> Self {
+        self.reasoning_slot = Some(slot);
+        self.reasoning_notice_tx = Some(notice_tx);
+        self
     }
 
     /// Persona / profile for every attempt. Catalog `ProviderModel`
@@ -179,6 +196,8 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
             inner,
             observer,
             system_prompt,
+            reasoning_slot,
+            reasoning_notice_tx,
         } = self;
         let mut report = |attempt: ProviderAttempt| {
             if let Some(observer) = observer.as_mut() {
@@ -233,6 +252,8 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
             });
             let mut request = provider_request(provider, &target.model, base_url, credential);
             request.system_prompt = system_prompt.clone();
+            request.reasoning_slot = reasoning_slot.clone();
+            request.reasoning_notice_tx = reasoning_notice_tx.clone();
             let model = inner.get_or_insert_with(|| ProviderModel::new(request.clone(), *limits));
             model.retarget(request, provider.tool_params.clone());
             let mut on_first_output = || {
@@ -519,6 +540,27 @@ mod tests {
             crate::reasoning_levels::ReasoningSupport::Unknown
         );
         crate::reasoning_levels::reset_reasoning_state_for_test(None);
+    }
+
+    #[test]
+    fn a_routing_probe_sends_no_reasoning_params() {
+        let server = serve(vec![reply("ok")]);
+        let mut router = RoutingModel::new(
+            catalog(&[("groq", &server.base_url)]),
+            keys(&["groq"]),
+            FakeClock::at(T0),
+            TEST_LIMITS,
+        );
+        assert_eq!(run(&mut router), done("ok"));
+        let body: Value = serde_json::from_str(&server.requests.lock().unwrap()[0].1).unwrap();
+        for key in [
+            "reasoning_effort",
+            "reasoning",
+            "thinking",
+            "chat_template_kwargs",
+        ] {
+            assert!(body.get(key).is_none(), "{key} was sent: {body}");
+        }
     }
 
     struct FakeKeys(HashMap<String, Credential>);

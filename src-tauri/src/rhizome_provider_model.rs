@@ -59,15 +59,39 @@ impl Model for ProviderModel {
         let request = &self.request;
         let tool_params = &self.tool_params;
         let limits = self.limits;
+        let (extras, thinking) = crate::ai_models::user_turn_reasoning(request);
         std::thread::scope(|scope| {
             scope.spawn(move || {
+                let mut saw_text = false;
+                let mut saw_tools = false;
                 stream_chat_events_with_params(
                     request,
                     messages,
                     tools,
                     tool_params,
+                    &extras,
                     limits,
-                    &mut |event| sender.send(event).is_ok(),
+                    &mut |event| {
+                        let event = match event {
+                            ModelEvent::TextDelta { ref text } if !text.trim().is_empty() => {
+                                saw_text = true;
+                                event
+                            }
+                            ModelEvent::ToolCallStart { .. } => {
+                                saw_tools = true;
+                                event
+                            }
+                            ModelEvent::Finish { .. } if thinking && !saw_text && !saw_tools => {
+                                ModelEvent::Error(crate::model_events::ModelError {
+                                    kind: crate::model_events::ModelErrorKind::Rejected,
+                                    status: None,
+                                    message: crate::ai_models::REASONING_EMPTY_REPLY.into(),
+                                })
+                            }
+                            other => other,
+                        };
+                        sender.send(event).is_ok()
+                    },
                 );
             });
             for event in receiver.iter() {
@@ -549,5 +573,128 @@ mod tests {
             body["messages"][0],
             json!({ "role": "user", "content": "go" })
         );
+    }
+
+    fn reasoned(
+        base_url: &str,
+        provider: &str,
+        model_id: &str,
+        level: &str,
+    ) -> AiModelStreamRequest {
+        let mut request = request(base_url);
+        request.provider.id = provider.into();
+        request.model_id = model_id.into();
+        request.provider.models[0].id = model_id.into();
+        request.reasoning_level = Some(level.into());
+        request
+    }
+
+    fn one_turn(model: &mut ProviderModel) -> Vec<ModelEvent> {
+        let mut events = Vec::new();
+        model.complete(&view("go", Vec::new()), &mut |event| {
+            let terminal = event.is_terminal();
+            events.push(event);
+            !terminal
+        });
+        events
+    }
+
+    #[test]
+    fn an_empty_reply_with_a_reasoning_level_is_an_error() {
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":""},"finish_reason":"length"}]}"#,
+            "[DONE]",
+        ])]);
+        let mut model = ProviderModel::new(
+            reasoned(&server.base_url, "xai", "grok-4.7", "high"),
+            TEST_LIMITS,
+        );
+        let events = one_turn(&mut model);
+        match events.last() {
+            Some(ModelEvent::Error(error)) => {
+                assert_eq!(error.message, crate::ai_models::REASONING_EMPTY_REPLY);
+            }
+            other => panic!("expected the empty-reply error, got {other:?}"),
+        }
+        let body: serde_json::Value =
+            serde_json::from_str(&server.requests.lock().unwrap()[0].1).unwrap();
+        assert_eq!(body["reasoning_effort"], json!("high"));
+        assert!(body["max_tokens"].as_u64().unwrap() >= 16_384);
+    }
+
+    #[test]
+    fn a_saved_level_the_model_cannot_use_steps_down_and_notifies() {
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}"#,
+            "[DONE]",
+        ])]);
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut request = reasoned(&server.base_url, "xai", "grok-4.7", "max");
+        request.reasoning_notice_tx = Some(tx);
+        let mut model = ProviderModel::new(request, TEST_LIMITS);
+        let events = one_turn(&mut model);
+        assert!(matches!(events.last(), Some(ModelEvent::Finish { .. })));
+        let notice = rx.try_recv().expect("downgrade notice");
+        assert_eq!(notice.code, "downgraded");
+        assert_eq!(notice.from.as_deref(), Some("max"));
+        assert_eq!(notice.to.as_deref(), Some("xhigh"));
+        let body: serde_json::Value =
+            serde_json::from_str(&server.requests.lock().unwrap()[0].1).unwrap();
+        assert_eq!(body["reasoning_effort"], json!("xhigh"));
+    }
+
+    #[test]
+    fn an_unknown_model_sends_no_reasoning_params() {
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}"#,
+            "[DONE]",
+        ])]);
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut request = reasoned(&server.base_url, "llm7", "not-a-real-model", "high");
+        request.reasoning_notice_tx = Some(tx);
+        let mut model = ProviderModel::new(request, TEST_LIMITS);
+        let _ = one_turn(&mut model);
+        let notice = rx.try_recv().expect("unsupported notice");
+        assert_eq!(notice.code, "unsupported");
+        assert_eq!(notice.from.as_deref(), Some("high"));
+        assert!(notice.to.is_none());
+        let body: serde_json::Value =
+            serde_json::from_str(&server.requests.lock().unwrap()[0].1).unwrap();
+        for key in [
+            "reasoning_effort",
+            "reasoning",
+            "thinking",
+            "chat_template_kwargs",
+            "max_tokens",
+        ] {
+            assert!(body.get(key).is_none(), "{key} was sent: {body}");
+        }
+    }
+
+    #[test]
+    fn a_tool_turn_forces_reasoning_off_and_keeps_the_saved_level() {
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}"#,
+            "[DONE]",
+        ])]);
+        let (tx, rx) = std::sync::mpsc::channel();
+        let slot = std::sync::Arc::new(std::sync::Mutex::new(Some("high".to_string())));
+        let mut request = reasoned(&server.base_url, "openai", "gpt-5.4", "high");
+        request.reasoning_slot = Some(std::sync::Arc::clone(&slot));
+        request.reasoning_notice_tx = Some(tx);
+        let mut model = ProviderModel::new(request, TEST_LIMITS);
+        let _ = one_turn(&mut model);
+        let notices: Vec<_> = rx.try_iter().collect();
+        let notice = notices
+            .iter()
+            .find(|notice| notice.code == "forced_off_for_tools")
+            .expect("forced_off_for_tools notice");
+        assert_eq!(notice.from.as_deref(), Some("high"));
+        assert_eq!(notice.to.as_deref(), Some("none"));
+        assert_eq!(slot.lock().unwrap().as_deref(), Some("high"));
+        let body: serde_json::Value =
+            serde_json::from_str(&server.requests.lock().unwrap()[0].1).unwrap();
+        assert_eq!(body["reasoning_effort"], json!("none"));
+        assert!(body.get("tools").is_some());
     }
 }

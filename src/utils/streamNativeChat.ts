@@ -37,6 +37,8 @@ export interface StreamNativeChatRequest {
   permissionMode?: AiAgentPermissionMode
   /** Continue this live native session instead of starting a new log. */
   sessionId?: string | null
+  /** Saved on this chat and sent on the user turn. Omitted keeps the saved level. */
+  reasoningLevel?: string | null
   callbacks: AgentStreamCallbacks
   signal?: AbortSignal
 }
@@ -47,6 +49,9 @@ export interface NativeEngineEvent {
   message?: string
   name?: string
   id?: string
+  code?: string
+  from?: string
+  to?: string
   args?: string
   output?: string
   fatal?: boolean
@@ -143,10 +148,15 @@ export async function streamNativeChat(request: StreamNativeChatRequest): Promis
           vaultPath: request.vaultPath || null,
           vaultPaths: request.vaultPaths ?? [],
           permissionMode: normalizeAiAgentPermissionMode(request.permissionMode),
+          reasoningLevel: request.reasoningLevel || null,
         },
       })
     if (request.sessionId) {
-      await invoke('native_chat_send', { sessionId, text: request.message })
+      await invoke('native_chat_send', {
+        sessionId,
+        text: request.message,
+        ...(request.reasoningLevel ? { reasoningLevel: request.reasoningLevel } : {}),
+      })
     }
     await new Promise<void>((resolve) => {
       let settled = false

@@ -122,6 +122,9 @@ where
                 vault_paths: Vec::new(),
                 api_key_override: None,
                 event_name: None,
+                reasoning_level: None,
+                reasoning_slot: None,
+                reasoning_notice_tx: None,
             };
             model_runner(request, &mut |event| {
                 accumulate(event, &mut response, on_line)

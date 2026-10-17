@@ -510,6 +510,9 @@ mod tests {
             vault_paths,
             api_key_override: None,
             event_name: None,
+            reasoning_level: None,
+            reasoning_slot: None,
+            reasoning_notice_tx: None,
         }
     }
 
