@@ -110,8 +110,8 @@ impl ProviderKeys {
             Err(error) => {
                 return match self.legacy.key(&id) {
                     Ok(key) => Ok(key),
-                    Err(legacy_error) => {
-                        note_legacy(&id, &legacy_error);
+                    Err(_legacy_error) => {
+                        note_legacy(&id);
                         Err(keychain_error(&id, &error))
                     }
                 };
@@ -133,9 +133,9 @@ impl ProviderKeys {
         }
         let previous = match self.backend.get(&id) {
             Ok(value) => Previous::Known(value),
-            Err(error) => {
+            Err(_error) => {
                 log::warn!(
-                    "The previous key for {id} could not be read ({error}). The new key will still be saved if it reads back."
+                    "The previous keychain entry could not be read. The new key will still be saved if it reads back."
                 );
                 Previous::Unknown
             }
@@ -205,14 +205,11 @@ impl ProviderKeys {
     fn drop_legacy_copy(&self, id: &str) -> Result<(), String> {
         match self.legacy.remove(id) {
             Ok(()) => Ok(()),
-            Err(error)
-                if error.starts_with("Failed to parse the legacy key file")
-                    || error.starts_with("Failed to read the legacy key file") =>
-            {
-                note_legacy(id, &error);
+            Err(LegacyError::Read(_) | LegacyError::Parse(_)) => {
+                note_legacy(id);
                 Ok(())
             }
-            Err(error) => Err(error),
+            Err(error) => Err(error.to_string()),
         }
     }
 
@@ -229,8 +226,8 @@ impl ProviderKeys {
             match self.legacy.key(&id) {
                 Ok(Some(_)) => {}
                 Ok(None) => return Err(keychain_error(&id, &error)),
-                Err(legacy_error) => {
-                    note_legacy(&id, &legacy_error);
+                Err(_legacy_error) => {
+                    note_legacy(&id);
                     return Err(keychain_error(&id, &error));
                 }
             }
@@ -272,11 +269,11 @@ impl ProviderKeys {
                     match self.legacy.key(&id) {
                         Ok(Some(value)) => keep(value),
                         Ok(None) => {}
-                        Err(error) => note_legacy(&id, &error),
+                        Err(_error) => note_legacy(&id),
                     }
                 }
             }
-            Err(error) => note_legacy("legacy", &error),
+            Err(_error) => note_legacy("legacy"),
         }
         values
     }
@@ -307,15 +304,15 @@ impl ProviderKeys {
         let file_key = match self.legacy.key(id) {
             Ok(Some(key)) => key,
             Ok(None) => return Ok(Step::NoFileKey),
-            Err(error) => {
-                note_legacy(id, &error);
+            Err(_error) => {
+                note_legacy(id);
                 return Ok(Step::NoFileKey);
             }
         };
         match stored {
             // The crash case: the write landed, the file update did not.
             Some(stored) if stored == file_key => {
-                self.legacy.remove(id)?;
+                self.legacy.remove(id).map_err(|error| error.to_string())?;
                 return Ok(Step::Moved(file_key));
             }
             Some(stored) => {
@@ -331,7 +328,7 @@ impl ProviderKeys {
         }
         match self.backend.get(id) {
             Ok(Some(read_back)) if read_back == file_key => {
-                self.legacy.remove(id)?;
+                self.legacy.remove(id).map_err(|error| error.to_string())?;
                 Ok(Step::Moved(file_key))
             }
             Ok(_) => Ok(Step::Kept(
@@ -351,14 +348,16 @@ struct LegacyFile {
 
 impl LegacyFile {
     fn ids(&self) -> Result<Vec<String>, String> {
-        Ok(read_legacy(&self.path)?
+        Ok(read_legacy(&self.path)
+            .map_err(|error| error.to_string())?
             .provider_api_keys
             .into_keys()
             .collect())
     }
 
     fn key(&self, id: &str) -> Result<Option<String>, String> {
-        Ok(read_legacy(&self.path)?
+        Ok(read_legacy(&self.path)
+            .map_err(|error| error.to_string())?
             .provider_api_keys
             .get(id)
             .map(|key| key.trim().to_string())
@@ -366,17 +365,38 @@ impl LegacyFile {
     }
 
     /// Deletes the file when the last key leaves it.
-    fn remove(&self, id: &str) -> Result<(), String> {
+    fn remove(&self, id: &str) -> Result<(), LegacyError> {
         let mut secrets = read_legacy(&self.path)?;
         if secrets.provider_api_keys.remove(id).is_none() {
             return Ok(());
         }
         keys_changed();
         if secrets.provider_api_keys.is_empty() {
-            return std::fs::remove_file(&self.path)
-                .map_err(|error| format!("Failed to remove the legacy key file: {error}"));
+            return std::fs::remove_file(&self.path).map_err(|error| {
+                LegacyError::Update(format!("Failed to remove the legacy key file: {error}"))
+            });
         }
-        write_legacy(&self.path, &secrets)
+        write_legacy(&self.path, &secrets).map_err(LegacyError::Update)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) enum LegacyError {
+    Read(std::io::Error),
+    Parse(serde_json::Error),
+    /// The file was readable, and replacing or deleting it failed.
+    Update(String),
+}
+
+impl std::fmt::Display for LegacyError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Read(error) => write!(formatter, "Failed to read the legacy key file: {error}"),
+            Self::Parse(error) => {
+                write!(formatter, "Failed to parse the legacy key file: {error}")
+            }
+            Self::Update(error) => formatter.write_str(error),
+        }
     }
 }
 
@@ -451,16 +471,17 @@ fn read_back_message(id: &str, outcome: ReadBack) -> String {
     }
 }
 
-/// Logs a legacy-file problem once per provider. The line names the provider
-/// id and the file error, never a key value.
-fn note_legacy(id: &str, error: &str) {
+/// Logs a legacy-file problem once per provider. The line does not name the
+/// provider or the key. `id` only decides whether this provider was already
+/// logged.
+fn note_legacy(id: &str) {
     use std::collections::HashSet;
     use std::sync::OnceLock;
     static SEEN: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
     let seen = SEEN.get_or_init(|| Mutex::new(HashSet::new()));
     let mut seen = seen.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     if seen.insert(id.to_string()) {
-        log::warn!("The legacy provider key file could not be read ({id}): {error}");
+        log::warn!("The legacy provider key file could not be read.");
     }
 }
 
@@ -515,14 +536,12 @@ fn normalize_id(provider_id: &str) -> Result<String, String> {
     }
 }
 
-pub(crate) fn read_legacy(path: &Path) -> Result<LegacySecrets, String> {
+pub(crate) fn read_legacy(path: &Path) -> Result<LegacySecrets, LegacyError> {
     if !path.exists() {
         return Ok(LegacySecrets::default());
     }
-    let content = std::fs::read_to_string(path)
-        .map_err(|error| format!("Failed to read the legacy key file: {error}"))?;
-    serde_json::from_str(&content)
-        .map_err(|error| format!("Failed to parse the legacy key file: {error}"))
+    let content = std::fs::read_to_string(path).map_err(LegacyError::Read)?;
+    serde_json::from_str(&content).map_err(LegacyError::Parse)
 }
 
 pub(crate) fn write_legacy(path: &Path, secrets: &LegacySecrets) -> Result<(), String> {
@@ -821,6 +840,60 @@ mod tests {
         }
     }
 
+    /// Stops a legacy rewrite, then puts the permissions back on drop so the
+    /// temp directory can be removed.
+    struct LegacyUpdateLock {
+        parent: PathBuf,
+        #[cfg(unix)]
+        mode: u32,
+    }
+
+    fn lock_legacy_updates(parent: &Path) -> LegacyUpdateLock {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(parent).unwrap().permissions().mode();
+            let mut perms = std::fs::metadata(parent).unwrap().permissions();
+            perms.set_mode(0o555);
+            std::fs::set_permissions(parent, perms).unwrap();
+            LegacyUpdateLock {
+                parent: parent.to_path_buf(),
+                mode,
+            }
+        }
+        #[cfg(not(unix))]
+        {
+            let file = parent.join(LEGACY_FILE_NAME);
+            let mut perms = std::fs::metadata(&file).unwrap().permissions();
+            perms.set_readonly(true);
+            std::fs::set_permissions(&file, perms).unwrap();
+            LegacyUpdateLock {
+                parent: parent.to_path_buf(),
+            }
+        }
+    }
+
+    impl Drop for LegacyUpdateLock {
+        fn drop(&mut self) {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mut perms = std::fs::metadata(&self.parent).unwrap().permissions();
+                perms.set_mode(self.mode);
+                let _ = std::fs::set_permissions(&self.parent, perms);
+            }
+            #[cfg(not(unix))]
+            {
+                let file = self.parent.join(LEGACY_FILE_NAME);
+                if let Ok(metadata) = std::fs::metadata(&file) {
+                    let mut perms = metadata.permissions();
+                    perms.set_readonly(false);
+                    let _ = std::fs::set_permissions(&file, perms);
+                }
+            }
+        }
+    }
+
     #[test]
     fn a_saved_key_reads_back_from_the_keychain() {
         let fixture = Fixture::with_file(&[]);
@@ -1109,6 +1182,27 @@ mod tests {
         keys.delete("groq").unwrap();
 
         assert_eq!(keys.get("groq").unwrap(), None);
+    }
+
+    #[test]
+    fn a_failed_legacy_write_is_still_reported() {
+        let fixture = Fixture::with_file(&[("groq", "gsk-old"), ("other", "sk-other")]);
+        let parent = fixture.file.parent().unwrap().to_path_buf();
+        let _restore = lock_legacy_updates(&parent);
+        let keys = fixture.keys(MemoryBackend::default());
+        let error = keys.save("groq", "gsk-new").unwrap_err();
+        drop(_restore);
+        assert!(
+            error.contains("Failed to write the legacy key file"),
+            "{error}"
+        );
+        assert!(!error.contains("Failed to parse"), "{error}");
+        assert_eq!(keys.get("groq").unwrap().as_deref(), Some("gsk-new"));
+        assert_eq!(
+            fixture.file_keys().unwrap().get("groq").map(String::as_str),
+            Some("gsk-old"),
+            "a failed rewrite must leave the file copy in place"
+        );
     }
 
     #[test]

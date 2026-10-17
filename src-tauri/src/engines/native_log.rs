@@ -801,6 +801,7 @@ pub fn append_or_roll(
                 log::warn!("Native session log saving stopped: {detail}");
                 return Err(LOG_SAVE_STOPPED.to_string());
             }
+            log::warn!("Native session log save failed: {detail}");
             Err(LOG_SAVE_NOTICE.to_string())
         }
     }

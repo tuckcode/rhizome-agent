@@ -344,11 +344,21 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let dest = dir.path().join("note.md");
         fs::write(&dest, "ok\n").unwrap();
-        copy_xattr_value(&dest, std::ffi::OsStr::new("not a valid xattr"), b"x");
+        // Longer than macOS XATTR_MAXNAMELEN (127) and Linux XATTR_NAME_MAX
+        // (255). A short name with a space is a real attribute on macOS, so
+        // the copy succeeds there and this test never reaches the failure path.
+        let name = format!("user.{}", "n".repeat(300));
+        let name = std::ffi::OsStr::new(name.as_str());
+        let rejected = xattr::set(&dest, name, b"x");
+        assert!(
+            rejected.is_err(),
+            "this name must be rejected so the copy failure is what the test runs: {rejected:?}"
+        );
+        copy_xattr_value(&dest, name, b"x");
         assert_eq!(fs::read_to_string(&dest).unwrap(), "ok\n");
-        assert!(xattr::get(&dest, "not a valid xattr")
-            .ok()
-            .flatten()
-            .is_none());
+        assert!(
+            xattr::get(&dest, name).ok().flatten().is_none(),
+            "a failed copy must not leave the attribute on the file"
+        );
     }
 }
