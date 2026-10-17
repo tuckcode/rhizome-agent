@@ -25,7 +25,8 @@ pub enum ApprovalReply {
 /// Default model rounds in one turn. A runaway tool loop stops here.
 pub const DEFAULT_STEP_CAP: usize = 8;
 
-type ApprovalWaiter = Arc<dyn Fn(&str, &str) -> ApprovalReply + Send + Sync>;
+type ApprovalWaiter =
+    Arc<dyn Fn(&str, &str, Option<&tools::ApprovalPreview>) -> ApprovalReply + Send + Sync>;
 type ApprovalDismiss = Arc<dyn Fn() + Send + Sync>;
 type AfterToolHook = Box<dyn FnMut(&str, &str) + Send>;
 type DurableHook = Arc<dyn Fn(DurableEvent) + Send + Sync>;
@@ -44,7 +45,8 @@ struct Shared {
     /// matches the exact command. Cleared by `end_session` and
     /// `set_vault`.
     session_grants: Vec<(String, String)>,
-    /// Hash of the file as it was when the approval card opened.
+    /// Hash of the file as it was when the approval card opened,
+    /// keyed by tool-call id.
     pending_stamp: Option<(String, String)>,
     /// Names a test adds on top of `policy::offered_tools`. Production
     /// modes do not use this list.
@@ -286,15 +288,28 @@ impl AgentLoop {
     /// cannot cover a file in the new one.
     pub fn set_vault(&self, vault_path: Option<String>, vault_paths: Vec<String>) {
         let mut shared = self.lock();
+        let changed = shared.vault_path != vault_path || shared.vault_paths != vault_paths;
         shared.vault_path = vault_path;
         shared.vault_paths = vault_paths;
-        shared.session_grants.clear();
-        shared.pending_stamp = None;
+        if changed {
+            shared.session_grants.clear();
+            shared.pending_stamp = None;
+        }
     }
 
     pub fn set_approval_waiter(
         &self,
         waiter: impl Fn(&str, &str) -> ApprovalReply + Send + Sync + 'static,
+    ) {
+        self.set_approval_waiter_preview(move |name, args, _preview| waiter(name, args));
+    }
+
+    pub fn set_approval_waiter_preview(
+        &self,
+        waiter: impl Fn(&str, &str, Option<&tools::ApprovalPreview>) -> ApprovalReply
+            + Send
+            + Sync
+            + 'static,
     ) {
         self.lock().waiter = Some(Arc::new(waiter));
     }
@@ -619,7 +634,7 @@ impl AgentLoop {
             self.record_denial(id, name, "cancelled".into());
             return;
         }
-        if matches!(
+        let prepared = if matches!(
             tools::lookup(name).map(|tool| tool.policy),
             Some(tools::ToolPolicy::Mutate)
         ) {
@@ -629,15 +644,20 @@ impl AgentLoop {
             };
             match tools::mutate_prepare(name, args, vault_path.as_deref(), &vault_paths) {
                 Ok(preview) => {
-                    self.lock().pending_stamp = Some((name.to_string(), preview.content_hash));
+                    self.lock().pending_stamp =
+                        Some((id.to_string(), preview.content_hash.clone()));
+                    Some(preview)
                 }
                 Err(error) => {
+                    self.clear_pending_stamp(id);
                     self.record_tool_output(id, name, error);
                     return;
                 }
             }
-        }
-        let reply = self.wait_for_approval(name, args);
+        } else {
+            None
+        };
+        let reply = self.wait_for_approval(name, args, prepared.as_ref());
         // Cancel or quit can land while the waiter is blocked, or just
         // after it returns. Either way the tool does not run.
         if self.is_cancelled() {
@@ -661,7 +681,12 @@ impl AgentLoop {
     /// Runs the waiter off-thread so cancel/quit can end the wait
     /// without waiting for a human reply. The waiter is not locked
     /// for the whole wait, so a later turn can ask again.
-    fn wait_for_approval(&self, name: &str, args: &str) -> ApprovalReply {
+    fn wait_for_approval(
+        &self,
+        name: &str,
+        args: &str,
+        preview: Option<&tools::ApprovalPreview>,
+    ) -> ApprovalReply {
         let Some(waiter) = self.lock().waiter.clone() else {
             return ApprovalReply::Cancelled;
         };
@@ -674,8 +699,9 @@ impl AgentLoop {
         let (tx, rx) = mpsc::channel();
         let asked = name.to_string();
         let asked_args = args.to_string();
+        let preview = preview.cloned();
         thread::spawn(move || {
-            let reply = waiter(&asked, &asked_args);
+            let reply = waiter(&asked, &asked_args, preview.as_ref());
             let _ = tx.send((gen, reply));
         });
         loop {
@@ -733,31 +759,18 @@ impl AgentLoop {
     }
 
     fn record_run(&self, id: &str, name: &str, args: &str, spend_grant: bool) {
-        let (vault_path, vault_paths, stamp) = {
-            let mut shared = self.lock();
-            let stamp = shared.pending_stamp.take();
-            (shared.vault_path.clone(), shared.vault_paths.clone(), stamp)
+        let expected_hash = self.take_pending_stamp(id);
+        let (vault_path, vault_paths) = {
+            let shared = self.lock();
+            (shared.vault_path.clone(), shared.vault_paths.clone())
         };
-        if let Some((stamp_name, expected)) = stamp {
-            if stamp_name == name {
-                match tools::current_content_hash(name, args, vault_path.as_deref(), &vault_paths) {
-                    Ok(actual) if actual == expected => {}
-                    Ok(_) => {
-                        self.record_tool_output(
-                            id,
-                            name,
-                            tools::CHANGED_SINCE_APPROVAL.to_string(),
-                        );
-                        return;
-                    }
-                    Err(error) => {
-                        self.record_tool_output(id, name, error);
-                        return;
-                    }
-                }
-            }
-        }
-        let output = match tools::execute_allowed(name, args, vault_path.as_deref(), &vault_paths) {
+        let output = match tools::execute_stamped(
+            name,
+            args,
+            vault_path.as_deref(),
+            &vault_paths,
+            expected_hash.as_deref(),
+        ) {
             Ok(output) => output,
             Err(error) => error,
         };
@@ -779,7 +792,24 @@ impl AgentLoop {
         });
     }
 
+    fn take_pending_stamp(&self, id: &str) -> Option<String> {
+        let mut shared = self.lock();
+        match shared.pending_stamp.take() {
+            Some((stamp_id, hash)) if stamp_id == id => Some(hash),
+            Some(other) => {
+                shared.pending_stamp = Some(other);
+                None
+            }
+            None => None,
+        }
+    }
+
+    fn clear_pending_stamp(&self, id: &str) {
+        let _ = self.take_pending_stamp(id);
+    }
+
     fn record_denial(&self, id: &str, name: &str, reason: String) {
+        self.clear_pending_stamp(id);
         {
             let mut shared = self.lock();
             shared.history.push(HistoryItem::ToolDenied {

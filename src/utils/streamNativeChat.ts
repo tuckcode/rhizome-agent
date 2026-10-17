@@ -55,6 +55,8 @@ export interface NativeEngineEvent {
   options?: Array<{ id: string; label: string }>
   path?: string
   preview?: string
+  notes?: string[]
+  capped?: boolean
   created?: boolean
   overwrite?: boolean
   reason?: string
@@ -82,6 +84,8 @@ export function applyNativeEvent(event: NativeEngineEvent, callbacks: AgentStrea
         options: event.options ?? [],
         path: event.path,
         preview: event.preview,
+        notes: event.notes,
+        capped: event.capped,
         created: event.created,
         overwrite: event.overwrite,
         reply: () => {},

@@ -278,6 +278,29 @@ fn component_is_git(component: std::path::Component<'_>) -> bool {
     }
 }
 
+/// Canonical relative path, plus `via <requested>` when that path is a symlink.
+pub fn display_path(requested: &str, canonical: &Path, roots: &Roots) -> String {
+    let target = relative_to_root(canonical, roots);
+    let trimmed = requested.trim();
+    let raw = PathBuf::from(trimmed);
+    let candidate = if raw.is_absolute() {
+        raw
+    } else {
+        roots
+            .current
+            .clone()
+            .or_else(|| roots.all.first().cloned())
+            .map(|base| base.join(&raw))
+            .unwrap_or(raw)
+    };
+    match fs::symlink_metadata(&candidate) {
+        Ok(meta) if meta.file_type().is_symlink() => {
+            format!("{target} via {}", trimmed.replace('\\', "/"))
+        }
+        _ => target,
+    }
+}
+
 /// Path relative to the longest matching allowed root, with `/`.
 pub fn relative_to_root(path: &Path, roots: &Roots) -> String {
     let root = roots

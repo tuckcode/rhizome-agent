@@ -14,6 +14,8 @@ export interface ToolApprovalCardProps {
   tool: string
   path?: string
   preview?: string
+  notes?: string[]
+  capped?: boolean
   created?: boolean
   overwrite?: boolean
   options: NativeApprovalOption[]
@@ -43,7 +45,9 @@ function hasMoreBelow(el: HTMLElement): boolean {
 
 export function ToolApprovalCard({
   busy = false,
+  capped = false,
   created: createdProp,
+  notes = [],
   onReply,
   options,
   overwrite: overwriteProp,
@@ -160,17 +164,26 @@ export function ToolApprovalCard({
                 data-testid="approval-show-all"
                 onClick={expandDiff}
               >
-                Show all {lineCount} lines
+                {capped ? 'Show full preview' : `Show all ${lineCount} lines`}
               </Button>
             </div>
           </div>
         ) : null}
       </div>
+      {notes.length > 0 ? (
+        <ul
+          className="space-y-0.5 px-3 py-2 text-[12px] text-muted-foreground"
+          data-testid="approval-notes"
+        >
+          {notes.map((note) => (
+            <li key={note}>{note}</li>
+          ))}
+        </ul>
+      ) : null}
       <footer className="flex flex-wrap items-center justify-end gap-1.5 px-3 py-2">
         {options.map((option) => (
           <Button
             key={option.id}
-            autoFocus={option.id === 'allow_once'}
             disabled={busy}
             size="sm"
             type="button"

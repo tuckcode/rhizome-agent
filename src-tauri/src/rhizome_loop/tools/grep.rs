@@ -371,6 +371,22 @@ mod tests {
     }
 
     #[test]
+    fn rhz_tmp_leftovers_are_skipped() {
+        let (_dir, root) = vault();
+        let root_path = Path::new(&root);
+        fs::write(root_path.join("open.md"), "needle\n").unwrap();
+        fs::write(root_path.join(".rhz1a2bcafebabe.tmp"), "needle\n").unwrap();
+        let out = run(
+            &json!({ "pattern": "needle" }).to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap();
+        assert!(out.contains("open.md"), "{out}");
+        assert!(!out.contains(".rhz"), "{out}");
+    }
+
+    #[test]
     fn literal_pattern_does_not_act_as_regex() {
         let (_dir, root) = vault();
         fs::write(Path::new(&root).join("a.md"), "a.b\naxb\n").unwrap();

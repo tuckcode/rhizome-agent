@@ -40,6 +40,19 @@ describe('DiffView', () => {
     expect(hunkLine).toBeInTheDocument()
   })
 
+  it('keeps compact content lines that start with --- or +++', () => {
+    render(
+      <DiffView
+        compact
+        diff={'--- a.md\n+++ a.md\n@@ -1,3 +1,3 @@\n+---\n++evil;\n-- sql\n'}
+      />,
+    )
+    expect(screen.queryByText('--- a.md')).not.toBeInTheDocument()
+    expect(screen.getByText('+---')).toBeInTheDocument()
+    expect(screen.getByText('++evil;')).toBeInTheDocument()
+    expect(screen.getByText('-- sql')).toBeInTheDocument()
+  })
+
   it('uses the raised surface for compact hunk rows and hides file headers', () => {
     const diff = '--- a.md\n+++ a.md\n@@ -1,1 +1,1 @@\n-old\n+new\n'
     render(<DiffView compact diff={diff} />)

@@ -45,7 +45,16 @@ pub fn run(
     vault_path: Option<&str>,
     vault_paths: &[String],
 ) -> Result<String, String> {
-    run_with_cap(raw_args, vault_path, vault_paths, MAX_BYTES)
+    run_stamped(raw_args, vault_path, vault_paths, None)
+}
+
+pub fn run_stamped(
+    raw_args: &str,
+    vault_path: Option<&str>,
+    vault_paths: &[String],
+    expected_hash: Option<&str>,
+) -> Result<String, String> {
+    run_with_cap(raw_args, vault_path, vault_paths, MAX_BYTES, expected_hash)
 }
 
 fn run_with_cap(
@@ -53,8 +62,14 @@ fn run_with_cap(
     vault_path: Option<&str>,
     vault_paths: &[String],
     max_bytes: usize,
+    expected_hash: Option<&str>,
 ) -> Result<String, String> {
     let plan = plan_with_cap(raw_args, vault_path, vault_paths, max_bytes)?;
+    if let Some(expected) = expected_hash {
+        if plan.content_hash != expected {
+            return Err(text::CHANGED_SINCE_APPROVAL.to_string());
+        }
+    }
     atomic::write_atomic(&plan.path, plan.after.as_bytes())?;
     let noun = if plan.replacements == 1 {
         "replacement"
@@ -98,18 +113,15 @@ fn plan_with_cap(
     if old_string.is_empty() {
         return Err("edit_file old_string must not be empty.".into());
     }
-    let old_lf = text::to_lf(old_string);
-    let new_lf = text::to_lf(new_string);
-    if old_lf == new_lf {
+    if text::to_lf(old_string) == text::to_lf(new_string) {
         return Err("old_string and new_string are the same; no change to make.".into());
     }
     let path = sandbox::resolve_file(requested, vault_path, vault_paths)?;
     atomic::preflight(&path)?;
     let before = text::read_text_limited(&path, max_bytes)?;
     let content_hash = text::hash_bytes(before.as_bytes());
-    let crlf = text::uses_crlf(&before);
-    let before_lf = text::to_lf(&before);
-    let matches = count_matches(&before_lf, &old_lf);
+    let (after, matches) =
+        text::replace_preserving_endings(&before, old_string, new_string, replace_all)?;
     if matches == 0 {
         return Err(format!("old_string was not found in {requested}."));
     }
@@ -118,15 +130,9 @@ fn plan_with_cap(
             "old_string matched {matches} times in {requested}. Set replace_all to true to change every match."
         ));
     }
-    let after_lf = if replace_all {
-        before_lf.replace(&old_lf, &new_lf)
-    } else {
-        before_lf.replacen(&old_lf, &new_lf, 1)
-    };
-    let after = text::apply_eol(&after_lf, crlf);
     let roots = sandbox::allowed_roots(vault_path, vault_paths)?;
     Ok(EditPlan {
-        display_path: sandbox::relative_to_root(&path, &roots),
+        display_path: sandbox::display_path(requested, &path, &roots),
         path,
         before,
         after,
@@ -147,13 +153,6 @@ pub fn preview_diff(
         &plan.before,
         &plan.after,
     ))
-}
-
-fn count_matches(haystack: &str, needle: &str) -> usize {
-    if needle.is_empty() {
-        return 0;
-    }
-    haystack.matches(needle).count()
 }
 
 #[cfg(test)]
@@ -426,6 +425,7 @@ mod tests {
             Some(&root),
             &[],
             8,
+            None,
         )
         .unwrap_err();
         assert!(error.contains("too large"), "{error}");
@@ -448,6 +448,7 @@ mod tests {
             Some(&root),
             &[],
             8,
+            None,
         )
         .unwrap();
         assert!(out.contains("1 replacement"), "{out}");
@@ -491,7 +492,92 @@ mod tests {
             &[],
         )
         .unwrap();
-        assert_eq!(plan.display_path, "real.md");
+        assert_eq!(plan.display_path, "real.md via link.md");
         assert_eq!(plan.path, dest);
+    }
+
+    #[test]
+    fn mixed_line_endings_are_kept_on_neighbours() {
+        let (_dir, root) = vault();
+        let dest = Path::new(&root).join("note.md");
+        fs::write(&dest, "a\nb\r\nc\n").unwrap();
+        run(
+            &json!({
+                "path": "note.md",
+                "old_string": "b",
+                "new_string": "B"
+            })
+            .to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap();
+        assert_eq!(fs::read(&dest).unwrap(), b"a\nB\r\nc\n");
+    }
+
+    #[test]
+    fn lone_cr_in_new_string_is_not_a_newline() {
+        let (_dir, root) = vault();
+        let dest = Path::new(&root).join("note.md");
+        fs::write(&dest, "alpha beta\n").unwrap();
+        run(
+            &json!({
+                "path": "note.md",
+                "old_string": "beta",
+                "new_string": "be\rta"
+            })
+            .to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap();
+        assert_eq!(fs::read(&dest).unwrap(), b"alpha be\rta\n");
+    }
+
+    #[test]
+    fn stale_expected_hash_refuses_without_writing() {
+        let (_dir, root) = vault();
+        let dest = Path::new(&root).join("note.md");
+        fs::write(&dest, "keep\n").unwrap();
+        let error = run_stamped(
+            &json!({
+                "path": "note.md",
+                "old_string": "keep",
+                "new_string": "no"
+            })
+            .to_string(),
+            Some(&root),
+            &[],
+            Some("deadbeef"),
+        )
+        .unwrap_err();
+        assert_eq!(error, text::CHANGED_SINCE_APPROVAL);
+        assert_eq!(fs::read_to_string(&dest).unwrap(), "keep\n");
+    }
+
+    #[test]
+    fn write_after_the_plan_hash_is_caught_by_the_same_read() {
+        let (_dir, root) = vault();
+        let dest = Path::new(&root).join("note.md");
+        fs::write(&dest, "keep\n").unwrap();
+        let hash = text::hash_bytes(b"keep\n");
+        fs::write(&dest, "changed\n").unwrap();
+        let error = run_stamped(
+            &json!({
+                "path": "note.md",
+                "old_string": "keep",
+                "new_string": "no"
+            })
+            .to_string(),
+            Some(&root),
+            &[],
+            Some(&hash),
+        )
+        .unwrap_err();
+        assert!(
+            error == text::CHANGED_SINCE_APPROVAL || error.contains("not found"),
+            "{error}"
+        );
+        assert_eq!(fs::read_to_string(&dest).unwrap(), "changed\n");
     }
 }

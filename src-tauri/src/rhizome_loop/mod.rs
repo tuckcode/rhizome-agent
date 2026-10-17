@@ -29,7 +29,7 @@ pub use driver::{AgentLoop, ApprovalReply, DEFAULT_STEP_CAP};
 pub use fake_model::{FakeModel, ScriptPart};
 pub use model::Model;
 pub use policy::{approval_options, ApprovalOption};
-pub(crate) use tools::{approval_preview, openai_tool_definition};
+pub(crate) use tools::{openai_tool_definition, require_mutate_card};
 pub use tools::resolve_for_write;
 pub use types::{DurableEvent, HistoryItem, ModelView, ToolCall, UNANSWERED_TOOL_OUTPUT};
 
@@ -644,6 +644,86 @@ mod tests {
         assert_eq!(
             std::fs::read_to_string(root_b.join("note.md")).unwrap(),
             "TWO\n"
+        );
+    }
+
+    #[test]
+    fn set_vault_same_path_keeps_session_grants() {
+        let vault = tempfile::tempdir().unwrap();
+        let root = vault.path().canonicalize().unwrap();
+        std::fs::write(root.join("note.md"), "keep\n").unwrap();
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::Safe);
+        let root_s = root.to_string_lossy().into_owned();
+        agent.set_vault(Some(root_s.clone()), Vec::new());
+        agent.grant_for_session(
+            "write_file",
+            serde_json::json!({ "path": "note.md", "content": "one\n" }).to_string(),
+        );
+        agent.set_vault(Some(root_s), Vec::new());
+        assert_eq!(agent.session_grants().len(), 1);
+        let asked = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&asked);
+        agent.set_approval_waiter(move |_, _| {
+            flag.store(true, Ordering::SeqCst);
+            ApprovalReply::AllowOnce
+        });
+        let mut model = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "write_file".into(),
+            args: serde_json::json!({ "path": "note.md", "content": "two\n" }).to_string(),
+        }]]);
+        agent.submit("again");
+        agent.run_until_idle(&mut model);
+        assert!(
+            !asked.load(Ordering::SeqCst),
+            "the same vault must not wipe a session grant"
+        );
+        assert_eq!(
+            std::fs::read_to_string(root.join("note.md")).unwrap(),
+            "two\n"
+        );
+    }
+
+    #[test]
+    fn deny_clears_stamp_so_a_later_session_grant_can_write() {
+        let vault = tempfile::tempdir().unwrap();
+        let root = vault.path().canonicalize().unwrap();
+        let dest = root.join("note.md");
+        std::fs::write(&dest, "keep\n").unwrap();
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::Safe);
+        agent.set_vault(Some(root.to_string_lossy().into_owned()), Vec::new());
+        agent.set_approval_waiter(|_, _| ApprovalReply::Deny);
+        let mut first = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "write_file".into(),
+            args: serde_json::json!({ "path": "note.md", "content": "no\n" }).to_string(),
+        }]]);
+        agent.submit("deny");
+        agent.run_until_idle(&mut first);
+        assert_eq!(std::fs::read_to_string(&dest).unwrap(), "keep\n");
+
+        std::fs::write(&dest, "other\n").unwrap();
+        agent.grant_for_session(
+            "write_file",
+            serde_json::json!({ "path": "note.md", "content": "yes\n" }).to_string(),
+        );
+        let mut second = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "write_file".into(),
+            args: serde_json::json!({ "path": "note.md", "content": "yes\n" }).to_string(),
+        }]]);
+        agent.submit("granted");
+        agent.run_until_idle(&mut second);
+        assert_eq!(std::fs::read_to_string(&dest).unwrap(), "yes\n");
+        assert!(
+            !agent.events().iter().any(|event| {
+                matches!(
+                    event,
+                    DurableEvent::ToolResult { output, .. }
+                        if output == super::tools::CHANGED_SINCE_APPROVAL
+                )
+            }),
+            "a leftover stamp must not block a later session grant: {:?}",
+            agent.events()
         );
     }
 

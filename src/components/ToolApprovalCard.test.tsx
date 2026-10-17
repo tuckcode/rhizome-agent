@@ -158,6 +158,57 @@ describe('ToolApprovalCard', () => {
     expect(screen.getByTestId('approval-show-all')).toBeInTheDocument()
   })
 
+  it('does not autofocus Allow once so Enter does not approve', () => {
+    const onReply = vi.fn()
+    render(
+      <ToolApprovalCard
+        tool="write_file"
+        path="a.md"
+        created
+        preview={'@@ -0,0 +1,1 @@\n+x\n'}
+        options={OPTIONS}
+        onReply={onReply}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Allow once' })).not.toHaveFocus()
+    fireEvent.keyDown(document.body, { key: 'Enter' })
+    expect(onReply).not.toHaveBeenCalled()
+  })
+
+  it('shows structural notes outside the collapse allowance', () => {
+    const preview = ['@@ -1,1 +1,1 @@', '-old', '+new'].join('\n')
+    render(
+      <ToolApprovalCard
+        tool="edit_file"
+        path="a.md"
+        preview={preview}
+        notes={['Line endings change: CRLF → LF', '… 2 more hunks / 4 more lines not shown']}
+        capped
+        options={OPTIONS}
+        onReply={vi.fn()}
+      />,
+    )
+    const notes = screen.getByTestId('approval-notes')
+    expect(notes).toHaveTextContent('Line endings change: CRLF → LF')
+    expect(notes).toHaveTextContent('… 2 more hunks / 4 more lines not shown')
+    expect(screen.getByTestId('approval-diff')).not.toHaveTextContent('Line endings change')
+  })
+
+  it('labels a capped preview as Show full preview', () => {
+    const long = ['@@ -1,20 +1,20 @@', ...Array.from({ length: 20 }, (_, i) => `+line${i}`)].join('\n')
+    render(
+      <ToolApprovalCard
+        tool="edit_file"
+        path="notes/weekly-review.md"
+        preview={long}
+        capped
+        options={OPTIONS}
+        onReply={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('approval-show-all')).toHaveTextContent('Show full preview')
+  })
+
   it('sends allow once, allow for session, and deny', () => {
     const onReply = vi.fn()
     render(

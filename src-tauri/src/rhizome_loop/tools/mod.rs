@@ -25,6 +25,7 @@ mod walk;
 mod write_file;
 
 pub use sandbox::resolve_for_write;
+#[cfg(test)]
 pub use text::CHANGED_SINCE_APPROVAL;
 
 use crate::ai_agents::AiAgentPermissionMode;
@@ -153,15 +154,30 @@ pub fn lookup(name: &str) -> Option<&'static Tool> {
     TOOLS.iter().find(|tool| tool.name == name)
 }
 
+#[cfg(test)]
 pub fn execute_allowed(
     name: &str,
     args: &str,
     vault_path: Option<&str>,
     vault_paths: &[String],
 ) -> Result<String, String> {
-    match lookup(name) {
-        Some(tool) => (tool.run)(args, vault_path, vault_paths),
-        None => Err(format!("unknown tool: {name}")),
+    execute_stamped(name, args, vault_path, vault_paths, None)
+}
+
+pub fn execute_stamped(
+    name: &str,
+    args: &str,
+    vault_path: Option<&str>,
+    vault_paths: &[String],
+    expected_hash: Option<&str>,
+) -> Result<String, String> {
+    match name {
+        "edit_file" => edit_file::run_stamped(args, vault_path, vault_paths, expected_hash),
+        "write_file" => write_file::run_stamped(args, vault_path, vault_paths, expected_hash),
+        _ => match lookup(name) {
+            Some(tool) => (tool.run)(args, vault_path, vault_paths),
+            None => Err(format!("unknown tool: {name}")),
+        },
     }
 }
 
@@ -175,6 +191,7 @@ pub fn openai_tool_definition(name: &str) -> Option<serde_json::Value> {
 /// Path and unified-style diff for an approval card. `None` when the
 /// tool is not a file mutation. Errors mean the call must fail
 /// before an approval card is shown.
+#[cfg(test)]
 pub fn approval_preview(
     name: &str,
     args: &str,
@@ -196,9 +213,17 @@ pub fn mutate_prepare(
     match name {
         "edit_file" => {
             let plan = edit_file::plan(args, vault_path, vault_paths)?;
+            let built = preview::build(
+                &plan.display_path,
+                &plan.before,
+                &plan.after,
+                preview::PREVIEW_TIMEOUT,
+            );
             Ok(ApprovalPreview {
                 path: plan.display_path.clone(),
-                diff: preview::unified(&plan.display_path, &plan.before, &plan.after),
+                diff: built.text,
+                notes: built.notes,
+                capped: built.capped,
                 created: false,
                 overwrite: false,
                 content_hash: plan.content_hash,
@@ -206,9 +231,17 @@ pub fn mutate_prepare(
         }
         "write_file" => {
             let plan = write_file::plan(args, vault_path, vault_paths)?;
+            let built = preview::build(
+                &plan.display_path,
+                &plan.before,
+                &plan.after,
+                preview::PREVIEW_TIMEOUT,
+            );
             Ok(ApprovalPreview {
                 path: plan.display_path.clone(),
-                diff: preview::unified(&plan.display_path, &plan.before, &plan.after),
+                diff: built.text,
+                notes: built.notes,
+                capped: built.capped,
                 created: plan.created,
                 overwrite: !plan.created,
                 content_hash: plan.content_hash,
@@ -218,28 +251,34 @@ pub fn mutate_prepare(
     }
 }
 
-pub fn current_content_hash(
-    name: &str,
-    args: &str,
-    vault_path: Option<&str>,
-    vault_paths: &[String],
-) -> Result<String, String> {
-    let requested = args::json_path(args).ok_or_else(|| "path is required".to_string())?;
-    let path = if name == "edit_file" {
-        sandbox::resolve_file(&requested, vault_path, vault_paths)?
-    } else {
-        sandbox::resolve(&requested, vault_path, vault_paths)?
-    };
-    text::hash_existing(&path, text::MAX_BYTES)
-}
-
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ApprovalPreview {
     pub path: String,
     pub diff: String,
+    pub notes: Vec<String>,
+    pub capped: bool,
     pub created: bool,
     pub overwrite: bool,
     pub content_hash: String,
+}
+
+/// Mutate tools must never show Allow with no path and no diff.
+pub fn require_mutate_card(
+    name: &str,
+    prepared: Option<Result<ApprovalPreview, String>>,
+) -> Result<ApprovalPreview, String> {
+    match prepared {
+        Some(Ok(card)) if mutate_card_is_showable(&card) => Ok(card),
+        Some(Err(error)) => Err(error),
+        Some(Ok(_)) | None if matches!(name, "edit_file" | "write_file") => {
+            Err("approval preview is unavailable".into())
+        }
+        _ => Err("approval preview is unavailable".into()),
+    }
+}
+
+fn mutate_card_is_showable(card: &ApprovalPreview) -> bool {
+    !card.path.is_empty() && (!card.diff.is_empty() || !card.notes.is_empty())
 }
 
 /// Session grants for mutate tools cover later calls of the same
@@ -388,5 +427,29 @@ mod tests {
             Some(root.to_str().unwrap()),
             &[],
         ));
+    }
+
+    #[test]
+    fn mutate_card_with_a_preview_error_is_refused() {
+        let error =
+            super::require_mutate_card("edit_file", Some(Err("old_string was not found".into())))
+                .unwrap_err();
+        assert!(error.contains("not found"), "{error}");
+        let missing = super::require_mutate_card("write_file", None).unwrap_err();
+        assert!(missing.contains("unavailable"), "{missing}");
+        let empty = super::require_mutate_card(
+            "write_file",
+            Some(Ok(super::ApprovalPreview {
+                path: String::new(),
+                diff: String::new(),
+                notes: Vec::new(),
+                capped: false,
+                created: false,
+                overwrite: false,
+                content_hash: super::text::ABSENT_HASH.to_string(),
+            })),
+        )
+        .unwrap_err();
+        assert!(empty.contains("unavailable"), "{empty}");
     }
 }

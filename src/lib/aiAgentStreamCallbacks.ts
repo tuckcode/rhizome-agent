@@ -362,6 +362,8 @@ export function createStreamCallbacks(context: StreamMutationContext) {
           promptId: prompt.promptId,
           options: prompt.options,
           preview: prompt.preview,
+          notes: prompt.notes,
+          capped: prompt.capped,
           path,
           created: prompt.created,
           overwrite: prompt.overwrite,

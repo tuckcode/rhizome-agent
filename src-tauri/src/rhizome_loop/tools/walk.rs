@@ -57,7 +57,13 @@ fn gitignore_walker(root: &Path, max_depth: Option<usize>, block: bool) -> Walk 
 }
 
 fn keep_entry(entry: &DirEntry, block: bool) -> bool {
-    entry.depth() == 0 || !sandbox::is_blocked_secret_with(entry.path(), block)
+    if entry.depth() == 0 {
+        return true;
+    }
+    if sandbox::is_blocked_secret_with(entry.path(), block) {
+        return false;
+    }
+    !super::atomic::is_rhz_tmp(entry.path())
 }
 
 /// Compile a glob. A pattern with no `/` also matches at any depth

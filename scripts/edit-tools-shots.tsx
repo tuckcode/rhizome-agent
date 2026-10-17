@@ -34,11 +34,20 @@ document.body.style.fontFamily = "Inter, -apple-system, BlinkMacSystemFont, 'Seg
 
 const PREVIEW: Record<
   ShotState,
-  { tool: string; path: string; preview: string; created?: boolean; overwrite?: boolean; label: string }
+  {
+    tool: string
+    path: string
+    preview: string
+    notes?: string[]
+    capped?: boolean
+    created?: boolean
+    overwrite?: boolean
+    label: string
+  }
 > = {
   edit: {
     tool: 'edit_file',
-    path: 'notes/plan.md',
+    path: 'notes/plan.md via link.md',
     preview: editPreview,
     label: 'edit with a diff',
   },
@@ -60,12 +69,16 @@ const PREVIEW: Record<
     tool: 'edit_file',
     path: 'notes/weekly-review.md',
     preview: longPreview,
+    notes: ['… 1 more hunks / 4 more lines not shown'],
+    capped: true,
     label: 'long diff',
   },
   'long-scrolled': {
     tool: 'edit_file',
     path: 'notes/weekly-review.md',
     preview: longPreview,
+    notes: ['… 1 more hunks / 4 more lines not shown'],
+    capped: true,
     label: 'long diff, scrolled',
   },
 }
@@ -93,6 +106,8 @@ export function Shot() {
           tool={card.tool}
           path={card.path}
           preview={card.preview}
+          notes={card.notes}
+          capped={card.capped}
           created={card.created}
           overwrite={card.overwrite}
           options={OPTIONS}

@@ -1,12 +1,22 @@
 //! Temp-file + rename writes. A failed write leaves the destination
 //! unchanged. Existing files keep their permissions. Read-only files
 //! and hard links are refused. The temp name is short so a long
-//! destination name still fits.
+//! destination name still fits. Unix xattrs are copied onto the temp
+//! file before rename (Finder tags, quarantine). Creation date is
+//! not an xattr and may still reset.
 
-use std::fs::{self, File};
-use std::io::Write;
-use std::path::Path;
+use std::fs::{self, File, OpenOptions};
+use std::io::{ErrorKind, Write};
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+const TMP_TRIES: usize = 8;
+
+pub fn is_rhz_tmp(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.starts_with(".rhz") && name.ends_with(".tmp"))
+}
 
 pub fn preflight(path: &Path) -> Result<(), String> {
     dest_permissions(path).map(|_| ())
@@ -16,7 +26,7 @@ fn dest_permissions(path: &Path) -> Result<Option<std::fs::Permissions>, String>
     match fs::metadata(path) {
         Ok(meta) if meta.is_dir() => Err(format!("Not a file: {}", path.display())),
         Ok(meta) => {
-            if meta.permissions().readonly() {
+            if is_not_writable(path, &meta) {
                 return Err(format!("File is read-only: {}", path.display()));
             }
             #[cfg(unix)]
@@ -33,6 +43,24 @@ fn dest_permissions(path: &Path) -> Result<Option<std::fs::Permissions>, String>
             Ok(Some(meta.permissions()))
         }
         Err(_) => Ok(None),
+    }
+}
+
+fn is_not_writable(path: &Path, meta: &std::fs::Metadata) -> bool {
+    #[cfg(unix)]
+    {
+        use std::os::unix::ffi::OsStrExt;
+        let Ok(c_path) = std::ffi::CString::new(path.as_os_str().as_bytes()) else {
+            return meta.permissions().readonly();
+        };
+        // POSIX owner/group/other (and ACLs). Catches 0464 where
+        // Permissions::readonly is false because the group can write.
+        unsafe { libc::access(c_path.as_ptr(), libc::W_OK) != 0 }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+        meta.permissions().readonly()
     }
 }
 
@@ -53,24 +81,11 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
     }
 
     let kept_permissions = dest_permissions(path)?;
-
     let parent = path.parent().unwrap_or_else(|| Path::new("."));
-    let stamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or(0);
-    let tmp = parent.join(format!(
-        ".rhz{:x}{:x}.tmp",
-        std::process::id() & 0xffff,
-        (stamp as u32) & 0xffff
-    ));
+    let names = (0..TMP_TRIES).map(|_| generate_tmp_name());
+    let (tmp, mut file) = open_exclusive_tmp(parent, names)?;
 
     let write_tmp = || -> Result<(), String> {
-        let mut file = fs::OpenOptions::new()
-            .create_new(true)
-            .write(true)
-            .open(&tmp)
-            .map_err(|error| format!("Failed to open temporary file: {error}"))?;
         file.write_all(bytes)
             .map_err(|error| format!("Failed to write temporary file: {error}"))?;
         file.sync_all()
@@ -80,6 +95,7 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
             fs::set_permissions(&tmp, permissions)
                 .map_err(|error| format!("Failed to keep file permissions: {error}"))?;
         }
+        copy_xattrs(path, &tmp);
         fs::rename(&tmp, path).map_err(|error| format!("Failed to replace file: {error}"))?;
         #[cfg(unix)]
         {
@@ -94,6 +110,63 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
     write_tmp().inspect_err(|_| {
         let _ = fs::remove_file(&tmp);
     })
+}
+
+fn generate_tmp_name() -> String {
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    let random = u32::from_le_bytes(uuid::Uuid::new_v4().as_bytes()[0..4].try_into().unwrap());
+    format!(
+        ".rhz{:x}{:x}{random:08x}.tmp",
+        std::process::id() & 0xffff,
+        (stamp as u32) & 0xffff
+    )
+}
+
+fn open_exclusive_tmp(
+    parent: &Path,
+    names: impl IntoIterator<Item = String>,
+) -> Result<(PathBuf, File), String> {
+    let mut last_exists = false;
+    for name in names {
+        let tmp = parent.join(name);
+        match OpenOptions::new().create_new(true).write(true).open(&tmp) {
+            Ok(file) => return Ok((tmp, file)),
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => {
+                last_exists = true;
+                continue;
+            }
+            Err(error) => return Err(format!("Failed to open temporary file: {error}")),
+        }
+    }
+    if last_exists {
+        Err("Failed to open temporary file: name collision".into())
+    } else {
+        Err("Failed to open temporary file".into())
+    }
+}
+
+fn copy_xattrs(from: &Path, to: &Path) {
+    #[cfg(unix)]
+    {
+        if !from.exists() {
+            return;
+        }
+        let Ok(attrs) = xattr::list(from) else {
+            return;
+        };
+        for name in attrs {
+            if let Ok(Some(value)) = xattr::get(from, &name) {
+                let _ = xattr::set(to, &name, &value);
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (from, to);
+    }
 }
 
 #[cfg(test)]
@@ -163,6 +236,21 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
+    fn refuses_a_0464_file_for_the_owner() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("group-write.md");
+        fs::write(&dest, "keep\n").unwrap();
+        fs::set_permissions(&dest, fs::Permissions::from_mode(0o464)).unwrap();
+        let error = write_atomic(&dest, b"no\n").unwrap_err();
+        let _ = fs::set_permissions(&dest, fs::Permissions::from_mode(0o644));
+        assert!(error.contains("read-only"), "{error}");
+        assert_eq!(fs::read_to_string(&dest).unwrap(), "keep\n");
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn refuses_a_hard_link() {
         let dir = tempfile::tempdir().unwrap();
         let dest = dir.path().join("note.md");
@@ -182,6 +270,46 @@ mod tests {
         let dest = dir.path().join(&long);
         fs::write(&dest, "old\n").unwrap();
         write_atomic(&dest, b"new\n").unwrap();
+        assert_eq!(fs::read_to_string(&dest).unwrap(), "new\n");
+    }
+
+    #[test]
+    fn temp_name_retries_when_the_first_candidate_exists() {
+        let dir = tempfile::tempdir().unwrap();
+        let taken = dir.path().join(".rhzdeadbeef.tmp");
+        fs::write(&taken, "hold\n").unwrap();
+        let names = [
+            ".rhzdeadbeef.tmp".to_string(),
+            ".rhzcafebabe.tmp".to_string(),
+        ];
+        let (path, file) = open_exclusive_tmp(dir.path(), names).unwrap();
+        drop(file);
+        assert_eq!(path.file_name().unwrap(), ".rhzcafebabe.tmp");
+        assert!(taken.exists());
+    }
+
+    #[test]
+    fn is_rhz_tmp_matches_leftover_names() {
+        assert!(is_rhz_tmp(Path::new(".rhz1a2bcafebabe.tmp")));
+        assert!(!is_rhz_tmp(Path::new("note.md")));
+        assert!(!is_rhz_tmp(Path::new(".rhznote.md")));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn copies_xattrs_onto_the_replacement() {
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("note.md");
+        fs::write(&dest, "old\n").unwrap();
+        let name = "user.rhizome-test";
+        if xattr::set(&dest, name, b"tag").is_err() {
+            return;
+        }
+        write_atomic(&dest, b"new\n").unwrap();
+        assert_eq!(
+            xattr::get(&dest, name).unwrap().as_deref(),
+            Some(&b"tag"[..])
+        );
         assert_eq!(fs::read_to_string(&dest).unwrap(), "new\n");
     }
 }

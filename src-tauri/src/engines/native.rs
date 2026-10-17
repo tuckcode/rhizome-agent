@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use crate::ai_agents::AiAgentPermissionMode;
 use crate::engines::native_log::{self, SharedWriter};
 use crate::rhizome_loop::{
-    approval_options, approval_preview, AgentLoop, ApprovalReply, DurableEvent, Model,
+    approval_options, require_mutate_card, AgentLoop, ApprovalReply, DurableEvent, Model,
 };
 use crate::rhizome_routing::ProviderAttempt;
 
@@ -286,49 +286,66 @@ impl<M: Model> Engine for NativeEngine<M> {
         let prompt_seq = Arc::clone(&self.prompt_seq);
         let emit_for_wait = emit.clone();
         let wait_prompt = Arc::clone(&live_prompt);
-        let vault_for_wait = self.vault_path.clone();
-        let vaults_for_wait = self.vault_paths.clone();
-        self.agent.set_approval_waiter(move |name, args| {
-            let id = format!("prompt_{}", prompt_seq.fetch_add(1, Ordering::SeqCst) + 1);
-            *wait_prompt.lock().expect("live prompt") = Some(id.clone());
-            let prepared =
-                approval_preview(name, args, vault_for_wait.as_deref(), &vaults_for_wait);
-            let (path, preview, created, overwrite) = match prepared {
-                Some(Ok(card)) => (
-                    Some(card.path),
-                    Some(card.diff),
-                    Some(card.created),
-                    Some(card.overwrite),
-                ),
-                Some(Err(_)) | None => (None, None, None, None),
-            };
-            emit_for_wait(EngineEvent::ApprovalRequested {
-                prompt_id: id.clone(),
-                tool: name.to_string(),
-                args: args.to_string(),
-                options: approval_options(mode, name),
-                path,
-                preview,
-                created,
-                overwrite,
-            });
-            let deadline = Instant::now() + timeout;
-            let reply = loop {
-                let left = deadline.saturating_duration_since(Instant::now());
-                if left.is_zero() {
-                    break ApprovalReply::Cancelled;
+        self.agent
+            .set_approval_waiter_preview(move |name, args, prepared| {
+                let id = format!("prompt_{}", prompt_seq.fetch_add(1, Ordering::SeqCst) + 1);
+                *wait_prompt.lock().expect("live prompt") = Some(id.clone());
+                if matches!(name, "edit_file" | "write_file") {
+                    match require_mutate_card(name, prepared.cloned().map(Ok)) {
+                        Ok(card) => {
+                            emit_for_wait(EngineEvent::ApprovalRequested {
+                                prompt_id: id.clone(),
+                                tool: name.to_string(),
+                                args: args.to_string(),
+                                options: approval_options(mode, name),
+                                path: Some(card.path),
+                                preview: Some(card.diff),
+                                created: Some(card.created),
+                                overwrite: Some(card.overwrite),
+                                notes: if card.notes.is_empty() {
+                                    None
+                                } else {
+                                    Some(card.notes)
+                                },
+                                capped: if card.capped { Some(true) } else { None },
+                            });
+                        }
+                        Err(_) => {
+                            release_live_prompt(&wait_prompt, &id);
+                            return ApprovalReply::Deny;
+                        }
+                    }
+                } else {
+                    emit_for_wait(EngineEvent::ApprovalRequested {
+                        prompt_id: id.clone(),
+                        tool: name.to_string(),
+                        args: args.to_string(),
+                        options: approval_options(mode, name),
+                        path: None,
+                        preview: None,
+                        created: None,
+                        overwrite: None,
+                        notes: None,
+                        capped: None,
+                    });
                 }
-                match approval_rx.lock().expect("approval rx").recv_timeout(left) {
-                    Ok((reply_id, reply)) if reply_id == id => break reply,
-                    Ok(_) => {}
-                    Err(RecvTimeoutError::Timeout) | Err(RecvTimeoutError::Disconnected) => {
+                let deadline = Instant::now() + timeout;
+                let reply = loop {
+                    let left = deadline.saturating_duration_since(Instant::now());
+                    if left.is_zero() {
                         break ApprovalReply::Cancelled;
                     }
-                }
-            };
-            release_live_prompt(&wait_prompt, &id);
-            reply
-        });
+                    match approval_rx.lock().expect("approval rx").recv_timeout(left) {
+                        Ok((reply_id, reply)) if reply_id == id => break reply,
+                        Ok(_) => {}
+                        Err(RecvTimeoutError::Timeout) | Err(RecvTimeoutError::Disconnected) => {
+                            break ApprovalReply::Cancelled;
+                        }
+                    }
+                };
+                release_live_prompt(&wait_prompt, &id);
+                reply
+            });
         let dismiss_prompt = Arc::clone(&live_prompt);
         let emit_dismiss = emit;
         self.agent.set_approval_dismiss(move || {

@@ -37,7 +37,16 @@ pub fn run(
     vault_path: Option<&str>,
     vault_paths: &[String],
 ) -> Result<String, String> {
-    run_with_cap(raw_args, vault_path, vault_paths, MAX_BYTES)
+    run_stamped(raw_args, vault_path, vault_paths, None)
+}
+
+pub fn run_stamped(
+    raw_args: &str,
+    vault_path: Option<&str>,
+    vault_paths: &[String],
+    expected_hash: Option<&str>,
+) -> Result<String, String> {
+    run_with_cap(raw_args, vault_path, vault_paths, MAX_BYTES, expected_hash)
 }
 
 fn run_with_cap(
@@ -45,8 +54,14 @@ fn run_with_cap(
     vault_path: Option<&str>,
     vault_paths: &[String],
     max_bytes: usize,
+    expected_hash: Option<&str>,
 ) -> Result<String, String> {
     let plan = plan_with_cap(raw_args, vault_path, vault_paths, max_bytes)?;
+    if let Some(expected) = expected_hash {
+        if plan.content_hash != expected {
+            return Err(text::CHANGED_SINCE_APPROVAL.to_string());
+        }
+    }
     atomic::write_atomic(&plan.path, plan.after.as_bytes())?;
     Ok(if plan.created {
         format!("Created {}", plan.display_path)
@@ -102,7 +117,7 @@ fn plan_with_cap(
     };
     let roots = sandbox::allowed_roots(vault_path, vault_paths)?;
     Ok(WritePlan {
-        display_path: sandbox::relative_to_root(&path, &roots),
+        display_path: sandbox::display_path(requested, &path, &roots),
         path,
         before,
         after: content.to_string(),
@@ -298,6 +313,7 @@ mod tests {
             Some(&root),
             &[],
             8,
+            None,
         )
         .unwrap_err();
         assert!(error.contains("too large"), "{error}");
@@ -315,6 +331,7 @@ mod tests {
             Some(&root),
             &[],
             8,
+            None,
         )
         .unwrap_err();
         assert!(error.contains("Content is too large"), "{error}");
@@ -331,6 +348,7 @@ mod tests {
             Some(&root),
             &[],
             8,
+            None,
         )
         .unwrap();
         assert!(out.contains("Created"), "{out}");
@@ -353,7 +371,7 @@ mod tests {
             &[],
         )
         .unwrap();
-        assert_eq!(plan.display_path, "real.md");
+        assert_eq!(plan.display_path, "real.md via link.md");
         assert_eq!(plan.path, dest);
         assert!(!plan.created);
     }
@@ -427,5 +445,41 @@ mod tests {
         .unwrap();
         assert!(out.contains("Wrote"), "{out}");
         assert_eq!(fs::read_to_string(&dest).unwrap(), "new\n");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn owner_0464_file_is_read_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let (_dir, root) = vault();
+        let dest = Path::new(&root).join("locked.md");
+        fs::write(&dest, "keep\n").unwrap();
+        fs::set_permissions(&dest, fs::Permissions::from_mode(0o464)).unwrap();
+        let error = run(
+            &json!({ "path": "locked.md", "content": "no\n" }).to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap_err();
+        let _ = fs::set_permissions(&dest, fs::Permissions::from_mode(0o644));
+        assert!(error.contains("read-only"), "{error}");
+        assert_eq!(fs::read_to_string(&dest).unwrap(), "keep\n");
+    }
+
+    #[test]
+    fn stale_expected_hash_refuses_without_writing() {
+        let (_dir, root) = vault();
+        let dest = Path::new(&root).join("note.md");
+        fs::write(&dest, "keep\n").unwrap();
+        let error = run_stamped(
+            &json!({ "path": "note.md", "content": "no\n" }).to_string(),
+            Some(&root),
+            &[],
+            Some("deadbeef"),
+        )
+        .unwrap_err();
+        assert_eq!(error, text::CHANGED_SINCE_APPROVAL);
+        assert_eq!(fs::read_to_string(&dest).unwrap(), "keep\n");
     }
 }

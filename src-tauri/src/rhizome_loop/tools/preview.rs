@@ -1,10 +1,40 @@
 //! Unified hunks for an approval card. Added lines keep their own
 //! budget so a large deletion cannot hide what will be written.
+//! Myers via `similar` with a deadline; leftover hunks become a note.
+
+use std::time::{Duration, Instant};
+
+use similar::{Algorithm, ChangeTag, TextDiff};
 
 pub const MAX_REMOVED: usize = 40;
 pub const MAX_ADDED: usize = 40;
 pub const CONTEXT: usize = 3;
-const RESYNC_WINDOW: usize = 2_000;
+pub const PREVIEW_TIMEOUT: Duration = Duration::from_millis(250);
+pub const TIMEOUT_NOTE: &str = "Preview timed out; showing a coarse whole-file preview";
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Preview {
+    pub text: String,
+    pub notes: Vec<String>,
+    pub capped: bool,
+}
+
+impl Preview {
+    #[cfg(test)]
+    pub fn render(&self) -> String {
+        let mut out = self.text.clone();
+        if !out.ends_with('\n') && !out.is_empty() {
+            out.push('\n');
+        }
+        for note in &self.notes {
+            out.push_str(note);
+            if !note.ends_with('\n') {
+                out.push('\n');
+            }
+        }
+        out
+    }
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct Line {
@@ -24,59 +54,216 @@ struct Tag {
     body: String,
 }
 
+#[cfg(test)]
 pub fn unified(path: &str, before: &str, after: &str) -> String {
+    build(path, before, after, PREVIEW_TIMEOUT).render()
+}
+
+pub fn build(path: &str, before: &str, after: &str, timeout: Duration) -> Preview {
     let created = before.is_empty() && !after.is_empty();
     let (old_lines, old_nl) = parse(before);
     let (new_lines, new_nl) = parse(after);
-    let old_crlf = super::text::uses_crlf(before);
-    let new_crlf = super::text::uses_crlf(after);
-
-    let mut out = if created {
+    let header = if created {
         format!("--- /dev/null\n+++ {path}\n")
     } else {
         format!("--- {path}\n+++ {path}\n")
     };
 
-    if old_lines == new_lines {
-        if old_crlf != new_crlf {
-            out.push_str(&format!(
-                "Line endings change: {} → {}\n",
-                ending_name(old_crlf),
-                ending_name(new_crlf)
-            ));
-        }
-        emit_eof_note(&mut out, created, old_nl, new_nl, after);
-        if old_crlf == new_crlf && old_nl == new_nl {
-            out.push_str("@@ -0,0 +0,0 @@\n");
-        }
-        return out;
-    }
-
-    let hunks = split_hunks(&old_lines, &new_lines);
-    let mut removed_left = MAX_REMOVED;
-    let mut added_left = MAX_ADDED;
-    for hunk in hunks {
-        if removed_left == 0 && added_left == 0 {
-            break;
-        }
-        emit_hunk(&mut out, hunk, created, &mut removed_left, &mut added_left);
-    }
-    if old_crlf != new_crlf {
-        out.push_str(&format!(
-            "Line endings change: {} → {}\n",
-            ending_name(old_crlf),
-            ending_name(new_crlf)
+    let mut notes = Vec::new();
+    if !before.is_empty() && super::text::endings_changed(before, after) {
+        notes.push(format!(
+            "Line endings change: {} → {}",
+            super::text::ending_label(before),
+            super::text::ending_label(after)
         ));
     }
-    emit_eof_note(&mut out, created, old_nl, new_nl, after);
-    out
+
+    if old_lines == new_lines {
+        let mut text = header;
+        emit_eof_note(&mut text, created, old_nl, new_nl, after);
+        if notes.is_empty() && old_nl == new_nl {
+            text.push_str("@@ -0,0 +0,0 @@\n");
+        }
+        return Preview {
+            text,
+            notes,
+            capped: false,
+        };
+    }
+
+    let started = Instant::now();
+    let old_refs: Vec<&str> = old_lines.iter().map(|line| line.body.as_str()).collect();
+    let new_refs: Vec<&str> = new_lines.iter().map(|line| line.body.as_str()).collect();
+    let diff = TextDiff::configure()
+        .algorithm(Algorithm::Myers)
+        .timeout(timeout)
+        .diff_slices(&old_refs, &new_refs);
+
+    if started.elapsed() >= timeout {
+        return coarse(
+            header, &old_lines, &new_lines, created, old_nl, new_nl, after, notes,
+        );
+    }
+
+    emit_similar(
+        header, created, &diff, &old_lines, &new_lines, old_nl, new_nl, after, notes,
+    )
 }
 
-fn ending_name(crlf: bool) -> &'static str {
-    if crlf {
-        "CRLF"
-    } else {
-        "LF"
+fn leftover_note(hunks: usize, lines: usize) -> Option<String> {
+    if hunks == 0 && lines == 0 {
+        return None;
+    }
+    Some(format!(
+        "… {hunks} more hunks / {lines} more lines not shown"
+    ))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn coarse(
+    header: String,
+    old: &[Line],
+    new: &[Line],
+    created: bool,
+    old_nl: bool,
+    new_nl: bool,
+    after: &str,
+    mut notes: Vec<String>,
+) -> Preview {
+    let mut text = header;
+    let old_count = old.len();
+    let new_count = new.len();
+    let old_start = if created || old.is_empty() { 0 } else { 1 };
+    let new_start = if new.is_empty() { 0 } else { 1 };
+    text.push_str(&format!(
+        "@@ -{old_start},{old_count} +{new_start},{new_count} @@\n"
+    ));
+    let mut skipped = 0usize;
+    for (index, line) in old.iter().enumerate() {
+        if index >= MAX_REMOVED {
+            skipped += 1;
+            continue;
+        }
+        text.push('-');
+        text.push_str(&line.body);
+        text.push('\n');
+    }
+    for (index, line) in new.iter().enumerate() {
+        if index >= MAX_ADDED {
+            skipped += 1;
+            continue;
+        }
+        text.push('+');
+        text.push_str(&line.body);
+        text.push('\n');
+    }
+    emit_eof_note(&mut text, created, old_nl, new_nl, after);
+    notes.push(TIMEOUT_NOTE.to_string());
+    if let Some(note) = leftover_note(0, skipped) {
+        notes.push(note);
+    }
+    Preview {
+        text,
+        notes,
+        capped: skipped > 0,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn emit_similar(
+    header: String,
+    created: bool,
+    diff: &TextDiff<'_, '_, '_, str>,
+    old_lines: &[Line],
+    new_lines: &[Line],
+    old_nl: bool,
+    new_nl: bool,
+    after: &str,
+    mut notes: Vec<String>,
+) -> Preview {
+    let mut text = header;
+    let mut removed_left = MAX_REMOVED;
+    let mut added_left = MAX_ADDED;
+    let mut leftover_hunks = 0usize;
+    let mut leftover_lines = 0usize;
+    let mut started = false;
+
+    for group in diff.grouped_ops(CONTEXT) {
+        if group.is_empty() {
+            continue;
+        }
+        if started && removed_left == 0 && added_left == 0 {
+            leftover_hunks += 1;
+            leftover_lines += change_lines(&group, diff);
+            continue;
+        }
+        started = true;
+        let hunk = hunk_from_group(&group, diff, created, old_lines, new_lines);
+        let skipped = emit_hunk(&mut text, hunk, created, &mut removed_left, &mut added_left);
+        leftover_lines += skipped;
+    }
+
+    emit_eof_note(&mut text, created, old_nl, new_nl, after);
+    let capped = leftover_hunks > 0 || leftover_lines > 0;
+    if let Some(note) = leftover_note(leftover_hunks, leftover_lines) {
+        notes.push(note);
+    }
+    Preview {
+        text,
+        notes,
+        capped,
+    }
+}
+
+fn change_lines(group: &[similar::DiffOp], diff: &TextDiff<'_, '_, '_, str>) -> usize {
+    group
+        .iter()
+        .flat_map(|op| diff.iter_changes(op))
+        .filter(|change| change.tag() != ChangeTag::Equal)
+        .count()
+}
+
+fn hunk_from_group(
+    group: &[similar::DiffOp],
+    diff: &TextDiff<'_, '_, '_, str>,
+    created: bool,
+    old_lines: &[Line],
+    new_lines: &[Line],
+) -> Hunk {
+    let first = group[0];
+    let old_start_idx = first.old_range().start;
+    let new_start_idx = first.new_range().start;
+    let mut tagged_old = Vec::new();
+    let mut tagged_new = Vec::new();
+    for op in group {
+        for change in diff.iter_changes(op) {
+            let body = change.value().to_string();
+            match change.tag() {
+                ChangeTag::Equal => {
+                    tagged_old.push(Tag {
+                        kind: ' ',
+                        body: body.clone(),
+                    });
+                    tagged_new.push(Tag { kind: ' ', body });
+                }
+                ChangeTag::Delete => tagged_old.push(Tag { kind: '-', body }),
+                ChangeTag::Insert => tagged_new.push(Tag { kind: '+', body }),
+            }
+        }
+    }
+    Hunk {
+        old_start: if created || old_lines.is_empty() {
+            0
+        } else {
+            old_start_idx + 1
+        },
+        new_start: if new_lines.is_empty() {
+            0
+        } else {
+            new_start_idx + 1
+        },
+        old: tagged_old,
+        new: tagged_new,
     }
 }
 
@@ -113,105 +300,13 @@ fn parse(text: &str) -> (Vec<Line>, bool) {
     (lines, trailing_nl)
 }
 
-fn split_hunks(old: &[Line], new: &[Line]) -> Vec<Hunk> {
-    let mut hunks = Vec::new();
-    let mut i = 0usize;
-    let mut j = 0usize;
-    while i < old.len() || j < new.len() {
-        while i < old.len() && j < new.len() && old[i] == new[j] {
-            i += 1;
-            j += 1;
-        }
-        if i >= old.len() && j >= new.len() {
-            break;
-        }
-        let old_from = i;
-        let new_from = j;
-        let (old_to, new_to) = match find_resync(old, new, i, j) {
-            Some(pair) => pair,
-            None => (old.len(), new.len()),
-        };
-        let ctx_before = CONTEXT.min(old_from).min(new_from);
-        let old_start = old_from - ctx_before;
-        let new_start = new_from - ctx_before;
-        let mut tagged_old = Vec::new();
-        let mut tagged_new = Vec::new();
-        for line in &old[old_start..old_from] {
-            tagged_old.push(Tag {
-                kind: ' ',
-                body: line.body.clone(),
-            });
-        }
-        for line in &new[new_start..new_from] {
-            tagged_new.push(Tag {
-                kind: ' ',
-                body: line.body.clone(),
-            });
-        }
-        for line in &old[old_from..old_to] {
-            tagged_old.push(Tag {
-                kind: '-',
-                body: line.body.clone(),
-            });
-        }
-        for line in &new[new_from..new_to] {
-            tagged_new.push(Tag {
-                kind: '+',
-                body: line.body.clone(),
-            });
-        }
-        let ctx_after_old = CONTEXT.min(old.len().saturating_sub(old_to));
-        let ctx_after_new = CONTEXT.min(new.len().saturating_sub(new_to));
-        let ctx_after = ctx_after_old.min(ctx_after_new);
-        for line in &old[old_to..old_to + ctx_after] {
-            tagged_old.push(Tag {
-                kind: ' ',
-                body: line.body.clone(),
-            });
-        }
-        for line in &new[new_to..new_to + ctx_after] {
-            tagged_new.push(Tag {
-                kind: ' ',
-                body: line.body.clone(),
-            });
-        }
-        hunks.push(Hunk {
-            old_start: if old.is_empty() { 0 } else { old_start + 1 },
-            new_start: if new.is_empty() { 0 } else { new_start + 1 },
-            old: tagged_old,
-            new: tagged_new,
-        });
-        i = old_to + ctx_after;
-        j = new_to + ctx_after;
-    }
-    hunks
-}
-
-fn find_resync(old: &[Line], new: &[Line], i: usize, j: usize) -> Option<(usize, usize)> {
-    let old_limit = old.len().min(i.saturating_add(RESYNC_WINDOW));
-    let new_limit = new.len().min(j.saturating_add(RESYNC_WINDOW));
-    for finger in [3, 2, 1] {
-        if old_limit.saturating_sub(i) < finger || new_limit.saturating_sub(j) < finger {
-            continue;
-        }
-        for k in i + 1..=old_limit.saturating_sub(finger) {
-            for l in j + 1..=new_limit.saturating_sub(finger) {
-                if old[k..k + finger] == new[l..l + finger] {
-                    return Some((k, l));
-                }
-            }
-        }
-    }
-    None
-}
-
 fn emit_hunk(
     out: &mut String,
     hunk: Hunk,
     created: bool,
     removed_left: &mut usize,
     added_left: &mut usize,
-) {
+) -> usize {
     let old_count = hunk.old.iter().filter(|line| line.kind != '+').count();
     let new_count = hunk.new.iter().filter(|line| line.kind != '-').count();
     let old_start = if created || hunk.old.iter().all(|line| line.kind != '-') && old_count == 0 {
@@ -224,8 +319,7 @@ fn emit_hunk(
         hunk.new_start
     ));
 
-    let mut skipped_removed = 0usize;
-    let mut skipped_added = 0usize;
+    let mut skipped = 0usize;
     let first_change = hunk
         .old
         .iter()
@@ -258,7 +352,7 @@ fn emit_hunk(
             continue;
         }
         if *removed_left == 0 {
-            skipped_removed += 1;
+            skipped += 1;
             continue;
         }
         *removed_left -= 1;
@@ -271,7 +365,7 @@ fn emit_hunk(
             continue;
         }
         if *added_left == 0 {
-            skipped_added += 1;
+            skipped += 1;
             continue;
         }
         *added_left -= 1;
@@ -284,12 +378,7 @@ fn emit_hunk(
         out.push_str(&line.body);
         out.push('\n');
     }
-    if skipped_removed > 0 {
-        out.push_str(&format!("… {skipped_removed} more removed lines\n"));
-    }
-    if skipped_added > 0 {
-        out.push_str(&format!("… {skipped_added} more added lines\n"));
-    }
+    skipped
 }
 
 #[cfg(test)]
@@ -347,7 +436,7 @@ mod tests {
         let diff = unified("big.md", &before, &after);
         assert!(diff.contains("+MALICIOUS"), "{diff}");
         assert!(diff.contains("+rm -rf ~"), "{diff}");
-        assert!(diff.contains("more removed lines"), "{diff}");
+        assert!(diff.contains("more lines not shown"), "{diff}");
         let added = diff
             .lines()
             .filter(|line| line.starts_with('+') && !line.starts_with("+++"))
@@ -358,10 +447,18 @@ mod tests {
     #[test]
     fn long_new_file_notes_more_added_lines() {
         let after: String = (0..201).map(|i| format!("line{i}\n")).collect();
-        let diff = unified("fresh.md", "", &after);
-        assert!(diff.contains("+line0"), "{diff}");
-        assert!(diff.contains("more added lines"), "{diff}");
-        let added = diff
+        let preview = build("fresh.md", "", &after, PREVIEW_TIMEOUT);
+        assert!(preview.text.contains("+line0"), "{}", preview.text);
+        assert!(preview.capped, "{preview:?}");
+        assert!(
+            preview
+                .notes
+                .iter()
+                .any(|note| note.contains("more lines not shown")),
+            "{preview:?}"
+        );
+        let added = preview
+            .text
             .lines()
             .filter(|line| line.starts_with('+') && !line.starts_with("+++"))
             .count();
@@ -384,9 +481,96 @@ mod tests {
     }
 
     #[test]
+    fn more_than_forty_hunks_appends_a_leftover_note() {
+        let mut before = String::new();
+        let mut after = String::new();
+        for i in 0..50 {
+            for pad in 0..8 {
+                let keep = format!("keep{i}_{pad}\n");
+                before.push_str(&keep);
+                after.push_str(&keep);
+            }
+            before.push_str(&format!("old{i}\n"));
+            after.push_str(&format!("EVIL{i}\n"));
+        }
+        let preview = build("note.md", &before, &after, PREVIEW_TIMEOUT);
+        let evils = preview
+            .text
+            .lines()
+            .filter(|line| line.starts_with("+EVIL"))
+            .count();
+        assert_eq!(evils, MAX_ADDED, "{}", preview.text);
+        assert!(preview.capped);
+        assert!(
+            preview
+                .notes
+                .iter()
+                .any(|note| note.contains("more hunks") && note.contains("more lines not shown")),
+            "{preview:?}"
+        );
+    }
+
+    #[test]
+    fn insert_does_not_invent_fake_pairs() {
+        let diff = unified("a.md", "a\nb\nc\n", "a\nX\nb\nc\n");
+        assert!(diff.contains("+X"), "{diff}");
+        assert!(!diff.contains("-b"), "{diff}");
+        assert!(!diff.contains("+b"), "{diff}");
+    }
+
+    #[test]
+    fn delete_does_not_invent_fake_pairs() {
+        let diff = unified("a.md", "a\nX\nb\n", "a\nb\n");
+        assert!(diff.contains("-X"), "{diff}");
+        assert!(!diff.contains("-b"), "{diff}");
+        assert!(!diff.contains("+b"), "{diff}");
+    }
+
+    #[test]
+    fn preview_deadline_falls_back_to_a_coarse_whole_file() {
+        let before: String = (0..80).map(|i| format!("old{i}\n")).collect();
+        let after: String = (0..80).map(|i| format!("new{i}\n")).collect();
+        let started = Instant::now();
+        let preview = build("big.md", &before, &after, Duration::ZERO);
+        assert!(
+            started.elapsed() < Duration::from_secs(1),
+            "deadline fallback must not hang"
+        );
+        assert!(
+            preview.notes.iter().any(|note| note.contains("timed out")),
+            "{preview:?}"
+        );
+        assert!(preview.text.contains("-old0"), "{}", preview.text);
+        assert!(preview.text.contains("+new0"), "{}", preview.text);
+        assert!(preview.capped);
+    }
+
+    #[test]
+    fn large_replace_finishes_under_the_live_deadline() {
+        let before: String = (0..4000).map(|i| format!("L{i}A\n")).collect();
+        let after: String = (0..4000).map(|i| format!("L{i}B\n")).collect();
+        let started = Instant::now();
+        let preview = build("big.md", &before, &after, PREVIEW_TIMEOUT);
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "similar preview hung: {:?}",
+            started.elapsed()
+        );
+        assert!(preview.text.contains("-L0A"), "{}", preview.text);
+        assert!(preview.text.contains("+L0B"), "{}", preview.text);
+        assert!(preview.capped);
+    }
+
+    #[test]
     fn crlf_only_change_is_visible() {
-        let diff = unified("a.md", "hello\r\n", "hello\n");
-        assert!(diff.contains("Line endings change: CRLF → LF"), "{diff}");
+        let preview = build("a.md", "hello\r\n", "hello\n", PREVIEW_TIMEOUT);
+        assert!(
+            preview
+                .notes
+                .iter()
+                .any(|note| note.contains("Line endings change: CRLF → LF")),
+            "{preview:?}"
+        );
     }
 
     #[test]

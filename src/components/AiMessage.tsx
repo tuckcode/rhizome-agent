@@ -41,6 +41,8 @@ export interface AiActionApproval {
   promptId: string
   options: NativeApprovalOption[]
   preview?: string
+  notes?: string[]
+  capped?: boolean
   path?: string
   created?: boolean
   overwrite?: boolean
@@ -314,6 +316,8 @@ function ActionCardsList({ actions, onOpenNote, expandedIds, onToggleExpand }: {
             tool={action.tool}
             path={action.approval.path ?? action.path}
             preview={action.approval.preview}
+            notes={action.approval.notes}
+            capped={action.approval.capped}
             created={action.approval.created}
             overwrite={action.approval.overwrite}
             options={action.approval.options}

@@ -49,11 +49,17 @@ function DiffLine({
   )
 }
 
+function dropLeadingFileHeaders(lines: string[]): string[] {
+  if (lines.length >= 2 && lines[0].startsWith('---') && lines[1].startsWith('+++')) {
+    return lines.slice(2)
+  }
+  return lines
+}
+
 function visibleDiffLines(diff: string, compact: boolean): string[] {
-  return diff.split('\n').filter((line) => {
-    if (!compact) return true
-    return !line.startsWith('---') && !line.startsWith('+++')
-  })
+  const lines = diff.split('\n')
+  if (!compact) return lines
+  return dropLeadingFileHeaders(lines.filter((line) => line.length > 0))
 }
 
 export function DiffView({ compact = false, diff }: DiffViewProps) {

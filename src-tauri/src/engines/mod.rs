@@ -55,6 +55,10 @@ pub enum EngineEvent {
         created: Option<bool>,
         #[serde(skip_serializing_if = "Option::is_none")]
         overwrite: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        notes: Option<Vec<String>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        capped: Option<bool>,
     },
     ApprovalDismissed {
         prompt_id: String,
@@ -495,6 +499,48 @@ mod tests {
             .recv_timeout(Duration::from_secs(2))
             .expect("turn finishes");
         assert!(!vault.path().join("fresh.md").exists());
+    }
+
+    #[test]
+    fn native_engine_refuses_a_mutate_call_when_preview_fails() {
+        let vault = tempfile::tempdir().unwrap();
+        std::fs::write(vault.path().join("note.md"), "only this\n").unwrap();
+        let mut engine = NativeEngine::from_parts(
+            AgentLoop::new(),
+            FakeModel::script(vec![vec![ScriptPart::Tool {
+                name: "edit_file".into(),
+                args: serde_json::json!({
+                    "path": "note.md",
+                    "old_string": "missing",
+                    "new_string": "x",
+                })
+                .to_string(),
+            }]]),
+        );
+        engine.set_vault(
+            Some(vault.path().to_string_lossy().into_owned()),
+            Vec::new(),
+        );
+        let (tx, rx) = mpsc::channel();
+        engine
+            .start(
+                "edit",
+                Box::new(move |event| {
+                    let _ = tx.send(event);
+                }),
+            )
+            .ok();
+        let events: Vec<_> = std::iter::from_fn(|| rx.try_recv().ok()).collect();
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, EngineEvent::ApprovalRequested { .. })),
+            "a failed preview must not show Allow: {events:?}"
+        );
+        assert_eq!(
+            std::fs::read_to_string(vault.path().join("note.md")).unwrap(),
+            "only this\n"
+        );
     }
 
     #[test]
