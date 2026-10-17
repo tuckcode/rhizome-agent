@@ -120,6 +120,7 @@ export function NativeChatModelPicker({
   onOpenProviders,
   engine = 'native',
   vaultPath,
+  showLabel = true,
 }: {
   value: string | null | undefined
   onChange: (target: string) => void
@@ -129,6 +130,7 @@ export function NativeChatModelPicker({
   onOpenProviders?: () => void
   engine?: 'native' | 'prime'
   vaultPath?: string
+  showLabel?: boolean
 }) {
   const t = createTranslator(locale)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -289,12 +291,14 @@ export function NativeChatModelPicker({
       className={
         chip
           ? cn('inline-flex min-w-0 self-center', removed ? 'flex-col items-start gap-1' : 'items-center')
-          : 'flex items-center gap-2 px-3 py-2'
+          : showLabel
+            ? 'flex items-center gap-2 px-3 py-2'
+            : 'flex items-center justify-end'
       }
       data-testid="native-chat-model-picker"
       data-engine={engine}
     >
-      {chip ? null : <span className="text-xs text-muted-foreground">{t('ai.composer.modelLabel')}</span>}
+      {chip || !showLabel ? null : <span className="text-xs text-muted-foreground">{t('ai.composer.modelLabel')}</span>}
       <DropdownMenu
         open={open}
         onOpenChange={(next) => {

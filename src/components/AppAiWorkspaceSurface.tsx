@@ -41,6 +41,8 @@ interface AppAiWorkspaceSurfaceProps {
   onVaultChanged?: () => void
   open: boolean
   openTabs: VaultEntry[]
+  requestedConversationTargetId?: string
+  conversationRetargetToken?: number
   vaultAiGuidanceStatus?: VaultAiGuidanceStatus
   vaultPath: string
   vaultPaths?: string[]
@@ -80,6 +82,8 @@ export function AppAiWorkspaceSurface({
   onVaultChanged,
   open,
   openTabs,
+  requestedConversationTargetId,
+  conversationRetargetToken,
   vaultAiGuidanceStatus,
   vaultPath,
   vaultPaths,
@@ -118,6 +122,8 @@ export function AppAiWorkspaceSurface({
       onFileCreated={onFileCreated}
       onFileModified={onFileModified}
       onVaultChanged={onVaultChanged}
+      requestedConversationTargetId={requestedConversationTargetId}
+      conversationRetargetToken={conversationRetargetToken}
       vaultAiGuidanceStatus={vaultAiGuidanceStatus}
       vaultPath={vaultPath}
       vaultPaths={vaultPaths}

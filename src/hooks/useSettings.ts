@@ -2,6 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import { normalizeStoredAiAgent } from '../lib/aiAgents'
+import {
+  migrateRemovedHarnessSettings,
+  removedHarnessSettingsNeedPersist,
+} from '../lib/migrateRemovedHarnessChoices'
 import { normalizeAiModelProviders } from '../lib/aiTargets'
 import { shouldHideGitignoredFiles } from '../lib/gitignoredVisibility'
 import {
@@ -80,7 +84,7 @@ const EMPTY_SETTINGS: Settings = {
 function normalizeSettings(settings: Settings): Settings {
   const aiModelProviders = normalizeAiModelProviders(settings.ai_model_providers)
 
-  return {
+  return migrateRemovedHarnessSettings({
     ...settings,
     git_enabled: settings.git_enabled ?? null,
     release_channel: serializeReleaseChannel(
@@ -107,7 +111,8 @@ function normalizeSettings(settings: Settings): Settings {
     all_notes_show_unsupported: settings.all_notes_show_unsupported ?? null,
     multi_workspace_enabled: settings.multi_workspace_enabled ?? null,
     agent_profile: settings.agent_profile?.trim() || null,
-  }
+    chat_engine: settings.chat_engine ?? null,
+  })
 }
 
 function normalizeAiWorkspaceConversations(settings: Settings['ai_workspace_conversations']) {
@@ -140,7 +145,15 @@ export function useSettings() {
   const loadSettings = useCallback(async () => {
     try {
       const s = await tauriCall<Settings>('get_settings', {})
-      setSettings(normalizeSettings(s))
+      const normalized = normalizeSettings(s)
+      setSettings(normalized)
+      if (removedHarnessSettingsNeedPersist(s, normalized)) {
+        try {
+          await tauriCall<null>('save_settings', { settings: normalized })
+        } catch (persistErr) {
+          console.warn('Failed to persist harness migration:', persistErr)
+        }
+      }
     } catch (err) {
       console.warn('Failed to load settings:', err)
     } finally {

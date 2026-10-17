@@ -1,10 +1,12 @@
 import type { Settings } from '../types'
 
-/** Chat runs on Rhizome's native loop until Settings stores `prime`. */
+/** Prime remains only for engine internals that this PR does not delete. */
 export type ChatEngine = 'prime' | 'native'
 
+/** Settings no longer store an engine choice. Every leftover value is native. */
 export function readChatEngine(value: string | null | undefined): ChatEngine {
-  return value === 'prime' ? 'prime' : 'native'
+  void value
+  return 'native'
 }
 
 /**
@@ -21,12 +23,8 @@ export function chatEngineFromSettings(settings: Pick<Settings, 'chat_engine'> |
   return readChatEngine(settings?.chat_engine)
 }
 
-/**
- * Null is the stored default (native), so a later default change still
- * reaches people who never picked an engine. `prime` is written only
- * when someone turns the switch off. An explicit `native` already on
- * disk still reads as native.
- */
+/** Native is the only Chat engine. Write that value, not an empty default. */
 export function chatEngineForSave(engine: ChatEngine): string | null {
-  return engine === 'prime' ? 'prime' : null
+  void engine
+  return 'native'
 }
