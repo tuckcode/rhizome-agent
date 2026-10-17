@@ -8,7 +8,7 @@ supersedes: "0176 (sign-in part only)"
 ---
 
 **Origin:** MyNAEga · 2026-10-16 · Builders room
-**Decisions confirmed:** knispo · 2026-10-16 · own sign-in storage, OpenAI and xAI first, Claude behind extra-usage opt-in pending terms, key import
+**Decisions confirmed:** knispo · 2026-10-16 · own sign-in storage, OpenAI and xAI first, key import. Claude subscription sign-in dropped for now (knispo, 2026-10-16); it may return only with extra usage enabled and only if Anthropic allows Rhizome (see decision 4 and Provider terms).
 
 ## Context
 
