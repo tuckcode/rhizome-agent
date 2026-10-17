@@ -50,6 +50,14 @@ export function ToolApprovalCard({
   const lineCount = compactDiffLines(preview ?? '').length
   const overflows = !expanded && lineCount > APPROVAL_COLLAPSE_AFTER
 
+  function expandDiff() {
+    setExpanded(true)
+  }
+
+  function choose(optionId: string) {
+    onReply(optionId as NativeApprovalChoice)
+  }
+
   return (
     <section
       aria-label={`${title} approval`}
@@ -99,11 +107,11 @@ export function ToolApprovalCard({
           className={expanded ? 'overflow-auto' : 'max-h-64 overflow-hidden'}
           data-testid="approval-diff"
         >
-          <div className={expanded || !overflows ? undefined : 'pb-14'}>
+          <div className={overflows ? 'pb-14' : undefined}>
             <DiffView collapsed={overflows} compact diff={preview ?? ''} />
           </div>
         </div>
-        {overflows ? (
+        {overflows && (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col justify-end">
             <div className="h-10 bg-gradient-to-t from-card to-transparent" data-testid="approval-diff-fade" />
             <div className="pointer-events-auto bg-card px-3 pb-2">
@@ -112,15 +120,13 @@ export function ToolApprovalCard({
                 type="button"
                 variant="ghost"
                 data-testid="approval-show-all"
-                onClick={() => {
-                  setExpanded(true)
-                }}
+                onClick={expandDiff}
               >
                 Show all {lineCount} lines
               </Button>
             </div>
           </div>
-        ) : null}
+        )}
       </div>
       <footer className="flex flex-wrap items-center justify-end gap-1.5 px-3 py-2">
         {options.map((option) => (
@@ -131,10 +137,10 @@ export function ToolApprovalCard({
             size="sm"
             type="button"
             variant={optionVariant(option.id)}
-            className={option.id === 'deny' ? 'text-destructive hover:text-destructive' : undefined}
+            className={option.id === 'deny' ? 'text-destructive hover:text-destructive' : ''}
             data-testid={`approval-${option.id}`}
-            onClick={() => {
-              onReply(option.id as NativeApprovalChoice)
+            onClick={function onChoose() {
+              choose(option.id)
             }}
           >
             {option.label}
