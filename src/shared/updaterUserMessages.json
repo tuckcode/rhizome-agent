@@ -3,5 +3,5 @@
   "checkFailed": "Couldn't check for updates. Check your connection and try again.",
   "installFailed": "Couldn't install the update. Try again, or download it from the Releases page.",
   "noUpdateToInstall": "You're on the latest version.",
-  "versionChangedWhileDownloading": "A newer version ({found}) came out while this one was downloading. Check for updates again."
+  "versionChangedWhileDownloading": "The update changed to version {found}. Check again."
 }

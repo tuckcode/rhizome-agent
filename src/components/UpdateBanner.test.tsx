@@ -72,10 +72,16 @@ describe('UpdateBanner', () => {
     expect(container.innerHTML).toBe('')
   })
 
-  it('renders nothing on error state', () => {
-    const status: UpdateStatus = { state: 'error' }
-    const { container } = renderBanner(status)
-    expect(container.innerHTML).toBe('')
+  it('shows allowlisted install errors with a dismiss control', () => {
+    const status: UpdateStatus = {
+      state: 'error',
+      message: "Couldn't install the update. Try again, or download it from the Releases page.",
+    }
+    renderBanner(status)
+
+    expect(screen.getByTestId('update-banner')).toHaveTextContent("Couldn't install the update.")
+    expect(screen.getByRole('button', { name: 'Releases page' })).toBeTruthy()
+    expect(screen.getByTestId('update-dismiss')).toBeTruthy()
   })
 
   it('shows immediate feedback while checking for updates', () => {

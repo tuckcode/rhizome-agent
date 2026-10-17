@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react'
 import { ArrowSquareOut as ExternalLink, ArrowsClockwise as RefreshCw, Download, X } from '@phosphor-icons/react'
 import type { UpdateStatus, UpdateActions } from '../hooks/useUpdater'
 import { restartApp } from '../hooks/useUpdater'
+import { renderUpdaterUserMessage } from '../lib/updaterUserMessages'
 import { Button } from './ui/button'
 import { translate, type AppLocale } from '../lib/i18n'
 
@@ -11,10 +12,10 @@ interface UpdateBannerProps {
   locale?: AppLocale
 }
 
-type VisibleUpdateStatus = Exclude<UpdateStatus, { state: 'idle' } | { state: 'error' }>
+type VisibleUpdateStatus = Exclude<UpdateStatus, { state: 'idle' }>
 
 function isUpdateBannerVisible(status: UpdateStatus): status is VisibleUpdateStatus {
-  return status.state !== 'idle' && status.state !== 'error'
+  return status.state !== 'idle'
 }
 
 const bannerStyle = {
@@ -164,6 +165,25 @@ function renderReadyContent(status: Extract<VisibleUpdateStatus, { state: 'ready
   )
 }
 
+function renderErrorContent(status: Extract<VisibleUpdateStatus, { state: 'error' }>, actions: UpdateActions) {
+  return (
+    <>
+      <span>{renderUpdaterUserMessage(status.message)}</span>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon-xs"
+        data-testid="update-dismiss"
+        onClick={actions.dismiss}
+        style={dismissButtonStyle}
+        aria-label="Dismiss update message"
+      >
+        <X size={14} />
+      </Button>
+    </>
+  )
+}
+
 function renderBannerContent(status: VisibleUpdateStatus, actions: UpdateActions, locale: AppLocale) {
   switch (status.state) {
     case 'checking':
@@ -174,6 +194,8 @@ function renderBannerContent(status: VisibleUpdateStatus, actions: UpdateActions
       return renderDownloadingContent(status, locale)
     case 'ready':
       return renderReadyContent(status, locale)
+    case 'error':
+      return renderErrorContent(status, actions)
   }
 }
 
