@@ -14,7 +14,7 @@ mod runtime;
 mod session_import;
 mod sheet;
 mod system;
-mod vault;
+pub(crate) mod vault;
 mod version;
 
 use std::borrow::Cow;

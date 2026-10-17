@@ -13,14 +13,14 @@
 //! which always applies the denylist. Reads use `resolve_for_read`.
 
 mod args;
-mod atomic;
+pub(crate) mod atomic;
 mod edit_file;
 mod glob;
 mod grep;
 mod list_dir;
 mod preview;
 mod read_file;
-mod sandbox;
+pub(crate) mod sandbox;
 mod scan;
 mod shell;
 mod text;

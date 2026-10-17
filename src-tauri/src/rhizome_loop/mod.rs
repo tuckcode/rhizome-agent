@@ -21,7 +21,7 @@ mod driver;
 mod fake_model;
 mod model;
 mod policy;
-mod tools;
+pub(crate) mod tools;
 mod types;
 
 pub use driver::{AgentLoop, ApprovalReply, DEFAULT_STEP_CAP};

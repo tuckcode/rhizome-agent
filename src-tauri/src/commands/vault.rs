@@ -1,4 +1,4 @@
-mod boundary;
+pub(crate) mod boundary;
 mod file_cmds;
 mod frontmatter_cmds;
 mod lifecycle_cmds;
