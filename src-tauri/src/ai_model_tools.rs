@@ -803,11 +803,11 @@ mod tests {
     }
 
     /// `CI` counts only when it is set to a real value. An empty string,
-    /// `false`, and `0` are the same as unset.
+    /// `false` in any ASCII case, and `0` are the same as unset.
     fn ci_is_set() -> bool {
         std::env::var("CI").ok().is_some_and(|value| {
             let value = value.trim();
-            !value.is_empty() && value != "false" && value != "0"
+            !value.is_empty() && !value.eq_ignore_ascii_case("false") && value != "0"
         })
     }
 
