@@ -1,13 +1,16 @@
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri } from '../mock-tauri'
 import type { AiModelProvider } from '../lib/aiTargets'
+import { resetListProviderModelsCache } from '../lib/listProviderModels'
 
 export async function saveAiModelProviderApiKey(providerId: string, apiKey: string): Promise<void> {
+  resetListProviderModelsCache()
   if (!isTauri()) return
   await invoke('save_ai_model_provider_api_key', { providerId, apiKey })
 }
 
 export async function deleteAiModelProviderApiKey(providerId: string): Promise<void> {
+  resetListProviderModelsCache()
   if (!isTauri()) return
   await invoke('delete_ai_model_provider_api_key', { providerId })
 }

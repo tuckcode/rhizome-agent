@@ -1,7 +1,7 @@
 #[cfg(desktop)]
 use crate::ai_agents::{AiAgentStreamRequest, AiAgentsStatus};
 #[cfg(desktop)]
-use crate::ai_models::{AiModelProviderTestRequest, AiModelStreamRequest};
+use crate::ai_models::{AiModelProvider, AiModelProviderTestRequest, AiModelStreamRequest};
 use crate::claude_cli::{ChatStreamRequest, ClaudeCliStatus};
 use crate::vault::VaultAiGuidanceStatus;
 
@@ -270,6 +270,15 @@ pub async fn discover_ai_models(
     .await?
 }
 
+/// Model ids the provider lists for its saved key. Blocking HTTP, so it runs off the UI thread.
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn list_ai_model_provider_models(
+    provider: AiModelProvider,
+) -> Result<Vec<String>, String> {
+    run_blocking(move || crate::ai_models::list_provider_models(provider)).await?
+}
+
 /// One plain reply with no tools, for batch callers such as chat titles.
 #[cfg(desktop)]
 #[tauri::command]
@@ -392,6 +401,14 @@ pub async fn discover_ai_models(
     _api_key_override: Option<String>,
 ) -> Result<Vec<String>, String> {
     Err("Model discovery is not available in this mobile build yet.".into())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn list_ai_model_provider_models(
+    _provider: crate::ai_models::AiModelProvider,
+) -> Result<Vec<String>, String> {
+    Err("Provider model lists are only available in the desktop app.".into())
 }
 
 #[cfg(mobile)]
@@ -822,6 +839,65 @@ mod tests {
         let result = abort_ai_agent_stream("ai-model-stream-chat-123".into());
 
         assert!(matches!(result, Err(message) if message.contains("Invalid AI agent stream id")));
+    }
+
+    #[cfg(desktop)]
+    fn demo_list_provider(base_url: &str) -> crate::ai_models::AiModelProvider {
+        serde_json::from_value(serde_json::json!({
+            "id": "demo",
+            "name": "Demo",
+            "kind": "lm_studio",
+            "base_url": base_url,
+            "api_key_storage": "none",
+            "api_key_env_var": null,
+            "headers": null,
+            "models": [{
+                "id": "demo-model",
+                "capabilities": {
+                    "streaming": false,
+                    "tools": false,
+                    "vision": false,
+                    "json_mode": false,
+                    "reasoning": false
+                }
+            }]
+        }))
+        .expect("demo list provider")
+    }
+
+    #[cfg(desktop)]
+    #[tokio::test]
+    async fn list_ai_model_provider_models_returns_the_ids_the_provider_reports() {
+        let server = crate::ai_models::test_server::serve(vec![
+            crate::ai_models::test_server::http_response(
+                "200 OK",
+                &["Content-Type: application/json"],
+                r#"{"object":"list","data":[{"id":"grok-4"},{"id":"grok-3-mini"}]}"#,
+            ),
+        ]);
+
+        let ids = list_ai_model_provider_models(demo_list_provider(&server.base_url))
+            .await
+            .unwrap();
+
+        assert_eq!(ids, vec!["grok-4", "grok-3-mini"]);
+    }
+
+    #[cfg(desktop)]
+    #[tokio::test]
+    async fn list_ai_model_provider_models_returns_the_provider_error() {
+        let closed = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let base_url = format!("http://{}/v1", closed.local_addr().unwrap());
+        drop(closed);
+
+        let error = list_ai_model_provider_models(demo_list_provider(&base_url))
+            .await
+            .unwrap_err();
+
+        assert!(
+            !error.is_empty(),
+            "the command must surface the provider failure"
+        );
     }
 
     #[test]

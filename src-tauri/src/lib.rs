@@ -832,6 +832,7 @@ macro_rules! app_invoke_handler {
             commands::delete_ai_model_provider_api_key,
             commands::test_ai_model_provider,
             commands::discover_ai_models,
+            commands::list_ai_model_provider_models,
             commands::complete_ai_model_text,
             commands::reload_vault,
             commands::reload_vault_entry,

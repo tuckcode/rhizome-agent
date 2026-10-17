@@ -354,6 +354,19 @@ export function rhizomeModelVisibleName(model: RhizomeChatModel): string {
   return model.displayName.trim() || model.modelId
 }
 
+/** Prefix the provider when two listed rows share a display name. */
+export function rhizomeModelRowLabel(
+  model: RhizomeChatModel,
+  peers: RhizomeChatModel[],
+): string {
+  const name = rhizomeModelVisibleName(model)
+  if (model.label === REMOVED_PROVIDER_LABEL) return name
+  const collided = peers.some(
+    (other) => other.id !== model.id && rhizomeModelVisibleName(other) === name,
+  )
+  return collided ? `${model.providerName} · ${name}` : name
+}
+
 /** Providers with no key stay out of the picker list. */
 export function excludeKeylessRhizomeModels(
   models: RhizomeChatModel[],

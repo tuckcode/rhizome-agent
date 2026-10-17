@@ -14,6 +14,7 @@ import { CHAT_FOCUS_RING_CLASS } from '../lib/chatFocusRing'
 import {
   COMPOSER_MENU_COLLISION_PADDING_PX,
   NATIVE_CHAT_MODEL_CHIP_MAX_WIDTH_CLASS,
+  NATIVE_CHAT_MODEL_LIST_MAX_HEIGHT_CLASS,
   NATIVE_CHAT_MODEL_MENU_HEIGHT_PX,
   composerChipMenuSideOffset,
   resolveComposerMenuSide,
@@ -22,15 +23,21 @@ import {
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { middleEllipsis, NATIVE_CHAT_MODEL_CHIP_LABEL_MAX_CHARS } from '../lib/middleEllipsis'
 import {
+  liveProviderHeadingNames,
+  loadLiveRhizomeChatModels,
+  offlineLiveProviderNames,
+  pendingLiveProviderNames,
+} from '../lib/listProviderModels'
+import {
   countKeylessRhizomeProviders,
   excludeKeylessRhizomeModels,
   filterRhizomeChatModels,
   groupRhizomeChatModels,
   includeRemovedProviderModel,
-  loadRhizomeChatModels,
   REMOVED_PROVIDER_ERROR,
   REMOVED_PROVIDER_LABEL,
   resolveRhizomeChatModel,
+  rhizomeModelRowLabel,
   rhizomeModelVisibleName,
   seedRhizomeChatModels,
   type RhizomeChatModel,
@@ -40,12 +47,14 @@ import { trackRhizomeModelChanged } from '../lib/productAnalytics'
 
 const FILTER_PLACEHOLDER = 'Filter models'
 const EMPTY_MATCH = 'No models match'
+const CLEAR_FILTER = 'Clear filter'
+const LOADING_STATUS = 'Loading…'
+const OFFLINE_STATUS = 'offline, showing saved list'
 const COMPOSER_BOX_SELECTOR = '[data-testid="chat-composer-box"]'
 
 const MENU_PANEL_CLASS = cn(
   'flex flex-col bg-popover text-popover-foreground border border-border rounded-lg shadow-md p-1',
-  'w-[18rem] max-h-[min(24rem,var(--radix-popover-content-available-height))]',
-  'overflow-hidden overflow-y-hidden',
+  'w-[18rem] overflow-hidden overflow-y-hidden',
 )
 
 const ROW_CLASS = cn(
@@ -55,11 +64,28 @@ const ROW_CLASS = cn(
   'data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground',
 )
 
-const GROUP_SEP_CLASS = 'my-1 h-px w-full bg-border'
+const GROUP_SEP_CLASS = 'my-1 h-px w-full bg-[var(--border-input)]'
 
 function modelAccessibleName(model: RhizomeChatModel): string {
   if (model.label === REMOVED_PROVIDER_LABEL) return REMOVED_PROVIDER_LABEL
   return `${model.providerName} · ${model.modelId}`
+}
+
+function groupsWithLiveHeadings(
+  groups: Array<{ provider: string; models: RhizomeChatModel[] }>,
+  liveNames: string[],
+  query: string,
+): Array<{ provider: string; models: RhizomeChatModel[] }> {
+  const needle = query.trim().toLowerCase()
+  const next = [...groups]
+  const seen = new Set(groups.map((group) => group.provider))
+  for (const name of liveNames) {
+    if (seen.has(name)) continue
+    if (needle && !name.toLowerCase().includes(needle)) continue
+    seen.add(name)
+    next.push({ provider: name, models: [] })
+  }
+  return next
 }
 
 function findComposerBox(trigger: HTMLElement | null): HTMLElement | null {
@@ -89,9 +115,12 @@ export function NativeChatModelPicker({
   const t = createTranslator(locale)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const filterRef = useRef<HTMLInputElement>(null)
+  const selectedRowRef = useRef<HTMLDivElement | null>(null)
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [models, setModels] = useState<RhizomeChatModel[]>(() => seedRhizomeChatModels(providers))
+  const [loadingNames, setLoadingNames] = useState<string[]>([])
+  const [offlineNames, setOfflineNames] = useState<string[]>([])
   const [menuSide, setMenuSide] = useState<ComposerMenuSide>(variant === 'chip' ? 'top' : 'bottom')
   const [sideOffset, setSideOffset] = useState(4)
   const selectedId = resolveNativeChatTarget(value, providers)
@@ -104,7 +133,11 @@ export function NativeChatModelPicker({
   const accessibleName = selected ? modelAccessibleName(selected) : selectedId
   const keyed = excludeKeylessRhizomeModels(listed, providers)
   const visible = filterRhizomeChatModels(keyed, query)
-  const groups = groupRhizomeChatModels(visible)
+  const groups = groupsWithLiveHeadings(
+    groupRhizomeChatModels(visible),
+    liveProviderHeadingNames(providers),
+    query,
+  )
   const keylessCount = countKeylessRhizomeProviders(listed, providers)
   const removed = selected?.label === REMOVED_PROVIDER_LABEL
   const chip = variant === 'chip'
@@ -114,10 +147,17 @@ export function NativeChatModelPicker({
   }, [providers])
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      setLoadingNames([])
+      return
+    }
     let cancelled = false
-    void loadRhizomeChatModels(providers).then((next) => {
-      if (!cancelled) setModels(next)
+    setLoadingNames(pendingLiveProviderNames(providers))
+    void loadLiveRhizomeChatModels(providers).then((next) => {
+      if (cancelled) return
+      setModels(next)
+      setLoadingNames([])
+      setOfflineNames(offlineLiveProviderNames(providers))
     })
     return () => {
       cancelled = true
@@ -127,6 +167,11 @@ export function NativeChatModelPicker({
   useEffect(() => {
     if (open) filterRef.current?.focus()
   }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    selectedRowRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [open, selectedId, models, query])
 
   const updateMenuPlacement = () => {
     if (!chip) {
@@ -172,6 +217,7 @@ export function NativeChatModelPicker({
           if (next) {
             updateMenuPlacement()
             setQuery('')
+            setLoadingNames(pendingLiveProviderNames(providers))
           }
           setOpen(next)
         }}
@@ -244,12 +290,27 @@ export function NativeChatModelPicker({
             />
           </div>
           <div
-            className="min-h-0 flex-1 overflow-y-auto"
+            className={cn('min-h-0 flex-1 overflow-y-auto', NATIVE_CHAT_MODEL_LIST_MAX_HEIGHT_CLASS)}
             data-testid="native-chat-model-list"
           >
             {groups.length === 0 ? (
-              <div className="px-2 py-1.5 text-[13px] text-muted-foreground" data-testid="native-chat-models-empty">
-                {query.trim() ? EMPTY_MATCH : t('ai.composer.modelsEmpty')}
+              <div className="flex items-center gap-2 px-2 py-1.5 text-[13px] text-muted-foreground" data-testid="native-chat-models-empty">
+                <span>{query.trim() ? EMPTY_MATCH : t('ai.composer.modelsEmpty')}</span>
+                {query.trim() ? (
+                  <button
+                    type="button"
+                    className="text-primary underline-offset-4 hover:underline"
+                    data-testid="native-chat-models-clear-filter"
+                    onPointerDown={(event) => {
+                      event.preventDefault()
+                    }}
+                    onClick={() => {
+                      setQuery('')
+                    }}
+                  >
+                    {CLEAR_FILTER}
+                  </button>
+                ) : null}
               </div>
             ) : (
               groups.map((group, index) => (
@@ -261,14 +322,40 @@ export function NativeChatModelPicker({
                     className="px-2 pb-1 pt-2 text-[11px] font-medium text-muted-foreground normal-case tracking-normal"
                     data-testid="native-chat-model-provider"
                   >
-                    {group.provider}
+                    <span>{group.provider}</span>
+                    {(() => {
+                      const live = liveProviderHeadingNames(providers).includes(group.provider)
+                      if (!live) return null
+                      const loading = loadingNames.includes(group.provider)
+                      const offline = !loading && offlineNames.includes(group.provider)
+                      const status = loading ? LOADING_STATUS : offline ? OFFLINE_STATUS : LOADING_STATUS
+                      return (
+                        <span
+                          className={cn(
+                            'ml-1.5 font-normal text-muted-foreground',
+                            !loading && !offline && 'invisible',
+                          )}
+                          data-testid={
+                            loading
+                              ? 'native-chat-model-loading'
+                              : offline
+                                ? 'native-chat-model-offline'
+                                : undefined
+                          }
+                          aria-hidden={!loading && !offline}
+                        >
+                          {status}
+                        </span>
+                      )
+                    })()}
                   </DropdownMenuLabel>
                   {group.models.map((model) => {
-                    const label = rhizomeModelVisibleName(model)
+                    const label = rhizomeModelRowLabel(model, keyed)
                     const isSelected = model.id === selectedId
                     return (
                       <DropdownMenuItem
                         key={model.id}
+                        ref={isSelected ? selectedRowRef : undefined}
                         className={ROW_CLASS}
                         title={model.modelId}
                         data-testid={`native-chat-model-${model.id}`}
@@ -298,21 +385,29 @@ export function NativeChatModelPicker({
             <div className="shrink-0" data-testid="native-chat-model-footer">
               <div className={GROUP_SEP_CLASS} data-testid="native-chat-model-footer-sep" />
               {keylessCount > 0 ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="h-auto w-full justify-start rounded-md px-2 py-1.5 text-[12px] font-normal text-muted-foreground"
+                <div
+                  className="flex flex-wrap items-center gap-x-1 px-2 py-1.5 text-[12px]"
                   data-testid="native-chat-model-open-providers"
-                  onPointerDown={(event) => {
-                    event.preventDefault()
-                  }}
-                  onClick={() => {
-                    onOpenProviders?.()
-                    setOpen(false)
-                  }}
                 >
-                  {`${keylessCount} providers need a key · Open settings`}
-                </Button>
+                  <span className="text-muted-foreground" data-testid="native-chat-model-keyless-note">
+                    {`${keylessCount} providers need a key · `}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto p-0 text-[12px] font-normal text-primary underline-offset-4"
+                    data-testid="native-chat-model-open-settings"
+                    onPointerDown={(event) => {
+                      event.preventDefault()
+                    }}
+                    onClick={() => {
+                      onOpenProviders?.()
+                      setOpen(false)
+                    }}
+                  >
+                    Open settings
+                  </Button>
+                </div>
               ) : null}
               <p
                 className="px-2 py-1.5 text-[12px] text-muted-foreground"

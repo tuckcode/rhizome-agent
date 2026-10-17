@@ -868,6 +868,12 @@ describe('Earth theme tokens', () => {
     }
   })
 
+  it('gives Earth light chip-menu dividers 3:1 on the popover', () => {
+    expect(
+      contrastRatio(token(light, '--border-input'), token(light, '--surface-popover')),
+    ).toBeGreaterThanOrEqual(3)
+  })
+
   it('replaces leftover Tolaria blues on sheet selection and block reorder with Earth tokens', () => {
     expect(sheetSelectionChrome).toContain("SHEET_SELECTION_ACCENT_FALLBACK = '#2C6A4D'")
     expect(sheetSelectionChrome).not.toContain('#155DFF')
