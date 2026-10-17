@@ -520,6 +520,10 @@ may display a chat; only one turn runs. Damage and a full log keep the
 original and continue in a new session. With the Settings switch on,
 new chats call `native_chat_start` and pick a catalog model or Free tier (auto).
 `rhizome_provider_model.rs` is the native loop's OpenAI-compatible `Model`.
+The loop registry (`rhizome_loop/tools`) offers `echo`, read-only file tools
+(`read_file`, `list_dir`, `grep`, `glob`), `create_note`, and Power User `bash`.
+Read-only tools stay inside canonical vault and workspace roots and auto-run;
+they do not open an approval card.
 `rhizome_routing/` wraps it with free-tier fallback over a pinned OmniRoute
 catalog (ADR-0182). Anthropic models stay refused until step 6a.
 ADR-0168 (amended) is the borrow-care rule. Prime is an optional engine

@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 /// The tool name the loop offers and the policy rules on.
 pub(crate) const CREATE_NOTE_TOOL_NAME: &str = "create_note";
-const CREATE_NOTE_TOOL_JSON: &str = r#"{
+pub(crate) const CREATE_NOTE_TOOL_JSON: &str = r#"{
   "type": "function",
   "function": {
     "name": "create_note",

@@ -167,18 +167,16 @@ fn close_unanswered(unanswered: &mut Vec<String>, messages: &mut Vec<Value>) {
 
 /// OpenAI tool definitions for the names the loop offers.
 ///
-/// `ModelView` carries names only. `create_note` gets its real schema.
-/// Any other name gets an open object schema until the loop carries
-/// schemas.
+/// `ModelView` carries names only. Registered tools use the schema from
+/// `rhizome_loop` (including `create_note` and the read-only file tools).
+/// An extra test name still gets an open object schema.
 fn tool_definitions(names: &[String]) -> Vec<Value> {
     let mut seen = HashSet::new();
     names
         .iter()
         .filter(|name| seen.insert(name.as_str()))
         .map(|name| {
-            if name == "create_note" {
-                crate::ai_model_tools::openai_create_note_tool()
-            } else {
+            crate::rhizome_loop::openai_tool_definition(name).unwrap_or_else(|| {
                 json!({
                     "type": "function",
                     "function": {
@@ -186,7 +184,7 @@ fn tool_definitions(names: &[String]) -> Vec<Value> {
                         "parameters": { "type": "object" },
                     },
                 })
-            }
+            })
         })
         .collect()
 }
@@ -436,6 +434,32 @@ mod tests {
         );
         assert_eq!(definitions[1]["function"]["name"], "echo");
         assert_eq!(definitions[1]["function"]["parameters"]["type"], "object");
+    }
+
+    #[test]
+    fn read_only_file_tools_carry_their_registry_schemas() {
+        let definitions = tool_definitions(&[
+            "read_file".into(),
+            "list_dir".into(),
+            "grep".into(),
+            "glob".into(),
+        ]);
+        assert_eq!(definitions[0]["function"]["name"], "read_file");
+        assert_eq!(
+            definitions[0]["function"]["parameters"]["required"],
+            json!(["path"])
+        );
+        assert_eq!(definitions[1]["function"]["name"], "list_dir");
+        assert_eq!(definitions[2]["function"]["name"], "grep");
+        assert_eq!(
+            definitions[2]["function"]["parameters"]["required"],
+            json!(["pattern"])
+        );
+        assert_eq!(definitions[3]["function"]["name"], "glob");
+        assert_eq!(
+            definitions[3]["function"]["parameters"]["required"],
+            json!(["pattern"])
+        );
     }
 
     #[test]
