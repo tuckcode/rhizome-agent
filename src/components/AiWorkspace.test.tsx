@@ -120,7 +120,7 @@ const providers: AiModelProvider[] = [
     models: [{
       id: 'llama3.2',
       display_name: 'Llama 3.2',
-      capabilities: { streaming: true, tools: false, vision: false, json_mode: false, reasoning: false },
+      capabilities: { streaming: true, tools: false, vision: false, json_mode: false, reasoning: { state: 'unknown' as const } },
     }],
   },
   {
@@ -132,7 +132,7 @@ const providers: AiModelProvider[] = [
     models: [{
       id: 'gpt-4.1',
       display_name: 'GPT-4.1',
-      capabilities: { streaming: true, tools: true, vision: true, json_mode: true, reasoning: true },
+      capabilities: { streaming: true, tools: true, vision: true, json_mode: true, reasoning: { state: 'unknown' as const } },
     }],
   },
 ]
