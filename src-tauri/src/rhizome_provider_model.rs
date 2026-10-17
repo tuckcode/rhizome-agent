@@ -139,20 +139,25 @@ fn next_replay_session() -> String {
     format!("replay-{}", NEXT.fetch_add(1, Ordering::Relaxed))
 }
 
+/// Last `/` segment, then the text before the first `:`.
+///
+/// `google/gemini-3.8-flash:free` becomes `gemini-3.8-flash`. A dash
+/// inside the name stays. Any OpenRouter-style tag (`:free`, `:floor`)
+/// is dropped the same way.
+fn normalized_model_name(model_id: &str) -> String {
+    let name = model_id.trim().to_ascii_lowercase();
+    let segment = name.rsplit('/').next().unwrap_or(name.as_str());
+    segment
+        .split_once(':')
+        .map(|(name, _tag)| name)
+        .unwrap_or(segment)
+        .to_string()
+}
+
 /// Gemini 3 and 4 reject a tool step that has no thought signature.
 /// The leading number is the generation: `gemini-2.5` is 2, `gemini-3.8` is 3.
 fn needs_gemini_thought_placeholder(model_id: &str) -> bool {
-    let mut name = model_id.trim().to_ascii_lowercase();
-    // OpenRouter tags the free pool as `:free`. That is a suffix, not the
-    // model name. A vendor prefix still splits on `/` or `:`.
-    if let Some(stripped) = name.strip_suffix(":free") {
-        name = stripped.to_string();
-    }
-    let name = name
-        .rsplit(['/', ':'])
-        .next()
-        .unwrap_or(name.as_str())
-        .to_string();
+    let name = normalized_model_name(model_id);
     let Some(rest) = name.strip_prefix("gemini-") else {
         return false;
     };
@@ -784,6 +789,33 @@ mod tests {
     }
 
     #[test]
+    fn model_name_keeps_the_last_segment_and_drops_the_first_tag() {
+        assert_eq!(
+            normalized_model_name("gemini-3.8-flash"),
+            "gemini-3.8-flash"
+        );
+        assert_eq!(
+            normalized_model_name("google/gemini-3.8-flash"),
+            "gemini-3.8-flash"
+        );
+        assert_eq!(
+            normalized_model_name("google/gemini-3.8-flash:free"),
+            "gemini-3.8-flash"
+        );
+        assert_eq!(normalized_model_name("a/b/model:tag"), "model");
+        assert_eq!(
+            normalized_model_name("gemini-2.5-flash"),
+            "gemini-2.5-flash"
+        );
+        assert!(needs_gemini_thought_placeholder("a/b/gemini-3-pro:tag"));
+        assert!(needs_gemini_thought_placeholder(
+            "google/gemini-3.8-flash:floor"
+        ));
+        assert!(!needs_gemini_thought_placeholder("a/b/model:tag"));
+        assert!(!needs_gemini_thought_placeholder("gemini-2.5-flash"));
+    }
+
+    #[test]
     fn a_reroute_onto_gemini_signs_tool_calls_from_the_previous_provider() {
         // Routing keeps one ProviderModel and retargets it
         // (`rhizome_routing` attempt loop). The calls in history were
@@ -910,6 +942,38 @@ mod tests {
         assert_eq!(messages[0]["reasoning_content"], "first thought");
         assert_eq!(messages[2]["reasoning_content"], "second thought");
         clear_reasoning_session("deepseek-order");
+    }
+
+    #[test]
+    fn a_missing_middle_text_turn_sends_empty_reasoning() {
+        crate::ai_models::note_reasoning("deepseek-gap", &[], "alpha", "first");
+        crate::ai_models::note_reasoning("deepseek-gap", &[], "gamma", "third");
+        let history = vec![
+            HistoryItem::Assistant {
+                text: "alpha".into(),
+                tool_calls: vec![],
+            },
+            HistoryItem::User { text: "mid".into() },
+            HistoryItem::Assistant {
+                text: "beta".into(),
+                tool_calls: vec![],
+            },
+            HistoryItem::User {
+                text: "next".into(),
+            },
+            HistoryItem::Assistant {
+                text: "gamma".into(),
+                tool_calls: vec![],
+            },
+        ];
+        let target = wire("deepseek-flash", "deepseek", None, "deepseek-gap");
+
+        let messages = openai_messages_for(&view("go", history), 5, &target);
+
+        assert_eq!(messages[0]["reasoning_content"], "first");
+        assert_eq!(messages[2]["reasoning_content"], "");
+        assert_eq!(messages[4]["reasoning_content"], "third");
+        clear_reasoning_session("deepseek-gap");
     }
 
     #[test]
