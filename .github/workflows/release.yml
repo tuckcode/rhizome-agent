@@ -2,6 +2,15 @@ name: Release (Alpha)
 
 on:
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build only. No tag, no GitHub Release, no feed, no Pages deploy."
+        type: boolean
+        default: true
+      macos_only:
+        description: "Skip the Linux and Windows builds (only applies to dry runs)."
+        type: boolean
+        default: false
   # push:branches:[main] intentionally paused — this workflow ran on every
   # push, mostly on macos-15 (~10x the Linux billing rate), and of the last
   # 50 combined CI+Release runs 44 failed. Cut a release manually
@@ -126,6 +135,7 @@ jobs:
       version: ${{ needs.version.outputs.version }}
       macos_bundles: app,dmg
       upload_macos_dmg: true
+      build_linux_windows: ${{ !(inputs.dry_run && inputs.macos_only) }}
     secrets: inherit
 
   # ─────────────────────────────────────────────────────────────
@@ -135,6 +145,8 @@ jobs:
   release:
     name: GitHub Release (alpha)
     needs: [version, build-artifacts]
+    # Creates the tag, the GitHub Release and alpha-latest.json (the feed).
+    if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -406,6 +418,8 @@ jobs:
   pages:
     name: Update docs and release pages
     needs: [version, release]
+    # Deploys the live Pages site.
+    if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
