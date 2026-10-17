@@ -8,7 +8,6 @@ vi.mock('../lib/productAnalytics', () => ({
   trackComposerPillOpened: vi.fn(),
 }))
 vi.mock('./NativeChatModelPicker', () => ({ NativeChatModelPicker: () => null }))
-vi.mock('./PrimeThinkingToggle', () => ({ PrimeThinkingToggle: () => null }))
 
 /**
  * #38: a pill that looks like a control and does nothing reads as a broken

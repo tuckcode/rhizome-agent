@@ -372,7 +372,6 @@ export default function ChatHome({
                 onCloseContext={() => {
                   setOpenNote(null)
                 }}
-                thinkingLevel={primeHost?.thinkingLevel ?? null}
                 activity={
                   // Idle agents are the normal state; only working ones earn
                   // a place on the row (native audit 2026-09-26).

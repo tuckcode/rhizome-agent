@@ -243,9 +243,9 @@ describe('ChatHome', () => {
             id: 'nous-portal',
             name: 'nous-portal',
             kind: 'open_ai_compatible',
-            models: [{ id: 'tencent-hy3', capabilities: { streaming: false, tools: false, vision: false, json_mode: false, reasoning: false } }],
+            models: [{ id: 'tencent-hy3', capabilities: { streaming: false, tools: false, vision: false, json_mode: false, reasoning: { state: 'unknown' as const } } }],
           },
-          model: { id: 'tencent-hy3', capabilities: { streaming: false, tools: false, vision: false, json_mode: false, reasoning: false } },
+          model: { id: 'tencent-hy3', capabilities: { streaming: false, tools: false, vision: false, json_mode: false, reasoning: { state: 'unknown' as const } } },
         }}
         defaultAiAgentReadiness="ready"
         defaultAiAgentReady

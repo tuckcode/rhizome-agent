@@ -21,7 +21,6 @@ import {
   type ComposerMenuSide,
 } from '../lib/composerMenuSide'
 import { createTranslator, type AppLocale } from '../lib/i18n'
-import { middleEllipsis, NATIVE_CHAT_MODEL_CHIP_LABEL_MAX_CHARS } from '../lib/middleEllipsis'
 import { loadPrimeModelCatalog } from '../lib/primeModelCatalog'
 import { groupModelsByProvider, modelKey, type PrimeModel } from '../lib/primeModels'
 import { primeProviderLabel } from '../lib/primeProviderLabels'
@@ -41,12 +40,12 @@ import {
   REMOVED_PROVIDER_LABEL,
   resolveRhizomeChatModel,
   rhizomeModelRowLabel,
-  rhizomeModelVisibleName,
   seedRhizomeChatModels,
   type RhizomeChatModel,
 } from '../lib/rhizomeChatModels'
 import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
 import { SETTINGS_MENU_Z_CLASS } from '../lib/settingsMenuLayer'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { trackPrimeModelChanged, trackRhizomeModelChanged } from '../lib/productAnalytics'
 import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
 
@@ -79,11 +78,6 @@ const ROW_CLASS = cn(
 )
 
 const GROUP_SEP_CLASS = 'my-1 h-px w-full bg-[var(--border-input)]'
-
-function modelAccessibleName(model: { label: string; providerName: string; modelId: string }): string {
-  if (model.label === REMOVED_PROVIDER_LABEL) return REMOVED_PROVIDER_LABEL
-  return `${model.providerName} · ${model.modelId}`
-}
 
 function groupsWithLiveHeadings(
   groups: Array<{ provider: string; models: RhizomeChatModel[] }>,
@@ -155,17 +149,28 @@ export function NativeChatModelPicker({
   const listed = includeRemovedProviderModel(models, selectedId)
   const selectedRhizome = resolveRhizomeChatModel(listed, selectedId)
   const selectedPrime = primeModels.find((model) => modelKey(model) === selectedId) ?? null
-  const visibleName = prime
+  const chip = variant === 'chip'
+  const providerName = prime
+    ? (primeHost.modelProvider
+      ? primeProviderLabel(primeHost.modelProvider)
+      : (selectedPrime ? primeProviderLabel(selectedPrime.provider) : null))
+    : (selectedRhizome?.providerName ?? null)
+  const rawId = prime
+    ? (primeHost.modelId ?? selectedPrime?.id ?? null)
+    : (selectedRhizome?.modelId ?? null)
+  const displayName = prime
     ? (primeModelLabel(primeHost) ?? selectedPrime?.name ?? selectedId)
-    : (selectedRhizome ? rhizomeModelVisibleName(selectedRhizome) : selectedId)
-  const triggerLabel = variant === 'chip'
-    ? middleEllipsis(visibleName, NATIVE_CHAT_MODEL_CHIP_LABEL_MAX_CHARS)
-    : (prime ? visibleName : (selectedRhizome?.label ?? visibleName))
-  const accessibleName = prime
-    ? (selectedPrime
-      ? `${selectedPrime.provider} · ${selectedPrime.id}`
-      : visibleName)
-    : (selectedRhizome ? modelAccessibleName(selectedRhizome) : selectedId)
+    : (selectedRhizome
+      ? (selectedRhizome.displayName.trim() || selectedRhizome.modelId)
+      : selectedId)
+  const rowLabel = prime ? displayName : (selectedRhizome?.label ?? displayName)
+  const visibleText = chip ? displayName : rowLabel
+  const tooltipTitle = providerName ? `${providerName} · ${displayName}` : displayName
+  const showRawId = rawId != null && rawId !== displayName
+  // WCAG 2.5.3: the accessible name starts with the text the control shows.
+  const accessibleName = chip
+    ? [displayName, providerName, showRawId ? rawId : null].filter((part): part is string => Boolean(part)).join(', ')
+    : [rowLabel, showRawId ? rawId : null].filter((part): part is string => Boolean(part)).join(', ')
   const keyed = excludeKeylessRhizomeModels(listed, providers, selectedId)
   const visibleRhizome = filterRhizomeChatModels(keyed, query)
   const needle = query.trim().toLowerCase()
@@ -202,7 +207,6 @@ export function NativeChatModelPicker({
     }))
   const keylessCount = prime ? 0 : countKeylessRhizomeProviders(listed, providers)
   const removed = !prime && selectedRhizome?.label === REMOVED_PROVIDER_LABEL
-  const chip = variant === 'chip'
   const showFooter = chip && !prime
 
   useEffect(() => {
@@ -297,6 +301,8 @@ export function NativeChatModelPicker({
       }
       data-testid="native-chat-model-picker"
       data-engine={engine}
+      data-variant={variant}
+      data-model-id={selectedId}
     >
       {chip || !showLabel ? null : <span className="text-xs text-muted-foreground">{t('ai.composer.modelLabel')}</span>}
       <DropdownMenu
@@ -310,38 +316,47 @@ export function NativeChatModelPicker({
           setOpen(next)
         }}
       >
-        <DropdownMenuTrigger asChild>
-          <button
-            ref={triggerRef}
-            type="button"
-            className={cn(
-              'inline-flex items-center gap-1 transition-colors',
-              CHAT_FOCUS_RING_CLASS,
-              chip
-                ? cn(
-                    'h-6 shrink-0 self-center rounded-md border border-border bg-transparent px-2',
-                    'font-mono text-[11px] text-muted-foreground',
-                    'hover:bg-accent/50 hover:text-foreground',
-                    'data-[state=open]:bg-accent',
-                    NATIVE_CHAT_MODEL_CHIP_MAX_WIDTH_CLASS,
-                  )
-                : 'h-8 min-w-[12rem] max-w-[20rem] rounded-md border border-border bg-background px-2 text-left text-sm',
-            )}
-            aria-label={t('ai.composer.modelNamed', { name: accessibleName })}
-            title={t('ai.composer.modelNamed', { name: accessibleName })}
-            data-testid="native-chat-model-trigger"
-          >
-            <span className="min-w-0 truncate" data-testid="native-chat-model-trigger-label">
-              {triggerLabel}
-            </span>
-            <CaretDown
-              size={chip ? 12 : 9}
-              weight="bold"
-              aria-hidden="true"
-              className="shrink-0 text-muted-foreground"
-            />
-          </button>
-        </DropdownMenuTrigger>
+        <Tooltip delayDuration={chip ? 300 : undefined}>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <button
+                ref={triggerRef}
+                type="button"
+                className={cn(
+                  'inline-flex items-center gap-1 transition-colors',
+                  CHAT_FOCUS_RING_CLASS,
+                  chip
+                    ? cn(
+                        'h-6 max-w-full shrink self-center rounded-md border border-border bg-transparent px-2',
+                        'text-[12px] text-muted-foreground',
+                        'hover:bg-accent/50 hover:text-foreground',
+                        'data-[state=open]:bg-accent',
+                        NATIVE_CHAT_MODEL_CHIP_MAX_WIDTH_CLASS,
+                      )
+                    : 'h-8 min-w-[12rem] max-w-[20rem] rounded-md border border-border bg-background px-2 text-left text-sm',
+                )}
+                aria-label={accessibleName}
+                data-testid="native-chat-model-trigger"
+              >
+                <span className="min-w-0 truncate" data-testid="native-chat-model-trigger-label">
+                  {visibleText}
+                </span>
+                <CaretDown
+                  size={chip ? 12 : 9}
+                  weight="bold"
+                  aria-hidden="true"
+                  className="shrink-0 text-muted-foreground"
+                />
+              </button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="top" data-testid="native-chat-model-tooltip">
+            <div>{tooltipTitle}</div>
+            {showRawId ? (
+              <div className="font-mono text-[11px]" data-testid="native-chat-model-tooltip-id">{rawId}</div>
+            ) : null}
+          </TooltipContent>
+        </Tooltip>
         <DropdownMenuContent
           side={chip ? menuSide : 'bottom'}
           align="start"

@@ -4,8 +4,9 @@
 > This is **Rhizome** (`ai.rhizome.agent`, repo `tuckcode/rhizome-agent`).  
 > It is **not** Rhizome Desktop (`ai.rhizome.desktop`, `knispo/rhizome`).  
 > Do not push here to desktop origin. Do not “fix branding back to Desktop.”  
-> Direction: chat UI + **Rhizome's own harness** (ADR-0180). Prime and
-> Hermes are optional engines. Details: `docs/IDENTITY.md`.
+> Direction: chat UI + **Rhizome's own harness** (ADR-0180). Native is the
+> only chat engine (ADR-0187). Prime and Hermes are being removed; do not
+> add code that depends on them. Details: `docs/IDENTITY.md`.
 > **Personal reply-voice skills stay out of this repo.** Global voice is STE-100
 > in Rhizome Vault `agents/shared/`. Do not copy voice skills into this tree.
 
@@ -567,7 +568,9 @@ mega-bullets. Do not move these into Learned.
   starting point. Borrow-care in 0168 still holds.
   Kern (getkern/kern) is Linux/WSL2 only.
 - **Rhizome is its own harness (ADR-0180).** It owns the agent loop, tool
-  runner, plugins, and model routing. Prime and Hermes are optional engines.
+  runner, plugins, and model routing. Native is the only chat engine
+  (ADR-0187). Prime and Hermes are being removed; do not add code that
+  depends on them.
 
 ## Continual-learning (Cursor plugin)
 

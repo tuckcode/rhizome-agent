@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { SettingsPanel } from './SettingsPanel'
 import type { Settings } from '../types'
 
@@ -30,7 +31,9 @@ const emptySettings: Settings = {
 describe('Chat engine picker', () => {
   it('does not render a Settings engine switch', () => {
     render(
-      <SettingsPanel open={true} settings={emptySettings} onSave={vi.fn()} onClose={vi.fn()} />,
+      <TooltipProvider>
+        <SettingsPanel open={true} settings={emptySettings} onSave={vi.fn()} onClose={vi.fn()} />
+      </TooltipProvider>,
     )
 
     expect(screen.queryByTestId('settings-chat-engine')).not.toBeInTheDocument()

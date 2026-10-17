@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { readAppShellSource } from '../test-utils/appShellSource'
 
 describe('leftover chat stays', () => {
-  const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+  const app = readAppShellSource()
   const rail = readFileSync(
     `${process.cwd()}/src/components/CommandRail.tsx`,
     'utf8',

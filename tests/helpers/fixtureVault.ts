@@ -366,10 +366,10 @@ async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo, folde
       register_mcp_tools: () => null,
       get_mcp_config_snippet: () => JSON.stringify({
         mcpServers: {
-          tolaria: {
+          rhizome: {
             type: 'stdio',
             command: 'node',
-            args: ['/fixture/Tolaria/mcp-server/index.js'],
+            args: ['/fixture/Rhizome/mcp-server/index.js'],
             env: {
               WS_UI_PORT: '9711',
             },

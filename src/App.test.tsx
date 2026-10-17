@@ -2060,6 +2060,7 @@ describe('App', () => {
 
   it('updates the main-window size constraints when the view mode changes', async () => {
     const { invoke } = await import('@tauri-apps/api/core') as { invoke: ReturnType<typeof vi.fn> }
+    vi.mocked(isTauri).mockReturnValue(true)
 
     render(<App />)
     await waitFor(() => {
@@ -2091,6 +2092,7 @@ describe('App', () => {
 
   it('does not ask Windows to grow the native window when toggling Properties', async () => {
     const { invoke } = await import('@tauri-apps/api/core') as { invoke: ReturnType<typeof vi.fn> }
+    vi.mocked(isTauri).mockReturnValue(true)
     const originalUserAgent = navigator.userAgent
     Object.defineProperty(window.navigator, 'userAgent', {
       configurable: true,

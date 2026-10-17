@@ -12,7 +12,4 @@ describe('leftover new chat no vault', () => {
     expect(source).toContain('clearEngineLock()')
   })
 
-  it('locks thinkingLevel from primeHost', () => {
-    expect(source).toContain('thinkingLevel={primeHost?.thinkingLevel ?? null}')
-  })
 })
