@@ -205,10 +205,7 @@ fn apply_scrub(text: &str, saved: &[String]) -> String {
         }
     }
     let scrubbers = scrub_regexes();
-    out = scrubbers
-        .assignment
-        .replace_all(&out, "${head}[redacted]")
-        .into_owned();
+    out = scrub_assignments(&out, scrubbers);
     for pattern in &scrubbers.patterns {
         out = pattern.replace_all(&out, "[redacted]").into_owned();
     }
@@ -217,6 +214,9 @@ fn apply_scrub(text: &str, saved: &[String]) -> String {
 
 struct ScrubRegexes {
     assignment: regex::Regex,
+    api_key_name: regex::Regex,
+    env_name: regex::Regex,
+    prefixed_key_name: regex::Regex,
     patterns: Vec<regex::Regex>,
     mistral_context: regex::Regex,
     mistral_key: regex::Regex,
@@ -226,12 +226,22 @@ fn scrub_regexes() -> &'static ScrubRegexes {
     // OnceLock, not LazyLock: LazyLock needs Rust 1.80 and this crate's MSRV is 1.77.2.
     static SCRUBBERS: std::sync::OnceLock<ScrubRegexes> = std::sync::OnceLock::new();
     SCRUBBERS.get_or_init(|| {
-        // The prefix before `_` is optional, so bare `API_KEY` matches.
-        // `api_key` is any case. `=` and `:` both count, including `"X_API_KEY": "v"`.
+        // `_` is part of the name, so `SORT_KEY` is not a bare `KEY`.
+        // `=` is not `==`. The value is checked in `scrub_assignments`.
         let assignment = regex::Regex::new(
-            r#"(?P<head>(?:^|[^A-Za-z0-9])(?:(?:export|set)[ \t]+)?["']?(?i:(?:[A-Z][A-Z0-9_]*_)?(?:API_KEY|PASSWORD|SECRET|TOKEN|KEY)(?:_[A-Z0-9]+)*)["']?[ \t]*[:=][ \t]*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^[:space:]#]+)"#,
+            r#"(?P<pre>(?:^|[^A-Za-z0-9_])(?:(?:export|set)[ \t]+)?)(?P<quote>["']?)(?P<name>[A-Za-z][A-Za-z0-9_]*)["']?[ \t]*(?P<sep>[=:])[ \t]*(?P<value>"[^"\r\n]*"|'[^'\r\n]*'|[^[:space:]#]+)"#,
         )
         .expect("assignment scrubber");
+        let api_key_name = regex::Regex::new(
+            r"(?i)^(?:[A-Z][A-Z0-9]*_)?API_KEY(?:_[A-Z0-9]+)*$",
+        )
+        .expect("api_key name");
+        let env_name = regex::Regex::new(
+            r"^(?:[A-Z][A-Z0-9]*_)?(?:TOKEN|SECRET|PASSWORD)(?:_[A-Z0-9]+)*$",
+        )
+        .expect("env secret name");
+        let prefixed_key_name =
+            regex::Regex::new(r"^[A-Z][A-Z0-9]*_KEY(?:_[A-Z0-9]+)*$").expect("prefixed key name");
         let patterns = [
             r"(?:sk-proj-|sk-or-v1-|sk-ant-|gsk_)[A-Za-z0-9_-]{8,}",
             r"(?:sk_live_|sk_test_|sk-|ghp_|gho_|ghs_|ghu_|ghr_|github_pat_|glpat-|gsk_|npm_|xox[abprse]-)[A-Za-z0-9_-]{20,}",
@@ -242,7 +252,7 @@ fn scrub_regexes() -> &'static ScrubRegexes {
             r"pplx-[A-Za-z0-9_-]{20,}",
             r"AKIA[0-9A-Z]{16}",
             r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----",
-            r"(?i)bearer\s+[A-Za-z0-9._\-+/=]+",
+            r"(?i)bearer\s+[A-Za-z0-9._\-+/=]{16,}",
             r#"(?i)"api_key"\s*:\s*"[^"]+""#,
         ]
         .into_iter()
@@ -250,12 +260,85 @@ fn scrub_regexes() -> &'static ScrubRegexes {
         .collect();
         ScrubRegexes {
             assignment,
+            api_key_name,
+            env_name,
+            prefixed_key_name,
             patterns,
             mistral_context: regex::Regex::new(r"(?i)mistral|api\.mistral\.ai")
                 .expect("mistral context"),
             mistral_key: regex::Regex::new(r"\b[A-Za-z0-9]{32}\b").expect("mistral key"),
         }
     })
+}
+
+/// `api_key` matches in any case. `TOKEN`, `SECRET`, `PASSWORD`, and a
+/// prefixed `_KEY` match only as uppercase env names. A `:` assignment also
+/// needs a quoted or uppercase name. The value has no spaces, is at least 8
+/// characters, and does not start with `{`, `$`, `<`, or `[`.
+fn scrub_assignments(text: &str, scrubbers: &ScrubRegexes) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut last = 0;
+    for caps in scrubbers.assignment.captures_iter(text) {
+        let Some(name) = caps.name("name") else {
+            continue;
+        };
+        let Some(value) = caps.name("value") else {
+            continue;
+        };
+        let Some(sep) = caps.name("sep") else {
+            continue;
+        };
+        if !assignment_name_is_secret(name.as_str(), scrubbers) {
+            continue;
+        }
+        if sep.as_str() == "=" && text.as_bytes().get(sep.end()) == Some(&b'=') {
+            continue;
+        }
+        let quoted = caps
+            .name("quote")
+            .is_some_and(|quote| !quote.as_str().is_empty());
+        let uppercase = name
+            .as_str()
+            .chars()
+            .all(|ch| ch.is_ascii_uppercase() || ch == '_');
+        if sep.as_str() == ":" && !quoted && !uppercase {
+            continue;
+        }
+        if !assignment_value_is_secret(value.as_str()) {
+            continue;
+        }
+        out.push_str(&text[last..value.start()]);
+        out.push_str("[redacted]");
+        last = value.end();
+    }
+    out.push_str(&text[last..]);
+    out
+}
+
+fn assignment_name_is_secret(name: &str, scrubbers: &ScrubRegexes) -> bool {
+    if scrubbers.api_key_name.is_match(name) {
+        return true;
+    }
+    scrubbers.env_name.is_match(name) || scrubbers.prefixed_key_name.is_match(name)
+}
+
+fn assignment_value_is_secret(raw: &str) -> bool {
+    let inner = raw
+        .strip_prefix('"')
+        .and_then(|rest| rest.strip_suffix('"'))
+        .or_else(|| {
+            raw.strip_prefix('\'')
+                .and_then(|rest| rest.strip_suffix('\''))
+        })
+        .unwrap_or(raw);
+    let mut chars = inner.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if matches!(first, '{' | '$' | '<' | '[') {
+        return false;
+    }
+    inner.chars().count() >= 8 && !inner.chars().any(char::is_whitespace)
 }
 
 /// A bare Mistral key is 32 letters and digits with both cases, and only
@@ -1172,6 +1255,81 @@ mod tests {
     }
 
     #[test]
+    fn scrub_secrets_leaves_an_object_key() {
+        assert_unchanged("{ key: item.id }");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_a_jsx_key() {
+        assert_unchanged("<Row key={item.id} />");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_a_json_key_field() {
+        assert_unchanged(r#""key": "en.greeting""#);
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_a_type_token_field() {
+        assert_unchanged("type User = { token: string }");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_primary_key() {
+        assert_unchanged("primary_key: id");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_max_token() {
+        assert_unchanged("max_token: 5");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_sort_key() {
+        assert_unchanged("SORT_KEY=name");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_token_count() {
+        assert_unchanged("token_count=12");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_prose_about_a_token() {
+        assert_unchanged("the token: is");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_prose_about_a_secret() {
+        assert_unchanged("secret: we should");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_prose_about_a_key() {
+        assert_unchanged("Key: the thing");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_a_url_query_key() {
+        assert_unchanged("https://example.test/search?key=ordinary-value");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_a_command_substitution() {
+        assert_unchanged("SECRET_KEY_BASE=$(rails secret)");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_an_equality_comparison() {
+        assert_unchanged("if MY_TOKEN == other");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_bearer_of_bad_news() {
+        assert_unchanged("bearer of bad news");
+    }
+
+    #[test]
     fn scrub_secrets_redacts_aiza_after_a_boundary_only() {
         let key = sample_aiza();
         assert_redacted(&format!("?key={key}"), &key);
@@ -1195,6 +1353,10 @@ mod tests {
         let scrubbed = scrub_secrets(input);
         assert!(!scrubbed.contains(secret), "secret must be removed");
         assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
+    }
+
+    fn assert_unchanged(input: &str) {
+        assert_eq!(scrub_secrets(input), input);
     }
 
     #[test]
