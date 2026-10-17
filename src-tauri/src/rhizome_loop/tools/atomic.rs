@@ -47,20 +47,12 @@ fn dest_permissions(path: &Path) -> Result<Option<std::fs::Permissions>, String>
 }
 
 fn is_not_writable(path: &Path, meta: &std::fs::Metadata) -> bool {
-    #[cfg(unix)]
-    {
-        use std::os::unix::ffi::OsStrExt;
-        let Ok(c_path) = std::ffi::CString::new(path.as_os_str().as_bytes()) else {
-            return meta.permissions().readonly();
-        };
-        // POSIX owner/group/other (and ACLs). Catches 0464 where
-        // Permissions::readonly is false because the group can write.
-        unsafe { libc::access(c_path.as_ptr(), libc::W_OK) != 0 }
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = path;
-        meta.permissions().readonly()
+    // Open for write without truncating. Catches 0464, where
+    // Permissions::readonly is false because the group can write.
+    match OpenOptions::new().write(true).open(path) {
+        Ok(_) => false,
+        Err(error) if error.kind() == ErrorKind::PermissionDenied => true,
+        Err(_) => meta.permissions().readonly(),
     }
 }
 
