@@ -8,7 +8,7 @@ pub(crate) const CREATE_NOTE_TOOL_JSON: &str = r#"{
   "type": "function",
   "function": {
     "name": "create_note",
-    "description": "Create a new markdown note inside the active Rhizome vault without overwriting existing files.",
+    "description": "Create a new markdown note inside the active Rhizome vault without overwriting existing files. Secret files (.env*, private keys) and anything under .git are refused.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -223,7 +223,9 @@ fn parse_tool_arguments(value: &serde_json::Value) -> Result<(serde_json::Value,
 /// `vault_path` is the default vault. `vault_paths` are the other active
 /// vaults. An explicit `vaultPath` argument must be one of them. The note
 /// path is checked against the vault root by `create_note_content`, so a
-/// path outside the vault is refused. An existing file is never overwritten.
+/// path outside the vault is refused. `resolve_for_write` refuses `.git/**`
+/// and any path `sandbox::is_secret` matches, including when the secret-file
+/// setting is off. An existing file is never overwritten.
 pub(crate) fn create_note(
     args: &serde_json::Value,
     vault_path: Option<&str>,
@@ -232,6 +234,7 @@ pub(crate) fn create_note(
     let note_path = required_tool_string(args, "path")?;
     let content = create_note_tool_content(args, note_path);
     let vault_path = tool_vault_path(vault_path, vault_paths, args)?;
+    crate::rhizome_loop::resolve_for_write(note_path, Some(vault_path), vault_paths)?;
     crate::commands::create_note_content(
         PathBuf::from(note_path),
         content,
@@ -648,6 +651,44 @@ mod tests {
             format!("Created note: {CREATED_NOTE_PATH}")
         );
         assert!(created.output.contains(CREATED_NOTE_PATH));
+    }
+
+    #[test]
+    fn create_note_refuses_secret_and_git_paths() {
+        let vault = tempfile::tempdir().unwrap();
+        let vault_path = vault.path().to_string_lossy().into_owned();
+        for path in [
+            ".env",
+            ".env.local",
+            "key.pem",
+            "id_rsa",
+            "nested/.git/config",
+            ".git/hooks/pre-commit",
+        ] {
+            let error = create_note(
+                &json!({ "path": path, "content": "no\n" }),
+                Some(&vault_path),
+                &[],
+            )
+            .err()
+            .expect("secret path must be refused");
+            assert!(error.contains("blocked: secret file"), "{path}: {error}");
+            assert!(
+                !vault.path().join(path).exists(),
+                "{path} must not be created"
+            );
+        }
+
+        create_note(
+            &json!({ "path": ".env.example", "content": "EXAMPLE=1\n" }),
+            Some(&vault_path),
+            &[],
+        )
+        .expect(".env.example is not a secret path");
+        assert_eq!(
+            fs::read_to_string(vault.path().join(".env.example")).unwrap(),
+            "EXAMPLE=1\n"
+        );
     }
 
     #[test]

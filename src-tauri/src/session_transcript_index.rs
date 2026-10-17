@@ -7,6 +7,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 #[cfg(test)]
 use std::cell::RefCell;
@@ -21,6 +22,11 @@ thread_local! {
 
 const INDEX_VERSION: u32 = 1;
 const INDEX_FILE_NAME: &str = "v1.json";
+
+fn index_lock() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: Mutex<()> = Mutex::new(());
+    LOCK.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
+}
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -79,6 +85,7 @@ pub(crate) fn append_native_turns_to(
     title: &str,
     new_turns: Vec<IndexedTranscriptTurn>,
 ) -> Result<(), String> {
+    let _guard = index_lock();
     let mut document = load_from(index_file.to_path_buf())?;
     if let Some(session) = document
         .sessions
@@ -117,9 +124,11 @@ pub(crate) fn append_native_turns_to(
 
 /// Remove a native session from the index. Missing is success.
 pub fn remove_session(path: &str) -> Result<(), String> {
-    let mut document = load()?;
+    let _guard = index_lock();
+    let index = index_path()?;
+    let mut document = load_from(index.clone())?;
     document.sessions.retain(|session| session.path != path);
-    save(&document)
+    save_to(index, &document)
 }
 
 /// Replace the persisted index with an atomic write.
@@ -130,6 +139,7 @@ pub fn save(document: &SessionTranscriptIndexDocument) -> Result<(), String> {
             document.version
         ));
     }
+    let _guard = index_lock();
     save_to(index_path()?, document)
 }
 
@@ -137,6 +147,7 @@ fn load_from(path: PathBuf) -> Result<SessionTranscriptIndexDocument, String> {
     if !path.exists() {
         return Ok(SessionTranscriptIndexDocument::empty());
     }
+    restrict_index_file(&path);
     let data = fs::read(&path)
         .map_err(|error| format!("read session transcript index {}: {error}", path.display()))?;
     let document: SessionTranscriptIndexDocument = serde_json::from_slice(&data)
@@ -148,30 +159,47 @@ fn load_from(path: PathBuf) -> Result<SessionTranscriptIndexDocument, String> {
 }
 
 fn save_to(path: PathBuf, document: &SessionTranscriptIndexDocument) -> Result<(), String> {
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(|error| {
-            format!(
-                "create session transcript index dir {}: {error}",
-                parent.display()
-            )
-        })?;
-    }
-    let data = serde_json::to_vec(document)
+    let document = scrub_document(document);
+    let data = serde_json::to_string(&document)
         .map_err(|error| format!("serialize session transcript index: {error}"))?;
-    let temp_path = path.with_extension("json.tmp");
-    fs::write(&temp_path, data).map_err(|error| {
-        format!(
-            "write session transcript index {}: {error}",
-            temp_path.display()
-        )
-    })?;
-    fs::rename(&temp_path, &path).map_err(|error| {
-        format!(
-            "replace session transcript index {}: {error}",
-            path.display()
-        )
-    })?;
+    crate::secure_fs::write_owner_only_atomic(&path, &data)
+        .map_err(|error| format!("write session transcript index {}: {error}", path.display()))?;
+    restrict_index_file(&path);
     Ok(())
+}
+
+fn scrub_document(document: &SessionTranscriptIndexDocument) -> SessionTranscriptIndexDocument {
+    let mut copy = document.clone();
+    for session in &mut copy.sessions {
+        session.title = crate::engines::native_log::scrub_secrets(&session.title);
+        for turn in &mut session.turns {
+            turn.text = crate::engines::native_log::scrub_secrets(&turn.text);
+        }
+    }
+    copy
+}
+
+fn restrict_index_file(path: &Path) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let Ok(meta) = fs::metadata(path) else {
+            return;
+        };
+        if meta.permissions().mode() & 0o077 == 0 {
+            return;
+        }
+        if let Err(error) = fs::set_permissions(path, fs::Permissions::from_mode(0o600)) {
+            log::warn!(
+                "could not restrict session transcript index {}: {error}",
+                path.display()
+            );
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+    }
 }
 
 pub(crate) fn index_path() -> Result<PathBuf, String> {
@@ -281,6 +309,93 @@ mod tests {
             assert!(raw.contains("\"messageIndex\""));
             assert!(raw.contains("\"sessions\""));
             assert!(!raw.contains("message_index"));
+        });
+    }
+
+    #[test]
+    fn append_scrubs_secrets_and_leaves_no_shared_temp_file() {
+        with_cache_dir(|dir| {
+            append_native_turns(
+                "native://secret",
+                "secret",
+                "NVIDIA_API_KEY=nvapi-abcdefghijklmnopqrstuvwxyz",
+                vec![IndexedTranscriptTurn {
+                    message_index: 0,
+                    role: "user".into(),
+                    text: "GEMINI_API_KEY=AIzaSyA1234567890abcdefghijklmnop".into(),
+                }],
+            )
+            .expect("append");
+            let dir = dir.path().join("session-transcript-index");
+            let raw = fs::read_to_string(dir.join(INDEX_FILE_NAME)).expect("read index");
+            assert!(!raw.contains("nvapi-abcdefghijklmnopqrstuvwxyz"));
+            assert!(!raw.contains("AIzaSyA1234567890abcdefghijklmnop"));
+            assert!(raw.contains("[redacted]"));
+            let names: Vec<_> = fs::read_dir(&dir)
+                .expect("list index dir")
+                .map(|entry| entry.expect("entry").file_name())
+                .collect();
+            assert!(
+                names
+                    .iter()
+                    .all(|name| !name.to_string_lossy().contains(".tmp")),
+                "temp files left behind: {names:?}"
+            );
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mode = fs::metadata(dir.join(INDEX_FILE_NAME))
+                    .expect("meta")
+                    .permissions()
+                    .mode()
+                    & 0o777;
+                assert_eq!(mode, 0o600);
+            }
+        });
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn load_restricts_an_existing_world_readable_index() {
+        use std::os::unix::fs::PermissionsExt;
+        with_cache_dir(|_| {
+            let path = index_path().expect("index path");
+            fs::create_dir_all(path.parent().expect("parent")).expect("create dir");
+            fs::write(&path, r#"{"version":1,"sessions":[]}"#).expect("write index");
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).expect("chmod");
+            load().expect("load");
+            let mode = fs::metadata(&path).expect("meta").permissions().mode() & 0o777;
+            assert_eq!(mode, 0o600);
+        });
+    }
+
+    #[test]
+    fn concurrent_appends_keep_every_turn() {
+        use std::thread;
+        with_cache_dir(|_| {
+            let handles: Vec<_> = (0..8)
+                .map(|index| {
+                    thread::spawn(move || {
+                        append_native_turns(
+                            "same",
+                            "same",
+                            "title",
+                            vec![IndexedTranscriptTurn {
+                                message_index: 0,
+                                role: "user".into(),
+                                text: format!("turn-{index}"),
+                            }],
+                        )
+                        .expect("append");
+                    })
+                })
+                .collect();
+            for handle in handles {
+                handle.join().expect("join");
+            }
+            let loaded = load().expect("load");
+            assert_eq!(loaded.sessions.len(), 1);
+            assert_eq!(loaded.sessions[0].turns.len(), 8);
         });
     }
 

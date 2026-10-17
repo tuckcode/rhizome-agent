@@ -1058,7 +1058,7 @@ Rhizome-owned index (`src/lib/sessionTranscriptSearch.ts`, ADR-0177 vault
 layer, still holds under ADR-0180). It reads
 each `list_prime_session_summaries` path once per `mtimeMs` stamp via
 `read_prime_session_transcript`, then persists the extracted turns under the
-OS cache (`ai.rhizome.agent/session-transcript-index/v1.json`). A later search
+OS cache (`ai.rhizome.agent/session-transcript-index/v1.json`). The file is owner-only on Unix. Turn text and titles pass through the same secret scrubber as the native session log before they are written. A later search
 or launch skips an unchanged log. Hits are user turns and assistant prose; tool
 noise is left out. Arrow keys move through the Sessions group with note
 results. Choosing a hit closes search, switches the live session, and scrolls

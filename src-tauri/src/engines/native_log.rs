@@ -170,23 +170,70 @@ pub fn scrub_secrets(text: &str) -> String {
             out = out.replace(&secret, "[redacted]");
         }
     }
-    let patterns = [
-        r"(?:sk-proj-|sk-or-v1-|sk-ant-|gsk_)[A-Za-z0-9_-]{8,}",
-        r"(?:sk_live_|sk_test_|sk-|ghp_|gho_|ghs_|ghu_|ghr_|github_pat_|glpat-|gsk_|npm_|xox[abprse]-)[A-Za-z0-9_-]{20,}",
-        r"hf_[A-Za-z0-9]{20,}",
-        r"xai-[A-Za-z0-9]{20,}",
-        r"AKIA[0-9A-Z]{16}",
-        r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----",
-        r"(?i)bearer\s+[A-Za-z0-9._\-+/=]+",
-        r#"(?i)"api_key"\s*:\s*"[^"]+""#,
-        r"(?i)\bapi_key\s*=\s*\S+",
-    ];
-    for pattern in patterns {
-        if let Ok(regex) = regex::Regex::new(pattern) {
-            out = regex.replace_all(&out, "[redacted]").into_owned();
-        }
+    let scrubber = secret_scrubber();
+    for regex in &scrubber.replace {
+        out = regex.replace_all(&out, "[redacted]").into_owned();
     }
+    // Keep the character before the name. `_` is a word character, so a
+    // leading `\b` misses `NVIDIA_API_KEY`.
+    out = scrubber
+        .assignment
+        .replace_all(&out, "${1}[redacted]")
+        .into_owned();
+    // A Mistral key is 32 alphanumeric characters with no prefix. Keep the
+    // nearby word so a hash that merely shares the length stays put.
+    out = scrubber
+        .mistral_after
+        .replace_all(&out, "${1}[redacted]")
+        .into_owned();
+    out = scrubber
+        .mistral_before
+        .replace_all(&out, "[redacted]${1}")
+        .into_owned();
     out
+}
+
+struct SecretScrubber {
+    replace: Vec<regex::Regex>,
+    assignment: regex::Regex,
+    mistral_after: regex::Regex,
+    mistral_before: regex::Regex,
+}
+
+fn secret_scrubber() -> &'static SecretScrubber {
+    static SCRUBBER: std::sync::OnceLock<SecretScrubber> = std::sync::OnceLock::new();
+    SCRUBBER.get_or_init(|| {
+        let replace = [
+            r"(?:sk-proj-|sk-or-v1-|sk-ant-|gsk_)[A-Za-z0-9_-]{8,}",
+            r"(?:sk_live_|sk_test_|sk-|ghp_|gho_|ghs_|ghu_|ghr_|github_pat_|glpat-|gsk_|npm_|xox[abprse]-)[A-Za-z0-9_-]{20,}",
+            r"hf_[A-Za-z0-9]{20,}",
+            r"xai-[A-Za-z0-9]{20,}",
+            r"nvapi-[A-Za-z0-9_-]{16,}",
+            r"AIza[0-9A-Za-z_-]{20,}",
+            r"AKIA[0-9A-Z]{16}",
+            r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----",
+            r"(?i)bearer\s+[A-Za-z0-9._\-+/=]+",
+            r#"(?i)"(?:[A-Za-z0-9]+_)*(?:api_)?(?:key|token|secret)"\s*:\s*"[^"]+""#,
+        ]
+        .into_iter()
+        .map(|pattern| regex::Regex::new(pattern).expect("secret pattern"))
+        .collect();
+        SecretScrubber {
+            replace,
+            assignment: regex::Regex::new(
+                r"(?i)(^|[^A-Za-z0-9])((?:[A-Za-z0-9]+_)*(?:api_)?(?:key|token|secret)\s*=\s*\S+)",
+            )
+            .expect("assignment pattern"),
+            mistral_after: regex::Regex::new(
+                r"(?i)(\bmistral(?:ai)?\b[^\n]{0,80}?)\b[A-Za-z0-9]{32}\b",
+            )
+            .expect("mistral-after pattern"),
+            mistral_before: regex::Regex::new(
+                r"(?i)\b[A-Za-z0-9]{32}\b([^\n]{0,80}?\bmistral(?:ai)?\b)",
+            )
+            .expect("mistral-before pattern"),
+        }
+    })
 }
 
 /// Saved provider keys, read through `ProviderKeys` (the OS keychain since
@@ -837,6 +884,75 @@ mod tests {
         assert!(!assigned.contains("super-secret-value"));
         let json = scrub_secrets(r#"{"api_key": "super-secret-value"}"#);
         assert!(!json.contains("super-secret-value"));
+    }
+
+    fn bare_mistral_key() -> String {
+        // Built in pieces so the source has no 32-character token literal.
+        "AbCdEfGh".repeat(4)
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_prefixed_assignments_and_known_prefixes() {
+        let mistral = bare_mistral_key();
+        let cases = [
+            (
+                "NVIDIA_API_KEY=nvapi-abcdefghijklmnopqrstuvwxyz".to_string(),
+                "nvapi-abcdefghijklmnopqrstuvwxyz".to_string(),
+            ),
+            (
+                "GEMINI_API_KEY=AIzaSyA1234567890abcdefghijklmnop".to_string(),
+                "AIzaSyA1234567890abcdefghijklmnop".to_string(),
+            ),
+            (format!("MISTRAL_API_KEY={mistral}"), mistral.clone()),
+            (
+                "export HF_TOKEN=hf_should_be_gone_value".to_string(),
+                "hf_should_be_gone_value".to_string(),
+            ),
+            (
+                "sk-abcdefghijklmnopqrstuvwxyz".to_string(),
+                "sk-abcdefghijklmnopqrstuvwxyz".to_string(),
+            ),
+            (
+                "xai-abcdefghijklmnopqrstuvwxyz".to_string(),
+                "xai-abcdefghijklmnopqrstuvwxyz".to_string(),
+            ),
+            (
+                "gsk_abcdefghijklmnopqrstuvwxyz".to_string(),
+                "gsk_abcdefghijklmnopqrstuvwxyz".to_string(),
+            ),
+            (format!("the mistral key is {mistral}"), mistral.clone()),
+            (format!("{mistral} is the mistral key"), mistral.clone()),
+            (
+                r#"{"nvidia_api_key": "nvapi-abcdefghijklmnopqrstuvwxyz"}"#.to_string(),
+                "nvapi-abcdefghijklmnopqrstuvwxyz".to_string(),
+            ),
+        ];
+        for (sample, secret) in cases {
+            let scrubbed = scrub_secrets(&sample);
+            assert!(
+                !scrubbed.contains(&secret),
+                "{sample} still contains {secret}: {scrubbed}"
+            );
+            assert!(scrubbed.contains("[redacted]"), "{sample} -> {scrubbed}");
+        }
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_ordinary_words_and_hashes() {
+        let samples = [
+            "use hf_hub_download to fetch the file",
+            "keyboard=qwerty",
+            "monkey=banana",
+            "token count is high",
+            "the primary key of the note",
+            "AIza is a prefix",
+            "nvapi-short",
+            "checksum d41d8cd98f00b204e9800998ecf8427e",
+            "mistral-large-latest is a model name",
+        ];
+        for sample in samples {
+            assert_eq!(scrub_secrets(sample), sample, "{sample}");
+        }
     }
 
     #[test]

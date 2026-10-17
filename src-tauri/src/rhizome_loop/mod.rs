@@ -1033,6 +1033,50 @@ mod tests {
     }
 
     #[test]
+    fn power_user_create_note_refuses_a_secret_path_without_asking() {
+        let vault = tempfile::tempdir().unwrap();
+        let _guard = super::tools::override_secret_block(false);
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::PowerUser);
+        agent.set_vault(
+            Some(vault.path().to_string_lossy().into_owned()),
+            Vec::new(),
+        );
+        let asked = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&asked);
+        agent.set_approval_waiter(move |_, _| {
+            flag.store(true, Ordering::SeqCst);
+            ApprovalReply::AllowOnce
+        });
+        let mut model = FakeModel::script(vec![
+            vec![ScriptPart::Tool {
+                name: "create_note".into(),
+                args: serde_json::json!({
+                    "path": ".env",
+                    "content": "SECRET=no\n",
+                })
+                .to_string(),
+            }],
+            vec![ScriptPart::Text("after".into())],
+        ]);
+        agent.submit("secret");
+        agent.run_until_idle(&mut model);
+
+        assert!(
+            !asked.load(Ordering::SeqCst),
+            "Power User create_note must not ask before the secret refusal"
+        );
+        assert!(!vault.path().join(".env").exists());
+        assert!(agent.events().iter().any(|event| {
+            matches!(
+                event,
+                DurableEvent::ToolResult { name, output, .. }
+                    if name == "create_note" && output.contains("blocked: secret file")
+            )
+        }));
+    }
+
+    #[test]
     fn power_user_runs_create_note_without_a_prompt() {
         let vault = tempfile::tempdir().unwrap();
         let note = vault.path().join("power.md");

@@ -463,7 +463,7 @@ fn index_native_turn(
             text: assistant,
         },
     ];
-    let _ = match index_file {
+    let result = match index_file {
         Some(file) => session_transcript_index::append_native_turns_to(
             file,
             session_path,
@@ -478,6 +478,9 @@ fn index_native_turn(
             turns,
         ),
     };
+    if let Err(error) = result {
+        log::warn!("session transcript index update failed: {error}");
+    }
 }
 
 fn join_with_bound(worker: thread::JoinHandle<()>, bound: Duration) -> bool {
@@ -1366,6 +1369,59 @@ mod tests {
                 .iter()
                 .any(|turn| { turn.role == "assistant" && turn.text == "ok" }));
         });
+    }
+
+    #[test]
+    fn transcript_index_scrubs_a_pasted_key() {
+        with_temp_home_and_cache(|_| {
+            let chats = NativeChats::new();
+            let (tx, rx) = mpsc::channel();
+            let id = chats
+                .start_with_engine(
+                    "NVIDIA_API_KEY=nvapi-abcdefghijklmnopqrstuvwxyz",
+                    NativeEngine::saying("ok"),
+                    move |event| {
+                        let _ = tx.send(event);
+                    },
+                )
+                .expect("start");
+            let path = chats.path_for(&id).expect("native path");
+            wait_for_turn_end(&rx);
+            let record = wait_for_indexed_session(&path);
+            let raw =
+                std::fs::read_to_string(session_transcript_index::index_path().expect("path"))
+                    .expect("read index");
+            assert!(!raw.contains("nvapi-abcdefghijklmnopqrstuvwxyz"));
+            assert!(record
+                .turns
+                .iter()
+                .any(|turn| { turn.role == "user" && turn.text.contains("[redacted]") }));
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mode = std::fs::metadata(session_transcript_index::index_path().expect("path"))
+                    .expect("meta")
+                    .permissions()
+                    .mode()
+                    & 0o777;
+                assert_eq!(mode, 0o600);
+            }
+        });
+    }
+
+    #[test]
+    fn a_failed_index_update_is_logged() {
+        let dir = tempfile::tempdir().unwrap();
+        let blocker = dir.path().join("not-a-directory");
+        std::fs::write(&blocker, "x").unwrap();
+        super::index_native_turn(
+            Some(&blocker.join("v1.json")),
+            "native://missing",
+            "missing",
+            "hello",
+            "ok".into(),
+        );
+        assert!(!blocker.join("v1.json").exists());
     }
 
     #[test]

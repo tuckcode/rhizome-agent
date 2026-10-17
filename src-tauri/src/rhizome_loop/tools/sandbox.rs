@@ -58,8 +58,14 @@ pub fn allowed_roots(vault_path: Option<&str>, vault_paths: &[String]) -> Result
         if trimmed.is_empty() {
             continue;
         }
-        let Ok(canonical) = canonicalize_root(trimmed) else {
-            continue;
+        let canonical = match canonicalize_root(trimmed) {
+            Ok(canonical) => canonical,
+            Err(error) => {
+                log::warn!(
+                    "skipping vault root that could not be canonicalized: {trimmed} ({error})"
+                );
+                continue;
+            }
         };
         if all.iter().any(|root| root == &canonical) {
             continue;
@@ -453,6 +459,18 @@ mod tests {
         )
         .unwrap();
         assert_eq!(resolved, requested);
+    }
+
+    #[test]
+    fn a_missing_extra_root_is_skipped_and_the_current_vault_still_resolves() {
+        let (_dir, root) = vault();
+        let resolved = resolve_for_read(
+            "inside.md",
+            Some(&root),
+            &["/no/such/rhizome-vault-root".to_string()],
+        )
+        .unwrap();
+        assert_eq!(resolved, PathBuf::from(&root).join("inside.md"));
     }
 
     #[cfg(unix)]
