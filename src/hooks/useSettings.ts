@@ -138,24 +138,6 @@ function effectiveAccentColor(settings: Settings): string {
   return normalizeAccentColor(settings.accent_color) ?? DEFAULT_ACCENT_COLOR
 }
 
-function assignChangedSetting<K extends keyof Settings>(target: Settings, key: K, value: Settings[K]) {
-  target[key] = value
-}
-
-function mergeChangedSettings(base: Settings, previous: Settings, next: Settings): Settings {
-  const merged = { ...base }
-  const keys = new Set<keyof Settings>([
-    ...(Object.keys(previous) as Array<keyof Settings>),
-    ...(Object.keys(next) as Array<keyof Settings>),
-  ])
-  keys.forEach((key) => {
-    if (!Object.is(previous[key], next[key])) {
-      assignChangedSetting(merged, key, next[key])
-    }
-  })
-  return merged
-}
-
 function loadErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
@@ -166,6 +148,7 @@ export function useSettings() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const settingsRef = useRef(settings)
   const loadOkRef = useRef(false)
+  const loadedRef = useRef(false)
   const loadEpoch = useRef(0)
 
   const loadSettings = useCallback(async (): Promise<Settings | null> => {
@@ -194,6 +177,7 @@ export function useSettings() {
       if (epoch === loadEpoch.current) setLoadError(loadErrorMessage(err))
       return null
     } finally {
+      loadedRef.current = true
       setLoaded(true)
     }
   }, [])
@@ -202,26 +186,31 @@ export function useSettings() {
     loadSettings()
   }, [loadSettings])
 
-  const saveSettings = useCallback(async (newSettings: Settings) => {
-    const memory = settingsRef.current
-    let toSave = newSettings
-    if (!loadOkRef.current) {
-      const disk = await loadSettings()
-      if (!disk || !loadOkRef.current) {
-        // TODO: tell the user this change was not saved. Copy belongs in
-        // en.json, which another PR is editing, so this stays silent.
-        return
-      }
-      toSave = mergeChangedSettings(disk, memory, newSettings)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const retryFailedLoad = () => {
+      if (loadOkRef.current || !loadedRef.current) return
+      void loadSettings()
     }
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') retryFailedLoad()
+    }
+    window.addEventListener('focus', retryFailedLoad)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('focus', retryFailedLoad)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [loadSettings])
 
+  const writeSettings = useCallback(async (newSettings: Settings) => {
     loadEpoch.current += 1
     const previous = settingsRef.current
     const previousHideGitignored = shouldHideGitignoredFiles(previous)
     const previousThemeMode = effectiveThemeMode(previous)
     const previousColorTheme = effectiveColorTheme(previous)
     const previousAccentColor = effectiveAccentColor(previous)
-    const normalizedSettings = normalizeSettings(toSave)
+    const normalizedSettings = normalizeSettings(newSettings)
     // Optimistic local state so theme/UI prefs flip immediately; disk write follows.
     settingsRef.current = normalizedSettings
     setSettings(normalizedSettings)
@@ -248,11 +237,37 @@ export function useSettings() {
       settingsRef.current = previous
       setSettings(previous)
     }
-  }, [loadSettings])
+  }, [])
+
+  const saveSettings = useCallback(async (newSettings: Settings) => {
+    if (!loadOkRef.current) {
+      const disk = await loadSettings()
+      if (!disk || !loadOkRef.current) {
+        console.warn('[settings] Did not save settings. The settings file still failed to load.')
+        return
+      }
+      // The caller built this object from the empty in-memory settings.
+      // Writing it would replace the file with form defaults. Show disk instead.
+      console.warn('[settings] Did not save settings. The file loaded on retry, so this change was dropped.')
+      return
+    }
+    await writeSettings(newSettings)
+  }, [loadSettings, writeSettings])
+
+  const saveSettingsPatch = useCallback(async (patch: Partial<Settings>) => {
+    if (!loadOkRef.current) {
+      const disk = await loadSettings()
+      if (!disk || !loadOkRef.current) {
+        console.warn('[settings] Did not save settings. The settings file still failed to load.')
+        return
+      }
+    }
+    await writeSettings({ ...settingsRef.current, ...patch })
+  }, [loadSettings, writeSettings])
 
   const saveNativeChatTarget = useCallback(async (target: string) => {
-    await saveSettings({ ...settingsRef.current, native_chat_target: target })
-  }, [saveSettings])
+    await saveSettingsPatch({ native_chat_target: target })
+  }, [saveSettingsPatch])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -270,5 +285,5 @@ export function useSettings() {
     }
   }, [saveSettings, settings])
 
-  return { settings, loaded, loadError, saveSettings, saveNativeChatTarget }
+  return { settings, loaded, loadError, saveSettings, saveSettingsPatch, saveNativeChatTarget }
 }

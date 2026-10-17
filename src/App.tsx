@@ -251,7 +251,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     void openExternalUrl(RHIZOME_DOCS_URL)
   }, [])
   const networkStatus = useNetworkStatus()
-  const { settings, loaded: settingsLoaded, loadError, saveSettings, saveNativeChatTarget } = useSettings()
+  const { settings, loaded: settingsLoaded, loadError, saveSettings, saveSettingsPatch, saveNativeChatTarget } = useSettings()
   const primeActiveClose = usePrimeActiveClose()
 
   // onSwitch closure captures `notes` declared below — safe because it's only
@@ -2107,6 +2107,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         loadError={loadError}
         runtimeMissingVaultPath={runtimeMissingVaultPath}
         saveSettings={saveSettings}
+        saveSettingsPatch={saveSettingsPatch}
         settings={settings}
         settingsLoaded={settingsLoaded}
         shouldResumeFreshStartOnboarding={shouldResumeFreshStartOnboarding}

@@ -25,6 +25,7 @@ export interface StartupScreenParams {
   runtimeMissingVaultPath: string | null
   loadError: string | null
   saveSettings: (settings: Settings) => Promise<void>
+  saveSettingsPatch: (patch: Partial<Settings>) => Promise<void>
   settings: Settings
   settingsLoaded: boolean
   shouldResumeFreshStartOnboarding: boolean
@@ -120,8 +121,7 @@ export function StartupScreen(params: StartupScreenParams) {
       <TelemetryConsentDialog
         onAccept={() => {
           const id = crypto.randomUUID()
-          params.saveSettings({
-            ...params.settings,
+          void params.saveSettingsPatch({
             telemetry_consent: true,
             crash_reporting_enabled: true,
             analytics_enabled: true,
@@ -129,8 +129,7 @@ export function StartupScreen(params: StartupScreenParams) {
           })
         }}
         onDecline={() => {
-          params.saveSettings({
-            ...params.settings,
+          void params.saveSettingsPatch({
             telemetry_consent: false,
             crash_reporting_enabled: false,
             analytics_enabled: false,

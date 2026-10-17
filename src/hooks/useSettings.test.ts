@@ -7,6 +7,7 @@ import {
   TOGGLE_GITIGNORED_VISIBILITY_EVENT,
 } from '../lib/gitignoredVisibilityEvents'
 import { readChatEngine } from '../lib/chatEngine'
+import { settingsAfterUseRhizome } from '../lib/settingsAfterUseRhizome'
 import { useSettings } from './useSettings'
 
 const { trackEventMock } = vi.hoisted(() => ({
@@ -613,7 +614,12 @@ describe('useSettings', () => {
 
     getSettingsFails = false
     await act(async () => {
-      await result.current.saveSettings(declineTelemetry(result.current.settings))
+      await result.current.saveSettingsPatch({
+        telemetry_consent: false,
+        crash_reporting_enabled: false,
+        analytics_enabled: false,
+        anonymous_id: null,
+      })
     })
 
     expect(saveSettingsCalls()).toHaveLength(1)
@@ -673,5 +679,126 @@ describe('useSettings', () => {
     expect(saveSettingsCalls()).toHaveLength(writesAfterFreshLoad)
     expect(mockSettingsStore.theme_mode).toBe('dark')
     expect(mockSettingsStore.native_chat_target).toBe('groq/llama-3.3-70b')
+  })
+
+  it('drops a full settings-panel save after a failed load recovers, and leaves every other field', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const conversations = [
+      { archived: false, id: 'keep-me', title: 'Kept chat', target_id: 'codex' },
+    ]
+    const disk: Settings = {
+      ...savedChatTarget(),
+      accent_color: 'blue',
+      analytics_enabled: true,
+      auto_pull_interval_minutes: 15,
+      git_enabled: false,
+      telemetry_consent: true,
+      theme_mode: 'dark',
+      ai_workspace_conversations: conversations,
+    }
+    mockSettingsStore = disk
+    let getSettingsFails = true
+    mockInvokeFn.mockImplementation((cmd: string, args?: Record<string, unknown>) => {
+      if (cmd === 'get_settings' && getSettingsFails) return Promise.reject(new Error('disk'))
+      return settingsInvoke(cmd, args)
+    })
+
+    const { result } = renderHook(() => useSettings())
+    await waitFor(() => {
+      expect(result.current.loadError).toBe('disk')
+    })
+
+    getSettingsFails = false
+    const panelSave: Settings = {
+      ...result.current.settings,
+      accent_color: 'green',
+      analytics_enabled: false,
+      auto_pull_interval_minutes: 5,
+      git_enabled: true,
+      telemetry_consent: false,
+      theme_mode: 'light',
+      ai_workspace_conversations: [
+        { archived: false, id: 'new', title: 'AI Chat', target_id: 'agent:prime' },
+      ],
+    }
+    await act(async () => {
+      await result.current.saveSettings(panelSave)
+    })
+
+    expect(saveSettingsCalls()).toHaveLength(0)
+    expect(mockSettingsStore.accent_color).toBe('blue')
+    expect(mockSettingsStore.analytics_enabled).toBe(true)
+    expect(mockSettingsStore.auto_pull_interval_minutes).toBe(15)
+    expect(mockSettingsStore.git_enabled).toBe(false)
+    expect(mockSettingsStore.telemetry_consent).toBe(true)
+    expect(mockSettingsStore.theme_mode).toBe('dark')
+    expect(mockSettingsStore.ai_workspace_conversations).toEqual(conversations)
+    expect(result.current.settings.accent_color).toBe('blue')
+    expect(result.current.settings.theme_mode).toBe('dark')
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('[settings] Did not save settings'))
+    warnSpy.mockRestore()
+  })
+
+  it('keeps the stored conversation list when Use Rhizome saves after a recovered load', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const conversations = [
+      { archived: false, id: 'codex-chat', title: 'Codex', target_id: 'codex' },
+      { archived: false, id: 'other', title: 'Other', target_id: 'claude_code' },
+    ]
+    mockSettingsStore = {
+      ...savedChatTarget(),
+      default_ai_target: 'codex',
+      ai_workspace_conversations: conversations,
+    }
+    let getSettingsFails = true
+    mockInvokeFn.mockImplementation((cmd: string, args?: Record<string, unknown>) => {
+      if (cmd === 'get_settings' && getSettingsFails) return Promise.reject(new Error('disk'))
+      return settingsInvoke(cmd, args)
+    })
+
+    const { result } = renderHook(() => useSettings())
+    await waitFor(() => {
+      expect(result.current.loadError).toBe('disk')
+    })
+
+    getSettingsFails = false
+    const fromEmptyMemory = settingsAfterUseRhizome(result.current.settings, 'agent:prime', 'codex-chat')
+    await act(async () => {
+      await result.current.saveSettings(fromEmptyMemory)
+    })
+
+    expect(saveSettingsCalls()).toHaveLength(0)
+    expect(mockSettingsStore.ai_workspace_conversations).toEqual(conversations)
+    expect(mockSettingsStore.default_ai_target).toBe('codex')
+    expect(result.current.settings.ai_workspace_conversations).toEqual(conversations)
+    warnSpy.mockRestore()
+  })
+
+  it('reloads a fixed settings file when the window regains focus', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mockSettingsStore = savedChatTarget()
+    let getSettingsFails = true
+    mockInvokeFn.mockImplementation((cmd: string, args?: Record<string, unknown>) => {
+      if (cmd === 'get_settings' && getSettingsFails) return Promise.reject(new Error('disk'))
+      return settingsInvoke(cmd, args)
+    })
+
+    const { result } = renderHook(() => useSettings())
+    await waitFor(() => {
+      expect(result.current.loadError).toBe('disk')
+    })
+
+    getSettingsFails = false
+    act(() => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    await waitFor(() => {
+      expect(result.current.loadError).toBeNull()
+    })
+
+    expect(result.current.settings.theme_mode).toBe('dark')
+    expect(result.current.settings.native_chat_target).toBe('openai/gpt-4.1-mini')
+    expect(saveSettingsCalls()).toHaveLength(0)
+    warnSpy.mockRestore()
   })
 })
