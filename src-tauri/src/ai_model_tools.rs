@@ -668,6 +668,116 @@ mod tests {
     }
 
     #[test]
+    fn create_note_refuses_secret_and_git_paths() {
+        let vault = tempfile::tempdir().unwrap();
+        let vault_path = vault.path().to_string_lossy().into_owned();
+        for requested in [
+            ".env",
+            ".env.local",
+            "key.pem",
+            "id_rsa",
+            "nested/.git/config",
+        ] {
+            let error = create_note(
+                &json!({ "path": requested, "content": "no\n" }),
+                Some(&vault_path),
+                &[],
+            )
+            .err()
+            .expect("secret path");
+            assert!(
+                error.contains(crate::rhizome_loop::BLOCKED_SECRET),
+                "{requested}: {error}"
+            );
+            assert!(
+                !vault.path().join(requested).exists(),
+                "{requested} must not be created"
+            );
+        }
+        assert!(
+            !vault.path().join("nested").exists(),
+            "create_note must not create a .git parent"
+        );
+
+        create_note(
+            &json!({ "path": ".env.example", "content": "EXAMPLE=1\n" }),
+            Some(&vault_path),
+            &[],
+        )
+        .expect(".env.example is not a secret");
+        assert_eq!(
+            fs::read_to_string(vault.path().join(".env.example")).unwrap(),
+            "EXAMPLE=1\n"
+        );
+    }
+
+    #[test]
+    fn create_note_stays_blocked_when_the_secret_setting_is_off() {
+        let vault = tempfile::tempdir().unwrap();
+        let vault_path = vault.path().to_string_lossy().into_owned();
+        fs::create_dir_all(vault.path().join(".git").join("hooks")).unwrap();
+        fs::write(
+            vault.path().join(".git").join("hooks").join("pre-commit"),
+            "keep\n",
+        )
+        .unwrap();
+        fs::write(vault.path().join(".env"), "SECRET=keep\n").unwrap();
+        let _guard = crate::rhizome_loop::override_secret_block(false);
+        for requested in [".git/hooks/pre-commit", ".env", "id_ed25519"] {
+            let error = create_note(
+                &json!({ "path": requested, "content": "no\n" }),
+                Some(&vault_path),
+                &[],
+            )
+            .err()
+            .expect("secret path");
+            assert!(
+                error.contains(crate::rhizome_loop::BLOCKED_SECRET),
+                "create_note must keep blocking {requested} with the setting off: {error}"
+            );
+            if requested != "id_ed25519" {
+                assert_eq!(
+                    fs::read_to_string(vault.path().join(requested)).unwrap(),
+                    if requested == ".env" {
+                        "SECRET=keep\n"
+                    } else {
+                        "keep\n"
+                    },
+                    "{requested} must stay unchanged"
+                );
+            } else {
+                assert!(!vault.path().join(requested).exists());
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn create_note_refuses_a_symlink_into_git() {
+        let vault = tempfile::tempdir().unwrap();
+        let vault_path = vault.path().to_string_lossy().into_owned();
+        fs::create_dir_all(vault.path().join(".git")).unwrap();
+        fs::write(vault.path().join(".git").join("config"), "keep\n").unwrap();
+        std::os::unix::fs::symlink(vault.path().join(".git"), vault.path().join("gitlink"))
+            .unwrap();
+        let error = create_note(
+            &json!({ "path": "gitlink/config", "content": "no\n" }),
+            Some(&vault_path),
+            &[],
+        )
+        .err()
+        .expect("symlink into .git");
+        assert!(
+            error.contains(crate::rhizome_loop::BLOCKED_SECRET),
+            "{error}"
+        );
+        assert_eq!(
+            fs::read_to_string(vault.path().join(".git").join("config")).unwrap(),
+            "keep\n"
+        );
+    }
+
+    #[test]
     fn create_note_refuses_an_inactive_vault_and_a_missing_vault() {
         let active = tempfile::tempdir().unwrap();
         let inactive = tempfile::tempdir().unwrap();

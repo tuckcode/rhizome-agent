@@ -183,22 +183,72 @@ pub fn scrub_secrets(text: &str) -> String {
             out = out.replace(&secret, "[redacted]");
         }
     }
+    // `\bapi_key` misses `OPENAI_API_KEY` because `_` is a word character.
+    // Keep the character before the name so a newline in `cat .env` output stays.
+    let env_assignment = r#"(?P<prefix>(?:^|[^A-Za-z0-9])(?:(?:export|set)[ \t]+)?)(?P<name>(?:[A-Z][A-Z0-9_]*(?:API_KEY|TOKEN|SECRET)(?:_[A-Z0-9]+)*|api_key)[ \t]*=[ \t]*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^[:space:]#]+)"#;
+    if let Ok(regex) = regex::Regex::new(env_assignment) {
+        out = regex
+            .replace_all(&out, "${prefix}${name}[redacted]")
+            .into_owned();
+    }
     let patterns = [
         r"(?:sk-proj-|sk-or-v1-|sk-ant-|gsk_)[A-Za-z0-9_-]{8,}",
         r"(?:sk_live_|sk_test_|sk-|ghp_|gho_|ghs_|ghu_|ghr_|github_pat_|glpat-|gsk_|npm_|xox[abprse]-)[A-Za-z0-9_-]{20,}",
         r"hf_[A-Za-z0-9]{20,}",
         r"xai-[A-Za-z0-9]{20,}",
+        r"nvapi-[A-Za-z0-9_-]{20,}",
+        r"AIza[0-9A-Za-z_-]{20,}",
+        r"pplx-[A-Za-z0-9]{20,}",
         r"AKIA[0-9A-Z]{16}",
         r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----",
         r"(?i)bearer\s+[A-Za-z0-9._\-+/=]+",
         r#"(?i)"api_key"\s*:\s*"[^"]+""#,
-        r"(?i)\bapi_key\s*=\s*\S+",
     ];
     for pattern in patterns {
         if let Ok(regex) = regex::Regex::new(pattern) {
             out = regex.replace_all(&out, "[redacted]").into_owned();
         }
     }
+    scrub_bare_mistral_keys(&out)
+}
+
+/// Mistral keys are 32 alphanumeric characters with no prefix. Redact one
+/// only when `mistral` (or `api.mistral.ai`) sits within 200 characters,
+/// so a checksum in ordinary text stays.
+fn scrub_bare_mistral_keys(text: &str) -> String {
+    let Ok(context) = regex::Regex::new(r"(?i)mistral|api\.mistral\.ai") else {
+        return text.to_string();
+    };
+    let Ok(key) = regex::Regex::new(r"\b[A-Za-z0-9]{32}\b") else {
+        return text.to_string();
+    };
+    let contexts: Vec<(usize, usize)> = context
+        .find_iter(text)
+        .map(|m| (m.start(), m.end()))
+        .collect();
+    if contexts.is_empty() {
+        return text.to_string();
+    }
+    let mut out = String::with_capacity(text.len());
+    let mut last = 0;
+    for matched in key.find_iter(text) {
+        let near = contexts.iter().any(|&(start, end)| {
+            let gap = if matched.end() < start {
+                start - matched.end()
+            } else if end < matched.start() {
+                matched.start() - end
+            } else {
+                0
+            };
+            gap <= 200
+        });
+        if near {
+            out.push_str(&text[last..matched.start()]);
+            out.push_str("[redacted]");
+            last = matched.end();
+        }
+    }
+    out.push_str(&text[last..]);
     out
 }
 
@@ -969,6 +1019,95 @@ mod tests {
         assert!(!assigned.contains("super-secret-value"));
         let json = scrub_secrets(r#"{"api_key": "super-secret-value"}"#);
         assert!(!json.contains("super-secret-value"));
+    }
+
+    /// 32 alphanumeric characters, split in source so push protection does
+    /// not treat the fixture as a live Mistral key.
+    fn bare_mistral_sample() -> String {
+        let key = format!("{}{}", "AbcdEf0123456789", "ZyXwVu9876543210");
+        assert_eq!(key.len(), 32);
+        key
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_env_assignments_and_provider_prefixes() {
+        let mistral = bare_mistral_sample();
+        let mistral_assigned = format!("MISTRAL_API_KEY={mistral}");
+        let mistral_bare = format!("mistral key {mistral}");
+        let cases = [
+            (
+                "NVIDIA_API_KEY=nvapi-abcdefghijklmnopqrstuvwxyz012345",
+                "nvapi-abcdefghijklmnopqrstuvwxyz012345",
+            ),
+            (
+                "GEMINI_API_KEY=AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ1234567",
+                "AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ1234567",
+            ),
+            (
+                "OPENAI_API_KEY=sk-proj-abcdefghijklmnopqrstuvwxyz",
+                "sk-proj-abcdefghijklmnopqrstuvwxyz",
+            ),
+            (mistral_assigned.as_str(), mistral.as_str()),
+            (mistral_bare.as_str(), mistral.as_str()),
+            (
+                "export HF_TOKEN=hf_abcdefghijklmnopqrstuvwxyz",
+                "hf_abcdefghijklmnopqrstuvwxyz",
+            ),
+            (
+                "pplx-abcdefghijklmnopqrstuvwxyz",
+                "pplx-abcdefghijklmnopqrstuvwxyz",
+            ),
+        ];
+        for (input, secret) in cases {
+            let scrubbed = scrub_secrets(input);
+            assert!(!scrubbed.contains(secret), "{input} -> {scrubbed}");
+            assert!(scrubbed.contains("[redacted]"), "{input} -> {scrubbed}");
+        }
+    }
+
+    #[test]
+    fn scrub_secrets_keeps_ordinary_text_and_redacts_dotenv_output() {
+        let mistral = bare_mistral_sample();
+        let checksum = format!("checksum {mistral} stays");
+        let ordinary = [
+            "The garden needs water before noon.",
+            "use hf_hub_download to fetch the file",
+            "Set the token in the settings screen.",
+            "secret=sauce is a recipe",
+            "OPENAI_API_KEY is the variable name",
+            "The word AIza appears in a short note.",
+            "PATH=/usr/bin",
+            checksum.as_str(),
+        ];
+        for text in ordinary {
+            assert_eq!(scrub_secrets(text), text, "{text}");
+        }
+        let far = format!("mistral\n{}\n{mistral}", "x".repeat(400));
+        let far_scrubbed = scrub_secrets(&far);
+        assert!(
+            far_scrubbed.contains(&mistral),
+            "a bare key far from the word mistral must stay: {far_scrubbed}"
+        );
+
+        let dotenv = format!(
+            "# local secrets\nOPENAI_API_KEY=sk-proj-abcdefghijklmnopqrstuvwxyz\nNVIDIA_API_KEY=nvapi-abcdefghijklmnopqrstuvwxyz012345\nGEMINI_API_KEY=\"AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ1234567\"\nMISTRAL_API_KEY={mistral}\nPATH=/usr/bin\n"
+        );
+        let scrubbed = scrub_secrets(&dotenv);
+        assert!(scrubbed.contains("PATH=/usr/bin"), "{scrubbed}");
+        assert!(scrubbed.contains("# local secrets"), "{scrubbed}");
+        assert!(
+            !scrubbed.contains("sk-proj-abcdefghijklmnopqrstuvwxyz"),
+            "{scrubbed}"
+        );
+        assert!(
+            !scrubbed.contains("nvapi-abcdefghijklmnopqrstuvwxyz012345"),
+            "{scrubbed}"
+        );
+        assert!(
+            !scrubbed.contains("AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ1234567"),
+            "{scrubbed}"
+        );
+        assert!(!scrubbed.contains(&mistral), "{scrubbed}");
     }
 
     #[test]
