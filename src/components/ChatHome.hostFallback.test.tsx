@@ -53,6 +53,7 @@ describe('ChatHome host fallback (real Prime host hook)', () => {
     render(
       <ChatHome
         locale="en"
+        chatEngine="prime"
         defaultAiAgent="prime"
         defaultAiAgentReadiness="ready"
         defaultAiAgentReady
