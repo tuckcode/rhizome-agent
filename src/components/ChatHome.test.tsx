@@ -175,6 +175,34 @@ describe('ChatHome', () => {
     expect(screen.getByRole('button', { name: 'New chat' })).toBeTruthy()
   })
 
+  it('reserves the Chat top bar height before the engine settles', () => {
+    const props = {
+      locale: 'en' as const,
+      defaultAiAgent: 'prime' as const,
+      defaultAiAgentReadiness: 'ready' as const,
+      defaultAiAgentReady: true,
+      chatEngine: 'prime' as const,
+      vaultPath: '/Users/jdoe/Documents/Laputa',
+      vaultPaths: ['/Users/jdoe/Documents/Laputa'],
+      entries: [],
+      onExit: vi.fn(),
+    }
+    const { rerender } = render(<ChatHome {...props} chatEngineSettled={false} />)
+    const placeholder = screen.getByTestId('chat-top-bar')
+    expect(placeholder).toHaveAttribute('data-chat-top-bar', 'placeholder')
+    expect(placeholder).toHaveAttribute('aria-hidden', 'true')
+    expect(placeholder).toHaveClass('app-titlebar-band', 'min-h-[30px]')
+    expect(placeholder.querySelector('button')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'New chat' })).toBeNull()
+
+    rerender(<ChatHome {...props} chatEngineSettled />)
+    const ready = screen.getByTestId('prime-session-subhead')
+    expect(ready).toHaveAttribute('data-chat-top-bar', 'ready')
+    expect(ready).toHaveClass('app-titlebar-band', 'min-h-[30px]')
+    expect(screen.queryByTestId('chat-top-bar')).toBeNull()
+    expect(screen.getByRole('button', { name: 'New chat' })).toBeTruthy()
+  })
+
   it('starts a new chat from the Frame A subhead', () => {
     startNewChat.mockClear()
     render(
@@ -581,7 +609,11 @@ describe('ChatHome composer wiring', () => {
 
   it('keeps the Chat top bar off the engine once settings have settled', () => {
     expect(chatHomeSource).toContain(
-      'const showChatTopBar = engineChromeReady && isPrimeChat && chatTarget?.kind !== \'api_model\'',
+      'const showChatTopBarSlot = isPrimeChat && chatTarget?.kind !== \'api_model\'',
+    )
+    expect(chatHomeSource).toContain('const showChatTopBar = engineChromeReady && showChatTopBarSlot')
+    expect(chatHomeSource).toContain(
+      'const showChatTopBarPlaceholder = !engineChromeReady && showChatTopBarSlot',
     )
     expect(chatHomeSource).toContain('onSessionHeader={handleSessionHeader}')
     expect(chatHomeSource).toContain('forkTargetsPrimeEntry={panelEngine === \'prime\'}')

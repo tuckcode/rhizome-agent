@@ -14,6 +14,12 @@ import {
   tildeVaultPath,
 } from '../lib/primeSubheadLabels'
 
+export const CHAT_TOP_BAR_BAND_CLASS = [
+  'app-titlebar-band flex min-h-[30px] shrink-0 items-center gap-2.5 pb-1.5 pr-3',
+  'select-none',
+  'pl-[var(--subhead-traffic-light-inset,0.75rem)]',
+].join(' ')
+
 interface PrimeSessionSubheadProps {
   locale?: AppLocale
   /** Host is up and holding a session. */
@@ -140,13 +146,10 @@ export function PrimeSessionSubhead({
 
   return (
     <div
-      className={cn(
-        'app-titlebar-band flex min-h-[30px] shrink-0 items-center gap-2.5 pb-1.5 pr-3',
-        'select-none',
-        'pl-[var(--subhead-traffic-light-inset,0.75rem)]',
-      )}
+      className={cn(CHAT_TOP_BAR_BAND_CLASS)}
       style={titleBarBand}
       data-testid="prime-session-subhead"
+      data-chat-top-bar="ready"
       onMouseDown={onDragRegionMouseDown}
     >
       <span

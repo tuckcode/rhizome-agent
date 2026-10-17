@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import { AiPanel } from './AiPanel'
-import { PrimeSessionSubhead } from './PrimeSessionSubhead'
+import { CHAT_TOP_BAR_BAND_CLASS, PrimeSessionSubhead } from './PrimeSessionSubhead'
+import { overlayTitleBarBandStyle } from '../utils/trafficLights'
 import { AgentActivityBand } from './AgentActivityBand'
 import { RlmFamilyBand } from './RlmFamilyBand'
 import { ChatComposerDeck } from './ChatComposerDeck'
@@ -162,7 +163,9 @@ export default function ChatHome({
   // The title strip and Command Palette are Chat chrome, not Prime-only.
   // Tying them to `effectiveEngine === 'prime'` hid the whole top bar on
   // Rhizome's native engine, including the header.
-  const showChatTopBar = engineChromeReady && isPrimeChat && chatTarget?.kind !== 'api_model'
+  const showChatTopBarSlot = isPrimeChat && chatTarget?.kind !== 'api_model'
+  const showChatTopBar = engineChromeReady && showChatTopBarSlot
+  const showChatTopBarPlaceholder = !engineChromeReady && showChatTopBarSlot
   const rhizomeCatalog = engineChromeReady && effectiveEngine === 'native'
   const showComposerDeck = engineChromeReady && isPrimeChat && (showPrimeChrome || rhizomeCatalog)
   const panelEngine = engineChromeReady ? effectiveEngine : undefined
@@ -231,6 +234,17 @@ export default function ChatHome({
       data-testid="chat-home"
       data-chat-engine={panelEngine ?? 'pending'}
     >
+      {showChatTopBarPlaceholder ? (
+        <div
+          aria-hidden="true"
+          className={CHAT_TOP_BAR_BAND_CLASS}
+          data-chat-top-bar="placeholder"
+          data-testid="chat-top-bar"
+          style={overlayTitleBarBandStyle(railLayoutWidth)}
+        >
+          <span className="h-[13px] w-24 max-w-[40%] rounded-sm bg-muted-foreground/20" />
+        </div>
+      ) : null}
       {showChatTopBar ? (
         <PrimeSessionSubhead
           railLayoutWidth={railLayoutWidth}

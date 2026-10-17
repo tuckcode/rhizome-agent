@@ -3,7 +3,7 @@ import { useEffect, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { AiMessage } from '../src/components/AiMessage'
 import { AiPanelMessageHistory } from '../src/components/AiPanelChrome'
-import { PrimeSessionSubhead } from '../src/components/PrimeSessionSubhead'
+import { CHAT_TOP_BAR_BAND_CLASS, PrimeSessionSubhead } from '../src/components/PrimeSessionSubhead'
 import { TooltipProvider } from '../src/components/ui/tooltip'
 import '../src/index.css'
 import '../src/themes.css'
@@ -23,6 +23,7 @@ type ShotState =
   | 'approval-newline'
   | 'approval-write'
   | 'approval-bidi-path'
+  | 'topbar-loading'
   | 'topbar-native'
   | 'header-title'
   | 'header-long'
@@ -42,6 +43,7 @@ const STATES: ShotState[] = [
   'approval-newline',
   'approval-write',
   'approval-bidi-path',
+  'topbar-loading',
   'topbar-native',
   'header-title',
   'header-long',
@@ -209,6 +211,17 @@ export function Shot() {
     />
   )
 
+  const loadingBar = (
+    <div
+      aria-hidden="true"
+      className={CHAT_TOP_BAR_BAND_CLASS}
+      data-chat-top-bar="placeholder"
+      data-testid="chat-top-bar"
+    >
+      <span className="h-[13px] w-24 max-w-[40%] rounded-sm bg-muted-foreground/20" />
+    </div>
+  )
+
   let body: ReactNode
   let title = 'Chat'
   let header: ReactNode = state === 'header-long-hover' ? (
@@ -221,7 +234,7 @@ export function Shot() {
         {LONG_HEADER_TITLE}
       </div>
     </div>
-  ) : nativeBar
+  ) : state === 'topbar-loading' ? loadingBar : nativeBar
 
   if (state === 'approval-collapsed-before') {
     title = 'Pending approval, collapsed (before)'
@@ -344,6 +357,43 @@ export function Shot() {
         isActive={false}
         hasContext={false}
       />
+    )
+  }
+
+  if (state === 'topbar-loading') {
+    const pane = (label: string, bar: ReactNode, caption: string) => (
+      <div
+        className="overflow-hidden rounded-xl border border-border shadow-sm"
+        style={{ background: 'var(--surface-app)' }}
+      >
+        {bar}
+        <div className="px-3 py-2">
+          <p className="mb-2 text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground">
+            {themeLabel()}
+            {' · '}
+            {label}
+          </p>
+          <div className="flex h-36 items-center justify-center text-[13px] text-muted-foreground">
+            {caption}
+          </div>
+        </div>
+      </div>
+    )
+    return (
+      <TooltipProvider>
+        <div
+          data-testid="audit-chat-shot"
+          data-theme={theme}
+          data-state={state}
+          className="flex min-h-screen items-start justify-center p-8"
+          style={{ background: 'var(--surface-app)' }}
+        >
+          <div className="flex w-[720px] flex-col gap-6">
+            {pane('Before settle', loadingBar, 'Settings still loading · New chat hidden')}
+            {pane('After settle', nativeBar, 'Same height · New chat available')}
+          </div>
+        </div>
+      </TooltipProvider>
     )
   }
 
