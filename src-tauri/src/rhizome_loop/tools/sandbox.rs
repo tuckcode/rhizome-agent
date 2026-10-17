@@ -228,13 +228,26 @@ pub fn is_within(candidate: &Path, root: &Path) -> bool {
 /// should use [`is_blocked_secret`]. Write callers use
 /// [`resolve_for_write`], which always consults this list.
 pub fn is_secret(path: &Path) -> bool {
-    if looks_secret(path) {
+    if looks_secret(path) || symlink_points_at_secret(path) {
         return true;
     }
     match path.canonicalize() {
         Ok(canonical) if canonical != path => looks_secret(&canonical),
         _ => false,
     }
+}
+
+/// A relative link such as `note -> .git/config` is a secret even when
+/// canonicalize does not follow it.
+fn symlink_points_at_secret(path: &Path) -> bool {
+    let Ok(target) = fs::read_link(path) else {
+        return false;
+    };
+    if looks_secret(&target) {
+        return true;
+    }
+    path.parent()
+        .is_some_and(|parent| looks_secret(&parent.join(target)))
 }
 
 /// Same denylist as [`is_secret`], after resolving a missing leaf through
