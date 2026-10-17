@@ -207,10 +207,16 @@ pub(crate) fn recall_call_reasoning(session: &str, call_ids: &[String]) -> Optio
 ///
 /// Walks `texts` and the stored turns backwards together. The stored
 /// cursor moves only when the texts match, so a missing middle turn
-/// does not slide reasoning onto a later answer. A step this session
-/// never captured, or that the cap already dropped, is `None`. The
-/// caller sends `""` for that miss. Identical answers stay in capture
-/// order because both sides move only on a match.
+/// does not slide reasoning onto a later answer. A stored turn whose
+/// text is nowhere in the history still ahead is skipped, so an orphan
+/// does not block an older match. A step this session never captured,
+/// or that the cap already dropped, is `None`. The caller sends `""`
+/// for that miss.
+///
+/// Identical text can still mis-pair. Stored `D1` then `D2`, both
+/// `"Done."`, against history `[D1, X, D2]` that is also all `"Done."`
+/// gives `X` the reasoning from `D1`. Telling those turns apart needs
+/// a per-turn id. DeepSeek does not answer 400 for that mismatch.
 pub(crate) fn recall_text_reasoning(session: &str, texts: &[&str]) -> Vec<Option<String>> {
     if session.is_empty() {
         return vec![None; texts.len()];
@@ -235,6 +241,16 @@ pub(crate) fn recall_text_reasoning(session: &str, texts: &[&str]) -> Vec<Option
     let mut matched = vec![None; texts.len()];
     let mut stored_at = stored.len();
     for (index, text) in texts.iter().enumerate().rev() {
+        while stored_at > 0 {
+            let (stored_text, _) = &stored[stored_at - 1];
+            let still_ahead = texts[..=index]
+                .iter()
+                .any(|candidate| candidate == stored_text);
+            if still_ahead {
+                break;
+            }
+            stored_at -= 1;
+        }
         if stored_at == 0 {
             break;
         }
@@ -876,6 +892,18 @@ mod tests {
             recall_text_reasoning("completion-session", &["Done."]),
             vec![Some("checked the tool".into())]
         );
+    }
+
+    #[test]
+    fn an_orphan_stored_turn_does_not_block_an_older_match() {
+        note_reasoning_limited("orphan", &[], "A", "kept", 8, 1_000_000);
+        note_reasoning_limited("orphan", &[], "ORPHAN", "dropped", 8, 1_000_000);
+
+        assert_eq!(
+            recall_text_reasoning("orphan", &["A", "B"]),
+            vec![Some("kept".into()), None]
+        );
+        clear_reasoning_session("orphan");
     }
 
     #[test]

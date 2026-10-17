@@ -154,15 +154,21 @@ fn normalized_model_name(model_id: &str) -> String {
         .to_string()
 }
 
-/// Gemini 3 and 4 reject a tool step that has no thought signature.
-/// The leading number is the generation: `gemini-2.5` is 2, `gemini-3.8` is 3.
+/// Gemini rejects a tool step that has no thought signature, except
+/// Gemini 1 and Gemini 2. A versionless alias such as
+/// `gemini-flash-latest` needs the placeholder too. The generation is
+/// the leading number: `gemini-2.5` is 2, `gemini-3.8` is 3. No leading
+/// number is not 1 or 2.
 fn needs_gemini_thought_placeholder(model_id: &str) -> bool {
     let name = normalized_model_name(model_id);
     let Some(rest) = name.strip_prefix("gemini-") else {
         return false;
     };
     let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
-    digits.parse::<u32>().is_ok_and(|major| major >= 3)
+    match digits.parse::<u32>() {
+        Ok(major) => major >= 3,
+        Err(_) => true,
+    }
 }
 
 fn is_deepseek_target(model_id: &str, provider_id: &str, base_url: Option<&str>) -> bool {
@@ -173,9 +179,10 @@ fn is_deepseek_target(model_id: &str, provider_id: &str, base_url: Option<&str>)
 
 /// `openai_messages` plus Gemini 3+/4 and DeepSeek wire fixes.
 ///
-/// Gemini gets `skip_thought_signature_validator` on the first tool call
-/// of each assistant step, including a call that another provider made
-/// before a Taproot reroute. DeepSeek gets `reasoning_content` on every
+/// Gemini, other than Gemini 1 and Gemini 2, gets
+/// `skip_thought_signature_validator` on the first tool call of each
+/// assistant step, including a call that another provider made before a
+/// Taproot reroute. DeepSeek gets `reasoning_content` on every
 /// assistant message. A step this process did not capture sends `""`.
 fn openai_messages_for(view: &ModelView, turn_start: usize, wire: &OutboundWire<'_>) -> Vec<Value> {
     let gemini = needs_gemini_thought_placeholder(wire.model_id);
@@ -785,6 +792,32 @@ mod tests {
                 "{model_id}"
             );
             assert_eq!(messages, openai_messages(&view, 0));
+        }
+    }
+
+    #[test]
+    fn versionless_gemini_aliases_need_the_thought_signature() {
+        let history = vec![tool_step("call_a", "call_b")];
+        let view = view("go", history);
+        for model_id in [
+            "gemini-flash-latest",
+            "gemini-pro-latest",
+            "models/gemini-flash-latest",
+            "google/gemini-pro-latest:free",
+        ] {
+            let messages = openai_messages_for(&view, 0, &wire(model_id, "gemini", None, ""));
+            assert_eq!(
+                messages[1]["tool_calls"][0]["extra_content"]["google"]["thought_signature"],
+                "skip_thought_signature_validator",
+                "{model_id}"
+            );
+        }
+        for model_id in ["gemini-2.5-flash", "gemini-1.5-pro"] {
+            let messages = openai_messages_for(&view, 0, &wire(model_id, "lan", None, ""));
+            assert!(
+                messages[1]["tool_calls"][0].get("extra_content").is_none(),
+                "{model_id}"
+            );
         }
     }
 
