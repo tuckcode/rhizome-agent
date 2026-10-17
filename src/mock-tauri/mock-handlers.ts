@@ -529,8 +529,7 @@ function handleMoveNoteToWorkspace(args: {
   return { new_path: newPath, updated_files: updatedFiles, failed_updates: 0 }
 }
 
-// Fixture for the wiki graph view (rhizome_wiki_graph tool): three notes
-// and one ghost so browser dev / tests exercise both node variants.
+// Sample Research library for the browser mock (rhizome_scan_library).
 const MOCK_LIBRARY = [
   {
     id: 'mock-repo.md',
@@ -543,6 +542,8 @@ const MOCK_LIBRARY = [
   },
 ]
 
+// Fixture for the wiki graph view (rhizome_wiki_graph tool): three notes
+// and one ghost so browser dev / tests exercise both node variants.
 const MOCK_WIKI_GRAPH = {
   nodes: [
     { id: 'note/daily-log.md', path: 'note/daily-log.md', title: 'Daily Log', isA: 'Note', ghost: false, snippet: 'Today I worked on the MCP server implementation.', modifiedAt: 1752300000, icon: null, linkCount: 2, backlinkCount: 0 },

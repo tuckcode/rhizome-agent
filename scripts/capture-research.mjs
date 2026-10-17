@@ -12,11 +12,13 @@ const shots = [
   ['graphite', 'error'],
   ['graphite', 'error-details'],
   ['graphite', 'retry-focus'],
+  ['graphite', 'disabled-generate'],
   ['earth', 'empty'],
   ['earth', 'depth-open'],
   ['earth', 'error'],
   ['earth', 'error-details'],
   ['earth', 'retry-focus'],
+  ['earth', 'disabled-generate'],
 ]
 
 const browser = await chromium.launch()
@@ -24,10 +26,14 @@ const page = await browser.newPage({ viewport: { width: 1100, height: 860 } })
 for (const [theme, state] of shots) {
   await page.goto(`${base}?theme=${theme}&state=${state}`, { waitUntil: 'networkidle' })
   await page.evaluate(() => document.fonts.ready)
-  if (state === 'empty' || state === 'depth-open') {
+  if (state === 'empty' || state === 'depth-open' || state === 'disabled-generate') {
     await page.getByTestId('research-generate-empty').waitFor()
   } else {
     await page.getByTestId('research-library-scan-error').waitFor()
+  }
+  if (state === 'disabled-generate') {
+    await page.getByTestId('research-generate-hint').waitFor()
+    await page.getByRole('button', { name: /generate into vault/i }).waitFor()
   }
   if (state === 'depth-open') {
     await page.getByTestId('research-generate-depth').click()

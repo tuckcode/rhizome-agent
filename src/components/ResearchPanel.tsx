@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useMemo } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -29,7 +29,7 @@ import {
   RocketLaunch, PuzzlePiece, Brain,
   MagnifyingGlass, Code, FileText, Folder,
   BookOpenText, Sparkle, Question,
-  ClockClockwise, WarningCircle
+  ClockClockwise, WarningCircle, CaretDown
 } from '@phosphor-icons/react'
 import { PeerToolExitButton } from './PeerToolExitButton'
 import { PEER_TOOL_EXIT_CHAT } from '../lib/peerToolExit'
@@ -129,47 +129,75 @@ function ResearchDepthSelect({
   )
 }
 
+const LIBRARY_SCAN_DETAILS_ID = 'research-library-scan-details'
+
 function ResearchLibraryScanError({
   technical,
   onRetry,
+  scanning,
+  attempt,
 }: {
   technical: string
   onRetry: () => void
+  scanning: boolean
+  attempt: number
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const redactedTechnical = redactCredentialTokens(technical).text
   return (
     <div
+      key={attempt}
       data-testid="research-library-scan-error"
+      data-attempt={attempt}
       role="alert"
-      className="mx-5 mt-3 rounded-lg border border-border bg-muted px-3 py-2.5"
+      className="mx-5 mt-3 flex items-start gap-2 rounded-lg border border-[var(--feedback-warning-border)] bg-[var(--feedback-warning-bg)] px-3 py-2.5"
     >
-      <p className="text-sm font-medium text-foreground">Couldn&apos;t scan this library.</p>
-      <p className="mt-0.5 text-xs text-muted-foreground">The vault listing did not finish.</p>
-      <div className="mt-2 flex items-center gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={onRetry}
-          data-testid="research-library-scan-retry"
-        >
-          Retry
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          aria-expanded={detailsOpen}
-          onClick={() => setDetailsOpen((open) => !open)}
-        >
-          Details
-        </Button>
+      <WarningCircle size={16} weight="bold" className="mt-0.5 shrink-0 text-[var(--feedback-warning-text)]" />
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-foreground">Couldn&apos;t scan this library.</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Rhizome couldn&apos;t read the library folder. Check that it still exists, then retry.
+        </p>
+        {attempt > 1 ? (
+          <p className="mt-0.5 text-xs text-muted-foreground">Attempt {attempt}.</p>
+        ) : null}
+        <div className="mt-2 flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onRetry}
+            disabled={scanning}
+            data-testid="research-library-scan-retry"
+          >
+            Retry
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-expanded={detailsOpen}
+            aria-controls={LIBRARY_SCAN_DETAILS_ID}
+            onClick={() => setDetailsOpen((open) => !open)}
+          >
+            Details
+            <CaretDown
+              data-testid="research-library-scan-details-chevron"
+              data-open={detailsOpen ? 'true' : 'false'}
+              className={`size-3.5 transition-transform ${detailsOpen ? 'rotate-180' : ''}`}
+            />
+          </Button>
+        </div>
+        {detailsOpen ? (
+          <pre
+            id={LIBRARY_SCAN_DETAILS_ID}
+            data-testid="research-library-scan-details"
+            className="mt-2 overflow-x-auto whitespace-pre-wrap font-mono text-xs text-muted-foreground"
+          >
+            {redactedTechnical}
+          </pre>
+        ) : null}
       </div>
-      {detailsOpen ? (
-        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap font-mono text-xs text-muted-foreground">
-          {technical}
-        </pre>
-      ) : null}
     </div>
   )
 }
@@ -302,6 +330,14 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
   const [library, setLibrary] = useState<LibraryItem[]>([])
   const [modeLabel, setModeLabel] = useState('Architecture map')
   const [libraryScanError, setLibraryScanError] = useState<string | null>(null)
+  const [libraryScanning, setLibraryScanning] = useState(false)
+  const [libraryScanAttempt, setLibraryScanAttempt] = useState(0)
+  const scanRequestIdRef = useRef(0)
+  const scanningRef = useRef(false)
+  const retryFocusRef = useRef(false)
+  const destinationVaultPathRef = useRef(destinationVaultPath)
+  destinationVaultPathRef.current = destinationVaultPath
+  const headingRef = useRef<HTMLHeadingElement>(null)
   const [askInput, setAskInput] = useState('')
   const [askRepo, setAskRepo] = useState('')
   const [askDepth, setAskDepth] = useState('regular')
@@ -344,11 +380,20 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
 
   const loadLibrary = useCallback(async (): Promise<LibraryItem[]> => {
     if (!destinationVaultPath) return []
+    const requestId = ++scanRequestIdRef.current
+    const vaultKey = destinationVaultPath
+    scanningRef.current = true
+    setLibraryScanning(true)
+    setLibraryScanError(null)
+    if (retryFocusRef.current) headingRef.current?.focus()
     try {
       const result = await callHost<string>('call_rhizome_tool', {
         name: 'rhizome_scan_library',
         args: { vaultPath: destinationVaultPath }
       })
+      if (requestId !== scanRequestIdRef.current || vaultKey !== destinationVaultPathRef.current) {
+        return []
+      }
       const items = JSON.parse(result) as Array<{
         id: string; path: string; title: string; description: string;
         type: string; tag: string; date: number
@@ -365,10 +410,23 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
       }))
       setLibrary(mapped)
       setLibraryScanError(null)
+      if (retryFocusRef.current) {
+        retryFocusRef.current = false
+        headingRef.current?.focus()
+      }
       return mapped
     } catch (err) {
+      if (requestId !== scanRequestIdRef.current || vaultKey !== destinationVaultPathRef.current) {
+        return []
+      }
+      setLibraryScanAttempt((current) => current + 1)
       setLibraryScanError(err instanceof Error ? err.message : String(err))
       return []
+    } finally {
+      if (requestId === scanRequestIdRef.current) {
+        scanningRef.current = false
+        setLibraryScanning(false)
+      }
     }
   }, [destinationVaultPath])
 
@@ -622,7 +680,12 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
     <>
           <div className="px-5 pt-4 pb-2 border-b border-border">
             <div className="flex items-start justify-between gap-2">
-            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
+            <h2
+              ref={headingRef}
+              tabIndex={-1}
+              data-testid="research-heading"
+              className="text-lg font-semibold text-foreground flex items-center gap-2 outline-none"
+            >
               <Sparkle weight="bold" className="w-5 h-5 text-muted-foreground" />
               {t('research.title')}
             </h2>
@@ -641,7 +704,7 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
                 >
                   <SelectTrigger
                     aria-label={t('research.destination.label')}
-                    className="h-6 text-xs bg-transparent border-none shadow-none text-muted-foreground px-1 w-auto gap-1 hover:text-foreground"
+                    className="h-6 text-xs bg-transparent dark:bg-transparent hover:bg-transparent dark:hover:bg-transparent border-none shadow-none text-muted-foreground px-1 w-auto gap-1 hover:text-foreground"
                   >
                     <SelectValue />
                   </SelectTrigger>
@@ -673,7 +736,13 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
           {libraryScanError ? (
             <ResearchLibraryScanError
               technical={libraryScanError}
-              onRetry={() => { void loadLibrary() }}
+              scanning={libraryScanning}
+              attempt={libraryScanAttempt}
+              onRetry={() => {
+                if (scanningRef.current) return
+                retryFocusRef.current = true
+                void loadLibrary()
+              }}
             />
           ) : null}
 
@@ -758,7 +827,7 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
                     value={repoInput}
                     onChange={(e) => setRepoInput(e.target.value)}
                     placeholder={t('research.generate.repoPlaceholder')}
-                    className="flex-1 bg-muted border-border text-foreground placeholder:text-muted-foreground/70"
+                    className="flex-1 bg-muted border-border text-foreground placeholder:text-muted-foreground"
                     onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
                   />
                   <Button
@@ -771,13 +840,18 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
                 </div>
 
                 <div className="flex items-center gap-3 mb-4">
-                  <Button
-                    variant="outline"
+                  <button
+                    type="button"
+                    data-testid="research-generate-mode"
+                    aria-haspopup="dialog"
+                    aria-expanded={formatModalOpen}
+                    aria-label="Research format"
                     onClick={() => setFormatModalOpen(true)}
-                    className="bg-muted border-border text-foreground hover:bg-accent"
+                    className="flex h-9 w-fit items-center justify-between gap-2 rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-[var(--state-focus-ring)]"
                   >
                     {modeLabel}
-                  </Button>
+                    <CaretDown className="size-4 opacity-50" />
+                  </button>
 
                   <ResearchDepthSelect
                     value={generateDepth}
@@ -800,19 +874,26 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
                     <Button
                       onClick={() => runWithDestinationConfirm(handleGenerate)}
                       disabled={!repoInput.trim() || generatePreflight.state !== 'ready'}
-                      className="bg-primary text-primary-foreground hover:bg-muted px-5"
+                      className={!repoInput.trim() || generatePreflight.state !== 'ready'
+                        ? 'bg-muted px-5 text-muted-foreground disabled:opacity-100'
+                        : 'bg-primary px-5 text-primary-foreground hover:bg-muted'}
                     >
-                      {`${t('research.generate.button')} → ${destinationLabel}`}
+                      {`${t('research.generate.button')} into ${destinationLabel}`}
                     </Button>
                   )}
                 </div>
+                {!repoInput.trim() ? (
+                  <p data-testid="research-generate-hint" className="mb-4 text-xs text-muted-foreground">
+                    Add a repo URL or folder first
+                  </p>
+                ) : null}
 
                 <div className="flex items-center gap-3 mb-4">
                   <Input
                     value={projectInput}
                     onChange={(e) => setProjectInput(e.target.value)}
                     placeholder={t('research.generate.projectPlaceholder')}
-                    className="flex-1 bg-muted border-border text-foreground placeholder:text-muted-foreground/70"
+                    className="flex-1 bg-muted border-border text-foreground placeholder:text-muted-foreground"
                   />
                 </div>
 
@@ -826,7 +907,7 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
                     className="flex flex-1 flex-col items-center justify-center text-center"
                   >
                     <RocketLaunch weight="thin" className="mb-3 h-12 w-12 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground/70">
+                    <p className="text-sm text-muted-foreground">
                       Paste a repo URL or pick a local folder to map it
                     </p>
                   </div>

@@ -988,12 +988,24 @@ describe('ResearchPanel', () => {
 
     const error = await screen.findByTestId('research-library-scan-error')
     expect(error).toHaveTextContent("Couldn't scan this library.")
-    expect(error).toHaveTextContent('The vault listing did not finish.')
+    expect(error).toHaveTextContent('Rhizome couldn\'t read the library folder. Check that it still exists, then retry.')
     expect(error).not.toHaveTextContent('TypeError')
     expect(screen.queryByText(/Library scan error/i)).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Details' }))
+    const details = screen.getByRole('button', { name: 'Details' })
+    expect(details).toHaveAttribute('aria-expanded', 'false')
+    expect(details).toHaveAttribute('aria-controls', 'research-library-scan-details')
+    expect(screen.getByTestId('research-library-scan-details-chevron')).toHaveAttribute('data-open', 'false')
+
+    fireEvent.click(details)
+    expect(details).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('research-library-scan-details-chevron')).toHaveAttribute('data-open', 'true')
     expect(error).toHaveTextContent("Cannot read properties of undefined (reading 'invoke')")
+    expect(document.getElementById('research-library-scan-details')).toBeTruthy()
+
+    fireEvent.click(details)
+    expect(details).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByTestId('research-library-scan-details-chevron')).toHaveAttribute('data-open', 'false')
   })
 
   it('retries the library scan from the error state', async () => {
@@ -1024,5 +1036,130 @@ describe('ResearchPanel', () => {
 
     fireEvent.mouseDown(screen.getByRole('tab', { name: /library/i }), { button: 0, ctrlKey: false })
     expect(await screen.findByText('my repo')).toBeInTheDocument()
+    expect(screen.getByTestId('research-heading')).toHaveFocus()
+  })
+
+  it('ignores a second Retry click while a scan is in flight', async () => {
+    let scanCalls = 0
+    let finishRetry: ((value: string) => void) | undefined
+    mockInvokeFn.mockImplementation((command: string, payload?: Record<string, unknown>) => {
+      if ((payload as { name?: string })?.name === 'rhizome_scan_library') {
+        scanCalls += 1
+        if (scanCalls === 1) return Promise.reject(new Error('offline'))
+        return new Promise<string>((resolve) => {
+          finishRetry = resolve
+        })
+      }
+      return Promise.resolve('{}')
+    })
+
+    render(
+      <ResearchPanel open={true} onClose={onClose} vaultPath="/vault" onOpenNote={onOpenNote} />
+    )
+
+    const retry = await screen.findByRole('button', { name: 'Retry' })
+    fireEvent.click(retry)
+    fireEvent.click(retry)
+    expect(scanCalls).toBe(2)
+
+    finishRetry?.(JSON.stringify(libraryItems))
+    await waitFor(() => {
+      expect(screen.queryByTestId('research-library-scan-error')).not.toBeInTheDocument()
+    })
+  })
+
+  it('drops a stale scan failure after a later success, including a vault switch', async () => {
+    const deferred: Array<{
+      resolve: (value: string) => void
+      reject: (error: Error) => void
+    }> = []
+    mockInvokeFn.mockImplementation((command: string, payload?: Record<string, unknown>) => {
+      if ((payload as { name?: string })?.name === 'rhizome_scan_library') {
+        return new Promise<string>((resolve, reject) => {
+          deferred.push({ resolve, reject })
+        })
+      }
+      return Promise.resolve('{}')
+    })
+
+    const { rerender } = render(
+      <ResearchPanel open={true} onClose={onClose} vaultPath="/vault-a" onOpenNote={onOpenNote} />,
+    )
+    await waitFor(() => expect(deferred).toHaveLength(1))
+
+    rerender(
+      <ResearchPanel open={true} onClose={onClose} vaultPath="/vault-b" onOpenNote={onOpenNote} />,
+    )
+    await waitFor(() => expect(deferred).toHaveLength(2))
+
+    deferred[1].resolve(JSON.stringify(libraryItems))
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /library/i }), { button: 0, ctrlKey: false })
+    expect(await screen.findByText('my repo')).toBeInTheDocument()
+
+    deferred[0].reject(new Error('stale vault-a failure'))
+    await waitFor(() => {
+      expect(screen.queryByTestId('research-library-scan-error')).not.toBeInTheDocument()
+    })
+  })
+
+  it('re-announces a failed Retry with an attempt line', async () => {
+    mockInvokeFn.mockImplementation((command: string, payload?: Record<string, unknown>) => {
+      if ((payload as { name?: string })?.name === 'rhizome_scan_library') {
+        return Promise.reject(new Error('still offline'))
+      }
+      return Promise.resolve('{}')
+    })
+
+    render(
+      <ResearchPanel open={true} onClose={onClose} vaultPath="/vault" onOpenNote={onOpenNote} />
+    )
+
+    const retry = await screen.findByRole('button', { name: 'Retry' })
+    expect(screen.getByTestId('research-library-scan-error')).toHaveAttribute('data-attempt', '1')
+    fireEvent.click(retry)
+
+    expect(await screen.findByText('Attempt 2.')).toBeInTheDocument()
+    expect(screen.getByTestId('research-library-scan-error')).toHaveAttribute('data-attempt', '2')
+  })
+
+  it('redacts credentials in the scan error Details text', async () => {
+    const pat = ['ghp', 'B'.repeat(36)].join('_')
+    mockInvokeFn.mockImplementation((command: string, payload?: Record<string, unknown>) => {
+      if ((payload as { name?: string })?.name === 'rhizome_scan_library') {
+        return Promise.reject(new Error(`scan failed token=${pat}`))
+      }
+      return Promise.resolve('{}')
+    })
+
+    render(
+      <ResearchPanel open={true} onClose={onClose} vaultPath="/vault" onOpenNote={onOpenNote} />
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Details' }))
+    const details = await screen.findByTestId('research-library-scan-details')
+    expect(details).toHaveTextContent('[redacted-token]')
+    expect(details).not.toHaveTextContent(pat)
+  })
+
+  it('labels Generate as into the vault and hints when no repo is set', async () => {
+    render(
+      <ResearchPanel open={true} onClose={onClose} vaultPath="/vault" onOpenNote={onOpenNote} />
+    )
+
+    expect(screen.getByRole('button', { name: /generate into vault/i })).toBeDisabled()
+    expect(screen.getByTestId('research-generate-hint')).toHaveTextContent('Add a repo URL or folder first')
+    expect(screen.queryByRole('button', { name: /generate →/i })).not.toBeInTheDocument()
+  })
+
+  it('presents Architecture map as a mode choice matching the depth menu', async () => {
+    render(
+      <ResearchPanel open={true} onClose={onClose} vaultPath="/vault" onOpenNote={onOpenNote} />
+    )
+
+    const mode = screen.getByTestId('research-generate-mode')
+    expect(mode).toHaveAttribute('aria-haspopup', 'dialog')
+    expect(mode).toHaveAttribute('aria-label', 'Research format')
+    expect(mode).toHaveTextContent('Architecture map')
+    expect(screen.getByTestId('research-generate-depth')).toHaveAttribute('aria-label', 'Research depth')
   })
 })
