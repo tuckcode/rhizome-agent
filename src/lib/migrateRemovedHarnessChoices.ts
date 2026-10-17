@@ -53,7 +53,8 @@ export function migrateRemovedHarnessChoice(value: unknown): string {
   return 'native'
 }
 
-export function migrateStoredChatEngine(_value: unknown): 'native' {
+export function migrateStoredChatEngine(value: unknown): 'native' {
+  void value
   return 'native'
 }
 

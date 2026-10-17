@@ -4,7 +4,8 @@ import type { Settings } from '../types'
 export type ChatEngine = 'prime' | 'native'
 
 /** Settings no longer store an engine choice. Every leftover value is native. */
-export function readChatEngine(_value: string | null | undefined): ChatEngine {
+export function readChatEngine(value: string | null | undefined): ChatEngine {
+  void value
   return 'native'
 }
 
@@ -23,6 +24,7 @@ export function chatEngineFromSettings(settings: Pick<Settings, 'chat_engine'> |
 }
 
 /** Native is the only Chat engine. Write that value, not an empty default. */
-export function chatEngineForSave(_engine: ChatEngine): string | null {
+export function chatEngineForSave(engine: ChatEngine): string | null {
+  void engine
   return 'native'
 }

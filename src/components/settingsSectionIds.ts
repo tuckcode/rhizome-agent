@@ -31,6 +31,7 @@ export function resolveSettingsSectionId(id: string | null | undefined): string 
   return id
 }
 
-export function shouldOpenAdvancedPrimeEngine(_id: string | null | undefined): boolean {
+export function shouldOpenAdvancedPrimeEngine(id: string | null | undefined): boolean {
+  void id
   return false
 }
