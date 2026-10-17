@@ -12,7 +12,6 @@ function emptyStatuses(): AiAgentsStatus {
     claude_code: { status: 'missing', version: null },
     codex: { status: 'missing', version: null },
     opencode: { status: 'missing', version: null },
-    pi: { status: 'missing', version: null },
     antigravity: { status: 'missing', version: null },
     kiro: { status: 'missing', version: null },
     hermes: { status: 'missing', version: null },

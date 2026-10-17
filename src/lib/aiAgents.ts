@@ -3,7 +3,6 @@ export type AiAgentId =
   | 'claude_code'
   | 'codex'
   | 'opencode'
-  | 'pi'
   | 'antigravity'
   | 'kiro'
   | 'hermes'
@@ -69,13 +68,6 @@ export const AI_AGENT_DEFINITIONS: readonly AiAgentDefinition[] = [
     productVisible: false,
   },
   {
-    id: 'pi',
-    label: 'Pi',
-    shortLabel: 'Pi',
-    installUrl: 'https://pi.dev',
-    productVisible: false,
-  },
-  {
     id: 'antigravity',
     label: 'Antigravity CLI',
     shortLabel: 'Antigravity',
@@ -127,7 +119,7 @@ export function createMissingAiAgentsStatus(): AiAgentsStatus {
 }
 
 export function normalizeStoredAiAgent(value: string | null | undefined): AiAgentId | null {
-  if (value === 'gemini') return 'antigravity'
+  if (value === 'pi' || value === 'gemini') return DEFAULT_AI_AGENT
   if (AI_AGENT_DEFINITIONS.some((definition) => definition.id === value)) return value as AiAgentId
   return null
 }

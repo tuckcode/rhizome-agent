@@ -28,7 +28,6 @@ vi.mock('../utils/sessionAutoDistill', async (importOriginal) => {
 
 import { createStreamCallbacks } from './aiAgentStreamCallbacks'
 import { conversationToNativeEvents } from './nativeChatTranscript'
-import { translate } from './i18n'
 
 function createMessageStore(initialMessages: AiAgentMessage[]) {
   let messages = initialMessages
@@ -310,7 +309,7 @@ describe('aiAgentStreamCallbacks', () => {
       onVaultChanged: vi.fn(),
     }
     const callbacks = createStreamCallbacks({
-      agent: 'pi',
+      agent: 'codex',
       messageId: 'msg-1',
       vaultPath: String.raw`H:\Notes`,
       setMessages: messages.setMessages,
@@ -496,42 +495,9 @@ describe('aiAgentStreamCallbacks', () => {
     expect(messages.getMessages().filter((message) => message.localMarker)).toHaveLength(1)
   })
 
-  it('localizes Pi empty-output stream errors with diagnostic output', () => {
-    const messages = createMessageStore([
-      {
-        id: 'msg-1',
-        userMessage: 'Question',
-        actions: [],
-        isStreaming: true,
-      },
-    ])
-    const diagnosticOutput = 'npm warn exec installing pi-mcp-adapter'
-    const callbacks = createStreamCallbacks({
-      agent: 'pi',
-      locale: 'it-IT',
-      messageId: 'msg-1',
-      vaultPath: '/vault',
-      setMessages: messages.setMessages,
-      setStatus: createStatusStore().setStatus,
-      abortRef: { current: { aborted: false } },
-      responseAccRef: { current: '' },
-      toolInputMapRef: { current: new Map() },
-      fileCallbacksRef: { current: undefined },
-    })
-
-    callbacks.onError(`rhizome:i18n-error:${JSON.stringify({
-      key: 'ai.error.pi.emptyOutputWithDiagnostic',
-      values: { diagnostic_output: diagnosticOutput },
-    })}`)
-
-    expect(messages.getMessages()[0].response).toBe(
-      `Error: ${translate('it-IT', 'ai.error.pi.emptyOutputWithDiagnostic', { diagnostic_output: diagnosticOutput })}`,
-    )
-  })
-
   it.each([
     ['claude_code', 'Claude Code finished without returning a reply.'],
-    ['pi', 'Pi finished without returning a reply.'],
+    ['hermes', 'Hermes Agent finished without returning a reply.'],
   ] as const)('uses the %s label for empty stream responses', (agent, response) => {
     const messages = createMessageStore([
       {

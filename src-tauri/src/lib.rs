@@ -41,10 +41,6 @@ mod opencode_config;
 mod opencode_discovery;
 mod opencode_events;
 mod permission_decision;
-pub mod pi_cli;
-mod pi_config;
-mod pi_discovery;
-mod pi_events;
 pub mod preflight;
 pub mod prime_agent_activity;
 mod prime_custom_models;
@@ -53,7 +49,6 @@ mod prime_daemon_pipe;
 mod prime_discovery;
 mod prime_events;
 mod prime_login;
-mod prime_packages;
 pub mod prime_session_host;
 pub mod prime_sessions;
 mod prime_settings;
@@ -809,8 +804,6 @@ macro_rules! app_invoke_handler {
             commands::get_prime_provider_status,
             commands::sign_in_prime_provider,
             commands::save_prime_provider_key,
-            commands::list_prime_packages,
-            commands::install_prime_package,
             commands::ensure_nous_portal_models,
             commands::preflight_chat,
             commands::start_mindwalk_sidecar,

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { SettingsPanel } from './SettingsPanel'
 import type { Settings } from '../types'
 import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../hooks/appCommandCatalog'
@@ -177,76 +177,37 @@ describe('SettingsPanel', () => {
     }
   })
 
-  it('keeps Packages out of the Settings nav and collapsed under Advanced Prime engine', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      ok: true,
-      json: async () => ({ objects: [], total: 0 }),
-    } as Response)
-    try {
-      renderOpenSettings()
-      expect(screen.queryByTestId('settings-nav-settings-section-extensions')).not.toBeInTheDocument()
-      expect(screen.getByTestId('settings-advanced-prime-engine-toggle')).toHaveAttribute(
-        'aria-expanded',
-        'false',
-      )
-      expect(screen.queryByTestId('prime-extensions-search')).not.toBeInTheDocument()
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 30))
-      })
-      expect(fetchSpy).not.toHaveBeenCalled()
+  it('keeps a Packages catalog out of Settings', async () => {
+    renderOpenSettings()
+    expect(screen.queryByTestId('settings-nav-settings-section-extensions')).not.toBeInTheDocument()
+    expect(screen.queryByText('Packages')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Browse packages' })).not.toBeInTheDocument()
 
-      fireEvent.click(screen.getByTestId('settings-advanced-prime-engine-toggle'))
-      expect(await screen.findByText('Packages')).toBeInTheDocument()
-      expect(screen.getByText('Prime is not installed')).toBeInTheDocument()
-      expect(screen.queryByTestId('prime-extensions-search')).not.toBeInTheDocument()
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 30))
-      })
-      expect(fetchSpy).not.toHaveBeenCalled()
-
-      fireEvent.click(screen.getByRole('button', { name: 'Browse packages' }))
-      expect(await screen.findByTestId('prime-extensions-search')).toBeInTheDocument()
-      await waitFor(() => {
-        expect(fetchSpy).toHaveBeenCalled()
-      })
-      expect(String(fetchSpy.mock.calls[0]?.[0])).toContain('keywords%3Api-package')
-    } finally {
-      fetchSpy.mockRestore()
-    }
+    fireEvent.click(screen.getByTestId('settings-advanced-prime-engine-toggle'))
+    expect(await screen.findByText('Prime is not installed')).toBeInTheDocument()
+    expect(screen.queryByText('Packages')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Browse packages' })).not.toBeInTheDocument()
   })
 
   it('opens Advanced Prime engine for an old Packages section id', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      ok: true,
-      json: async () => ({ objects: [], total: 0 }),
-    } as Response)
-    try {
-      render(
-        <SettingsPanel
-          open={true}
-          settings={emptySettings}
-          initialSectionId="packages"
-          onSave={onSave}
-          onClose={onClose}
-        />,
-      )
-      expect(await screen.findByText('Packages')).toBeInTheDocument()
-      expect(screen.getByTestId('settings-advanced-prime-engine-toggle')).toHaveAttribute(
-        'aria-expanded',
-        'true',
-      )
-      expect(screen.queryByTestId('prime-extensions-search')).not.toBeInTheDocument()
-      fireEvent.click(screen.getByRole('button', { name: 'Browse packages' }))
-      expect(await screen.findByTestId('prime-extensions-search')).toBeInTheDocument()
-      await waitFor(() => {
-        expect(fetchSpy).toHaveBeenCalled()
-      })
-    } finally {
-      fetchSpy.mockRestore()
-    }
+    render(
+      <SettingsPanel
+        open={true}
+        settings={emptySettings}
+        initialSectionId="packages"
+        onSave={onSave}
+        onClose={onClose}
+      />,
+    )
+    expect(screen.getByTestId('settings-advanced-prime-engine-toggle')).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
+    expect(await screen.findByText('Prime is not installed')).toBeInTheDocument()
+    expect(screen.queryByText('Packages')).not.toBeInTheDocument()
   })
 
-  it('puts Prime install status and Copy MCP above Packages', () => {
+  it('puts Prime install status and Copy MCP in Advanced Prime engine', () => {
     const aiAgentsStatus: AiAgentsStatus = {
       ...createMissingAiAgentsStatus(),
       prime: createAiAgentAvailability('installed', '2.1.18'),
@@ -270,11 +231,8 @@ describe('SettingsPanel', () => {
     expect(within(advanced).getByTestId('settings-advanced-prime-install-status')).toHaveTextContent(
       '2.1.18',
     )
-    const copy = within(advanced).getByRole('button', { name: 'Copy MCP config' })
-    const packagesHeading = within(advanced).getByText('Packages')
-    expect(
-      copy.compareDocumentPosition(packagesHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy()
+    expect(within(advanced).getByRole('button', { name: 'Copy MCP config' })).toBeInTheDocument()
+    expect(within(advanced).queryByText('Packages')).not.toBeInTheDocument()
   })
 
   it('loads the Prime catalog when Settings opens on Agents', async () => {
@@ -336,10 +294,10 @@ describe('SettingsPanel', () => {
     expect(screen.getByRole('button', { name: 'Add API model' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add local model' })).not.toBeInTheDocument()
     fireEvent.pointerDown(screen.getByText('OpenAI').closest('button')!, { button: 0, pointerType: 'mouse' })
-    fireEvent.click(screen.getByRole('option', { name: 'Gemini' }))
-    expect(screen.getByDisplayValue('Gemini')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('option', { name: 'Google Gemini' }))
+    expect(screen.getByDisplayValue('Google Gemini')).toBeInTheDocument()
     expect(screen.getByDisplayValue('https://generativelanguage.googleapis.com/v1beta/openai')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('gemini-2.5-flash')).toBeInTheDocument()
+    expect(screen.getByLabelText('Model ID')).toHaveValue('gemini-3.8-flash')
   })
 
   it('does not offer a global keep-sessions-running-on-quit toggle', () => {

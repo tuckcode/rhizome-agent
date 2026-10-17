@@ -351,8 +351,8 @@ impl AgentLoop {
     }
 
     /// Adds a name to this loop's offered set. Production `offered_tools`
-    /// is Safe = echo and create_note, Power User = echo, bash, and
-    /// create_note.
+    /// comes from the tool registry: Safe = echo, read-only file tools,
+    /// and create_note. Power User also offers bash.
     pub fn offer_extra_tool_for_test(&self, name: impl Into<String>) {
         self.lock().extra_offered.push(name.into());
     }

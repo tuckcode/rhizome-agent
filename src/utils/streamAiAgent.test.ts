@@ -7,7 +7,7 @@ const {
   listenMock,
 } = vi.hoisted(() => ({
   getAiAgentDefinitionMock: vi.fn((agent: string) => ({
-    label: agent === 'codex' ? 'Codex' : agent === 'pi' ? 'Pi' : 'Claude Code',
+    label: agent === 'codex' ? 'Codex' : 'Claude Code',
   })),
   invokeMock: vi.fn(),
   isTauriState: { value: false },
@@ -390,7 +390,7 @@ describe('streamAiAgent', () => {
     })
 
     const callbacks = createCallbacks()
-    await streamAiAgent({ agent: 'pi', message: 'hi', vaultPath: '/vault', callbacks })
+    await streamAiAgent({ agent: 'codex', message: 'hi', vaultPath: '/vault', callbacks })
 
     expect(callbacks.onCompaction).toHaveBeenCalledWith('start', 'threshold', undefined)
     expect(callbacks.onCompaction).toHaveBeenCalledWith('end', 'threshold', 150000)

@@ -520,6 +520,10 @@ may display a chat; only one turn runs. Damage and a full log keep the
 original and continue in a new session. With the Settings switch on,
 new chats call `native_chat_start` and pick a catalog model or Free tier (auto).
 `rhizome_provider_model.rs` is the native loop's OpenAI-compatible `Model`.
+The loop registry (`rhizome_loop/tools`) offers `echo`, read-only file tools
+(`read_file`, `list_dir`, `grep`, `glob`), `create_note`, and Power User `bash`.
+Read-only tools stay inside canonical vault and workspace roots and auto-run;
+they do not open an approval card.
 `rhizome_routing/` wraps it with free-tier fallback over a pinned OmniRoute
 catalog (ADR-0182). Anthropic models stay refused until step 6a.
 ADR-0168 (amended) is the borrow-care rule. Prime is an optional engine
@@ -727,24 +731,11 @@ itself: an empty allow-list means *never curated* (normalized to `None` in
 Rust), and a list matching no live model shows everything. `activeModelKey`
 keeps whatever is running listed, since the picker only ever receives a label.
 
-#### Prime packages
+#### Advanced Prime engine
 
-Settings → AI Agents → **Advanced Prime engine** holds Prime install status,
-Copy MCP config, and the package catalog. The catalog is npm's `pi-package`
-keyword — the same index as [pi.dev/packages](https://pi.dev/packages).
-Installed entries come from `~/.prime/agent/settings.json` via
-`list_prime_packages`. Install runs `prime-agent package install` in the
-background (`install_prime_package`), then reloads the attached Prime session
-(`reload`). Settings shows the full-system-access warning on its own line.
-If the CLI is missing, Settings copies the command or asks Chat to run it
-(`primePackageAskAgentPrompt`). Kind tabs (extension / skill / prompt / theme)
-add a second keyword. Search hits the public npm registry from the renderer
-(`catalogSearchUrl`). Prime's **daemon has no install command**. Install is a
-180s background process (`prime_packages.rs`). Bare names become `npm:{name}`.
-Sources that start with `-` or contain whitespace are refused. Expanding
-Advanced Prime engine does **not** search the catalog until **Browse packages**
-is opened. An old Packages section id (`packages`, `settings-section-extensions`)
-opens that disclosure.
+Settings → AI Agents → **Advanced Prime engine** holds Prime install status
+and Copy MCP config. An old Packages section id (`packages`,
+`settings-section-extensions`) still opens that disclosure.
 
 The allow-list is Rhizome's view of Prime's catalog, in the same sense as
 archiving below: Prime's CLI and every other client still see all 501.
@@ -851,7 +842,7 @@ Large active notes are compacted into a head/tail body snapshot before they ente
 
 ### Direct Model Targets
 
-Tolaria also supports direct model targets for local servers and API providers. These targets are stored as app-level provider metadata and can be selected in Settings or the status bar alongside coding agents. `src/shared/aiModelProviderCatalog.json` is the shared source for provider defaults, local/API grouping, API-key environment placeholders, and runtime fallback base URLs; the renderer imports it through `aiTargets.ts`, and Tauri includes the same JSON in `ai_models.rs`. Direct model targets run in Chat mode: they receive the same note-context snapshot and conversation history, but they do not receive shell access. OpenAI-compatible direct targets can use Tolaria's narrow native `create_note` tool when an active vault is loaded; the tool calls the same create-only, active-vault-bounded note write command as the UI and emits tool events so the renderer refreshes and opens the created note. The backend `stream_ai_model` command supports OpenAI-compatible chat completions and Anthropic Messages-compatible calls, including Ollama, LM Studio, OpenRouter, OpenAI, Anthropic, Gemini, and custom compatible endpoints. Callers that need one plain reply with no tools — the Settings connection test (`test_ai_model_provider`) and chat titles (`complete_ai_model_text`, from `src/utils/completeAiModelText.ts`) — go through `ai_models::complete_text`. It streams OpenAI-compatible providers through `stream_chat_events_with` with no tools, and keeps the blocking Anthropic call until Anthropic streaming lands.
+Tolaria also supports direct model targets for local servers and API providers. These targets are stored as app-level provider metadata and can be selected in Settings or the status bar alongside coding agents. `src/shared/aiModelProviderCatalog.json` is the shared source for provider defaults, local/API grouping, API-key environment placeholders, and runtime fallback base URLs; the renderer imports it through `aiTargets.ts`, and Tauri includes the same JSON in `ai_models.rs`. Settings API setup also prefills popular hosted providers from `src/lib/providerPresets.ts` (id, label, base URL, key-page URL, API style, per-vendor `apiKeyEnvVar`, and a real model id). Switching between named presets always takes the new row's URL, env var, model id, and name. An edited URL is kept when entering Custom or changing API style inside Custom, including when the URL was never touched. After a save the draft rebuilds from the selected preset, not the shared catalog kind. Custom starts with a blank env var and keeps it blank when the API style changes. A pasted API key is cleared on switch. Get API key sits under the key field and opens the official key page through `openExternalUrl`, with a copyable URL if the opener fails. Anthropic stays in the preset list with an inline “Not in Rhizome chat yet” note; Rhizome chat filtering is unchanged. Storage and kinds are unchanged. Direct model targets run in Chat mode: they receive the same note-context snapshot and conversation history, but they do not receive shell access. OpenAI-compatible direct targets can use Tolaria's narrow native `create_note` tool when an active vault is loaded; the tool calls the same create-only, active-vault-bounded note write command as the UI and emits tool events so the renderer refreshes and opens the created note. The backend `stream_ai_model` command supports OpenAI-compatible chat completions and Anthropic Messages-compatible calls, including Ollama, LM Studio, OpenRouter, OpenAI, Anthropic, Gemini, and custom compatible endpoints. Callers that need one plain reply with no tools — the Settings connection test (`test_ai_model_provider`) and chat titles (`complete_ai_model_text`, from `src/utils/completeAiModelText.ts`) — go through `ai_models::complete_text`. It streams OpenAI-compatible providers through `stream_chat_events_with` with no tools, and keeps the blocking Anthropic call until Anthropic streaming lands.
 
 Provider secrets are not written to `settings.json`. Hosted API targets keep their key in the OS keychain (service `ai.rhizome.agent`, account = provider id; ADR-0185) through `provider_keys::ProviderKeys`, or reference an environment variable name. Keys still in the legacy app-data file `ai-provider-secrets.json` move into the keychain on first read (write, read back, then remove from the file; ADR-0183). That legacy file and `settings.json` (bridge token) are written through `secure_fs::write_owner_only_atomic` — Unix `0o600`, replace a symlink, do not follow it. Env-backed provider keys are resolved from the app process first, then from exported values in the user's zsh/bash startup files on Unix so GUI-launched sessions can still use shell-managed secrets. Local endpoints can omit authentication.
 
@@ -989,8 +980,6 @@ flowchart LR
 |----------|---------|
 | `spawn_ws_bridge(vault_path)` | Spawns `ws-bridge.js` as child process with `VAULT_PATH`/`VAULT_PATHS` env |
 | `sync_mcp_bridge_vault(vault_path?)` | Starts, restarts, or stops the desktop WebSocket bridge as the selected vault changes |
-| `list_prime_packages` | Installed Prime packages from `~/.prime/agent/settings.json` |
-| `install_prime_package` | Run `prime-agent package install`, then reload the attached session |
 | `get_prime_provider_status` | Read-only connection status per provider (no keys). Settings waits until Agents is visible |
 | `sign_in_prime_provider` | OAuth sign-in in the system browser via `mcp-server/prime-login.mjs` and Prime's `AuthStorage`, then reload the session (ADR-0176) |
 | `save_prime_provider_key` | Store a pasted API key through Prime's `AuthStorage` (key on stdin), then reload the session (ADR-0176) |
@@ -1790,8 +1779,7 @@ The vault backend (`src-tauri/src/vault/`) is split into focused submodules:
 | `ai_agents.rs` | CLI-agent request normalization and adapter dispatch |
 | `cli_agent_runtime.rs` | Shared CLI-agent request, prompt, subprocess, version, and MCP path helpers |
 | `acp_client/` | Generic Agent Client Protocol stdio JSON-RPC client (ADR-0178). Not Hermes-specific. |
-| `claude_cli.rs`, `codex_cli.rs`, `opencode_cli.rs`, `pi_cli.rs`, `antigravity_cli.rs`, `hermes_cli.rs` | CLI-agent command/config/event adapters. Hermes prefers ACP (`hermes acp`) and falls back to one-shot `hermes chat`. |
-| `pi_cli.rs`, `pi_config.rs`, `pi_discovery.rs`, `pi_events.rs` | Pi subprocess launch, user-config-seeded transient MCP adapter config, discovery, and JSON stream parsing |
+| `claude_cli.rs`, `codex_cli.rs`, `opencode_cli.rs`, `antigravity_cli.rs`, `hermes_cli.rs` | CLI-agent command/config/event adapters. Hermes prefers ACP (`hermes acp`) and falls back to one-shot `hermes chat`. |
 | `mcp.rs` | MCP server spawning + explicit config registration/removal |
 | `commands/` | Tauri command handlers (split into submodules) |
 | `settings.rs` | App settings persistence |

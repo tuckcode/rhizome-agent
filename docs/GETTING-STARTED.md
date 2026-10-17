@@ -306,7 +306,6 @@ rhizome-agent/
 │   │   ├── hermes_cli.rs         # Hermes ACP adapter + one-shot chat fallback
 │   │   ├── claude_cli.rs         # Claude CLI adapter
 │   │   ├── codex_cli.rs          # Codex CLI adapter
-│   │   ├── pi_cli.rs             # Pi CLI adapter
 │   │   ├── kiro_cli.rs           # Kiro CLI adapter
 │   │   ├── mcp.rs                # MCP server lifecycle + explicit config registration/removal
 │   │   ├── app_updater.rs        # Alpha/stable updater metadata resolution
@@ -385,7 +384,7 @@ rhizome-agent/
 | `src-tauri/src/search.rs` | Keyword search — scans vault files with walkdir. |
 | `src-tauri/src/ai_agents.rs` | CLI-agent request normalization, availability aggregation, adapter dispatch, and Claude event mapping. |
 | `src-tauri/src/cli_agent_runtime.rs` | Shared CLI-agent request shape, prompt wrapping, JSON subprocess lifecycle, version probing, and MCP path helpers. |
-| `src-tauri/src/claude_cli.rs`, `src-tauri/src/codex_cli.rs`, `src-tauri/src/opencode_cli.rs`, `src-tauri/src/pi_cli.rs`, `src-tauri/src/antigravity_cli.rs`, `src-tauri/src/kiro_cli.rs` | Per-agent command, config, discovery, and event adapters. |
+| `src-tauri/src/claude_cli.rs`, `src-tauri/src/codex_cli.rs`, `src-tauri/src/opencode_cli.rs`, `src-tauri/src/antigravity_cli.rs`, `src-tauri/src/kiro_cli.rs` | Per-agent command, config, discovery, and event adapters. |
 | `src-tauri/src/app_updater.rs` | App-update stub. It reports that no release feed is configured. |
 
 ### Editor
@@ -417,8 +416,6 @@ rhizome-agent/
 | `src/components/chatNoteSplit.ts` | On top / Beside for an open note over Chat. Beside forces compact Sessions/Notes. |
 | `src/App.tsx` `handleAskAgentAboutNote` | Right-click a list row → Ask the agent about this note. Keeps Chat and opens that note (`App.test.tsx`). |
 | `src/hooks/useNoteLockMode.ts` | Ephemeral per-note lock. Locked notes make BlockNote/raw read-only (`EditorContentLayout.test.tsx`). Not vault `editor_mode`. |
-| `src/components/PrimeExtensionsSection.tsx` | Settings → AI Agents → Advanced Prime engine. Catalog stays behind **Browse packages**; install is the Prime CLI, not a daemon command. |
-| `src/lib/primePackages.ts` | Catalog search URL, install spec (`npm:` prefix), and Ask-Chat fallback prompt. |
 | `src/hooks/useViewMode.ts` | Runtime pane preset (`chat` / `notes` / `read` / `workbench`). Legacy `editor-only` / `editor-list` / `all` remain compatibility mirrors. Fresh default is Chat. |
 | `src/components/ConnectionsPanel.tsx` | Overlay for note-list **Show in Graph** and for a Chat session footprint. Renders nothing until presented. The rail Graph view is `GraphView`, not this panel. |
 | `src/lib/railViews.ts` | Research, Graph, Mycelium, and History: labels, command ids, and order. Changes is not in this list. |
@@ -547,8 +544,6 @@ Verified against source 2026-09-14. Longer landmine list:
   so the grant can live. Never send Prime `shutdown` (ADR-0163
   transport, kept by ADR-0180). A Rhizome-owned turn that is not
   using Prime is not a Prime helper. Cmd+Q still quits.
-- **Packages install is CLI, not the daemon.** `install_prime_package` runs
-  `prime-agent package install` (180s). Confirm full system access once.
 - **Tab completion is rules-first.** `suggestReply` only. Do not add
   model-backed ghost text (#51 Case 2) without a separate decision.
 - **MCP wiki verbs are gone.** `listTools` must not include

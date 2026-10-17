@@ -5,10 +5,12 @@
 //! the tools it called. The loop consumes `ModelEvent`. Cancel stops
 //! reading; the model has no `Cancelled` event. Tool-call `id`s stay
 //! on the history items that go back to the model.
-//! Allow-once is spent for echo. `create_note` is offered in both
-//! modes: Limited tools asks every call (Allow once and Deny);
-//! Power User runs it with no prompt. Power User bash asks each call
-//! unless a session grant matches the exact command. Quit is
+//! Allow-once is spent for echo. Read-only file tools (`read_file`,
+//! `list_dir`, `grep`, `glob`) auto-run in both modes. `create_note`
+//! is offered in both modes: Limited tools asks every call (Allow
+//! once and Deny); Power User runs it with no prompt. Power User bash
+//! asks each call unless a session grant matches the exact command.
+//! Unknown tools always ask and never match a session grant. Quit is
 //! `stop_and_drain`.
 //! The turn / inbox vocabulary is the DeepSeek Harness idea. No DeepSeek
 //! code is copied.
@@ -26,6 +28,7 @@ pub use driver::{AgentLoop, ApprovalReply, DEFAULT_STEP_CAP};
 pub use fake_model::{FakeModel, ScriptPart};
 pub use model::Model;
 pub use policy::{approval_options, ApprovalOption};
+pub(crate) use tools::openai_tool_definition;
 pub use types::{DurableEvent, HistoryItem, ModelView, ToolCall, UNANSWERED_TOOL_OUTPUT};
 
 #[cfg(test)]
@@ -121,7 +124,7 @@ mod tests {
                     admitted: "A".into(),
                     history: vec![],
                     turn_start: 0,
-                    offered_tools: vec!["echo".into(), "create_note".into()],
+                    offered_tools: super::policy::offered_tools(AiAgentPermissionMode::Safe),
                 },
                 ModelView {
                     admitted: "B".into(),
@@ -133,7 +136,7 @@ mod tests {
                         },
                     ],
                     turn_start: 2,
-                    offered_tools: vec!["echo".into(), "create_note".into()],
+                    offered_tools: super::policy::offered_tools(AiAgentPermissionMode::Safe),
                 },
             ]
         );
@@ -307,6 +310,79 @@ mod tests {
             matches!(first, HistoryItem::Assistant { .. }),
             "step order: the model must see its own tool call before the result, got {first:?}"
         );
+    }
+
+    #[test]
+    fn read_only_file_tools_run_without_approval_and_are_offered() {
+        let vault = tempfile::tempdir().unwrap();
+        let root = vault.path().canonicalize().unwrap();
+        std::fs::write(root.join("note.md"), "hello rhizome\n").unwrap();
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::Safe);
+        agent.set_vault(Some(root.to_string_lossy().into_owned()), Vec::new());
+        let asked = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&asked);
+        agent.set_approval_waiter(move |_, _| {
+            flag.store(true, Ordering::SeqCst);
+            ApprovalReply::Deny
+        });
+        let mut model = FakeModel::script(vec![
+            vec![
+                ScriptPart::Tool {
+                    name: "read_file".into(),
+                    args: serde_json::json!({ "path": "note.md" }).to_string(),
+                },
+                ScriptPart::Tool {
+                    name: "list_dir".into(),
+                    args: serde_json::json!({ "path": "." }).to_string(),
+                },
+                ScriptPart::Tool {
+                    name: "grep".into(),
+                    args: serde_json::json!({ "pattern": "hello" }).to_string(),
+                },
+                ScriptPart::Tool {
+                    name: "glob".into(),
+                    args: serde_json::json!({ "pattern": "*.md" }).to_string(),
+                },
+            ],
+            vec![ScriptPart::Text("done".into())],
+        ]);
+        agent.submit("look");
+        agent.run_until_idle(&mut model);
+
+        assert!(
+            !asked.load(Ordering::SeqCst),
+            "read-only tools must not open an approval card: {:?}",
+            agent.events()
+        );
+        let offered = &model.seen[0].offered_tools;
+        for name in ["read_file", "list_dir", "grep", "glob"] {
+            assert!(
+                offered.iter().any(|offered| offered == name),
+                "registry must offer {name}: {offered:?}"
+            );
+        }
+        let results: Vec<(String, String)> = agent
+            .events()
+            .into_iter()
+            .filter_map(|event| match event {
+                DurableEvent::ToolResult { name, output, .. } => Some((name, output)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(results.len(), 4, "all four tools must run: {results:?}");
+        assert_eq!(results[0].0, "read_file");
+        assert!(results[0].1.contains("hello rhizome"), "{:?}", results[0]);
+        assert_eq!(results[1].0, "list_dir");
+        assert!(results[1].1.contains("file note.md"), "{:?}", results[1]);
+        assert_eq!(results[2].0, "grep");
+        assert!(
+            results[2].1.contains("note.md:1:hello rhizome"),
+            "{:?}",
+            results[2]
+        );
+        assert_eq!(results[3].0, "glob");
+        assert!(results[3].1.contains("note.md"), "{:?}", results[3]);
     }
 
     #[test]
@@ -872,11 +948,7 @@ mod tests {
         allowed.submit("go");
         allowed.run_until_idle(&mut allow_model);
         assert!(allowed.events().iter().any(|event| {
-            matches!(
-                event,
-                DurableEvent::ToolResult { name, output, .. }
-                    if name == "edit" && output == "note"
-            )
+            matches!(event, DurableEvent::ToolResult { name, .. } if name == "edit")
         }));
 
         let denied = AgentLoop::new();
@@ -897,9 +969,43 @@ mod tests {
     }
 
     #[test]
-    fn allow_session_covers_the_tool_for_any_args() {
+    fn unknown_tool_is_denied_when_not_offered() {
         let agent = AgentLoop::new();
-        agent.offer_extra_tool_for_test("edit");
+        agent.grant_for_session("mystery", "anything");
+        let asked = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&asked);
+        agent.set_approval_waiter(move |_, _| {
+            flag.store(true, Ordering::SeqCst);
+            ApprovalReply::AllowOnce
+        });
+        let mut model = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "mystery".into(),
+            args: "anything".into(),
+        }]]);
+        agent.submit("go");
+        agent.run_until_idle(&mut model);
+
+        assert!(
+            !asked.load(Ordering::SeqCst),
+            "an unknown tool must be denied before the waiter runs"
+        );
+        assert!(!agent.events().iter().any(|event| {
+            matches!(event, DurableEvent::ToolResult { name, .. } if name == "mystery")
+        }));
+        assert!(agent.events().iter().any(|event| {
+            matches!(
+                event,
+                DurableEvent::ToolDenied { name, reason, .. }
+                    if name == "mystery" && reason == "not offered"
+            )
+        }));
+    }
+
+    #[test]
+    fn unknown_tool_session_grant_does_not_cover_later_calls() {
+        let agent = AgentLoop::new();
+        agent.offer_extra_tool_for_test("mystery");
+        agent.grant_for_session("mystery", "alpha");
         let asks = Arc::new(AtomicUsize::new(0));
         let count = Arc::clone(&asks);
         agent.set_approval_waiter(move |_, _| {
@@ -909,11 +1015,11 @@ mod tests {
         let mut model = FakeModel::script(vec![
             vec![
                 ScriptPart::Tool {
-                    name: "edit".into(),
+                    name: "mystery".into(),
                     args: "alpha".into(),
                 },
                 ScriptPart::Tool {
-                    name: "edit".into(),
+                    name: "mystery".into(),
                     args: "beta".into(),
                 },
             ],
@@ -922,15 +1028,11 @@ mod tests {
         agent.submit("go");
         agent.run_until_idle(&mut model);
 
-        assert_eq!(asks.load(Ordering::SeqCst), 1);
-        let edits = agent
-            .events()
-            .iter()
-            .filter(
-                |event| matches!(event, DurableEvent::ToolResult { name, .. } if name == "edit"),
-            )
-            .count();
-        assert_eq!(edits, 2);
+        assert_eq!(
+            asks.load(Ordering::SeqCst),
+            2,
+            "a session grant must not cover an unknown tool"
+        );
     }
 
     #[test]
@@ -994,7 +1096,7 @@ mod tests {
     #[test]
     fn session_grants_clear_when_the_session_ends() {
         let agent = AgentLoop::new();
-        agent.offer_extra_tool_for_test("edit");
+        agent.set_permission_mode(AiAgentPermissionMode::PowerUser);
         let asks = Arc::new(AtomicUsize::new(0));
         let count = Arc::clone(&asks);
         agent.set_approval_waiter(move |_, _| {
@@ -1002,16 +1104,16 @@ mod tests {
             ApprovalReply::AllowSession
         });
         let mut first = FakeModel::script(vec![vec![ScriptPart::Tool {
-            name: "edit".into(),
-            args: "one".into(),
+            name: "bash".into(),
+            args: "ls".into(),
         }]]);
         agent.submit("a");
         agent.run_until_idle(&mut first);
         assert_eq!(asks.load(Ordering::SeqCst), 1);
 
         let mut replay = FakeModel::script(vec![vec![ScriptPart::Tool {
-            name: "edit".into(),
-            args: "one".into(),
+            name: "bash".into(),
+            args: "ls".into(),
         }]]);
         agent.submit("again");
         agent.run_until_idle(&mut replay);
@@ -1024,20 +1126,20 @@ mod tests {
         agent.end_session();
 
         let mut after = FakeModel::script(vec![vec![ScriptPart::Tool {
-            name: "edit".into(),
-            args: "one".into(),
+            name: "bash".into(),
+            args: "ls".into(),
         }]]);
         agent.submit("b");
         agent.run_until_idle(&mut after);
         assert_eq!(asks.load(Ordering::SeqCst), 2);
-        let edits = agent
+        let runs = agent
             .events()
             .iter()
             .filter(
-                |event| matches!(event, DurableEvent::ToolResult { name, .. } if name == "edit"),
+                |event| matches!(event, DurableEvent::ToolResult { name, .. } if name == "bash"),
             )
             .count();
-        assert_eq!(edits, 3);
+        assert_eq!(runs, 3);
     }
 
     #[test]
@@ -1520,13 +1622,9 @@ mod tests {
             "the same waiter must be asked again after a mid-wait cancel"
         );
         assert!(
-            agent.events().iter().any(|event| {
-                matches!(
-                    event,
-                    DurableEvent::ToolResult { name, output, .. }
-                        if name == "edit" && output == "note"
-                )
-            }),
+            agent.events().iter().any(
+                |event| matches!(event, DurableEvent::ToolResult { name, .. } if name == "edit")
+            ),
             "AllowOnce on the next turn must run the tool: {:?}",
             agent.events()
         );
@@ -1599,15 +1697,15 @@ mod tests {
             .recv_timeout(Duration::from_secs(1))
             .expect("the second turn must finish while the first waiter is still held");
         assert_eq!(asks.load(Ordering::SeqCst), 2);
-        assert!(
-            events.iter().any(|event| {
-                matches!(
-                    event,
-                    DurableEvent::ToolResult { name, output, .. }
-                        if name == "edit" && output == "later"
-                )
-            }),
-            "AllowOnce on the live prompt must run: {events:?}"
+        let edit_results = events
+            .iter()
+            .filter(
+                |event| matches!(event, DurableEvent::ToolResult { name, .. } if name == "edit"),
+            )
+            .count();
+        assert_eq!(
+            edit_results, 1,
+            "AllowOnce on the live prompt must run once: {events:?}"
         );
         drop(hold_tx);
         assert!(
@@ -1618,7 +1716,7 @@ mod tests {
                         if name == "edit" && output == "note"
                 )
             }),
-            "a stale AllowOnce must not run after dismiss: {events:?}"
+            "a stale AllowOnce must not echo cancelled args: {events:?}"
         );
     }
 
