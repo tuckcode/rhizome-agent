@@ -12,7 +12,7 @@ pub(crate) const SCHEMA: &str = r#"{
   "type": "function",
   "function": {
     "name": "write_file",
-    "description": "Create or overwrite a text file inside the user's vault roots or current workspace. Paths are canonicalized; anything outside those roots is refused. Parent directories are created only inside those roots. Writes are atomic (temp file then rename). This tool asks for approval on every call unless the session already granted this path.",
+    "description": "Create or overwrite a text file inside the user's vault roots or current workspace. Paths are canonicalized; anything outside those roots is refused. Secret files (.env*, .git/, *.pem, id_*) are refused. Parent directories are created only inside those roots. Writes are atomic (temp file then rename). This tool asks for approval on every call unless the session already granted this path.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -213,5 +213,57 @@ mod tests {
         assert!(diff.contains("--- /dev/null"), "{diff}");
         assert!(diff.contains("+alpha"), "{diff}");
         assert!(!Path::new(&root).join("fresh.md").exists());
+    }
+
+    #[test]
+    fn secret_paths_are_refused_without_writing() {
+        let (_dir, root) = vault();
+        let root_path = Path::new(&root);
+        fs::write(root_path.join(".env"), "SECRET=keep\n").unwrap();
+        let existing = run(
+            &json!({ "path": ".env", "content": "SECRET=no\n" }).to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap_err();
+        assert!(existing.contains(sandbox::BLOCKED_SECRET), "{existing}");
+        assert_eq!(
+            fs::read_to_string(root_path.join(".env")).unwrap(),
+            "SECRET=keep\n"
+        );
+
+        for requested in [".env.local", "key.pem", "id_ed25519", "nested/.git/config"] {
+            let error = run(
+                &json!({ "path": requested, "content": "no\n" }).to_string(),
+                Some(&root),
+                &[],
+            )
+            .unwrap_err();
+            assert!(
+                error.contains(sandbox::BLOCKED_SECRET),
+                "{requested}: {error}"
+            );
+            assert!(
+                !root_path.join(requested).exists(),
+                "{requested} must not be created"
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlink_to_a_secret_file_is_refused() {
+        let (_dir, root) = vault();
+        let env = Path::new(&root).join(".env.local");
+        fs::write(&env, "SECRET=keep\n").unwrap();
+        std::os::unix::fs::symlink(&env, Path::new(&root).join("notes.md")).unwrap();
+        let error = run(
+            &json!({ "path": "notes.md", "content": "no\n" }).to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap_err();
+        assert!(error.contains(sandbox::BLOCKED_SECRET), "{error}");
+        assert_eq!(fs::read_to_string(&env).unwrap(), "SECRET=keep\n");
     }
 }

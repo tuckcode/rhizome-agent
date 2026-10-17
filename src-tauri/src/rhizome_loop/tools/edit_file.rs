@@ -1,6 +1,7 @@
 //! Exact string replace inside a text file in the allowed roots.
 
-use std::fs;
+use std::fs::{self, File};
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use super::args;
@@ -8,11 +9,15 @@ use super::atomic;
 use super::preview;
 use super::sandbox;
 
+/// Largest file `edit_file` will load. Bigger files are refused
+/// before the whole body is read.
+pub const MAX_BYTES: usize = 2_097_152;
+
 pub(crate) const SCHEMA: &str = r#"{
   "type": "function",
   "function": {
     "name": "edit_file",
-    "description": "Replace an exact string in a text file inside the user's vault roots or current workspace. Paths are canonicalized; anything outside those roots is refused. Fails if old_string is missing or not unique unless replace_all is true. Line endings and file permissions are kept. Writes are atomic. This tool asks for approval on every call unless the session already granted this path.",
+    "description": "Replace an exact string in a text file inside the user's vault roots or current workspace. Paths are canonicalized; anything outside those roots is refused. Secret files (.env*, .git/, *.pem, id_*) are refused. Files larger than 2097152 bytes are refused. Fails if old_string is missing or not unique unless replace_all is true. Line endings and file permissions are kept. Writes are atomic. This tool asks for approval on every call unless the session already granted this path.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -44,7 +49,16 @@ pub fn run(
     vault_path: Option<&str>,
     vault_paths: &[String],
 ) -> Result<String, String> {
-    let plan = plan(raw_args, vault_path, vault_paths)?;
+    run_with_cap(raw_args, vault_path, vault_paths, MAX_BYTES)
+}
+
+fn run_with_cap(
+    raw_args: &str,
+    vault_path: Option<&str>,
+    vault_paths: &[String],
+    max_bytes: usize,
+) -> Result<String, String> {
+    let plan = plan_with_cap(raw_args, vault_path, vault_paths, max_bytes)?;
     atomic::write_atomic(&plan.path, plan.after.as_bytes())?;
     let noun = if plan.replacements == 1 {
         "replacement"
@@ -70,6 +84,15 @@ pub fn plan(
     vault_path: Option<&str>,
     vault_paths: &[String],
 ) -> Result<EditPlan, String> {
+    plan_with_cap(raw_args, vault_path, vault_paths, MAX_BYTES)
+}
+
+fn plan_with_cap(
+    raw_args: &str,
+    vault_path: Option<&str>,
+    vault_paths: &[String],
+    max_bytes: usize,
+) -> Result<EditPlan, String> {
     let args = args::parse_object(raw_args, "edit_file")?;
     let requested = args::required_str(&args, "path", "edit_file")?;
     let old_string = args::required_string(&args, "old_string", "edit_file")?;
@@ -82,7 +105,7 @@ pub fn plan(
         return Err("old_string and new_string are the same; no change to make.".into());
     }
     let path = sandbox::resolve_file(requested, vault_path, vault_paths)?;
-    let before = read_text(&path)?;
+    let before = read_text_limited(&path, max_bytes)?;
     let matches = count_matches(&before, old_string);
     if matches == 0 {
         return Err(format!("old_string was not found in {requested}."));
@@ -120,8 +143,25 @@ pub fn preview_diff(
     ))
 }
 
-fn read_text(path: &Path) -> Result<String, String> {
-    let bytes = fs::read(path).map_err(|error| format!("Failed to read file: {error}"))?;
+fn read_text_limited(path: &Path, max_bytes: usize) -> Result<String, String> {
+    let meta = fs::metadata(path).map_err(|error| format!("Failed to read file: {error}"))?;
+    if meta.len() > max_bytes as u64 {
+        return Err(format!(
+            "File is too large to edit ({} bytes; limit is {max_bytes}).",
+            meta.len()
+        ));
+    }
+    let file = File::open(path).map_err(|error| format!("Failed to read file: {error}"))?;
+    let mut bytes = Vec::new();
+    let n = file
+        .take((max_bytes as u64).saturating_add(1))
+        .read_to_end(&mut bytes)
+        .map_err(|error| format!("Failed to read file: {error}"))?;
+    if n > max_bytes {
+        return Err(format!(
+            "File is too large to edit ({n} bytes; limit is {max_bytes})."
+        ));
+    }
     if bytes.contains(&0) {
         return Err(format!(
             "File is binary and cannot be edited as text: {}",
@@ -325,5 +365,119 @@ mod tests {
         assert!(diff.contains("-alpha"), "{diff}");
         assert!(diff.contains("+beta"), "{diff}");
         assert_eq!(fs::read_to_string(&dest).unwrap(), "alpha\n");
+    }
+
+    #[test]
+    fn secret_paths_are_refused_without_writing() {
+        let (_dir, root) = vault();
+        let root_path = Path::new(&root);
+        fs::write(root_path.join(".env"), "SECRET=keep\n").unwrap();
+        fs::write(root_path.join("key.pem"), "keep\n").unwrap();
+        fs::write(root_path.join("id_rsa"), "keep\n").unwrap();
+        fs::create_dir_all(root_path.join("nested").join(".git")).unwrap();
+        fs::write(
+            root_path.join("nested").join(".git").join("config"),
+            "keep\n",
+        )
+        .unwrap();
+        for requested in [".env", "key.pem", "id_rsa", "nested/.git/config"] {
+            let error = run(
+                &json!({
+                    "path": requested,
+                    "old_string": "keep",
+                    "new_string": "no"
+                })
+                .to_string(),
+                Some(&root),
+                &[],
+            )
+            .unwrap_err();
+            assert!(
+                error.contains(sandbox::BLOCKED_SECRET),
+                "{requested}: {error}"
+            );
+        }
+        assert_eq!(
+            fs::read_to_string(root_path.join(".env")).unwrap(),
+            "SECRET=keep\n"
+        );
+        assert_eq!(
+            fs::read_to_string(root_path.join("key.pem")).unwrap(),
+            "keep\n"
+        );
+        assert_eq!(
+            fs::read_to_string(root_path.join("id_rsa")).unwrap(),
+            "keep\n"
+        );
+        assert_eq!(
+            fs::read_to_string(root_path.join("nested").join(".git").join("config")).unwrap(),
+            "keep\n"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlink_to_a_secret_file_is_refused() {
+        let (_dir, root) = vault();
+        let env = Path::new(&root).join(".env.local");
+        fs::write(&env, "SECRET=keep\n").unwrap();
+        std::os::unix::fs::symlink(&env, Path::new(&root).join("notes.md")).unwrap();
+        let error = run(
+            &json!({
+                "path": "notes.md",
+                "old_string": "keep",
+                "new_string": "no"
+            })
+            .to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap_err();
+        assert!(error.contains(sandbox::BLOCKED_SECRET), "{error}");
+        assert_eq!(fs::read_to_string(&env).unwrap(), "SECRET=keep\n");
+    }
+
+    #[test]
+    fn file_over_the_byte_cap_is_refused_without_writing() {
+        let (_dir, root) = vault();
+        let dest = Path::new(&root).join("note.md");
+        let body = "abcdefghijUNIQUE";
+        fs::write(&dest, body).unwrap();
+        let error = run_with_cap(
+            &json!({
+                "path": "note.md",
+                "old_string": "UNIQUE",
+                "new_string": "CHANGED"
+            })
+            .to_string(),
+            Some(&root),
+            &[],
+            8,
+        )
+        .unwrap_err();
+        assert!(error.contains("too large"), "{error}");
+        assert!(error.contains("limit is 8"), "{error}");
+        assert_eq!(fs::read_to_string(&dest).unwrap(), body);
+    }
+
+    #[test]
+    fn file_at_the_byte_cap_can_be_edited() {
+        let (_dir, root) = vault();
+        let dest = Path::new(&root).join("note.md");
+        fs::write(&dest, "abcdefgh").unwrap();
+        let out = run_with_cap(
+            &json!({
+                "path": "note.md",
+                "old_string": "abcdefgh",
+                "new_string": "ABCDEFGH"
+            })
+            .to_string(),
+            Some(&root),
+            &[],
+            8,
+        )
+        .unwrap();
+        assert!(out.contains("1 replacement"), "{out}");
+        assert_eq!(fs::read_to_string(&dest).unwrap(), "ABCDEFGH");
     }
 }

@@ -525,8 +525,10 @@ The loop registry (`rhizome_loop/tools`) offers `echo`, read-only file tools
 `write_file`), `create_note`, and Power User `bash`.
 Read-only tools stay inside canonical vault and workspace roots and auto-run;
 they do not open an approval card. `edit_file` and `write_file` use the same
-roots, write through a temp file then rename, and ask in both permission
-modes unless a session grant already covers that tool and path. The Chat
+roots and the same secret denylist (`.env*`, `.git/`, `*.pem`, `id_*`),
+write through a temp file then rename, and ask in both permission
+modes unless a session grant already covers that tool and path. `edit_file`
+refuses files over 2 MiB rather than loading them whole. The Chat
 approval card shows the path and a unified-style preview.
 Secret-path blocking (`.env*` except `.env.example`, `.git/`, `*.pem` /
 `*.key` / `*.p12` / `*.pfx`, known private-key basenames and their
