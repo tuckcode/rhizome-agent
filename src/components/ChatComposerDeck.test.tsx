@@ -30,7 +30,6 @@ describe('ChatComposerDeck', () => {
 
     expect(screen.getByTestId('native-chat-model-picker')).toBeInTheDocument()
     expect(screen.getByTestId('native-chat-model-trigger').tagName).toBe('BUTTON')
-    expect(screen.queryByTestId('prime-thinking-toggle')).not.toBeInTheDocument()
     expect(screen.queryByTestId('prime-model-chip')).not.toBeInTheDocument()
   })
 
@@ -65,7 +64,6 @@ describe('ChatComposerDeck', () => {
     expect(picker).toHaveAttribute('data-engine', 'native')
     expect(screen.getByTestId('native-chat-model-trigger')).toHaveClass('h-6')
     expect(screen.queryByTestId('prime-model-chip')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('prime-thinking-toggle')).not.toBeInTheDocument()
   })
 
   it('keeps the native chip on a Prime chat and does not mount PrimeModelPicker', () => {
@@ -79,7 +77,6 @@ describe('ChatComposerDeck', () => {
 
     expect(screen.getByTestId('native-chat-model-picker')).toBeInTheDocument()
     expect(screen.getByTestId('native-chat-model-picker')).toHaveAttribute('data-engine', 'prime')
-    expect(screen.queryByTestId('prime-thinking-toggle')).not.toBeInTheDocument()
     expect(screen.queryByTestId('prime-model-chip')).not.toBeInTheDocument()
   })
 

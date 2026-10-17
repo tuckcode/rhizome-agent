@@ -154,13 +154,11 @@ unless a row below is the task.
 are **closed** on GitHub (2026-08-29). Do not redesign the strip again.
 
 - Pills are live, not inert.
-- Model + thinking live on the strip (moved off the Prime subhead).
-- Thinking is a **menu of the levels the model can run**
-  (`get_prime_thinking_levels` filtered by
-  `get_prime_supported_thinking_levels`; on `deepseek-v4-flash` that is Off /
-  High / X-High, and the menu says "Limited by this model" when it is short).
-  Do not restore a binary quiet/loud toggle. The model picker lists the same
-  set.
+- Model chip lives on the strip (moved off the Prime subhead). There is no
+  composer thinking-level menu anymore; Prime still honors each model's
+  `thinkingLevelMap` in `models.json` (written when you use Add to Chat list).
+  Do not restore `PrimeThinkingToggle` or the old `get/set_prime_thinking_*`
+  commands unless product asks for UI again.
 - **#51 Case 1 shipped:** Tab ghost-text and reply pills are rules-first
   (`suggestReply`). Options win over completion. Case 2 (model-backed) is
   not built.

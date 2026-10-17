@@ -21,9 +21,9 @@ interface ChatComposerDeckProps {
   /** Stop sending the open note. Without it the pill stays a plain label. */
   onCloseContext?: () => void
   vaultPath?: string
-  /** Agent activity — idle/working pill, sits next to thinking. */
+  /** Agent activity — idle/working pill on the composer row. */
   activity?: ReactNode
-  /** Prime thinking stays on a Prime chat; the model chip is always Rhizome. */
+  /** Rhizome vs Prime catalog for the native model chip. */
   catalog?: 'prime' | 'rhizome'
   nativeTarget?: string | null
   onNativeTargetChange?: (target: string) => void
@@ -69,8 +69,8 @@ function Chip({
 }
 
 /**
- * Live turn controls on the compact composer row (#38 / #9 / #35, native
- * audit 2026-09-26): model, thinking, active agents, the open note.
+ * Live turn controls on the compact composer row (#38, native audit
+ * 2026-09-26): model chip, active agents, and the open note.
  *
  * The model chip is always NativeChatModelPicker.
  */
