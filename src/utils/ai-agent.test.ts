@@ -51,12 +51,6 @@ describe('buildAgentSystemPrompt', () => {
     expect(prompt).not.toContain('not available in this mode')
   })
 
-  it('does not promise shell execution for Pi power user mode', () => {
-    const prompt = buildAgentSystemPrompt({ agent: 'pi', permissionMode: 'power_user' })
-    expect(prompt).toContain('Pi currently uses the same conservative Rhizome MCP configuration')
-    expect(prompt).not.toContain('Local shell commands are available')
-  })
-
   it('instructs AI to use wikilink syntax', () => {
     const prompt = buildAgentSystemPrompt()
     expect(prompt).toContain('[[')

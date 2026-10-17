@@ -405,8 +405,6 @@
   "ai.panel.stop": "Detener respuesta",
   "ai.panel.stoppedResponse": "Detenido.",
   "ai.error.claude.tooManyRedirects": "Claude Code no pudo conectarse a su proveedor porque la solicitud de API se redirigió demasiadas veces. En Terminal, ejecute 'claude auth status' y luego 'claude auth login' si es necesario. Si usas un proveedor o proxy personalizado, verifica ANTHROPIC_BASE_URL, HTTPS_PROXY, HTTP_PROXY y la configuración de SSO/proxy corporativo, y luego reinicia Rhizome.",
-  "ai.error.pi.emptyOutput": "Pi CLI finalizó sin salida del agente. Rhizome esperaba eventos de flujo JSON de 'pi --mode json'; ejecute Pi en una terminal para inspeccionar la configuración.",
-  "ai.error.pi.emptyOutputWithDiagnostic": "La CLI de Pi finalizó sin salida del agente. Rhizome esperaba eventos de flujo JSON de 'pi --mode json', pero Pi solo escribió:\n{diagnostic_output}",
   "ai.message.regenerate": "Regenerar respuesta",
   "ai.message.copy": "Copiar respuesta",
   "ai.message.fork": "Bifurcar chat desde aquí",
@@ -967,5 +965,4 @@
   "ai.composer.modelsFilter": "Filter models…",
   "ai.composer.modelsNotConnected": "Not connected · {count}",
   "ai.composer.modelsHidden": "Hidden by your list · {count}"
-
 }

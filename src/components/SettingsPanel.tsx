@@ -69,7 +69,6 @@ import { AiProviderSettings } from './AiProviderSettings'
 import { PrimeDefaultModelSection } from './PrimeDefaultModelSection'
 import { PrimeModelAllowListSection } from './PrimeModelAllowListSection'
 import { PrimeProviderStatusSection } from './PrimeProviderStatusSection'
-import { PrimeExtensionsSection } from './PrimeExtensionsSection'
 import { AiAgentIcon } from './AiAgentIcon'
 import { readCelebrationsEnabled } from '../lib/celebration'
 import { GitSettingsSection } from './GitSettingsSection'
@@ -256,9 +255,7 @@ interface SettingsBodyProps {
   onOpenDocs?: () => void
   initialSectionId?: string | null
   loadModelCatalog?: boolean
-  loadExtensionCatalog?: boolean
   openAdvancedPrime?: boolean
-  onOpenAdvancedPrime?: () => void
   onClose?: () => void
 }
 
@@ -878,9 +875,6 @@ function SettingsBody(props: SettingsBodyProps) {
   const [loadModelCatalog, setLoadModelCatalog] = useState(
     props.initialSectionId === SETTINGS_SECTION_IDS.ai || openAdvancedPrime,
   )
-  const [loadExtensionCatalog, setLoadExtensionCatalog] = useState(openAdvancedPrime)
-  const handleOpenAdvancedPrime = useCallback(() => setLoadExtensionCatalog(true), [])
-
   useEffect(() => {
     if (loadModelCatalog) return
     const el = document.getElementById(SETTINGS_SECTION_IDS.ai)
@@ -910,9 +904,7 @@ function SettingsBody(props: SettingsBodyProps) {
         <SettingsAgentWorkflowSections
           {...props}
           loadModelCatalog={loadModelCatalog}
-          loadExtensionCatalog={loadExtensionCatalog}
           openAdvancedPrime={openAdvancedPrime}
-          onOpenAdvancedPrime={handleOpenAdvancedPrime}
         />
         {/* Lets the last sections scroll their heading to the top when picked
             in the nav (native audit 2026-09-26). Sized to the scroll box. */}
@@ -1106,10 +1098,7 @@ function SettingsAgentWorkflowSections({
   onOpenDocs,
   activeVaultPath,
   loadModelCatalog = false,
-  loadExtensionCatalog = false,
   openAdvancedPrime = false,
-  onOpenAdvancedPrime,
-  onClose,
 }: SettingsBodyProps) {
   return (
     <>
@@ -1130,10 +1119,7 @@ function SettingsAgentWorkflowSections({
           setAiModelProviders={setAiModelProviders}
           onCopyMcpConfig={onCopyMcpConfig}
           loadModelCatalog={loadModelCatalog}
-          loadExtensionCatalog={loadExtensionCatalog}
           openAdvancedPrime={openAdvancedPrime}
-          onOpenAdvancedPrime={onOpenAdvancedPrime}
-          onClose={onClose}
           activeVaultPath={activeVaultPath}
         />
         <div className="mt-4">
@@ -1517,10 +1503,7 @@ function AiAgentSettingsSection({
   setAiModelProviders,
   onCopyMcpConfig,
   loadModelCatalog,
-  loadExtensionCatalog,
   openAdvancedPrime,
-  onOpenAdvancedPrime,
-  onClose,
   activeVaultPath,
 }: Pick<
   SettingsBodyProps,
@@ -1539,10 +1522,7 @@ function AiAgentSettingsSection({
   | 'setAiModelProviders'
   | 'onCopyMcpConfig'
   | 'loadModelCatalog'
-  | 'loadExtensionCatalog'
   | 'openAdvancedPrime'
-  | 'onOpenAdvancedPrime'
-  | 'onClose'
   | 'activeVaultPath'
 >) {
   const primeStatus = getAiAgentAvailability(aiAgentsStatus, DEFAULT_AI_AGENT)
@@ -1613,10 +1593,7 @@ function AiAgentSettingsSection({
         setAiModelProviders={setAiModelProviders}
         onCopyMcpConfig={onCopyMcpConfig}
         loadModelCatalog={loadModelCatalog}
-        loadExtensionCatalog={loadExtensionCatalog}
         openAdvancedPrime={openAdvancedPrime}
-        onOpenAdvancedPrime={onOpenAdvancedPrime}
-        onClose={onClose}
         vaultPath={activeVaultPath}
       />
     </>
@@ -1630,10 +1607,7 @@ function AiTargetManagementTabs({
   setAiModelProviders,
   onCopyMcpConfig,
   loadModelCatalog,
-  loadExtensionCatalog,
   openAdvancedPrime,
-  onOpenAdvancedPrime,
-  onClose,
   vaultPath,
 }: {
   t: Translate
@@ -1642,10 +1616,7 @@ function AiTargetManagementTabs({
   setAiModelProviders: (value: AiModelProvider[]) => void
   onCopyMcpConfig?: () => void
   loadModelCatalog?: boolean
-  loadExtensionCatalog?: boolean
   openAdvancedPrime?: boolean
-  onOpenAdvancedPrime?: () => void
-  onClose?: () => void
   vaultPath?: string | null
 }) {
   return (
@@ -1664,11 +1635,8 @@ function AiTargetManagementTabs({
         <AdvancedPrimeEngineSection
           t={t}
           aiAgentsStatus={aiAgentsStatus}
-          loadExtensionCatalog={loadExtensionCatalog}
           openAdvancedPrime={openAdvancedPrime}
-          onOpenAdvancedPrime={onOpenAdvancedPrime}
           onCopyMcpConfig={onCopyMcpConfig}
-          onClose={onClose}
         />
         <BridgeTokenRow t={t} />
       </TabsContent>
@@ -1685,19 +1653,13 @@ function AiTargetManagementTabs({
 function AdvancedPrimeEngineSection({
   t,
   aiAgentsStatus,
-  loadExtensionCatalog = false,
   openAdvancedPrime = false,
-  onOpenAdvancedPrime,
   onCopyMcpConfig,
-  onClose,
 }: {
   t: Translate
   aiAgentsStatus: AiAgentsStatus
-  loadExtensionCatalog?: boolean
   openAdvancedPrime?: boolean
-  onOpenAdvancedPrime?: () => void
   onCopyMcpConfig?: () => void
-  onClose?: () => void
 }) {
   const [userExpanded, setUserExpanded] = useState<boolean | null>(null)
   const expanded = userExpanded ?? openAdvancedPrime
@@ -1722,11 +1684,7 @@ function AdvancedPrimeEngineSection({
         aria-expanded={expanded}
         aria-controls={bodyId}
         data-testid="settings-advanced-prime-engine-toggle"
-        onClick={() => {
-          const next = !expanded
-          if (next) onOpenAdvancedPrime?.()
-          setUserExpanded(next)
-        }}
+        onClick={() => setUserExpanded(!expanded)}
         className="h-auto w-full justify-start gap-2 rounded-none px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-muted/50"
       >
         {expanded ? (
@@ -1753,7 +1711,6 @@ function AdvancedPrimeEngineSection({
               </SettingsGroupItem>
             ) : null}
           </SettingsGroup>
-          <PrimeExtensionsSection active={loadExtensionCatalog} onClose={onClose} />
         </div>
       ) : null}
     </div>

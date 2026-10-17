@@ -39,10 +39,6 @@ function permissionModeInstructions(
   }
 
   if (resolvedMode === 'power_user') {
-    if (agent === 'pi') {
-      return `Power User mode is selected, but Pi currently uses the same conservative Rhizome MCP configuration in both modes. Do not promise shell execution unless the Pi CLI exposes it directly in this run.`
-    }
-
     return `Power User mode is active. Local shell commands are available for this vault where the selected CLI agent supports them. Keep commands scoped to the active vault, avoid destructive commands unless explicitly requested, and do not expose note content unnecessarily.`
   }
 
@@ -120,7 +116,7 @@ function primeVaultSkillInstructions(agent?: AiAgentId, vaultPaths?: string[]): 
 export function buildAgentSystemPrompt(options?: string | AgentSystemPromptOptions): string {
   const { vaultContext, agentDocsPath, permissionMode, agent, vaultPaths } = normalizePromptOptions(options)
   const resolvedMode = resolvePermissionModeForAgent(agent, permissionMode)
-  const canUseShell = resolvedMode === 'power_user' && agent !== 'pi'
+  const canUseShell = resolvedMode === 'power_user'
   const prompt = [
     AGENT_SYSTEM_PREAMBLE,
     vaultScopeInstructions(vaultPaths),

@@ -12,7 +12,6 @@ pub enum AiAgentId {
     ClaudeCode,
     Codex,
     Opencode,
-    Pi,
     #[serde(alias = "gemini")]
     Antigravity,
     Kiro,
@@ -29,7 +28,6 @@ pub fn parse_agent_id(value: &str) -> Option<AiAgentId> {
         "claude_code" => Some(AiAgentId::ClaudeCode),
         "codex" => Some(AiAgentId::Codex),
         "opencode" => Some(AiAgentId::Opencode),
-        "pi" => Some(AiAgentId::Pi),
         "antigravity" | "gemini" => Some(AiAgentId::Antigravity),
         "kiro" => Some(AiAgentId::Kiro),
         "hermes" => Some(AiAgentId::Hermes),
@@ -57,7 +55,6 @@ pub struct AiAgentsStatus {
     pub claude_code: AiAgentAvailability,
     pub codex: AiAgentAvailability,
     pub opencode: AiAgentAvailability,
-    pub pi: AiAgentAvailability,
     pub antigravity: AiAgentAvailability,
     pub kiro: AiAgentAvailability,
     pub hermes: AiAgentAvailability,
@@ -153,17 +150,15 @@ pub async fn get_ai_agents_status() -> AiAgentsStatus {
     let claude = tokio::task::spawn_blocking(availability_from_claude);
     let codex = tokio::task::spawn_blocking(crate::codex_cli::check_cli);
     let opencode = tokio::task::spawn_blocking(crate::opencode_cli::check_cli);
-    let pi = tokio::task::spawn_blocking(crate::pi_cli::check_cli);
     let antigravity = tokio::task::spawn_blocking(crate::antigravity_cli::check_cli);
     let kiro = tokio::task::spawn_blocking(crate::kiro_cli::check_cli);
     let hermes = tokio::task::spawn_blocking(crate::hermes_cli::check_cli);
 
-    let (prime, claude, codex, opencode, pi, antigravity, kiro, hermes) = tokio::join!(
+    let (prime, claude, codex, opencode, antigravity, kiro, hermes) = tokio::join!(
         availability_or_missing(prime, AI_AGENT_STATUS_PROBE_TIMEOUT),
         availability_or_missing(claude, AI_AGENT_STATUS_PROBE_TIMEOUT),
         availability_or_missing(codex, AI_AGENT_STATUS_PROBE_TIMEOUT),
         availability_or_missing(opencode, AI_AGENT_STATUS_PROBE_TIMEOUT),
-        availability_or_missing(pi, AI_AGENT_STATUS_PROBE_TIMEOUT),
         availability_or_missing(antigravity, AI_AGENT_STATUS_PROBE_TIMEOUT),
         availability_or_missing(kiro, AI_AGENT_STATUS_PROBE_TIMEOUT),
         availability_or_missing(hermes, AI_AGENT_STATUS_PROBE_TIMEOUT)
@@ -174,7 +169,6 @@ pub async fn get_ai_agents_status() -> AiAgentsStatus {
         claude_code: claude,
         codex,
         opencode,
-        pi,
         antigravity,
         kiro,
         hermes,
@@ -216,12 +210,6 @@ where
             request,
             permission_mode,
             crate::opencode_cli::run_agent_stream,
-            emit,
-        ),
-        AiAgentId::Pi => run_shared_agent_stream(
-            request,
-            permission_mode,
-            crate::pi_cli::run_agent_stream,
             emit,
         ),
         AiAgentId::Antigravity => run_shared_agent_stream(
@@ -368,7 +356,6 @@ mod tests {
         assert_eq!(parse_agent_id("claude_code"), Some(AiAgentId::ClaudeCode));
         assert_eq!(parse_agent_id("codex"), Some(AiAgentId::Codex));
         assert_eq!(parse_agent_id("opencode"), Some(AiAgentId::Opencode));
-        assert_eq!(parse_agent_id("pi"), Some(AiAgentId::Pi));
         assert_eq!(parse_agent_id("antigravity"), Some(AiAgentId::Antigravity));
         assert_eq!(parse_agent_id("gemini"), Some(AiAgentId::Antigravity));
         assert_eq!(parse_agent_id("kiro"), Some(AiAgentId::Kiro));
@@ -415,7 +402,6 @@ mod tests {
             status.claude_code.installed,
             status.codex.installed,
             status.opencode.installed,
-            status.pi.installed,
             status.antigravity.installed,
             status.kiro.installed,
             status.hermes.installed,

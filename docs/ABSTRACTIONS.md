@@ -1063,8 +1063,8 @@ Schedules: see/pause/cancel already lived on the activity band (#14). Create is
 `heartbeat_set` / `cron_add` from `PrimeScheduleDialog` next to Goal — not on
 the idle strip, which must stay quiet when nothing is scheduled.
 
-**Origin:** Prime Session body is older; reply / packages / hide notes
-added 2026-09-13 against `replySuggestions.ts`, `prime_packages.rs`,
+**Origin:** Prime Session body is older; reply / hide notes
+added 2026-09-13 against `replySuggestions.ts`
 and `lib.rs::release_helpers_for_hidden_window`.
 
 ### Reply suggestions
@@ -1084,16 +1084,6 @@ CodeMirror read-only (`EditorContentLayout.test.tsx`). Not vault
 `editor_mode`. Sheet lock is out of scope.
 
 **Origin:** Cursor Grok 4.6 · 2026-09-14 14:08 · leftover stamp.
-
-### Packages
-
-Installed packages are Prime settings (`list_prime_packages`). The
-catalog is the public npm `pi-package` index and stays behind **Browse
-packages**. Install is a CLI spawn (`install_prime_package`), then
-`reload` on the attached session. The daemon has no package-install
-verb. The hub lives under Settings → AI Agents → Advanced Prime engine,
-not as a top-level Settings page. Prime install status and Copy MCP
-config sit above Packages in that disclosure.
 
 ### Hide vs quit
 
@@ -1135,7 +1125,7 @@ interface Settings {
   sidebar_type_pluralization_enabled: boolean | null // null = default true
   ai_features_enabled: boolean | null // null = default true
   git_enabled: boolean | null // null = default true
-  default_ai_agent: 'claude_code' | 'codex' | 'opencode' | 'pi' | 'antigravity' | 'kiro' | 'hermes' | null
+  default_ai_agent: 'prime' | 'claude_code' | 'codex' | 'opencode' | 'antigravity' | 'kiro' | 'hermes' | null
   default_ai_target: string | null // "agent:codex" or "model:<provider>/<model>"
   ai_model_providers: AiModelProvider[] | null
   ai_workspace_conversations: AiWorkspaceConversationSetting[] | null

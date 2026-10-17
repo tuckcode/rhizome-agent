@@ -405,8 +405,6 @@
   "ai.panel.stop": "Остановить ответ",
   "ai.panel.stoppedResponse": "Остановлено.",
   "ai.error.claude.tooManyRedirects": "Claude Code не смог подключиться к своему провайдеру, поскольку запрос API перенаправлялся слишком много раз. В Терминале выполните команду 'claude auth status', а затем, при необходимости, 'claude auth login'. Если вы используете пользовательского провайдера или прокси, проверьте ANTHROPIC_BASE_URL, HTTPS_PROXY, HTTP_PROXY и корпоративные настройки SSO/прокси, а затем перезапустите Rhizome.",
-  "ai.error.pi.emptyOutput": "Pi CLI завершил работу без вывода агента. Rhizome ожидала события потока JSON от 'pi --mode json'; запустите Pi в терминале, чтобы проверить настройку.",
-  "ai.error.pi.emptyOutputWithDiagnostic": "Pi CLI завершил работу без вывода агента. Rhizome ожидала события потока JSON от 'pi --mode json', но Pi вывела только:\n{diagnostic_output}",
   "ai.message.regenerate": "Сгенерировать ответ заново",
   "ai.message.copy": "Скопировать ответ",
   "ai.message.fork": "Разветвить чат отсюда",
@@ -967,5 +965,4 @@
   "ai.composer.modelsFilter": "Filter models…",
   "ai.composer.modelsNotConnected": "Not connected · {count}",
   "ai.composer.modelsHidden": "Hidden by your list · {count}"
-
 }
