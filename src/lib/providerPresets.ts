@@ -32,7 +32,7 @@ export const PROVIDER_PRESETS = [
     keyPageUrl: 'https://platform.openai.com/api-keys',
     apiStyle: 'open_ai',
     apiKeyEnvVar: 'OPENAI_API_KEY',
-    modelId: 'gpt-4.1-mini',
+    modelId: 'gpt-6-luna',
   },
   {
     id: 'anthropic',
@@ -41,7 +41,7 @@ export const PROVIDER_PRESETS = [
     keyPageUrl: 'https://platform.claude.com/settings/keys',
     apiStyle: 'anthropic',
     apiKeyEnvVar: 'ANTHROPIC_API_KEY',
-    modelId: 'claude-3-5-sonnet-latest',
+    modelId: 'claude-sonnet-5-5',
   },
   {
     id: 'xai',
@@ -50,7 +50,7 @@ export const PROVIDER_PRESETS = [
     keyPageUrl: 'https://console.x.ai',
     apiStyle: 'open_ai_compatible',
     apiKeyEnvVar: 'XAI_API_KEY',
-    modelId: 'grok-4',
+    modelId: 'grok-4.3',
   },
   {
     id: 'gemini',
@@ -59,7 +59,7 @@ export const PROVIDER_PRESETS = [
     keyPageUrl: 'https://aistudio.google.com/app/apikey',
     apiStyle: 'gemini',
     apiKeyEnvVar: 'GEMINI_API_KEY',
-    modelId: 'gemini-2.5-flash',
+    modelId: 'gemini-3.8-flash',
   },
   {
     id: 'openrouter',
@@ -68,7 +68,7 @@ export const PROVIDER_PRESETS = [
     keyPageUrl: 'https://openrouter.ai/keys',
     apiStyle: 'open_router',
     apiKeyEnvVar: 'OPENROUTER_API_KEY',
-    modelId: 'openai/gpt-4.1-mini',
+    modelId: 'openai/gpt-6-luna',
   },
   {
     id: 'groq',
@@ -77,7 +77,7 @@ export const PROVIDER_PRESETS = [
     keyPageUrl: 'https://console.groq.com/keys',
     apiStyle: 'open_ai_compatible',
     apiKeyEnvVar: 'GROQ_API_KEY',
-    modelId: 'llama-3.3-70b-versatile',
+    modelId: 'openai/gpt-oss-120b',
   },
   {
     id: 'mistral',
@@ -95,7 +95,7 @@ export const PROVIDER_PRESETS = [
     keyPageUrl: 'https://platform.deepseek.com/api_keys',
     apiStyle: 'open_ai_compatible',
     apiKeyEnvVar: 'DEEPSEEK_API_KEY',
-    modelId: 'deepseek-chat',
+    modelId: 'deepseek-flash',
   },
 ] as const satisfies readonly ProviderPreset[]
 
@@ -155,7 +155,7 @@ export function draftPatchForCustomProvider(baseUrl = ''): ProviderPresetDraftPa
     baseUrl,
     modelId: '',
     apiKeyStorage: defaults.api_key_storage,
-    apiKeyEnvVar: defaults.api_key_env_var ?? '',
+    apiKeyEnvVar: '',
   }
 }
 
@@ -169,12 +169,13 @@ export function mergeProviderPresetPatch<T extends {
   patch: ProviderPresetDraftPatch,
   touched: ProviderDraftTouched,
   clearApiKey: boolean,
+  keepBaseUrl = false,
 ): T & ProviderPresetDraftPatch {
   return {
     ...current,
     ...patch,
     name: touched.name ? current.name : patch.name,
-    baseUrl: touched.baseUrl ? current.baseUrl : patch.baseUrl,
+    baseUrl: keepBaseUrl && touched.baseUrl ? current.baseUrl : patch.baseUrl,
     modelId: touched.modelId ? current.modelId : patch.modelId,
     apiKey: clearApiKey ? '' : current.apiKey,
   }

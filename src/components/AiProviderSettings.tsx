@@ -107,7 +107,7 @@ function draftFromPreset(preset: ReturnType<typeof defaultApiProviderPreset>): P
 function providerKindOptions(mode: ProviderMode, t: Translate): Array<{ value: AiModelProviderKind; label: string }> {
   return providerKindsForMode(mode).map((kind) => {
     const defaults = aiModelProviderCatalogEntry(kind)
-    return { value: kind, label: t(defaults.label_key) }
+    return { value: kind, label: kind === 'gemini' ? 'Google Gemini' : t(defaults.label_key) }
   })
 }
 
@@ -243,7 +243,7 @@ function ProviderKindSelect({
         <SelectTrigger id={triggerId} className={`h-9 w-full ${editableInputClassName()}`}>
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent position="popper" data-anchor-strategy="popper" data-settings-panel-portal="true">
           {providerKindOptions(mode, t).map((option) => (
             <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
           ))}
@@ -269,7 +269,7 @@ function ProviderPresetSelect({
         <SelectTrigger id={triggerId} className={`h-9 w-full ${editableInputClassName()}`}>
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent position="popper" data-anchor-strategy="popper" data-settings-panel-portal="true">
           {PROVIDER_PRESETS.map((preset) => (
             <SelectItem key={preset.id} value={preset.id}>{preset.label}</SelectItem>
           ))}
@@ -294,7 +294,6 @@ function GetApiKeyButton({
       type="button"
       variant="secondary"
       size="sm"
-      className="disabled:opacity-100"
       data-testid="ai-provider-get-api-key"
       onClick={() => {
         trackEvent('provider_preset_get_api_key', { preset: presetId })
@@ -328,7 +327,7 @@ function ApiKeyStorageSelect({
         <SelectTrigger id={triggerId} className={`h-9 w-full ${editableInputClassName()}`}>
           <SelectValue />
         </SelectTrigger>
-        <SelectContent>
+        <SelectContent position="popper" data-anchor-strategy="popper" data-settings-panel-portal="true">
           <SelectItem value="local_file">System keychain</SelectItem>
           <SelectItem value="env">{t('settings.aiProviders.keyStorage.env')}</SelectItem>
           <SelectItem value="none">{t('settings.aiProviders.keyStorage.none')}</SelectItem>
@@ -396,10 +395,10 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
     setTestState('idle')
     setError(null)
   }
-  const applyPatch = (patch: ProviderPresetDraftPatch, clearApiKey: boolean) => {
+  const applyPatch = (patch: ProviderPresetDraftPatch, clearApiKey: boolean, keepBaseUrl = false) => {
     resetTest()
     setKeyPageError(null)
-    setDraft((current) => mergeProviderPresetPatch(current, patch, touched, clearApiKey))
+    setDraft((current) => mergeProviderPresetPatch(current, patch, touched, clearApiKey, keepBaseUrl))
   }
   const updateDraft = (patch: Partial<ProviderDraft>) => {
     resetTest()
@@ -411,14 +410,14 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
     updateDraft({ [field]: value })
   }
   const selectedPreset = providerPresetById(draft.presetId)
-  const updateKind = (kind: AiModelProviderKind) => applyPatch(providerKindPatch(kind), false)
+  const updateKind = (kind: AiModelProviderKind) => applyPatch(providerKindPatch(kind), false, true)
   const updatePreset = (presetId: string) => {
     if (presetId === CUSTOM_PROVIDER_PRESET_ID) {
-      applyPatch(draftPatchForCustomProvider(draft.baseUrl), true)
+      applyPatch(draftPatchForCustomProvider(draft.baseUrl), true, true)
       return
     }
     const preset = providerPresetById(presetId)
-    if (preset) applyPatch(draftPatchForProviderPreset(preset), true)
+    if (preset) applyPatch(draftPatchForProviderPreset(preset), true, false)
   }
   const disabledReason = disabledActionReason(draft, mode)
   const canSave = disabledReason === null
@@ -432,13 +431,18 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
         await saveAiModelProviderApiKey(providerId, draft.apiKey)
       }
       onChange(normalizeAiModelProviders([...providers, buildProvider(draft, providerId)]))
-      setDraft((current) => ({
-        ...draftFromProviderKind(current.kind),
-        presetId: current.presetId,
-        name: current.name,
-        baseUrl: current.baseUrl,
-        modelId: current.presetId === CUSTOM_PROVIDER_PRESET_ID ? '' : current.modelId,
-      }))
+      setDraft((current) => {
+        const preset = providerPresetById(current.presetId)
+        if (preset) return { ...draftFromPreset(preset), apiKey: '' }
+        return {
+          ...draftFromProviderKind(current.kind),
+          presetId: CUSTOM_PROVIDER_PRESET_ID,
+          name: current.name,
+          baseUrl: current.baseUrl,
+          modelId: '',
+          apiKeyEnvVar: current.kind === 'open_ai_compatible' ? '' : current.apiKeyEnvVar,
+        }
+      })
       setTouched({ name: false, baseUrl: false, modelId: false })
       setTestState('idle')
     } catch (error) {
@@ -526,7 +530,11 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
         ) : (
           <ProviderKindSelect mode={mode} t={t} value={draft.kind} onChange={updateKind} />
         )}
-        <LabeledInput label={t('settings.aiProviders.name')} value={draft.name} onChange={(name) => updateTouchedField('name', name)} />
+        {mode === 'api' && draft.presetId === CUSTOM_PROVIDER_PRESET_ID ? (
+          <ProviderKindSelect mode={mode} t={t} value={draft.kind} onChange={updateKind} label="API style" />
+        ) : (
+          <LabeledInput label={t('settings.aiProviders.name')} value={draft.name} onChange={(name) => updateTouchedField('name', name)} />
+        )}
         {draft.presetId === 'anthropic' ? (
           <div
             className="col-span-2 rounded-md border border-border bg-background px-3 py-2 text-xs leading-5 text-muted-foreground"
@@ -534,22 +542,31 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
           >
             <div className="font-medium text-foreground">Not in Rhizome chat yet</div>
             <p>
-              This preset saves the provider. Anthropic models stay out of the Rhizome picker until
-              native Anthropic support lands.
+              Anthropic models won't show in the model picker until Rhizome supports Anthropic
+              directly.
             </p>
           </div>
         ) : null}
         {mode === 'api' && draft.presetId === CUSTOM_PROVIDER_PRESET_ID ? (
-          <ProviderKindSelect mode={mode} t={t} value={draft.kind} onChange={updateKind} label="API style" />
+          <LabeledInput label={t('settings.aiProviders.name')} value={draft.name} onChange={(name) => updateTouchedField('name', name)} />
+        ) : null}
+        {mode === 'api' && draft.presetId === CUSTOM_PROVIDER_PRESET_ID ? (
+          <LabeledInput
+            label={t('settings.aiProviders.model')}
+            value={draft.modelId}
+            onChange={(modelId) => updateTouchedField('modelId', modelId)}
+            placeholder={modelIdPlaceholder(draft.kind)}
+          />
         ) : null}
         <LabeledInput label={t('settings.aiProviders.baseUrl')} value={draft.baseUrl} onChange={(baseUrl) => updateTouchedField('baseUrl', baseUrl)} />
-        <LabeledInput
-          label={t('settings.aiProviders.model')}
-          value={draft.modelId}
-          onChange={(modelId) => updateTouchedField('modelId', modelId)}
-          placeholder={modelIdPlaceholder(draft.kind)}
-        />
-        {mode === 'api' && draft.presetId === CUSTOM_PROVIDER_PRESET_ID ? <div /> : null}
+        {mode === 'api' && draft.presetId === CUSTOM_PROVIDER_PRESET_ID ? null : (
+          <LabeledInput
+            label={t('settings.aiProviders.model')}
+            value={draft.modelId}
+            onChange={(modelId) => updateTouchedField('modelId', modelId)}
+            placeholder={modelIdPlaceholder(draft.kind)}
+          />
+        )}
         {mode === 'api' ? (
           <div className="space-y-1.5">
             <ApiKeyStorageSelect
@@ -603,22 +620,38 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
       {testState === 'success' ? <div className="text-xs text-feedback-success-text">{t('settings.aiProviders.testSuccess')}</div> : null}
       {error ? <div className="text-xs text-destructive">{error}</div> : null}
       {disabledReason ? (
-        <p className="text-xs leading-5 text-muted-foreground" data-testid="ai-provider-disabled-reason">
+        <p
+          id="ai-provider-disabled-reason"
+          className="text-xs leading-5 text-muted-foreground"
+          data-testid="ai-provider-disabled-reason"
+        >
           {disabledReason}
         </p>
       ) : null}
       <div className="flex items-center gap-3">
-        <Button type="button" size="sm" className="disabled:opacity-100" onClick={() => void addProvider()} disabled={!canSave}>
+        <Button
+          type="button"
+          size="sm"
+          aria-disabled={!canSave || undefined}
+          aria-describedby={disabledReason ? 'ai-provider-disabled-reason' : undefined}
+          onClick={() => {
+            if (!canSave) return
+            void addProvider()
+          }}
+        >
           {mode === 'local' ? t('settings.aiProviders.addLocal') : t('settings.aiProviders.addApi')}
         </Button>
         <Button
           type="button"
           variant="secondary"
           size="sm"
-          className="disabled:opacity-100"
           data-testid="ai-provider-test-model"
-          onClick={() => void testProvider()}
-          disabled={!canSave || testState === 'testing'}
+          aria-disabled={!canSave || testState === 'testing' || undefined}
+          aria-describedby={disabledReason ? 'ai-provider-disabled-reason' : undefined}
+          onClick={() => {
+            if (!canSave || testState === 'testing') return
+            void testProvider()
+          }}
         >
           {testState === 'testing' ? t('settings.aiProviders.testing') : t('settings.aiProviders.test')}
         </Button>

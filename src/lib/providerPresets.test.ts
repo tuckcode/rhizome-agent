@@ -94,7 +94,7 @@ describe('provider preset table', () => {
       keyPageUrl: 'https://console.groq.com/keys',
       apiStyle: 'open_ai_compatible',
       apiKeyEnvVar: 'GROQ_API_KEY',
-      modelId: 'llama-3.3-70b-versatile',
+      modelId: 'openai/gpt-oss-120b',
     })
     expect(providerPresetById('missing')).toBeNull()
     expect(defaultApiProviderPreset()).toMatchObject({
@@ -110,7 +110,7 @@ describe('provider preset table', () => {
       kind: 'anthropic',
       name: 'Anthropic',
       baseUrl: 'https://api.anthropic.com/v1',
-      modelId: 'claude-3-5-sonnet-latest',
+      modelId: 'claude-sonnet-5-5',
       apiKeyStorage: 'local_file',
       apiKeyEnvVar: 'ANTHROPIC_API_KEY',
     })
@@ -121,17 +121,17 @@ describe('provider preset table', () => {
       baseUrl: 'https://lab.example/v1',
       modelId: '',
       apiKeyStorage: 'local_file',
-      apiKeyEnvVar: 'OPENAI_API_KEY',
+      apiKeyEnvVar: '',
     })
   })
 
-  it('keeps edited fields when merging a later preset and clears the pasted key', () => {
+  it('takes the new named preset URL even when the current URL was edited', () => {
     const current = {
       presetId: 'openai',
       kind: 'open_ai' as const,
       name: 'Lab OpenAI',
       baseUrl: 'https://lab.example/v1',
-      modelId: 'gpt-4.1-mini',
+      modelId: 'gpt-6-luna',
       apiKeyStorage: 'local_file' as const,
       apiKeyEnvVar: 'OPENAI_API_KEY',
       apiKey: 'sk-live-openai',
@@ -145,10 +145,35 @@ describe('provider preset table', () => {
       presetId: 'groq',
       kind: 'open_ai_compatible',
       name: 'Lab OpenAI',
-      baseUrl: 'https://lab.example/v1',
-      modelId: 'llama-3.3-70b-versatile',
+      baseUrl: 'https://api.groq.com/openai/v1',
+      modelId: 'openai/gpt-oss-120b',
       apiKeyEnvVar: 'GROQ_API_KEY',
       apiKey: '',
+    })
+  })
+
+  it('keeps an edited URL only when keepBaseUrl is set for Custom or API style', () => {
+    const current = {
+      presetId: CUSTOM_PROVIDER_PRESET_ID,
+      kind: 'open_ai_compatible' as const,
+      name: 'Custom provider',
+      baseUrl: 'https://lab.example/v1',
+      modelId: '',
+      apiKeyStorage: 'local_file' as const,
+      apiKeyEnvVar: '',
+      apiKey: '',
+    }
+    const openAiStyle = draftPatchForCustomProvider(current.baseUrl)
+    expect(mergeProviderPresetPatch(current, {
+      ...openAiStyle,
+      kind: 'open_ai',
+      name: 'OpenAI',
+    }, {
+      name: false,
+      baseUrl: true,
+      modelId: false,
+    }, false, true)).toMatchObject({
+      baseUrl: 'https://lab.example/v1',
     })
   })
 

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { AiProviderSettings } from './AiProviderSettings'
@@ -176,16 +177,27 @@ describe('AiProviderSettings presets', () => {
     expect(baseUrl).toHaveValue('https://lab.example/v1')
   })
 
-  it('keeps an edited base URL when switching presets', () => {
+  it('takes the new named preset URL when switching vendors', () => {
     renderProviders()
 
     const baseUrl = screen.getByLabelText('Base URL')
     fireEvent.change(baseUrl, { target: { value: 'https://lab.example/v1' } })
     selectProviderPreset('Groq')
 
-    expect(baseUrl).toHaveValue('https://lab.example/v1')
+    expect(baseUrl).toHaveValue('https://api.groq.com/openai/v1')
     expect(screen.getByLabelText('Name')).toHaveValue('Groq')
-    expect(screen.getByLabelText('Model ID')).toHaveValue('llama-3.3-70b-versatile')
+    expect(screen.getByLabelText('Model ID')).toHaveValue('openai/gpt-oss-120b')
+  })
+
+  it('keeps an edited URL when switching into Custom', () => {
+    renderProviders()
+
+    const baseUrl = screen.getByLabelText('Base URL')
+    fireEvent.change(baseUrl, { target: { value: 'https://lab.example/v1' } })
+    selectProviderPreset('Custom')
+
+    expect(baseUrl).toHaveValue('https://lab.example/v1')
+    expect(screen.getByRole('combobox', { name: 'API style' })).toHaveTextContent('OpenAI-compatible')
   })
 
   it('keeps an edited Custom URL when the API style changes', () => {
@@ -195,6 +207,7 @@ describe('AiProviderSettings presets', () => {
     const baseUrl = screen.getByLabelText('Base URL')
     fireEvent.change(baseUrl, { target: { value: 'https://lab.example/v1' } })
     fireEvent.click(screen.getByRole('combobox', { name: 'API style' }))
+    expect(screen.getByRole('option', { name: 'Google Gemini' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('option', { name: 'OpenAI' }))
 
     expect(baseUrl).toHaveValue('https://lab.example/v1')
@@ -233,17 +246,57 @@ describe('AiProviderSettings presets', () => {
 
     const note = screen.getByTestId('ai-provider-anthropic-note')
     expect(note).toHaveTextContent('Not in Rhizome chat yet')
-    expect(screen.getByLabelText('Model ID')).toHaveValue('claude-3-5-sonnet-latest')
-    expect(screen.getByRole('button', { name: 'Add API model' })).toBeDisabled()
+    expect(note).toHaveTextContent(
+      "Anthropic models won't show in the model picker until Rhizome supports Anthropic directly.",
+    )
+    expect(screen.getByLabelText('Model ID')).toHaveValue('claude-sonnet-5-5')
+    const add = screen.getByRole('button', { name: 'Add API model' })
+    const test = screen.getByTestId('ai-provider-test-model')
+    expect(add).toHaveAttribute('aria-disabled', 'true')
+    expect(add).toHaveAttribute('aria-describedby', 'ai-provider-disabled-reason')
+    expect(test).toHaveAttribute('aria-disabled', 'true')
+    expect(test).toHaveAttribute('aria-describedby', 'ai-provider-disabled-reason')
     expect(screen.getByTestId('ai-provider-disabled-reason')).toHaveTextContent('Paste an API key first.')
-    expect(screen.getByTestId('ai-provider-test-model')).toBeDisabled()
+    expect(screen.getByTestId('ai-provider-disabled-reason')).toHaveAttribute('id', 'ai-provider-disabled-reason')
   })
 
   it('fills a real model id from the default OpenAI preset', () => {
     renderProviders()
 
-    expect(screen.getByLabelText('Model ID')).toHaveValue('gpt-4.1-mini')
+    expect(screen.getByLabelText('Model ID')).toHaveValue('gpt-6-luna')
     expect(screen.getByPlaceholderText('Paste your OpenAI key')).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'API key storage' })).toHaveTextContent('System keychain')
+  })
+
+  it('keeps the preset env var after a save so a second model does not inherit OPENAI_API_KEY', async () => {
+    function StatefulProviders() {
+      const [saved, setSaved] = useState<AiModelProvider[]>([])
+      return <AiProviderSettings t={t} mode="api" providers={saved} onChange={setSaved} />
+    }
+    render(<StatefulProviders />)
+    selectProviderPreset('Groq')
+    fireEvent.change(screen.getByLabelText('API key'), { target: { value: 'gsk-live-groq' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Add API model' }))
+
+    await waitFor(() => expect(screen.queryByText('No API models yet.')).not.toBeInTheDocument())
+    expect(screen.getByLabelText('Name')).toHaveValue('Groq')
+    expect(screen.getByLabelText('Model ID')).toHaveValue('openai/gpt-oss-120b')
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'API key storage' }))
+    fireEvent.click(screen.getByRole('option', { name: 'Read from env var' }))
+    expect(screen.getByLabelText('API key env var')).toHaveValue('GROQ_API_KEY')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add API model' }))
+    await waitFor(() => expect(screen.getByText(/GROQ_API_KEY/)).toBeInTheDocument())
+  })
+
+  it('leaves the Custom env var blank instead of OPENAI_API_KEY', () => {
+    renderProviders()
+    selectProviderPreset('Custom')
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'API key storage' }))
+    fireEvent.click(screen.getByRole('option', { name: 'Read from env var' }))
+
+    expect(screen.getByLabelText('API key env var')).toHaveValue('')
   })
 })
