@@ -553,18 +553,18 @@ function AiPanelEmptyState({
       <h2 className="font-sans text-xl font-medium text-foreground">
         Ask Rhizome
       </h2>
-      <p className="mt-2 max-w-md text-[13px] leading-5 text-muted-foreground">
+      <p className="mt-2 max-w-lg text-[13px] leading-5 text-muted-foreground">
         {hasContext
-          ? 'Rhizome can work from the open note, or from the rest of this workspace.'
-          : 'Rhizome can research this workspace, edit files, and run commands.'}
+          ? 'Rhizome can work from the open note, or from the rest of this repo.'
+          : 'Rhizome can research this repo, edit files, and run commands here.'}
       </p>
       <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-        {EMPTY_CHAT_STARTERS.map((starter, index) => (
+        {EMPTY_CHAT_STARTERS.map((starter) => (
           <Button
             key={starter.label}
             type="button"
             size="sm"
-            variant={index === 0 ? 'default' : 'outline'}
+            variant="outline"
             data-testid="chat-empty-starter"
             onClick={() => prefillAiComposer(starter.prompt)}
           >

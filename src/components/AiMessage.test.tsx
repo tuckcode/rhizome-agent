@@ -1,6 +1,7 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { AiMessage } from './AiMessage'
+import { COLLAPSED_COMMAND_VISIBLE_CHARS } from '../lib/collapsedApproval'
 import { AI_COMPOSER_INSERT_EVENT } from '../utils/aiPromptBridge'
 
 function selectNodeText(node: HTMLElement) {
@@ -351,7 +352,7 @@ describe('AiMessage', () => {
     expect(screen.queryByTestId('reasoning-content')).toBeNull()
   })
 
-  it('lists each tool call inside collapsed-by-default Reasoning', () => {
+  it('does not show Reasoning for tool calls when there is no reasoning text', () => {
     render(
       <AiMessage
         userMessage="Ask"
@@ -364,15 +365,9 @@ describe('AiMessage', () => {
       />,
     )
 
-    expect(screen.getByTestId('reasoning-toggle')).toBeTruthy()
-    expect(screen.queryByTestId('reasoning-content')).toBeNull()
-    expect(screen.queryByTestId('reasoning-tools')).toBeNull()
-
-    fireEvent.click(screen.getByTestId('reasoning-toggle'))
-    const tools = screen.getAllByTestId('reasoning-tool')
-    expect(tools).toHaveLength(2)
-    expect(tools[0]).toHaveTextContent('ipython')
-    expect(tools[1]).toHaveTextContent('get_note')
+    expect(screen.queryByTestId('reasoning-toggle')).toBeNull()
+    expect(screen.queryByText('ipython')).toBeNull()
+    expect(screen.queryByText('get_note')).toBeNull()
   })
 
   it('expands collapsed reasoning on toggle click', () => {
@@ -562,8 +557,8 @@ describe('AiMessage', () => {
     expect(screen.getByTestId('tool-use-toggle')).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByTestId('tool-approval-card')).toBeNull()
 
-    const allow = screen.getByRole('button', { name: 'Allow once' })
-    const deny = screen.getByRole('button', { name: 'Deny' })
+    const allow = screen.getByRole('button', { name: `Allow once: ${raw}` })
+    const deny = screen.getByRole('button', { name: `Deny: ${raw}` })
     expect(allow).toBeVisible()
     expect(deny).toBeVisible()
     expect(allow).not.toBeDisabled()
@@ -571,7 +566,79 @@ describe('AiMessage', () => {
     allow.focus()
     expect(allow).toHaveFocus()
     expect(screen.getByTestId('tool-use-approval-command').textContent).toBe(raw)
-    expect(screen.queryByRole('button', { name: 'Allow for session' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Allow for session/ })).toBeNull()
+    expect(screen.getByTestId('tool-use-needs-approval')).toHaveTextContent('Needs approval')
+  })
+
+  it('keeps two pending approvals on their own collapsed rows', () => {
+    const allowSafe = vi.fn()
+    const allowEvil = vi.fn()
+    render(
+      <AiMessage
+        userMessage="Run two"
+        actions={[
+          pendingApprovalAction('bash', {
+            args: 'echo SAFE',
+            callId: 'safe',
+            onReply: allowSafe,
+          }),
+          {
+            tool: 'bash',
+            toolId: 'evil-1',
+            label: 'bash',
+            status: 'pending' as const,
+            approval: {
+              promptId: 'evil-prompt',
+              callId: 'evil',
+              args: 'rm -rf ~/EVIL',
+              options: APPROVAL_OPTIONS,
+              onReply: allowEvil,
+            },
+          },
+        ]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    const rows = screen.getAllByTestId('tool-use-approval-row')
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toHaveAttribute('data-call-id', 'safe')
+    expect(rows[1]).toHaveAttribute('data-call-id', 'evil')
+    fireEvent.click(screen.getByRole('button', { name: 'Allow once: echo SAFE' }))
+    expect(allowSafe).toHaveBeenCalledWith('allow_once')
+    expect(allowEvil).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Allow once: rm -rf ~/EVIL' }))
+    expect(allowEvil).toHaveBeenCalledWith('allow_once')
+  })
+
+  it('shows the path on a collapsed edit approval and hides Allow for session', () => {
+    render(
+      <AiMessage
+        userMessage="Edit"
+        actions={[pendingApprovalAction('edit_file', { path: 'notes/plan.md', preview: '@@\n-a\n+b' })]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByTestId('tool-use-approval-command')).toHaveTextContent('notes/plan.md')
+    expect(screen.getByRole('button', { name: 'Allow once: notes/plan.md' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Deny: notes/plan.md' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: /Allow for session/ })).toBeNull()
+  })
+
+  it('offers Review instead of Allow when a collapsed command overflows', () => {
+    const command = `echo ${'A'.repeat(COLLAPSED_COMMAND_VISIBLE_CHARS)}`
+    render(
+      <AiMessage
+        userMessage="Run it"
+        actions={[pendingApprovalAction('bash', { args: command, callId: 'long' })]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByRole('button', { name: `Review: ${command}` })).toBeVisible()
+    expect(screen.getByTestId('approval-more-chars')).toHaveTextContent('more characters')
+    expect(screen.queryByRole('button', { name: `Allow once: ${command}` })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: `Review: ${command}` }))
+    expect(screen.getByTestId('tool-use-toggle')).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('tool-approval-card')).toBeInTheDocument()
   })
 
   it('groups five identical tool names into one counted row', () => {

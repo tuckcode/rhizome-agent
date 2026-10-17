@@ -44,6 +44,8 @@ interface PrimeSessionSubheadProps {
    * back to "New chat" rather than showing nothing.
    */
   sessionTitle?: string | null
+  /** Prime-only Idle/live dot and session popover. Hidden on native. */
+  showSessionStatus?: boolean
   /** Frame A hides AiPanelHeader — New chat lives here instead. */
   onNewChat?: () => void
   /** Open this session's footprint in Mycelium (#22). */
@@ -107,6 +109,7 @@ export function PrimeSessionSubhead({
   startedAt,
   problem,
   sessionTitle,
+  showSessionStatus = true,
   onNewChat,
   onOpenFootprint,
   onOpenCommandPalette,
@@ -155,6 +158,7 @@ export function PrimeSessionSubhead({
       </span>
 
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
+        {showSessionStatus ? (
         <Popover>
           <PopoverTrigger asChild>
             <Button
@@ -221,6 +225,7 @@ export function PrimeSessionSubhead({
             </div>
           </PopoverContent>
         </Popover>
+        ) : null}
 
         {showCommandPalette ? (
           <Button

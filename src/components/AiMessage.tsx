@@ -19,6 +19,7 @@ import { AiActionCard, type AiActionStatus } from './AiActionCard'
 import { BashResultCard } from './BashResultCard'
 import { ToolApprovalCard } from './ToolApprovalCard'
 import { VisibleCommand } from './VisibleCommand'
+import { collapsedApprovalOverflow } from '../lib/collapsedApproval'
 import {
   bashApprovalCommand,
   commandFromToolCallInput,
@@ -253,10 +254,9 @@ function UserBubble({ content, images, references, onOpenNote, createdAtMs }: {
 /** Same slack as the transcript: one deliberate scroll up releases the tail. */
 const REASONING_FOLLOW_THRESHOLD_PX = 48
 
-function ReasoningBlock({ locale, text, tools, expanded, onToggle }: {
+function ReasoningBlock({ locale, text, expanded, onToggle }: {
   locale: AppLocale
   text: string
-  tools?: readonly string[]
   expanded: boolean
   onToggle: () => void
 }) {
@@ -303,15 +303,6 @@ function ReasoningBlock({ locale, text, tools, expanded, onToggle }: {
         >
           {normalizeReasoningDisplay(text).trim() ? (
             <MarkdownContent content={normalizeReasoningDisplay(text)} />
-          ) : null}
-          {tools && tools.length > 0 ? (
-            <ul className="m-0 list-none p-0" data-testid="reasoning-tools">
-              {tools.map((tool, index) => (
-                <li key={`${tool}-${index}`} data-testid="reasoning-tool">
-                  {tool}
-                </li>
-              ))}
-            </ul>
           ) : null}
         </div>
       )}
@@ -402,39 +393,81 @@ function pendingApprovalActions(actions: AiAction[]): AiAction[] {
   return actions.filter((action) => action.approval && action.status === 'pending')
 }
 
-function pendingApprovalCommand(action: AiAction): string | undefined {
-  if (!isBashTool(action.tool)) return undefined
-  return bashApprovalCommand(action.approval?.args)
-    ?? commandFromToolCallInput(action.input)
+function pendingApprovalDisplay(action: AiAction): string {
+  if (isBashTool(action.tool)) {
+    return bashApprovalCommand(action.approval?.args)
+      ?? commandFromToolCallInput(action.input)
+      ?? ''
+  }
+  return action.approval?.path ?? action.path ?? ''
 }
 
-function ApprovalRowActions({ actions }: { actions: AiAction[] }) {
+function CollapsedApprovalRow({
+  action,
+  onReview,
+}: {
+  action: AiAction
+  onReview: () => void
+}) {
+  const display = pendingApprovalDisplay(action)
+  const overflow = collapsedApprovalOverflow(display)
+  const options = (action.approval?.options ?? []).filter((option) => (
+    option.id === 'allow_once' || option.id === 'deny'
+  ))
+
   return (
     <div
-      className="flex shrink-0 items-center justify-end gap-1.5"
-      data-testid="tool-use-approval-actions"
+      className="mt-1 flex flex-wrap items-center gap-2"
+      data-testid="tool-use-approval-row"
+      data-call-id={action.approval?.callId ?? action.toolId}
       onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => event.stopPropagation()}
     >
-      {actions.flatMap((action) => {
-        const options = isBashTool(action.tool)
-          ? (action.approval?.options ?? []).filter((option) => option.id !== 'allow_session')
-          : (action.approval?.options ?? [])
-        return options.map((option) => (
+      {display ? (
+        <code
+          className="min-w-0 truncate rounded-sm bg-[var(--syntax-monospace-bg)] px-0.5 font-mono text-[12px]"
+          data-testid="tool-use-approval-command"
+        >
+          <VisibleCommand command={display} wrap={false} />
+        </code>
+      ) : null}
+      {overflow.moreChars > 0 ? (
+        <span className="shrink-0 text-[11px] text-muted-foreground" data-testid="approval-more-chars">
+          {`${overflow.moreChars} more characters`}
+        </span>
+      ) : null}
+      <div className="flex shrink-0 items-center gap-1.5" data-testid="tool-use-approval-actions">
+        {overflow.review ? (
           <Button
-            key={`${action.toolId}-${option.id}`}
-            disabled={action.approval?.busy}
             size="sm"
             type="button"
-            variant={option.id === 'allow_once' ? 'default' : option.id === 'deny' ? 'ghost' : 'outline'}
-            className={option.id === 'deny' ? 'text-destructive hover:text-destructive' : ''}
-            data-testid={`approval-${option.id}`}
-            onClick={() => action.approval?.onReply?.(option.id as NativeApprovalChoice)}
+            variant="outline"
+            data-testid="approval-review"
+            aria-label={`Review: ${display}`}
+            onClick={onReview}
           >
-            {option.label}
+            Review
           </Button>
-        ))
-      })}
+        ) : null}
+        {options.map((option) => {
+          if (overflow.review && option.id === 'allow_once') return null
+          return (
+            <Button
+              key={`${action.toolId}-${option.id}`}
+              disabled={action.approval?.busy}
+              size="sm"
+              type="button"
+              variant={option.id === 'allow_once' ? 'default' : 'ghost'}
+              className={option.id === 'deny' ? 'text-destructive hover:text-destructive' : ''}
+              data-testid={`approval-${option.id}`}
+              aria-label={`${option.label}: ${display}`}
+              onClick={() => action.approval?.onReply?.(option.id as NativeApprovalChoice)}
+            >
+              {option.label}
+            </Button>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -456,16 +489,13 @@ function ToolUseBlock({
   const approvals = pendingApprovalActions(actions)
   const [userExpanded, setUserExpanded] = useState<boolean | null>(null)
   const expanded = userExpanded ?? approvals.length > 0
-  const collapsedCommand = !expanded
-    ? approvals.map(pendingApprovalCommand).find((command) => command !== undefined)
-    : undefined
 
   return (
     <div style={{ marginBottom: 8 }}>
-      <div className="flex flex-nowrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 border-none bg-transparent p-0 text-muted-foreground transition-colors hover:text-foreground"
+          className="flex cursor-pointer items-center gap-1.5 border-none bg-transparent p-0 text-muted-foreground transition-colors hover:text-foreground"
           style={{ fontSize: 12, padding: '4px 0' }}
           aria-expanded={expanded}
           onClick={() => setUserExpanded(!expanded)}
@@ -487,18 +517,26 @@ function ToolUseBlock({
           >
             {actions.length}
           </span>
+          {approvals.length > 0 ? (
+            <span
+              className="font-sans text-[12px] text-[var(--warn-text)]"
+              data-testid="tool-use-needs-approval"
+            >
+              Needs approval
+            </span>
+          ) : null}
           {expanded ? <CaretDown size={12} /> : <CaretRight size={12} />}
         </button>
-        {!expanded && collapsedCommand !== undefined ? (
-          <code
-            className="min-w-0 truncate rounded-sm bg-[var(--syntax-monospace-bg)] px-0.5 font-mono text-[12px]"
-            data-testid="tool-use-approval-command"
-          >
-            <VisibleCommand command={collapsedCommand} wrap={false} />
-          </code>
-        ) : null}
-        {!expanded && approvals.length > 0 ? <ApprovalRowActions actions={approvals} /> : null}
       </div>
+      {!expanded
+        ? approvals.map((action) => (
+            <CollapsedApprovalRow
+              key={action.toolId}
+              action={action}
+              onReview={() => setUserExpanded(true)}
+            />
+          ))
+        : null}
       {expanded && (
         <div data-testid="tool-use-content" style={{ marginTop: 4 }}>
           <ActionCardsList
@@ -818,11 +856,7 @@ function ConversationMessage({ userMessage, images, references, locale = 'en', m
   // streaming re-opened itself the moment reasoningDone flipped.
   const autoExpanded = !reasoningDone
   const reasoningExpanded = userOverride ?? autoExpanded
-  const toolNames = actions.map((action) => action.tool).filter((tool) => tool.trim().length > 0)
-  const reasoningVisible = Boolean(
-    (reasoning && normalizeReasoningDisplay(reasoning).trim())
-    || toolNames.length > 0,
-  )
+  const reasoningVisible = Boolean(reasoning && normalizeReasoningDisplay(reasoning).trim())
 
   const toggleAction = useCallback((toolId: string) => {
     setExpandedActions(prev => {
@@ -859,7 +893,6 @@ function ConversationMessage({ userMessage, images, references, locale = 'en', m
         <ReasoningBlock
           locale={locale}
           text={reasoning ?? ''}
-          tools={toolNames}
           expanded={reasoningExpanded}
           onToggle={() => setUserOverride(prev => !(prev ?? autoExpanded))}
         />

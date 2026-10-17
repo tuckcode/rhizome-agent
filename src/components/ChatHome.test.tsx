@@ -180,6 +180,7 @@ describe('ChatHome', () => {
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
     expect(screen.getByTestId('prime-session-subhead')).toBeInTheDocument()
     expect(screen.getByTestId('open-command-palette')).toHaveTextContent('Command Palette')
+    expect(screen.queryByTestId('prime-session-status')).toBeNull()
   })
 
   it('shows the session title in the header as soon as one exists', () => {
@@ -498,6 +499,11 @@ describe('ChatHome composer wiring', () => {
   it('keeps a Settings API default on the Prime harness', () => {
     expect(chatHomeSource).toContain("if (defaultAiTarget?.kind === 'api_model')")
     expect(chatHomeSource).toContain("target.kind === 'agent' && target.agent === 'prime'")
+  })
+
+  it('uses a primitive session-title refresh key', () => {
+    expect(chatHomeSource).toContain('sessionTitleRefreshKey(primeHost?.isStreaming, sessionPath)')
+    expect(chatHomeSource).not.toContain('[primeHost?.isStreaming, sessionMeta.path]')
   })
 
   it('polls Prime from the open chat engine, not the Settings switch', () => {

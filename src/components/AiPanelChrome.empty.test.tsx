@@ -23,7 +23,7 @@ describe('AiPanelMessageHistory empty vs selected-session states', () => {
     render(<AiPanelMessageHistory {...historyProps()} />)
 
     expect(screen.getByRole('heading', { name: 'Ask Rhizome' })).toBeInTheDocument()
-    expect(screen.getByText(/Rhizome can research this workspace/)).toBeInTheDocument()
+    expect(screen.getByText(/Rhizome can research this repo/)).toBeInTheDocument()
     expect(screen.queryByTestId('ai-panel-transcript-loading')).toBeNull()
   })
 
@@ -36,6 +36,10 @@ describe('AiPanelMessageHistory empty vs selected-session states', () => {
     expect(empty.className).toMatch(/items-center/)
     expect(empty.className).toMatch(/justify-center/)
     expect(empty.className).toMatch(/min-h-full|flex-1/)
+    expect(screen.getAllByTestId('chat-empty-starter').every((button) => (
+      button.getAttribute('class')?.includes('border')
+      && !button.getAttribute('class')?.includes('bg-primary')
+    ))).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: 'Explain this repo' }))
     fireEvent.click(screen.getByRole('button', { name: 'Find and fix a bug' }))
     fireEvent.click(screen.getByRole('button', { name: 'Write tests for a file' }))

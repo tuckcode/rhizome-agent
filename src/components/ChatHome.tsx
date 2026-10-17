@@ -15,6 +15,7 @@ import { usePanelWidth } from '../hooks/usePanelWidth'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 import { usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
 import { usePrimeActiveSessionTitle } from '../hooks/usePrimeActiveSessionTitle'
+import { sessionTitleRefreshKey } from '../lib/sessionHeaderTitle'
 import { resolveChatOpenNote } from '../utils/resolveChatOpenNote'
 import { agentTargets, type AiModelProvider, type AiTarget } from '../lib/aiTargets'
 import {
@@ -176,9 +177,10 @@ export default function ChatHome({
       current.path === next.path && current.title === next.title ? current : next
     ))
   }, [])
+  const sessionPath = sessionMeta.path ?? primeHost?.sessionPath ?? null
   const listedTitle = usePrimeActiveSessionTitle(
-    sessionMeta.path ?? primeHost?.sessionPath ?? null,
-    [primeHost?.isStreaming, sessionMeta.path],
+    sessionPath,
+    sessionTitleRefreshKey(primeHost?.isStreaming, sessionPath),
   )
   const sessionTitle = listedTitle ?? sessionMeta.title
   const newChatRef = useRef<(() => void) | null>(null)
@@ -230,6 +232,7 @@ export default function ChatHome({
           startedAt={primeHost?.startedAt ?? null}
           problem={primeHost?.problem ?? null}
           sessionTitle={sessionTitle}
+          showSessionStatus={effectiveEngine === 'prime'}
           onNewChat={() => {
             clearEngineLock()
             setSessionMeta({ path: null, title: null })

@@ -364,6 +364,26 @@ describe('AiPanel', () => {
     })
   })
 
+  it('collapses whitespace and caps a fallback title at 60 characters', async () => {
+    mockMessages = [{
+      id: 'm1',
+      userMessage: 'Plan\n\nthe   launch of a very long session title that should not fill the header forever',
+      response: 'ok',
+      actions: [],
+    }]
+    const onSessionHeader = vi.fn()
+    render(
+      <AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" onSessionHeader={onSessionHeader} />,
+    )
+    await waitFor(() => {
+      expect(onSessionHeader).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Plan the launch of a very long session title that should not…',
+        }),
+      )
+    })
+  })
+
   it('names a native-engine empty chat Rhizome', () => {
     render(
       <AiPanel

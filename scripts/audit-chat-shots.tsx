@@ -16,8 +16,12 @@ type ShotState =
   | 'approval-collapsed'
   | 'approval-bash'
   | 'approval-allow-focus'
+  | 'approval-two'
+  | 'approval-edit'
+  | 'approval-overflow'
   | 'topbar-native'
   | 'header-title'
+  | 'header-long'
   | 'empty-before'
   | 'empty'
 
@@ -26,8 +30,12 @@ const STATES: ShotState[] = [
   'approval-collapsed',
   'approval-bash',
   'approval-allow-focus',
+  'approval-two',
+  'approval-edit',
+  'approval-overflow',
   'topbar-native',
   'header-title',
+  'header-long',
   'empty-before',
   'empty',
 ]
@@ -56,20 +64,30 @@ function themeLabel() {
   return theme === 'graphite' ? 'Graphite dark' : 'Earth light'
 }
 
-function pendingBash() {
+function pendingAction(
+  tool: string,
+  extra: Record<string, unknown> = {},
+  toolId = `${tool}-1`,
+) {
   return {
-    tool: 'bash',
-    toolId: 'bash-1',
-    label: 'bash',
+    tool,
+    toolId,
+    label: tool,
     status: 'pending' as const,
-    input: '{"command":"pnpm test","timeout_secs":30}',
     approval: {
-      promptId: 'p1',
-      callId: 'bash-1',
-      args: 'pnpm test',
+      promptId: `${toolId}-prompt`,
+      callId: toolId,
       options: OPTIONS,
       onReply: () => {},
+      ...extra,
     },
+  }
+}
+
+function pendingBash(args = 'pnpm test', toolId = 'bash-1') {
+  return {
+    ...pendingAction('bash', { args }, toolId),
+    input: `{"command":${JSON.stringify(args)},"timeout_secs":30}`,
   }
 }
 
@@ -142,7 +160,13 @@ function ChatFrame({
 
 export function Shot() {
   useEffect(() => {
-    if (state !== 'approval-collapsed' && state !== 'approval-allow-focus') return
+    if (
+      state !== 'approval-collapsed'
+      && state !== 'approval-allow-focus'
+      && state !== 'approval-two'
+      && state !== 'approval-edit'
+      && state !== 'approval-overflow'
+    ) return
     document.querySelector<HTMLButtonElement>('[data-testid="tool-use-toggle"]')?.click()
     if (state !== 'approval-allow-focus') return
     requestAnimationFrame(() => {
@@ -153,7 +177,14 @@ export function Shot() {
   const nativeBar = (
     <PrimeSessionSubhead
       live={false}
-      sessionTitle={state === 'header-title' ? 'Plan the launch' : null}
+      showSessionStatus={false}
+      sessionTitle={
+        state === 'header-long'
+          ? 'Plan the launch of a very long session title that should not fill the header'
+          : state === 'header-title'
+            ? 'Plan the launch'
+            : null
+      }
       onNewChat={() => {}}
       onOpenCommandPalette={() => {}}
     />
@@ -191,6 +222,30 @@ export function Shot() {
         actions={[pendingBash()]}
       />
     )
+  } else if (state === 'approval-two') {
+    title = 'Two pending approvals, collapsed'
+    body = (
+      <AiMessage
+        userMessage="Run two"
+        actions={[pendingBash('echo SAFE', 'safe'), pendingBash('rm -rf ~/EVIL', 'evil')]}
+      />
+    )
+  } else if (state === 'approval-edit') {
+    title = 'Collapsed edit approval'
+    body = (
+      <AiMessage
+        userMessage="Edit the plan"
+        actions={[pendingAction('edit_file', { path: 'notes/plan.md', preview: '@@\n-a\n+b' })]}
+      />
+    )
+  } else if (state === 'approval-overflow') {
+    title = 'Collapsed overflowing command'
+    body = (
+      <AiMessage
+        userMessage="Run a long command"
+        actions={[pendingBash(`echo ${'A'.repeat(48)}`)]}
+      />
+    )
   } else if (state === 'topbar-native') {
     title = 'Native engine top bar'
     body = (
@@ -198,11 +253,13 @@ export function Shot() {
         Rhizome native engine · header stays
       </div>
     )
-  } else if (state === 'header-title') {
-    title = 'Header after first message'
+  } else if (state === 'header-title' || state === 'header-long') {
+    title = state === 'header-long'
+      ? 'Long session title next to Command Palette'
+      : 'Header after first message'
     body = (
       <div className="flex flex-1 items-center justify-center text-[13px] text-muted-foreground">
-        First turn titled the session
+        {state === 'header-long' ? 'Title truncates beside Command Palette' : 'First turn titled the session'}
       </div>
     )
   } else if (state === 'empty-before') {

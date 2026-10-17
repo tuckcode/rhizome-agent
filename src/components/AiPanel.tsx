@@ -53,6 +53,7 @@ import { PrimeGoalDialog } from './PrimeGoalDialog'
 import { PrimeScheduleDialog } from './PrimeScheduleDialog'
 import { useAiPanelGoalDialog } from './useAiPanelGoalDialog'
 import { useAiPanelScheduleDialog } from './useAiPanelScheduleDialog'
+import { sessionHeaderReport } from '../lib/sessionHeaderTitle'
 
 interface AiPanelProps {
   onClose: () => void
@@ -406,18 +407,19 @@ export function AiPanelView({
     onConversationReset?.()
     return handleSelectSession(...args)
   }
+  const nativeSessionId = agent.getNativeSession().sessionId ?? null
+  const firstUserMessage = agent.messages.find((message) => message.userMessage?.trim())?.userMessage ?? null
   useEffect(() => {
     if (!onSessionHeader) return
-    const nativeId = agent.getNativeSession().sessionId
-    const path = activeSessionPath
-      ?? primeHost.sessionPath
-      ?? (nativeId ? nativeSessionPath(nativeId) : null)
-    const firstTurn = agent.messages.find((message) => message.userMessage?.trim())
-    onSessionHeader({
-      path: path ?? null,
-      title: firstTurn?.userMessage.trim() ?? null,
+    const report = sessionHeaderReport({
+      activeSessionPath,
+      primeSessionPath: primeHost.sessionPath,
+      nativeSessionId,
+      firstUserMessage,
     })
-  }, [activeSessionPath, agent, onSessionHeader, primeHost.sessionPath])
+    if (!report) return
+    onSessionHeader(report)
+  }, [activeSessionPath, firstUserMessage, nativeSessionId, onSessionHeader, primeHost.sessionPath])
   const handleNativeFork = async (messageId: string) => {
     try {
       const sessionId = await persistNativeFork({

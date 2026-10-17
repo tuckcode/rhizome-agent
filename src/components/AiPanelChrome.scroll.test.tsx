@@ -200,7 +200,7 @@ describe('AiPanelMessageHistory first-run contrast (C77)', () => {
   it('does not stack extra opacity on the first-run description', () => {
     render(<AiPanelMessageHistory {...historyProps([])} isActive={false} />)
 
-    const description = screen.getByText(/Rhizome can research this workspace/)
+    const description = screen.getByText(/Rhizome can research this repo/)
     expect(description).not.toHaveStyle({ opacity: '0.6' })
   })
 })

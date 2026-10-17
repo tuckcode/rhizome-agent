@@ -110,6 +110,28 @@ describe('usePrimeActiveSessionTitle', () => {
     expect(invoked.calls).toEqual(['native_chat_list'])
   })
 
+  it('bounds list calls across re-renders and refetches only when the key changes', async () => {
+    invoked.sessions = [{ id: 'a', path: '/mock/sessions/a.jsonl', title: 'Plan the launch' }]
+    const { rerender } = renderHook(
+      ({ key }) => usePrimeActiveSessionTitle('/mock/sessions/a.jsonl', key),
+      { initialProps: { key: '1|/mock/sessions/a.jsonl' } },
+    )
+    await waitFor(() => expect(invoked.calls).toHaveLength(1))
+
+    for (let index = 0; index < 20; index += 1) {
+      rerender({ key: '1|/mock/sessions/a.jsonl' })
+    }
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(invoked.calls).toEqual(['list_prime_session_summaries'])
+
+    rerender({ key: '0|/mock/sessions/a.jsonl' })
+    await waitFor(() => expect(invoked.calls).toHaveLength(2))
+    expect(invoked.calls).toEqual([
+      'list_prime_session_summaries',
+      'list_prime_session_summaries',
+    ])
+  })
+
   it('never shows the previous session title after a switch', async () => {
     invoked.sessions = [
       { id: 'a', path: '/mock/sessions/a.jsonl', title: 'Old chat' },

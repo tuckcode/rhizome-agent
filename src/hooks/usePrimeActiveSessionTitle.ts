@@ -46,7 +46,12 @@ export function usePrimeActiveSessionTitle(
         ? nativeChatListToSummaries(rows)
         : Array.isArray(rows) ? rows as PrimeSessionSummary[] : []
       const match = sessions.find((session) => session.path === sessionPath)
-      setRead({ path: sessionPath, title: match?.title?.trim() || null })
+      const title = match?.title?.trim() || null
+      setRead((current) => (
+        current?.path === sessionPath && current.title === title
+          ? current
+          : { path: sessionPath, title }
+      ))
     })
 
     return () => {
