@@ -5,14 +5,9 @@ description: Add model providers, store keys in the system keychain, test the co
 
 Choose which models Chat can use, store their API keys safely, and check that they answer. Keys are kept in your operating system's keychain, never in the vault.
 
-## Choose an engine first
+## Engine
 
-**Chat engine** in Settings → AI Agents decides who runs Chat:
-
-- **On (default):** Rhizome's own engine runs new chats with the models you set up below. It doesn't need Prime.
-- **Off:** Prime handles its own provider login. Sign in from Settings → AI Agents → Local agent, or run `prime-agent` in a terminal and use `/login`. If Prime isn't installed, a new Prime-targeted chat falls back to Rhizome's engine after the host status says so.
-
-An open chat keeps the engine it started with.
+New chats use Rhizome's own engine (ADR-0187). Set up the models below in Settings → AI Agents. Prime is only for legacy Prime-locked chats or CLI use.
 
 ## Add a provider
 

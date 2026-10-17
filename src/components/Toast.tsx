@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { renderUpdaterUserMessage, shouldLinkUpdaterReleasesPage } from '../lib/updaterUserMessages'
 
 interface ToastProps {
   message: string | null
@@ -31,7 +32,7 @@ export function Toast({ message, onDismiss, actionLabel, onAction }: ToastProps)
         "animate-in slide-in-from-bottom-2 fade-in duration-200",
       )}
     >
-      <span>{message}</span>
+      <span>{renderUpdaterUserMessage(message, { linkReleasesPage: shouldLinkUpdaterReleasesPage(message) })}</span>
       {hasAction ? (
         <Button
           type="button"

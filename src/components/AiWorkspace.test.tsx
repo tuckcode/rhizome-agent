@@ -60,26 +60,41 @@ vi.mock('./useAiPanelController', () => ({
 
 vi.mock('./AiPanel', () => ({
   AiPanelView: ({
+    chatEngine,
     composerControls,
+    defaultAiAgent,
     onMessageHistoryScrollStateChange,
     onSendPrompt,
     showHeader,
   }: {
+    chatEngine?: 'prime' | 'native'
     composerControls?: ReactNode
+    defaultAiAgent?: string
     onMessageHistoryScrollStateChange?: (scrolled: boolean) => void
     onSendPrompt?: (prompt: string) => void
     showHeader?: boolean
-  }) => (
-    <div data-testid="ai-panel-view" data-show-header={String(showHeader)}>
-      <button type="button" onClick={() => onSendPrompt?.('summarize quarterly sponsor outreach')}>
-        Send mocked prompt
-      </button>
-      <button type="button" onClick={() => onMessageHistoryScrollStateChange?.(true)}>
-        Mock history scroll
-      </button>
-      {composerControls}
-    </div>
-  ),
+  }) => {
+    const nativeHarness = defaultAiAgent === 'prime' || defaultAiAgent === 'hermes' || defaultAiAgent === undefined
+    const label = nativeHarness && chatEngine === 'native'
+      ? 'Rhizome'
+      : defaultAiAgent === 'hermes'
+        ? 'Hermes'
+        : defaultAiAgent === 'codex'
+          ? 'Codex'
+          : 'Prime'
+    return (
+      <div data-testid="ai-panel-view" data-show-header={String(showHeader)}>
+        <div data-testid="agent-input" aria-placeholder={`Ask ${label}`}>Ask {label}</div>
+        <button type="button" onClick={() => onSendPrompt?.('summarize quarterly sponsor outreach')}>
+          Send mocked prompt
+        </button>
+        <button type="button" onClick={() => onMessageHistoryScrollStateChange?.(true)}>
+          Mock history scroll
+        </button>
+        {composerControls}
+      </div>
+    )
+  },
 }))
 
 vi.mock('../utils/aiConversationTitle', () => ({
@@ -540,7 +555,8 @@ describe('AiWorkspace', () => {
     expect(within(menu).getByText('Local agents')).toBeTruthy()
     expect(within(menu).getByText('Local models')).toBeTruthy()
     expect(within(menu).getByText('API models')).toBeTruthy()
-    expect(within(menu).getByText('Prime Agent')).toBeTruthy()
+    expect(within(menu).getByText('Rhizome')).toBeTruthy()
+    expect(within(menu).queryByText('Prime Agent')).toBeNull()
     expect(within(menu).queryByText('Claude Code')).toBeNull()
     expect(within(menu).queryByText('Codex')).toBeNull()
     expect(within(menu).queryByText('Antigravity CLI')).toBeNull()
@@ -583,6 +599,87 @@ describe('AiWorkspace', () => {
         kind: 'api_model',
         shortLabel: 'Llama 3.2',
       }))
+    })
+  })
+
+  it('shows Rhizome on the chip and composer for leftover Prime and Hermes chats', async () => {
+    render(
+      <AiWorkspace
+        open
+        mode="window"
+        aiAgentsStatus={installedStatuses()}
+        aiModelProviders={providers}
+        conversationSettings={[
+          { id: 'prime-chat', title: 'Prime leftover', target_id: 'agent:prime', archived: false },
+          { id: 'hermes-chat', title: 'Hermes leftover', target_id: 'agent:hermes', archived: false },
+        ]}
+        vaultPath="/tmp/vault"
+        onClose={vi.fn()}
+      />,
+    )
+
+    const primeSession = screen.getByTestId('ai-workspace-session-prime-chat')
+    expect(within(primeSession).getByTestId('ai-workspace-target-trigger')).toHaveTextContent('Rhizome')
+    expect(within(primeSession).getByTestId('ai-workspace-target-trigger')).not.toHaveTextContent('Prime')
+    expect(within(primeSession).getByTestId('brand-mark')).toBeInTheDocument()
+    expect(within(primeSession).getByTestId('agent-input')).toHaveAttribute('aria-placeholder', 'Ask Rhizome')
+    expect(within(primeSession).getByText('Ask Rhizome')).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand AI chat list' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Hermes leftover' }))
+
+    const hermesSession = screen.getByTestId('ai-workspace-session-hermes-chat')
+    expect(hermesSession).toHaveClass('flex')
+    expect(within(hermesSession).getByTestId('ai-workspace-target-trigger')).toHaveTextContent('Rhizome')
+    expect(within(hermesSession).getByTestId('ai-workspace-target-trigger')).not.toHaveTextContent('Hermes')
+    expect(within(hermesSession).getByTestId('brand-mark')).toBeInTheDocument()
+    expect(within(hermesSession).getByTestId('agent-input')).toHaveAttribute('aria-placeholder', 'Ask Rhizome')
+    expect(within(hermesSession).getByText('Ask Rhizome')).toBeTruthy()
+  })
+
+  it('retargets an unsaved conversation in memory and persists that target', async () => {
+    const onConversationSettingsChange = vi.fn()
+    const { rerender } = render(
+      <AiWorkspace
+        open
+        mode="window"
+        aiAgentsStatus={installedStatuses()}
+        aiModelProviders={providers}
+        conversationSettings={null}
+        conversationSettingsReady
+        conversationRetargetToken={0}
+        requestedConversationTargetId={undefined}
+        vaultPath="/tmp/vault"
+        onClose={vi.fn()}
+        onConversationSettingsChange={onConversationSettingsChange}
+      />,
+    )
+
+    await waitFor(() => {
+      expect(onConversationSettingsChange).toHaveBeenCalled()
+    })
+    const before = onConversationSettingsChange.mock.calls.at(-1)?.[0] as Array<{ target_id: string | null }>
+    expect(before[0]?.target_id).toBeNull()
+
+    rerender(
+      <AiWorkspace
+        open
+        mode="window"
+        aiAgentsStatus={installedStatuses()}
+        aiModelProviders={providers}
+        conversationSettings={null}
+        conversationSettingsReady
+        conversationRetargetToken={1}
+        requestedConversationTargetId="agent:prime"
+        vaultPath="/tmp/vault"
+        onClose={vi.fn()}
+        onConversationSettingsChange={onConversationSettingsChange}
+      />,
+    )
+
+    await waitFor(() => {
+      const saved = onConversationSettingsChange.mock.calls.at(-1)?.[0] as Array<{ target_id: string | null }>
+      expect(saved[0]?.target_id).toBe('agent:prime')
     })
   })
 
@@ -722,6 +819,68 @@ describe('AiWorkspace', () => {
     ])
   })
 
+  it('reports a persisted Rhizome target when reopened after settings change', () => {
+    const onActiveTargetChange = vi.fn()
+    const statuses = installedStatuses()
+    statuses.codex = createAiAgentAvailability('missing', null)
+    const conversation = {
+      id: 'codex-chat',
+      title: 'Codex notes',
+      target_id: 'agent:codex',
+      archived: false,
+    }
+
+    const { rerender } = render(
+      <AiWorkspace
+        open
+        mode="side"
+        aiAgentsStatus={statuses}
+        aiModelProviders={providers}
+        conversationSettings={[conversation]}
+        conversationSettingsReady
+        vaultPath="/tmp/vault"
+        onActiveTargetChange={onActiveTargetChange}
+        onClose={vi.fn()}
+      />,
+    )
+    expect(onActiveTargetChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      id: 'agent:codex',
+      agent: 'codex',
+    }))
+
+    rerender(
+      <AiWorkspace
+        open={false}
+        mode="side"
+        aiAgentsStatus={statuses}
+        aiModelProviders={providers}
+        conversationSettings={[{ ...conversation, target_id: 'agent:prime' }]}
+        conversationSettingsReady
+        vaultPath="/tmp/vault"
+        onActiveTargetChange={onActiveTargetChange}
+        onClose={vi.fn()}
+      />,
+    )
+    onActiveTargetChange.mockClear()
+    rerender(
+      <AiWorkspace
+        open
+        mode="side"
+        aiAgentsStatus={statuses}
+        aiModelProviders={providers}
+        conversationSettings={[{ ...conversation, target_id: 'agent:prime' }]}
+        conversationSettingsReady
+        vaultPath="/tmp/vault"
+        onActiveTargetChange={onActiveTargetChange}
+        onClose={vi.fn()}
+      />,
+    )
+    expect(onActiveTargetChange).toHaveBeenLastCalledWith(expect.objectContaining({
+      id: 'agent:prime',
+      agent: 'prime',
+    }))
+  })
+
   it('routes only Prime conversations through the Chat engine', () => {
     const statuses = installedStatuses()
     statuses.codex = createAiAgentAvailability('missing', null)
@@ -736,6 +895,17 @@ describe('AiWorkspace', () => {
         expectEngine: undefined,
         expectNativeTarget: undefined,
         expectReadiness: 'missing',
+      },
+      {
+        id: 'claude-chat',
+        title: 'Claude chat',
+        targetId: 'agent:claude_code',
+        engine: 'native' as const,
+        nativeTarget: 'open_ai/gpt-4o',
+        agent: 'claude_code',
+        expectEngine: undefined,
+        expectNativeTarget: undefined,
+        expectReadiness: 'ready',
       },
       {
         id: 'model-chat',
@@ -765,8 +935,8 @@ describe('AiWorkspace', () => {
         engine: 'prime' as const,
         nativeTarget: 'open_ai/gpt-4o',
         agent: 'prime',
-        expectEngine: 'prime',
-        expectNativeTarget: undefined,
+        expectEngine: 'native',
+        expectNativeTarget: 'open_ai/gpt-4o',
       },
     ]
 

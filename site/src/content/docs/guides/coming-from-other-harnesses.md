@@ -45,7 +45,7 @@ Rhizome isn't a code editor. Keep Cursor for code, and use Rhizome as the place 
 
 ## From Prime Agent
 
-Chat starts on Rhizome's own engine. Prime is still there if you turn **Chat engine** off:
+Chat runs on Rhizome's own engine (ADR-0187). Prime remains available for legacy Prime-locked chats and CLI use:
 
 - Your sessions stay in `~/.prime/agent/sessions/`. Rhizome lists them, lets you switch, fork and archive, and draws their footprint in Mycelium.
 - Your login stays with Prime (`/login` in a terminal, or **Sign in** on a provider card in Settings → AI Agents → Local agent).

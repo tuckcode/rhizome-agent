@@ -2,7 +2,8 @@
 //! Each registered tool has a name, a run function, a policy, and a
 //! schema. An unknown name returns an error; it does not echo its args.
 //! `bash` runs one command in the vault root. Limited tools never
-//! offer it. `create_note` writes through `ai_model_tools::run_create_note_tool`.
+//! offer it. `create_note` writes through `ai_model_tools::run_create_note_tool`
+//! and refuses the same secret paths as `edit_file` and `write_file`.
 //! Read-only file tools stay inside canonical vault and workspace roots
 //! and auto-run in both permission modes. `edit_file` and `write_file`
 //! use the same roots and ask before they write. Secret-path blocking
@@ -26,7 +27,13 @@ mod text;
 mod walk;
 mod write_file;
 
+pub(crate) use atomic::preflight;
+pub(crate) use atomic::write_atomic;
+#[cfg(test)]
+pub(crate) use sandbox::override_secret_block;
 pub use sandbox::resolve_for_write;
+pub(crate) use sandbox::{allowed_roots, relative_to_root, resolve_file_for_write};
+pub(crate) use sandbox::{write_target_is_secret, BLOCKED_SECRET};
 #[cfg(test)]
 pub(crate) use shell::command_from_args;
 pub(crate) use shell::{approval_stamp as bash_stamp, command_from_args as bash_command};

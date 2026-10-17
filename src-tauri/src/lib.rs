@@ -11,6 +11,7 @@ mod antigravity_discovery;
 mod app_config;
 mod app_icon;
 pub mod app_updater;
+mod board;
 pub mod claude_cli;
 mod claude_invocation;
 mod cli_agent_runtime;
@@ -774,9 +775,6 @@ macro_rules! app_invoke_handler {
             commands::get_prime_commands,
             commands::export_prime_session,
             commands::set_prime_model,
-            commands::set_prime_thinking_level,
-            commands::get_prime_thinking_levels,
-            commands::get_prime_supported_thinking_levels,
             commands::fork_prime_session,
             commands::settle_prime_session,
             commands::finish_main_window_close,

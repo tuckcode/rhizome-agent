@@ -4,6 +4,7 @@ import {
   type AiAgentId,
   type AiAgentsStatus,
 } from '../../lib/aiAgents'
+import { isKeptExternalAgentId } from '../../lib/migrateRemovedHarnessChoices'
 import {
   isVaultAiGuidanceStatusChecking,
   vaultAiGuidanceNeedsRestore,
@@ -43,6 +44,7 @@ function explicitSwitchCommands({
 
   return AI_AGENT_DEFINITIONS
     .filter((definition) => definition.id !== selectedAiAgent)
+    .filter((definition) => isKeptExternalAgentId(definition.id))
     .filter((definition) => isAiAgentInstalled(aiAgentsStatus, definition.id))
     .map((definition) => ({
       id: `switch-ai-agent-${definition.id}`,

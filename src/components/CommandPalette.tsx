@@ -11,6 +11,7 @@ import { localizeCommandGroup } from '../hooks/commands/localizeCommands'
 import { rememberFeedbackDialogOpener } from '../lib/feedbackDialogOpener'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { formatDroppedPathList } from './inlineWikilinkDropText'
+import { extractInlineWikilinkReferences } from './inlineWikilinkText'
 import { CommandPaletteAiMode } from './CommandPaletteAiMode'
 import { Input } from './ui/input'
 import { useNativePathDrop } from './useNativePathDrop'
@@ -21,10 +22,13 @@ interface CommandPaletteProps {
   entries?: VaultEntry[]
   aiAgentReady?: boolean
   aiAgentLabel?: string
+  aiAgentInstallUrl?: string
   aiModeEnabled?: boolean
   aiPromptTargetId?: string
+  aiRhizomeTargetId?: string
   locale?: AppLocale
   onClose: () => void
+  onUseRhizome?: () => void
 }
 
 interface ScoredCommand {
@@ -286,10 +290,13 @@ function OpenCommandPalette({
   entries = [],
   aiAgentReady = true,
   aiAgentLabel = 'Claude Code',
+  aiAgentInstallUrl,
   aiModeEnabled = true,
   aiPromptTargetId,
+  aiRhizomeTargetId,
   locale = 'en',
   onClose,
+  onUseRhizome,
 }: Omit<CommandPaletteProps, 'open'>) {
   const [query, setQuery] = useState('')
   const [aiValue, setAiValue] = useState('')
@@ -320,7 +327,7 @@ function OpenCommandPalette({
       focusPaletteTarget(target)
     })
     return () => window.cancelAnimationFrame(focusRetry)
-  }, [aiMode])
+  }, [aiAgentReady, aiMode])
 
   useEffect(() => {
     void selectedIndex
@@ -419,6 +426,18 @@ function OpenCommandPalette({
     onClose()
   }
 
+  const handleUseRhizome = () => {
+    onUseRhizome?.()
+    const prompt = aiValue.startsWith(' ') ? aiValue.slice(1).trim() : aiValue.trim()
+    if (!prompt) return
+
+    const references = extractInlineWikilinkReferences(prompt, entries)
+    if (aiRhizomeTargetId) queueAiPrompt(prompt, references, aiRhizomeTargetId)
+    else queueAiPrompt(prompt, references)
+    requestOpenAiChat()
+    onClose()
+  }
+
   return (
     <div
       ref={rootRef}
@@ -443,9 +462,11 @@ function OpenCommandPalette({
             value={aiValue}
             aiAgentReady={aiAgentReady}
             aiAgentLabel={aiAgentLabel}
+            aiAgentInstallUrl={aiAgentInstallUrl}
             inputRef={aiInputRef}
             onChange={handleAiValueChange}
             onSubmit={handleSubmitAiPrompt}
+            onUseRhizome={onUseRhizome ? handleUseRhizome : undefined}
           />
         ) : (
           <>

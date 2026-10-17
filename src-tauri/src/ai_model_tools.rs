@@ -57,6 +57,166 @@ pub(crate) struct CreatedNoteToolResult {
     pub(crate) output: String,
 }
 
+/// GPT-6 Sol, GPT-6 Luna, GPT-5.5, and GPT-5.6 default to medium reasoning.
+/// Chat Completions rejects their function tools unless `reasoning_effort`
+/// is `none`. Only GPT-5.4 already defaults to `none`; the field is still
+/// sent when tools are present so the request does not depend on that
+/// default. Match the model id, not the host. An Azure deployment name
+/// often differs from the model id, so this override does not fire for
+/// those names. OpenRouter is left unchanged: the OpenRouter kind, and any
+/// base URL whose host is `openrouter.ai` or a subdomain of it (Taproot
+/// stores that route as `open_ai_compatible`).
+const CHAT_TOOLS_REASONING_NONE_PREFIXES: &[(&str, &str)] = &[
+    ("gpt-6-sol", "GPT-6 Sol"),
+    ("gpt-6-luna", "GPT-6 Luna"),
+    ("gpt-5.4", "GPT-5.4"),
+    ("gpt-5.5", "GPT-5.5"),
+    ("gpt-5.6", "GPT-5.6"),
+];
+
+/// These models do not accept `reasoning_effort: "none"`. Chat Completions
+/// cannot run vault tools for them yet (issue #225).
+const CHAT_TOOLS_UNSUPPORTED_PREFIXES: &[(&str, &str)] = &[
+    ("gpt-6-astra", "GPT-6 Astra"),
+    ("gpt-6.1-sol", "GPT-6.1 Sol"),
+];
+
+/// What a tool turn should do on Chat Completions.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ChatToolsReasoning {
+    /// Leave tools and `reasoning_effort` alone.
+    Unchanged,
+    /// Send the tools with `reasoning_effort: "none"`.
+    None,
+    /// The streaming loop stops with this message. The optional create-note
+    /// call omits the tool and still sends the chat.
+    OmitTools(String),
+    /// Stop before any HTTP call. A `-pro` id does not work in Rhizome chat.
+    Refuse(String),
+}
+
+/// `None` when this tool turn must send `reasoning_effort`. `OmitTools` for
+/// Astra and GPT-6.1 Sol. `Refuse` for a `-pro` id in the family above.
+/// `Unchanged` leaves the body alone.
+pub(crate) fn chat_tools_reasoning(
+    kind: &AiModelProviderKind,
+    base_url: Option<&str>,
+    model_id: &str,
+    tools_present: bool,
+) -> ChatToolsReasoning {
+    if !tools_present || *kind == AiModelProviderKind::OpenRouter || is_openrouter_base(base_url) {
+        return ChatToolsReasoning::Unchanged;
+    }
+    let bare = bare_chat_model_id(model_id);
+    if let Some((name, _)) = bounded_family(&bare, CHAT_TOOLS_UNSUPPORTED_PREFIXES) {
+        return ChatToolsReasoning::OmitTools(format!(
+            "{name} can't use vault tools in Rhizome yet. Switch to GPT-6 Luna or Sol, or chat without a vault."
+        ));
+    }
+    if let Some((name, rest)) = bounded_family(&bare, CHAT_TOOLS_REASONING_NONE_PREFIXES) {
+        if is_pro_suffix(rest) {
+            return ChatToolsReasoning::Refuse(pro_refusal(name, rest));
+        }
+        return ChatToolsReasoning::None;
+    }
+    ChatToolsReasoning::Unchanged
+}
+
+fn bare_chat_model_id(model_id: &str) -> String {
+    model_id
+        .trim()
+        .rsplit('/')
+        .next()
+        .unwrap_or("")
+        .to_ascii_lowercase()
+}
+
+/// The id matches a family entry exactly, or continues with `-` (a date or
+/// other suffix). `gpt-5.40` does not match `gpt-5.4`.
+fn bounded_family<'a>(
+    bare: &'a str,
+    families: &'static [(&'static str, &'static str)],
+) -> Option<(&'static str, &'a str)> {
+    let mut found: Option<(&str, &str, &str)> = None;
+    for (prefix, name) in families {
+        let rest = if bare == *prefix {
+            Some("")
+        } else {
+            bare.strip_prefix(prefix)
+                .and_then(|rest| rest.strip_prefix('-'))
+        };
+        let Some(rest) = rest else {
+            continue;
+        };
+        let replace = match found {
+            None => true,
+            Some((previous, _, _)) => prefix.len() > previous.len(),
+        };
+        if replace {
+            found = Some((*prefix, *name, rest));
+        }
+    }
+    found.map(|(_, name, rest)| (name, rest))
+}
+
+/// `pro` as its own `-` segment, including after another suffix (`mini-pro`).
+fn is_pro_suffix(rest: &str) -> bool {
+    rest.split('-').any(|part| part == "pro")
+}
+
+/// "GPT-6 Luna Mini Pro doesn't work…" when the segments before `pro` are
+/// known. Anything else falls back to a generic sentence.
+fn pro_refusal(base_name: &str, rest: &str) -> String {
+    let Some(display) = pro_display_name(base_name, rest) else {
+        return "This Pro model doesn't work in Rhizome chat yet.".into();
+    };
+    let pick = if base_name.starts_with("GPT-5") {
+        format!("Pick {base_name} instead.")
+    } else {
+        "Pick GPT-6 Sol or Luna instead.".into()
+    };
+    format!("{display} doesn't work in Rhizome chat yet. {pick}")
+}
+
+fn pro_display_name(base_name: &str, rest: &str) -> Option<String> {
+    let mut qualifiers = Vec::new();
+    for part in rest.split('-') {
+        if part == "pro" {
+            let mut name = base_name.to_string();
+            for qualifier in qualifiers {
+                name.push(' ');
+                name.push_str(qualifier);
+            }
+            name.push_str(" Pro");
+            return Some(name);
+        }
+        let qualifier = match part {
+            "mini" => "Mini",
+            _ => return None,
+        };
+        qualifiers.push(qualifier);
+    }
+    None
+}
+
+fn is_openrouter_base(base_url: Option<&str>) -> bool {
+    base_url_host(base_url)
+        .is_some_and(|host| host == "openrouter.ai" || host.ends_with(".openrouter.ai"))
+}
+
+fn base_url_host(base_url: Option<&str>) -> Option<String> {
+    let base = base_url?.trim();
+    let without_scheme = base.split_once("://").map(|(_, rest)| rest).unwrap_or(base);
+    let host_port = without_scheme.split(['/', '?', '#']).next().unwrap_or("");
+    let host = host_port
+        .rsplit_once('@')
+        .map(|(_, host)| host)
+        .unwrap_or(host_port);
+    let host = host.split(':').next().unwrap_or("").trim();
+    let host = host.trim_end_matches('.').to_ascii_lowercase();
+    (!host.is_empty()).then_some(host)
+}
+
 pub(crate) fn openai_chat_payload(request: &AiModelStreamRequest) -> serde_json::Value {
     let mut payload = serde_json::json!({
         "model": request.model_id,
@@ -64,8 +224,19 @@ pub(crate) fn openai_chat_payload(request: &AiModelStreamRequest) -> serde_json:
         "stream": false
     });
     if should_offer_openai_tools(request) {
-        payload["tools"] = serde_json::Value::Array(vec![openai_create_note_tool()]);
-        payload["tool_choice"] = serde_json::Value::String("auto".into());
+        let reasoning = chat_tools_reasoning(
+            &request.provider.kind,
+            request.provider.base_url.as_deref(),
+            &request.model_id,
+            true,
+        );
+        if !matches!(reasoning, ChatToolsReasoning::OmitTools(_)) {
+            payload["tools"] = serde_json::Value::Array(vec![openai_create_note_tool()]);
+            payload["tool_choice"] = serde_json::Value::String("auto".into());
+        }
+        if reasoning == ChatToolsReasoning::None {
+            payload["reasoning_effort"] = serde_json::Value::String("none".into());
+        }
     }
     payload
 }
@@ -94,7 +265,7 @@ fn openai_chat_messages(request: &AiModelStreamRequest) -> Vec<serde_json::Value
     messages
 }
 
-fn should_offer_openai_tools(request: &AiModelStreamRequest) -> bool {
+pub(crate) fn should_offer_openai_tools(request: &AiModelStreamRequest) -> bool {
     let has_active_vault = non_empty_option(request.vault_path.as_deref()).is_some();
     has_active_vault
         && (request.provider.kind == AiModelProviderKind::OpenAi
@@ -500,6 +671,198 @@ mod tests {
         assert!(payload.get("tool_choice").is_none());
     }
 
+    fn payload_for(model_id: &str, kind: AiModelProviderKind, vault: bool) -> serde_json::Value {
+        let mut provider = provider();
+        provider.kind = kind;
+        provider.models[0].id = model_id.into();
+        provider.models[0].capabilities.tools = true;
+        let mut request =
+            request_with_provider(provider, vault.then(|| "vault".into()), Vec::new());
+        request.model_id = model_id.into();
+        openai_chat_payload(&request)
+    }
+
+    fn reasoning_for(
+        model_id: &str,
+        kind: AiModelProviderKind,
+        base_url: Option<&str>,
+        tools: bool,
+    ) -> ChatToolsReasoning {
+        chat_tools_reasoning(&kind, base_url, model_id, tools)
+    }
+
+    #[test]
+    fn openai_payload_sends_reasoning_none_only_with_tools_on_the_gpt_family() {
+        for model_id in [
+            "gpt-6-sol",
+            "gpt-6-luna",
+            "GPT-6-LUNA",
+            "gpt-5.4",
+            "gpt-5.4-2026-03-01",
+            "gpt-5.5-mini",
+            "gpt-5.6-terra",
+            "openai/gpt-6-luna",
+        ] {
+            let payload = payload_for(model_id, AiModelProviderKind::OpenAi, true);
+            assert_eq!(payload["reasoning_effort"], "none", "{model_id}");
+            assert!(payload.get("tools").is_some(), "{model_id}");
+        }
+
+        for model_id in [
+            "gpt-4.1",
+            "gpt-5.3",
+            "gpt-5.40",
+            "gpt-5.55",
+            "gpt-5-nano",
+            "gpt-6-lunatic",
+        ] {
+            let payload = payload_for(model_id, AiModelProviderKind::OpenAi, true);
+            assert!(payload.get("tools").is_some(), "{model_id}");
+            assert!(payload.get("reasoning_effort").is_none(), "{model_id}");
+            assert_eq!(
+                reasoning_for(model_id, AiModelProviderKind::OpenAi, None, true),
+                ChatToolsReasoning::Unchanged,
+                "{model_id}"
+            );
+        }
+
+        let no_tools = payload_for("gpt-6-luna", AiModelProviderKind::OpenAi, false);
+        assert!(no_tools.get("tools").is_none());
+        assert!(no_tools.get("reasoning_effort").is_none());
+        assert_eq!(
+            reasoning_for("gpt-6-astra", AiModelProviderKind::OpenAi, None, false),
+            ChatToolsReasoning::Unchanged
+        );
+
+        for model_id in ["openai/gpt-6-luna", "gpt-6-astra", "gpt-6.1-sol"] {
+            let payload = payload_for(model_id, AiModelProviderKind::OpenRouter, true);
+            assert!(payload.get("tools").is_some(), "{model_id}");
+            assert!(payload.get("reasoning_effort").is_none(), "{model_id}");
+        }
+
+        let mut openrouter_host = provider();
+        openrouter_host.kind = AiModelProviderKind::OpenAiCompatible;
+        openrouter_host.base_url = Some("https://OpenRouter.ai/api/v1".into());
+        openrouter_host.models[0].id = "gpt-6-luna".into();
+        openrouter_host.models[0].capabilities.tools = true;
+        let mut request = request_with_provider(openrouter_host, Some("vault".into()), Vec::new());
+        request.model_id = "gpt-6-luna".into();
+        let payload = openai_chat_payload(&request);
+        assert!(payload.get("tools").is_some());
+        assert!(payload.get("reasoning_effort").is_none());
+        assert_eq!(
+            chat_tools_reasoning(
+                &AiModelProviderKind::OpenAiCompatible,
+                Some("https://openrouter.ai/api/v1"),
+                "gpt-6-luna",
+                true,
+            ),
+            ChatToolsReasoning::Unchanged
+        );
+
+        for (model_id, name) in [
+            ("gpt-6-astra", "GPT-6 Astra"),
+            ("GPT-6-ASTRA", "GPT-6 Astra"),
+            ("gpt-6-astra-900k", "GPT-6 Astra"),
+            ("gpt-6.1-sol", "GPT-6.1 Sol"),
+            ("openai/gpt-6.1-sol", "GPT-6.1 Sol"),
+        ] {
+            let payload = payload_for(model_id, AiModelProviderKind::OpenAi, true);
+            assert!(payload.get("tools").is_none(), "{model_id}");
+            assert!(payload.get("reasoning_effort").is_none(), "{model_id}");
+            assert_eq!(
+                reasoning_for(model_id, AiModelProviderKind::OpenAi, None, true),
+                ChatToolsReasoning::OmitTools(format!(
+                    "{name} can't use vault tools in Rhizome yet. Switch to GPT-6 Luna or Sol, or chat without a vault."
+                )),
+                "{model_id}"
+            );
+        }
+
+        for (model_id, message) in [
+            (
+                "gpt-6-luna-pro",
+                "GPT-6 Luna Pro doesn't work in Rhizome chat yet. Pick GPT-6 Sol or Luna instead.",
+            ),
+            (
+                "gpt-5.4-pro",
+                "GPT-5.4 Pro doesn't work in Rhizome chat yet. Pick GPT-5.4 instead.",
+            ),
+            (
+                "gpt-5.6-pro",
+                "GPT-5.6 Pro doesn't work in Rhizome chat yet. Pick GPT-5.6 instead.",
+            ),
+            (
+                "gpt-6-luna-mini-pro",
+                "GPT-6 Luna Mini Pro doesn't work in Rhizome chat yet. Pick GPT-6 Sol or Luna instead.",
+            ),
+            (
+                "gpt-6-sol-mini-pro-2026-01-01",
+                "GPT-6 Sol Mini Pro doesn't work in Rhizome chat yet. Pick GPT-6 Sol or Luna instead.",
+            ),
+            (
+                "gpt-6-luna-custom-pro",
+                "This Pro model doesn't work in Rhizome chat yet.",
+            ),
+        ] {
+            assert_eq!(
+                reasoning_for(model_id, AiModelProviderKind::OpenAi, None, true),
+                ChatToolsReasoning::Refuse(message.into()),
+                "{model_id}"
+            );
+        }
+
+        for base_url in [
+            "https://openrouter.ai.evil.com/api/v1",
+            "https://evilopenrouter.ai/api/v1",
+            "https://evil.com/openrouter.ai",
+            "https://openrouter.ai@evil.com/api/v1",
+            "openrouter.ai.evil.com",
+            "evil.com/openrouter.ai",
+            "openrouter.ai@evil.com",
+        ] {
+            assert_eq!(
+                reasoning_for(
+                    "gpt-6-luna",
+                    AiModelProviderKind::OpenAiCompatible,
+                    Some(base_url),
+                    true,
+                ),
+                ChatToolsReasoning::None,
+                "{base_url}"
+            );
+            let mut provider = provider();
+            provider.kind = AiModelProviderKind::OpenAiCompatible;
+            provider.base_url = Some(base_url.into());
+            provider.models[0].id = "gpt-6-luna".into();
+            provider.models[0].capabilities.tools = true;
+            let mut request = request_with_provider(provider, Some("vault".into()), Vec::new());
+            request.model_id = "gpt-6-luna".into();
+            let payload = openai_chat_payload(&request);
+            assert_eq!(payload["reasoning_effort"], "none", "{base_url}");
+        }
+
+        assert_eq!(
+            reasoning_for(
+                "gpt-6-luna",
+                AiModelProviderKind::OpenAiCompatible,
+                Some("https://api.openrouter.ai/api/v1"),
+                true,
+            ),
+            ChatToolsReasoning::Unchanged
+        );
+        let mut subdomain = provider();
+        subdomain.kind = AiModelProviderKind::OpenAiCompatible;
+        subdomain.base_url = Some("https://api.openrouter.ai/api/v1".into());
+        subdomain.models[0].id = "gpt-6-luna".into();
+        subdomain.models[0].capabilities.tools = true;
+        let mut request = request_with_provider(subdomain, Some("vault".into()), Vec::new());
+        request.model_id = "gpt-6-luna".into();
+        let payload = openai_chat_payload(&request);
+        assert!(payload.get("tools").is_some());
+        assert!(payload.get("reasoning_effort").is_none());
+    }
+
     #[test]
     fn execute_openai_tool_calls_returns_none_without_tool_calls() {
         let dir = tempfile::tempdir().unwrap();
@@ -665,6 +1028,231 @@ mod tests {
 
         assert!(result.is_err());
         assert!(!parent.path().join("escape.md").exists());
+    }
+
+    #[test]
+    fn create_note_refuses_secret_and_git_paths() {
+        let vault = tempfile::tempdir().unwrap();
+        let vault_path = vault.path().to_string_lossy().into_owned();
+        for requested in [
+            ".env",
+            ".env.local",
+            "key.pem",
+            "id_rsa",
+            "nested/.git/config",
+        ] {
+            let error = create_note(
+                &json!({ "path": requested, "content": "no\n" }),
+                Some(&vault_path),
+                &[],
+            )
+            .err()
+            .expect("secret path");
+            assert!(
+                error.contains(crate::rhizome_loop::BLOCKED_SECRET),
+                "{requested}: {error}"
+            );
+            assert!(
+                !vault.path().join(requested).exists(),
+                "{requested} must not be created"
+            );
+        }
+        assert!(
+            !vault.path().join("nested").exists(),
+            "create_note must not create a .git parent"
+        );
+
+        create_note(
+            &json!({ "path": ".env.example", "content": "EXAMPLE=1\n" }),
+            Some(&vault_path),
+            &[],
+        )
+        .expect(".env.example is not a secret");
+        assert_eq!(
+            fs::read_to_string(vault.path().join(".env.example")).unwrap(),
+            "EXAMPLE=1\n"
+        );
+    }
+
+    #[test]
+    fn create_note_stays_blocked_when_the_secret_setting_is_off() {
+        let vault = tempfile::tempdir().unwrap();
+        let vault_path = vault.path().to_string_lossy().into_owned();
+        fs::create_dir_all(vault.path().join(".git").join("hooks")).unwrap();
+        fs::write(
+            vault.path().join(".git").join("hooks").join("pre-commit"),
+            "keep\n",
+        )
+        .unwrap();
+        fs::write(vault.path().join(".env"), "SECRET=keep\n").unwrap();
+        let _guard = crate::rhizome_loop::override_secret_block(false);
+        for requested in [".git/hooks/pre-commit", ".env", "id_ed25519"] {
+            let error = create_note(
+                &json!({ "path": requested, "content": "no\n" }),
+                Some(&vault_path),
+                &[],
+            )
+            .err()
+            .expect("secret path");
+            assert!(
+                error.contains(crate::rhizome_loop::BLOCKED_SECRET),
+                "create_note must keep blocking {requested} with the setting off: {error}"
+            );
+            if requested != "id_ed25519" {
+                assert_eq!(
+                    fs::read_to_string(vault.path().join(requested)).unwrap(),
+                    if requested == ".env" {
+                        "SECRET=keep\n"
+                    } else {
+                        "keep\n"
+                    },
+                    "{requested} must stay unchanged"
+                );
+            } else {
+                assert!(!vault.path().join(requested).exists());
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn create_note_refuses_a_symlink_into_git() {
+        let vault = tempfile::tempdir().unwrap();
+        let vault_path = vault.path().to_string_lossy().into_owned();
+        fs::create_dir_all(vault.path().join(".git")).unwrap();
+        fs::write(vault.path().join(".git").join("config"), "keep\n").unwrap();
+        std::os::unix::fs::symlink(vault.path().join(".git"), vault.path().join("gitlink"))
+            .unwrap();
+        let error = create_note(
+            &json!({ "path": "gitlink/config", "content": "no\n" }),
+            Some(&vault_path),
+            &[],
+        )
+        .err()
+        .expect("symlink into .git");
+        assert!(
+            error.contains(crate::rhizome_loop::BLOCKED_SECRET),
+            "{error}"
+        );
+        assert_eq!(
+            fs::read_to_string(vault.path().join(".git").join("config")).unwrap(),
+            "keep\n"
+        );
+    }
+
+    #[test]
+    fn create_note_refuses_git_and_env_aliases() {
+        let vault = tempfile::tempdir().unwrap();
+        let vault_path = vault.path().to_string_lossy().into_owned();
+        for requested in [".GIT/x", ".ENV.LOCAL", ".git/../.git/x", ".env.production"] {
+            let error = create_note(
+                &json!({ "path": requested, "content": "no\n" }),
+                Some(&vault_path),
+                &[],
+            )
+            .err()
+            .expect("secret path");
+            assert!(
+                error.contains(crate::rhizome_loop::BLOCKED_SECRET),
+                "{requested}: {error}"
+            );
+            assert!(
+                !vault.path().join(requested).exists(),
+                "{requested} must not be created"
+            );
+        }
+        assert!(!vault.path().join(".git").join("x").exists());
+        assert!(!vault.path().join(".env.production").exists());
+    }
+
+    /// `CI` counts only when it is set to a real value. An empty string,
+    /// `false` in any ASCII case, and `0` are the same as unset.
+    fn ci_is_set() -> bool {
+        std::env::var("CI").ok().is_some_and(|value| {
+            let value = value.trim();
+            !value.is_empty() && !value.eq_ignore_ascii_case("false") && value != "0"
+        })
+    }
+
+    /// False when this platform cannot make a symlink. The test then returns.
+    fn relative_symlink(target: &str, link: &std::path::Path) -> bool {
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(target, link).is_ok()
+        }
+        #[cfg(windows)]
+        {
+            std::os::windows::fs::symlink_file(target, link).is_ok()
+        }
+        #[cfg(not(any(unix, windows)))]
+        {
+            let _ = (target, link);
+            false
+        }
+    }
+
+    #[test]
+    fn create_note_refuses_a_relative_symlink_into_git() {
+        let vault = tempfile::tempdir().unwrap();
+        let git = vault.path().join(".git");
+        fs::create_dir(&git).unwrap();
+        fs::write(git.join("config"), "keep\n").unwrap();
+        let link = vault.path().join("note");
+        #[cfg(windows)]
+        let target = ".git\\config";
+        #[cfg(not(windows))]
+        let target = ".git/config";
+        if !relative_symlink(target, &link) {
+            if ci_is_set() {
+                panic!("symlink support is required when CI is set");
+            }
+            eprintln!(
+                "skipping create_note_refuses_a_relative_symlink_into_git: this platform cannot create a symlink"
+            );
+            return;
+        }
+        let vault_path = vault.path().to_string_lossy().into_owned();
+        let error = create_note(
+            &json!({ "path": "note", "content": "hello\n" }),
+            Some(&vault_path),
+            &[],
+        )
+        .err()
+        .expect("a symlink into git is refused");
+        assert!(
+            error.contains(crate::rhizome_loop::BLOCKED_SECRET),
+            "secret path must be refused"
+        );
+        assert_eq!(fs::read_to_string(git.join("config")).unwrap(), "keep\n");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn create_note_refuses_windows_git_short_names() {
+        let vault = tempfile::tempdir().unwrap();
+        let vault_path = vault.path().to_string_lossy().into_owned();
+        for requested in [
+            ".git./config",
+            "GIT~1/config",
+            ".git /config",
+            ".git../config",
+            ".git.../config",
+            ".git. /config",
+            ".git::$INDEX_ALLOCATION/config",
+        ] {
+            let error = create_note(
+                &json!({ "path": requested, "content": "no\n" }),
+                Some(&vault_path),
+                &[],
+            )
+            .err()
+            .expect("windows git alias");
+            assert!(
+                error.contains(crate::rhizome_loop::BLOCKED_SECRET),
+                "{requested}: {error}"
+            );
+            assert!(!vault.path().join(requested).exists(), "{requested}");
+        }
     }
 
     #[test]

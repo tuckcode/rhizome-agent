@@ -497,18 +497,15 @@ worker expires after Prime's reconnect grace. Active close asks, with
 `promote_owned_session`. The daemon may stay available; that is not the same
 as an agent still working. ADR-0180 is the identity: Rhizome owns the loop.
 `src-tauri/src/engines/` holds the Phase 5 trait and the native / Prime /
-Hermes wrappers. Settings `chat_engine` chooses Prime or the native engine.
-Absent or any value other than `prime` means native (`readChatEngine` in
-`src/lib/chatEngine.ts`). The Settings switch is on for native. Stored
-`prime` is the only way new chats stay on Prime. A native-engine chat
-can send when Prime is not installed. A Prime-targeted chat still shows
-the install-Prime guidance until the host status is known; if that
-status says Prime is missing, new chats fall back to native
-(`resolveEffectiveChatEngine`). An already-open chat keeps the engine it
-started on. Cmd+K uses the same native-or-ready gate. Native mode does
-not poll Prime or show Prime chrome. Native no-key errors point at
-Settings → AI Agents → API models.
-`commands/native_chat.rs` is the backend for that toggle: start / send /
+Hermes wrappers. ADR-0187: native is the only chat engine; the picker is
+gone (#218). `readChatEngine` in `src/lib/chatEngine.ts` always returns
+`native`. Settings may still load a stored `chat_engine` value for
+compatibility; nothing writes a Prime choice for new chats. New chats call
+native paths only. An open Prime-locked chat keeps that lock until closed.
+Native chat can send when Prime is not installed. Cmd+K uses the same
+native-or-ready gate. Native mode does not poll Prime or show Prime chrome.
+Native no-key errors point at Settings → AI Agents → API models.
+`commands/native_chat.rs` is the backend for native chat: start / send /
 cancel / approval_reply / end / list / open / delete, events on
 `native-chat:<session_id>`. Native `Error` events carry `fatal`: log-save
 failures and the 100 MiB rollover notice are non-fatal; missing keys,
@@ -683,29 +680,19 @@ Each answers "nothing", which is true of a host with no session.
   fallback is a Chat sidebar), `primeSessionMeta.ts` (row labels),
   `NativeChatModelPicker` + `rhizomeChatModels.ts` (the composer model chip —
   Rhizome catalog with live provider listing on the native engine; Prime
-  chats use Prime's catalog), `primeModels.ts` (Prime allow-list
-  and Settings catalog helpers),
-  `PrimeThinkingToggle` (composer reasoning menu on a Prime chat — see below)
+  chats use Prime's catalog),   `primeModels.ts` (Prime allow-list
+  and Settings catalog helpers)
 
-#### Thinking levels (composer pill)
+#### Thinking levels (Prime daemon, not composer UI)
 
-The host owns the list. `get_prime_thinking_levels` returns Prime's
-`PRIME_THINKING_LEVELS`, and `get_prime_supported_thinking_levels` returns
-that scale filtered by the attached model's own `thinkingLevelMap`; the
-frontend must not hardcode Off → Max. `PrimeThinkingToggle` opens a menu of
-the levels the model can actually run and writes the pick with
-`set_prime_thinking_level`. The filter matters: Prime clamps every pick to the
-model's own set, so a menu drawn from the full scale offers clicks that apply
-nothing and then reads as a broken control (`deepseek-v4-flash` has no
-`medium`, and picking it landed back on High). `primeThinkingLevels.ts`
-renders labels (`xhigh` → “X-High”), filters the scale by the model's answer,
-and still has a quiet/loud helper for older one-click tests — the shipped pill
-is the menu, not a binary toggle. The model picker lists the same set.
-
-Constraint: opening the menu or changing a level still calls
-`ensure_prime_session_host` when a vault path is present, because those
-commands need an attached session. Session *switch* is the path that skips
-ensure once the host is already up.
+Rhizome no longer exposes a composer control to pick Prime thinking levels
+(the old `PrimeThinkingToggle` and the `get/set_prime_thinking_*` Tauri
+commands are gone). Prime still reads each model's `thinkingLevelMap` in
+`~/.prime/agent/models.json` and clamps levels per model. Settings → **Add to
+Chat list** (`PrimeProviderStatusSection`) still writes those maps when Nous
+Portal (or similar) catalogs are merged into `models.json`; `merge_nous_portal`
+replaces the whole provider entry, so dropping `thinkingLevelMap` on write
+would wipe user maps on the next click.
 
 #### New-session names
 
@@ -761,8 +748,8 @@ fire both mechanisms on the same turn.
 The composer chip is `NativeChatModelPicker`. On the native engine it lists
 the Rhizome catalog from Settings, including live `list_ai_model_provider_models`
 rows. On a Prime chat it lists Prime's own catalog (`get_available_prime_models`)
-and does not fetch provider models live. Prime remains an optional engine;
-thinking still uses `PrimeThinkingToggle` next to the chip. Providers without
+and does not fetch provider models live. Prime remains an optional engine for
+legacy sessions; new chats default to Rhizome's harness (#218). Providers without
 a key stay out of the native list except the current pick, and the footer
 links to Settings.
 
@@ -2198,19 +2185,23 @@ sequenceDiagram
 **Origin:** Cursor Grok 4.6 · 2026-09-20 · #26 Chat-engine apply
 
 Rhizome has two update paths. The **app** path (`app_updater.rs`,
-`useUpdater`, `UpdateBanner`) is still a stub: `check_for_app_update`
-returns none, and `download_and_install_app_update` errors, because there
-is no signed Rhizome feed yet (`tauri.conf.json` `endpoints` is empty).
-The **Chat-engine** path (`prime_update.rs`, `usePrimeUpdate`) checks
-GitHub, then `apply_prime_update` runs the resolved `prime-agent update`
-only after Update now. The host refuses when `is_streaming()` is true.
-The client `chatBusy` flag is only a hint. It does not start a new session.
-
-The app-update chrome is still wired for a future signed feed:
+`useUpdater`, `UpdateBanner`) checks the moving GitHub release tag for
+the selected channel (`alpha-latest` or `stable-latest`), then downloads
+and installs through the Tauri updater plugin. Restart stays on the
+existing Restart control. Production `tauri.conf.json` carries the
+minisign public key; the test fixture still uses
+`PLACEHOLDER_KNISPO_TAURI_UPDATER_PUBKEY` so unit tests refuse before
+any feed request. Generate signing material outside the repo with
+`pnpm tauri signer generate -w ~/.tauri/rhizome-updater.key`. The
+**Chat-engine** path
+(`prime_update.rs`, `usePrimeUpdate`) checks GitHub, then
+`apply_prime_update` runs the resolved `prime-agent update` only after
+Update now. The host refuses when `is_streaming()` is true. The client
+`chatBusy` flag is only a hint. It does not start a new session.
 
 - `useUpdater(releaseChannel, automaticChecksEnabled)` waits 3 seconds after launch when automatic checks are enabled, then calls the Rust commands
 - `automatic_update_checks_enabled` is an installation-local Settings flag that defaults to enabled; disabling it skips only the startup probe, not a manual status-bar check
-- `download_and_install_app_update` would stream progress into `UpdateBanner` once a feed exists. Today it returns the stub error.
+- `download_and_install_app_update` streams progress into `UpdateBanner` and installs through the updater plugin
 
 ### Feature Flags (PostHog + Release Channels)
 

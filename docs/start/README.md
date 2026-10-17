@@ -17,7 +17,7 @@ cd rhizome-agent
 pnpm tauri dev
 ```
 
-`./install.sh` installs this repo and fetches Prime Agent when that program is not already on the machine. Chat starts on Rhizome's own engine. Prime is optional. Native chat does not need Prime. The script still downloads the Prime command-line tool so you can switch to that engine later.
+`./install.sh` installs this repo and may fetch Prime Agent when that program is not already on the machine. Chat runs on Rhizome's own engine (ADR-0187). Native chat does not need Prime. The script may still download the Prime command-line tool for legacy optional-engine support.
 
 The first launch of `prime-agent` asks you to run `/login` and choose a provider. Skip that if you use Rhizome's engine and add a provider key in Settings. Keys live in the system keychain.
 

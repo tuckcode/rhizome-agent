@@ -16,6 +16,7 @@ describe('leftover Prime keep chrome', () => {
       `${process.cwd()}/src/components/SettingsPanel.tsx`,
       'utf8',
     )
-    expect(settings.match(/<ChatEngineSettings /g)?.length).toBe(1)
+    expect(settings).not.toContain('ChatEngineSettings')
+    expect(settings).not.toContain('settings-chat-engine')
   })
 })

@@ -1,0 +1,17 @@
+{
+  "productName": "Rhizome Updater Test",
+  "version": "0.1.0",
+  "identifier": "ai.rhizome.agent.updater-test",
+  "build": {},
+  "bundle": {
+    "icon": ["../icons/32x32.png"]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "PLACEHOLDER_KNISPO_TAURI_UPDATER_PUBKEY",
+      "endpoints": [
+        "https://127.0.0.1:9/should-not-be-requested.json"
+      ]
+    }
+  }
+}

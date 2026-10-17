@@ -137,12 +137,15 @@ export function getAiAgentDefinition(agent: AiAgentId): AiAgentDefinition {
   return AI_AGENT_DEFINITIONS.find((definition) => definition.id === agent) ?? AI_AGENT_DEFINITIONS[0]
 }
 
-/** Composer and Cmd+K copy: Prime chats say Prime; native chats say Rhizome. */
+/** Composer and Cmd+K copy: derive the name from the resolved target, not the global engine. */
 export function composerAgentLabel(options: {
   chatEngine?: 'prime' | 'native'
   agent: AiAgentId
   targetLabel?: string
 }): string {
+  if (options.agent !== 'prime' && options.agent !== 'hermes') {
+    return options.targetLabel ?? getAiAgentDefinition(options.agent).label
+  }
   if (options.chatEngine === 'native') return 'Rhizome'
   if (options.agent === 'prime') return getAiAgentDefinition('prime').shortLabel
   return options.targetLabel ?? getAiAgentDefinition(options.agent).label

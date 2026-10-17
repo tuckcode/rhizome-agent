@@ -1,9 +1,9 @@
 ---
 title: Agents, engines and models
-description: The agent loop, Chat engines (Rhizome's own and Prime), models, tools and permission modes.
+description: The agent loop, Rhizome's chat engine, models, tools and permission modes.
 ---
 
-Chat runs on Rhizome's own engine by default. You can switch new chats to Prime Agent. Whichever you use, the vault, the permissions and the saved memory stay the same.
+Chat runs on Rhizome's own engine (ADR-0187). Prime and Hermes are being removed as chat engines. Open Prime-locked chats keep that lock until closed. The vault, permissions, and saved memory stay the same.
 
 ## Terms on this page
 
@@ -12,14 +12,9 @@ Chat runs on Rhizome's own engine by default. You can switch new chats to Prime 
 - **Model:** the language model the engine talks to, hosted or running locally.
 - **Tool:** an action the agent can take, such as reading a note or running a command.
 
-## Engines for Chat
+## Engine for Chat
 
-| Engine | What it is | Good for |
-|---|---|---|
-| **Rhizome's engine** (default) | Rhizome's own loop, built into the app. It doesn't need Prime | Your own providers, **Taproot**, and vault tools: read, search, edit, create notes, and (in Power User) a shell command |
-| **Prime Agent** | A separate harness Rhizome connects to. It runs sessions, tools, skills and provider login | Long Prime runs, Prime skills, and Prime's own model catalog (including Anthropic) |
-
-**Chat engine** in Settings → AI Agents is on for Rhizome's engine. Turn it off to send new chats to Prime. The switch is only in Settings, not in the message box. An open chat keeps the engine it started with. If you asked for Prime and Prime isn't installed, a new Prime-targeted chat falls back to Rhizome's engine after the host status says so.
+New chats use **Rhizome's engine**: the loop built into the app. It does not need Prime. You pick catalog providers or **Taproot**, and the vault tools below run against the open vault.
 
 ### Rhizome's engine
 

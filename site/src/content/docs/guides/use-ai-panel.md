@@ -11,7 +11,7 @@ Chat is where you work with the agent: ask, let it use tools, keep what's worth 
 2. Attach a vault if you want the agent to read your notes or save to them.
 3. Type a message and press Enter.
 
-New chats use Rhizome's own engine unless you turn **Chat engine** off in Settings → AI Agents. See [Agents, engines and models](../concepts/ai.md).
+New chats use Rhizome's own engine (ADR-0187). See [Agents, engines and models](../concepts/ai.md).
 
 ## While a reply is running
 

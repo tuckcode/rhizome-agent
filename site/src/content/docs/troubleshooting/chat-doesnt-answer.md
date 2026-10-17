@@ -3,7 +3,7 @@ title: Chat doesn't answer
 description: What to do when a message gets no reply, for Rhizome's own engine and for Prime.
 ---
 
-New chats use Rhizome's own engine unless **Chat engine** in Settings → AI Agents is off.
+New chats use Rhizome's own engine (ADR-0187).
 
 ## Rhizome's engine
 
@@ -21,7 +21,7 @@ New chats use Rhizome's own engine unless **Chat engine** in Settings → AI Age
 
 | You see | Do this |
 |---|---|
-| Prime is missing | Leave **Chat engine** on (Rhizome's engine), or install Prime with `./install.sh`, run `prime-agent` once, and start the daemon (see [Install](../start/install.md#set-up-prime)) |
+| Prime is missing | Applies to Prime-locked chats only. Install Prime with `./install.sh`, run `prime-agent` once, and start the daemon (see [Install](../start/install.md#set-up-prime)) |
 | Prime is installed, but Chat still says it's missing | Wait a few seconds. The check repeats. If it keeps failing, see [AI agent not found](ai-agent-not-found.md) |
 | Chat stopped answering after you closed a terminal | Prime stops with the terminal that started it. Start it as a daemon: `(prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status` |
 | The provider login expired | Settings → AI Agents → Local agent → **Reconnect** on that provider. Or run `prime-agent`, then `/login` |
