@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   approvalTitle,
-  bashCommandFromArgs,
+  bashApprovalCommand,
+  commandFromToolCallInput,
   isBashTool,
   matchPendingApprovalAction,
   pathFromToolArgs,
@@ -49,17 +50,27 @@ describe('native tool approval helpers', () => {
   })
 
   it('reads a JSON tool-call command without trimming it', () => {
-    expect(bashCommandFromArgs('{"command":"  rg foo wiki/  ","timeout_secs":30}')).toBe('  rg foo wiki/  ')
+    expect(commandFromToolCallInput('{"command":"  rg foo wiki/  ","timeout_secs":30}')).toBe('  rg foo wiki/  ')
     expect(timeoutSecsFromToolArgs('{"command":"  rg foo wiki/  ","timeout_secs":30}')).toBe(30)
     expect(timeoutSecsFromToolArgs('{"command":"ls"}')).toBeUndefined()
+    expect(timeoutSecsFromToolArgs('{"command":"ls","timeout_secs":"7"}')).toBe(7)
+    expect(timeoutSecsFromToolArgs('{"command":"ls","timeout_secs":0}')).toBe(60)
+    expect(timeoutSecsFromToolArgs('{"command":"ls","timeout_secs":500}')).toBe(300)
   })
 
   it('uses a raw ApprovalRequested command as-is, including surrounding whitespace', () => {
-    expect(bashCommandFromArgs('  ls notes  ')).toBe('  ls notes  ')
-    expect(bashCommandFromArgs('ls')).toBe('ls')
-    expect(bashCommandFromArgs('not-json')).toBe('not-json')
-    expect(bashCommandFromArgs('')).toBe('')
-    expect(bashCommandFromArgs()).toBeUndefined()
+    expect(bashApprovalCommand('  ls notes  ', 'call_1')).toBe('  ls notes  ')
+    expect(bashApprovalCommand('ls', 'call_1')).toBe('ls')
+    expect(bashApprovalCommand('')).toBe('')
+    expect(bashApprovalCommand()).toBeUndefined()
+  })
+
+  it('does not JSON-parse approval.args when call_id is present', () => {
+    expect(bashApprovalCommand('{"command":"ls"}', 'call_1')).toBe('{"command":"ls"}')
+    expect(bashApprovalCommand(
+      '{"command":"echo hi","x":"$(touch /tmp/pwned)"}',
+      'call_1',
+    )).toBe('{"command":"echo hi","x":"$(touch /tmp/pwned)"}')
   })
 
   it('detects a new-file preview', () => {

@@ -1,3 +1,5 @@
+import { bashTimeoutSecs } from './bashToolResult'
+
 export type NativeApprovalChoice = 'allow_once' | 'allow_session' | 'deny'
 
 export function isBashTool(tool: string): boolean {
@@ -79,23 +81,36 @@ export function pathFromToolArgs(args?: string): string | undefined {
 }
 
 /**
- * Command for the Run command card and result row.
- * ApprovalRequested.args is the raw command (driver shown_args, not trimmed).
- * Tool-call input may still be JSON `{command, timeout_secs}`.
+ * ApprovalRequested.args for bash is the literal command. Never JSON-parse it.
+ * When call_id is present this is the command the runner will execute.
  */
-export function bashCommandFromArgs(args?: string): string | undefined {
+export function bashApprovalCommand(args?: string, callId?: string): string | undefined {
+  if (args === undefined) return undefined
+  if (callId) return args
+  return args
+}
+
+/**
+ * Tool-call input may be JSON `{command, timeout_secs}`. Read .command only
+ * from that object. Do not use this on approval.args.
+ */
+export function commandFromToolCallInput(args?: string): string | undefined {
   if (args === undefined) return undefined
   try {
     const parsed: unknown = JSON.parse(args)
     if (isCommandObject(parsed)) return parsed.command
   } catch {
-    // Raw command string from ApprovalRequested.args.
+    // Raw command stored on an unmatched approval card.
   }
   return args
 }
 
+export function bashCommandFromArgs(args?: string): string | undefined {
+  return commandFromToolCallInput(args)
+}
+
 export function commandFromToolArgs(args?: string): string | undefined {
-  return bashCommandFromArgs(args)
+  return commandFromToolCallInput(args)
 }
 
 function isCommandObject(value: unknown): value is { command: string } {
@@ -109,8 +124,9 @@ export function timeoutSecsFromToolArgs(args?: string): number | undefined {
   if (!args?.trim()) return undefined
   try {
     const parsed = JSON.parse(args) as { timeout_secs?: unknown; timeoutSecs?: unknown }
-    const value = parsed.timeout_secs ?? parsed.timeoutSecs
-    return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+    if (!parsed || typeof parsed !== 'object') return undefined
+    if (parsed.timeout_secs === undefined && parsed.timeoutSecs === undefined) return undefined
+    return bashTimeoutSecs(parsed.timeout_secs ?? parsed.timeoutSecs)
   } catch {
     return undefined
   }

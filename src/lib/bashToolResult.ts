@@ -1,5 +1,6 @@
 export const BASH_RESULT_KIND = 'bash_result'
 export const BASH_DEFAULT_TIMEOUT_SECS = 60
+export const BASH_MAX_TIMEOUT_SECS = 300
 
 /**
  * JSON body from the native bash runner (`BashResult` in the shell PR).
@@ -29,7 +30,10 @@ export interface ParsedBashToolResult {
   timedOut: boolean
   stopped: boolean
   truncated: boolean
-  hiddenLines?: number
+  stdoutTruncated: boolean
+  stderrTruncated: boolean
+  stdoutLinesHidden?: number
+  stderrLinesHidden?: number
 }
 
 export type BashRowVerb = 'Running' | 'Ran' | 'Denied' | 'Failed'
@@ -54,6 +58,8 @@ export function parseBashToolResult(output?: string): ParsedBashToolResult {
     timedOut: false,
     stopped: false,
     truncated: false,
+    stdoutTruncated: false,
+    stderrTruncated: false,
   }
   if (!output) return unstructured
 
@@ -65,7 +71,6 @@ export function parseBashToolResult(output?: string): ParsedBashToolResult {
   }
   if (!isRecord(parsed) || !isStructuredBashResult(parsed)) return unstructured
 
-  const hidden = hiddenLineCount(parsed)
   const stdoutTruncated = parsed.stdout_truncated === true
   const stderrTruncated = parsed.stderr_truncated === true
   return {
@@ -78,16 +83,20 @@ export function parseBashToolResult(output?: string): ParsedBashToolResult {
     timedOut: parsed.timed_out === true,
     stopped: parsed.stopped === true,
     truncated: stdoutTruncated || stderrTruncated,
-    hiddenLines: hidden,
+    stdoutTruncated,
+    stderrTruncated,
+    stdoutLinesHidden: numberOrZero(parsed.stdout_lines_hidden),
+    stderrLinesHidden: numberOrZero(parsed.stderr_lines_hidden),
   }
 }
 
 export function bashResultRowStatus(
   actionStatus: 'pending' | 'done' | 'error',
   result: ParsedBashToolResult,
-  output?: string,
+  options?: { denied?: boolean },
 ): BashRowStatus {
   if (actionStatus === 'pending') return { verb: 'Running', verbDanger: false }
+  if (options?.denied) return { verb: 'Denied', verbDanger: true }
   if (result.structured) {
     if (result.timedOut) {
       return {
@@ -121,7 +130,6 @@ export function bashResultRowStatus(
     }
   }
   if (actionStatus === 'error') {
-    if (isDeniedOutput(output)) return { verb: 'Denied', verbDanger: true }
     return {
       verb: 'Failed',
       verbDanger: true,
@@ -135,14 +143,19 @@ export function bashResultRowStatus(
   }
 }
 
-export function bashTimeoutLabel(timeoutSecs?: number): string {
-  const secs = timeoutSecs ?? BASH_DEFAULT_TIMEOUT_SECS
-  return `Stops after ${secs} seconds.`
+export function bashTimeoutSecs(value?: unknown): number {
+  const n = coerceTimeout(value)
+  if (n === undefined || !Number.isFinite(n) || n <= 0) return BASH_DEFAULT_TIMEOUT_SECS
+  return Math.min(Math.floor(n), BASH_MAX_TIMEOUT_SECS)
+}
+
+export function bashTimeoutLabel(timeoutSecs?: unknown): string {
+  return `Stops after ${bashTimeoutSecs(timeoutSecs)} seconds.`
 }
 
 export function trimmedOutputNote(hiddenLines?: number): string {
   if (hiddenLines !== undefined && hiddenLines > 0) {
-    return `Output trimmed, ${hiddenLines.toLocaleString('en-US')} lines hidden (start and end shown)`
+    return `${hiddenLines.toLocaleString('en-US')} lines hidden from the middle`
   }
   return 'Output trimmed (start and end shown)'
 }
@@ -160,21 +173,18 @@ function isStructuredBashResult(record: Record<string, unknown>): boolean {
   return typeof record.exit_code === 'number' && Number.isFinite(record.exit_code)
 }
 
-function hiddenLineCount(record: Record<string, unknown>): number | undefined {
-  const stdout = numberOrZero(record.stdout_lines_hidden)
-  const stderr = numberOrZero(record.stderr_lines_hidden)
-  if (stdout === undefined && stderr === undefined) return undefined
-  return (stdout ?? 0) + (stderr ?? 0)
-}
-
 function numberOrZero(value: unknown): number | undefined {
   if (typeof value !== 'number' || !Number.isFinite(value)) return undefined
   return value
 }
 
-function isDeniedOutput(output?: string): boolean {
-  const trimmed = output?.trim().toLowerCase()
-  return trimmed === 'denied' || trimmed === 'approval cancelled'
+function coerceTimeout(value: unknown): number | undefined {
+  if (typeof value === 'number') return value
+  if (typeof value === 'string' && value.trim() !== '') {
+    const n = Number(value)
+    return Number.isFinite(n) ? n : undefined
+  }
+  return undefined
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

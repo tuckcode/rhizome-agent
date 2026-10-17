@@ -19,7 +19,8 @@ import { AiActionCard, type AiActionStatus } from './AiActionCard'
 import { BashResultCard } from './BashResultCard'
 import { ToolApprovalCard } from './ToolApprovalCard'
 import {
-  bashCommandFromArgs,
+  bashApprovalCommand,
+  commandFromToolCallInput,
   isBashTool,
   timeoutSecsFromToolArgs,
   type NativeApprovalChoice,
@@ -68,6 +69,10 @@ export interface AiAction {
   status: AiActionStatus
   input?: string
   output?: string
+  /** Literal bash command from ApprovalRequested.args when call_id is present. */
+  command?: string
+  /** Set from a deny / approval-cancelled event, not from output text. */
+  denied?: boolean
   /** Assistant text that was logged immediately before this tool round. */
   beforeText?: string
   approval?: AiActionApproval
@@ -353,8 +358,9 @@ function ActionCardRow({
         capped={action.approval.capped}
         created={action.approval.created}
         overwrite={action.approval.overwrite}
-        command={bashCommandFromArgs(action.approval.args) ?? bashCommandFromArgs(action.input)}
-        timeoutSecs={timeoutSecsFromToolArgs(action.input) ?? timeoutSecsFromToolArgs(action.approval.args)}
+        command={bashApprovalCommand(action.approval.args, action.approval.callId)
+          ?? commandFromToolCallInput(action.input)}
+        timeoutSecs={timeoutSecsFromToolArgs(action.input)}
         options={action.approval.options}
         busy={action.approval.busy}
         onReply={(choice) => action.approval?.onReply?.(choice)}
@@ -364,7 +370,8 @@ function ActionCardRow({
   if (isBashTool(action.tool)) {
     return (
       <BashResultCard
-        command={bashCommandFromArgs(action.input)}
+        command={action.command ?? commandFromToolCallInput(action.input)}
+        denied={action.denied}
         output={action.output}
         status={action.status}
         expanded={expanded}

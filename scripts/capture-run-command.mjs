@@ -35,15 +35,10 @@ for (const [theme, state] of shots) {
   await page.goto(`${base}?theme=${theme}&state=${state}`, { waitUntil: 'networkidle' })
   await page.evaluate(() => document.fonts.ready)
   if (state === 'approval-focus') {
-    await page.getByRole('button', { name: 'Copy command' }).focus()
-    await page.keyboard.press('Tab')
+    await page.getByRole('button', { name: 'Allow once' }).focus()
   }
   if (state === 'result-focus') {
     await page.getByTestId('bash-result-header').focus()
-    await page.keyboard.down('Shift')
-    await page.keyboard.press('Tab')
-    await page.keyboard.up('Shift')
-    await page.keyboard.press('Tab')
   }
   await page.waitForTimeout(200)
   const file = path.join(outDir, `${theme}-${state}.png`)

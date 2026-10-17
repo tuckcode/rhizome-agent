@@ -6,9 +6,11 @@ import {
   trimmedOutputNote,
   truncateCommand,
 } from '../lib/bashToolResult'
+import { VisibleCommand } from './VisibleCommand'
 
 export interface BashResultCardProps {
   command?: string
+  denied?: boolean
   output?: string
   status: AiActionStatus
   expanded: boolean
@@ -23,11 +25,16 @@ function OutputBlock({
   content,
   label,
   testId,
+  trimmed,
+  hiddenLines,
 }: {
   content: string
   label: string
   testId: string
+  trimmed?: boolean
+  hiddenLines?: number
 }) {
+  if (!content && !trimmed) return null
   return (
     <div className="mt-1.5 first:mt-0">
       <div
@@ -36,12 +43,19 @@ function OutputBlock({
       >
         {label}
       </div>
-      <pre
-        className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-md border border-border bg-[var(--editor-code-block-background)] px-1.5 py-1 font-mono text-[11px] leading-4 text-[var(--editor-code-block-text)]"
-        data-testid={testId}
-      >
-        {content}
-      </pre>
+      {trimmed ? (
+        <p className="mb-1 text-[12px] text-muted-foreground" data-testid={`${testId}-trimmed`}>
+          {trimmedOutputNote(hiddenLines)}
+        </p>
+      ) : null}
+      {content ? (
+        <pre
+          className="max-h-48 overflow-auto whitespace-pre-wrap [overflow-wrap:anywhere] rounded-md border border-border bg-[var(--editor-code-block-background)] px-1.5 py-1 font-mono text-[11px] leading-4 text-[var(--editor-code-block-text)]"
+          data-testid={testId}
+        >
+          {content}
+        </pre>
+      ) : null}
     </div>
   )
 }
@@ -64,7 +78,7 @@ function BashResultSummary({
   return (
     <button
       type="button"
-      className="flex w-full items-center gap-2 border-0 bg-transparent px-3 py-2 text-left text-[12px]"
+      className="flex w-full items-center gap-2 rounded-xl border-0 bg-transparent px-3 py-2 text-left text-[12px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--state-focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-card"
       aria-expanded={expanded}
       data-testid="bash-result-header"
       onClick={onToggle}
@@ -76,7 +90,7 @@ function BashResultSummary({
         <span className={dangerClass(verbDanger)}>{verb}</span>
         {' '}
         <code className="rounded-sm bg-[var(--syntax-monospace-bg)] px-0.5 font-mono text-[12px]">
-          {command}
+          <VisibleCommand command={command} />
         </code>
         {extra ? (
           <>
@@ -95,26 +109,38 @@ function BashResultSummary({
 }
 
 function BashResultDetails({
-  hiddenLines,
   stderr,
+  stderrHidden,
+  stderrTruncated,
   stdout,
-  truncated,
+  stdoutHidden,
+  stdoutTruncated,
 }: {
-  hiddenLines?: number
   stderr: string
+  stderrHidden?: number
+  stderrTruncated: boolean
   stdout: string
-  truncated: boolean
+  stdoutHidden?: number
+  stdoutTruncated: boolean
 }) {
+  const empty = !stdout && !stderr && !stdoutTruncated && !stderrTruncated
   return (
     <div className="border-t border-border bg-muted/40 px-3 py-2" data-testid="bash-result-details">
-      {truncated ? (
-        <p className="mb-1.5 text-[12px] text-muted-foreground" data-testid="bash-result-trimmed">
-          {trimmedOutputNote(hiddenLines)}
-        </p>
-      ) : null}
-      {stdout ? <OutputBlock content={stdout} label="stdout" testId="bash-result-stdout" /> : null}
-      {stderr ? <OutputBlock content={stderr} label="stderr" testId="bash-result-stderr" /> : null}
-      {!stdout && !stderr && !truncated ? (
+      <OutputBlock
+        content={stdout}
+        hiddenLines={stdoutHidden}
+        label="stdout"
+        testId="bash-result-stdout"
+        trimmed={stdoutTruncated}
+      />
+      <OutputBlock
+        content={stderr}
+        hiddenLines={stderrHidden}
+        label="stderr"
+        testId="bash-result-stderr"
+        trimmed={stderrTruncated}
+      />
+      {empty ? (
         <p className="text-[12px] text-muted-foreground">No output</p>
       ) : null}
     </div>
@@ -123,13 +149,14 @@ function BashResultDetails({
 
 export function BashResultCard({
   command,
+  denied,
   expanded,
   onToggle,
   output,
   status,
 }: BashResultCardProps) {
   const result = parseBashToolResult(output)
-  const row = bashResultRowStatus(status, result, output)
+  const row = bashResultRowStatus(status, result, { denied })
   const displayCommand = command ? truncateCommand(command) : 'command'
 
   return (
@@ -147,10 +174,12 @@ export function BashResultCard({
       />
       {expanded ? (
         <BashResultDetails
-          hiddenLines={result.hiddenLines}
           stderr={result.stderr}
+          stderrHidden={result.stderrLinesHidden}
+          stderrTruncated={result.stderrTruncated}
           stdout={result.stdout}
-          truncated={result.truncated}
+          stdoutHidden={result.stdoutLinesHidden}
+          stdoutTruncated={result.stdoutTruncated}
         />
       ) : null}
     </div>

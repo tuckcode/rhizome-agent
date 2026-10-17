@@ -80,15 +80,33 @@ describe('BashResultCard', () => {
 
   it('shows Denied and Failed verbs', () => {
     const { rerender } = render(
-      <BashResultCard command="ls" output="denied" status="error" expanded={false} onToggle={vi.fn()} />,
+      <BashResultCard command="ls" denied output="denied" status="error" expanded={false} onToggle={vi.fn()} />,
     )
     expect(screen.getByTestId('bash-result-summary')).toHaveTextContent('Denied')
     expect(screen.getByTestId('bash-result-summary').textContent).toContain('ls')
+    rerender(
+      <BashResultCard command="ls" output="denied" status="error" expanded={false} onToggle={vi.fn()} />,
+    )
+    expect(screen.getByTestId('bash-result-summary')).toHaveTextContent('Failed')
     rerender(
       <BashResultCard command="ls" output="boom" status="error" expanded={false} onToggle={vi.fn()} />,
     )
     expect(screen.getByTestId('bash-result-summary')).toHaveTextContent('Failed')
     expect(screen.getByTestId('bash-result-unknown')).toHaveTextContent('status unknown')
+  })
+
+  it('escapes hidden characters on the collapsed row', () => {
+    render(
+      <BashResultCard
+        command={'echo \u202Esecret'}
+        output={result()}
+        status="done"
+        expanded={false}
+        onToggle={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('command-hidden')).toHaveTextContent('\\u{202E}')
+    expect(screen.getByTestId('bash-result-summary')).toHaveTextContent('echo')
   })
 
   it('does not take the displayed command from tool output', () => {
@@ -117,6 +135,8 @@ describe('BashResultCard', () => {
         onToggle={onToggle}
       />,
     )
+    expect(screen.getByTestId('bash-result-stdout').className).toContain('[overflow-wrap:anywhere]')
+    expect(screen.getByTestId('bash-result-stdout')).not.toHaveClass('break-all')
     expect(screen.getByTestId('bash-result-stdout')).toHaveTextContent('hello vault')
     expect(screen.getByTestId('bash-result-stdout-label')).toHaveTextContent('stdout')
     expect(screen.getByTestId('bash-result-stderr')).toHaveTextContent('note: slow')
@@ -140,8 +160,41 @@ describe('BashResultCard', () => {
         onToggle={vi.fn()}
       />,
     )
-    expect(screen.getByTestId('bash-result-trimmed')).toHaveTextContent(
-      'Output trimmed, 9,994 lines hidden (start and end shown)',
+    expect(screen.getByTestId('bash-result-stdout-trimmed')).toHaveTextContent(
+      '9,994 lines hidden from the middle',
     )
+  })
+
+  it('shows stdout and stderr hidden-line counts separately', () => {
+    render(
+      <BashResultCard
+        command="cat both.log"
+        output={result({
+          stdout: 'HEAD\n…\nTAIL',
+          stderr: 'e1\n…\ne2',
+          stdout_truncated: true,
+          stderr_truncated: true,
+          stdout_lines_hidden: 9994,
+          stderr_lines_hidden: 3,
+        })}
+        status="done"
+        expanded
+        onToggle={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('bash-result-stdout-trimmed')).toHaveTextContent(
+      '9,994 lines hidden from the middle',
+    )
+    expect(screen.getByTestId('bash-result-stderr-trimmed')).toHaveTextContent(
+      '3 lines hidden from the middle',
+    )
+  })
+
+  it('uses the button focus-visible ring token', () => {
+    render(
+      <BashResultCard command="ls" output={result()} status="done" expanded={false} onToggle={vi.fn()} />,
+    )
+    expect(screen.getByTestId('bash-result-header').className).toContain('focus-visible:ring-[var(--state-focus-ring)]')
+    expect(screen.getByTestId('bash-result-header').className).toContain('ring-offset-2')
   })
 })

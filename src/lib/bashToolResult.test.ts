@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   BASH_DEFAULT_TIMEOUT_SECS,
+  BASH_MAX_TIMEOUT_SECS,
   BASH_RESULT_KIND,
   bashResultRowStatus,
   bashTimeoutLabel,
+  bashTimeoutSecs,
   parseBashToolResult,
   trimmedOutputNote,
   truncateCommand,
@@ -45,7 +47,7 @@ describe('parseBashToolResult', () => {
     expect(parsed.structured).toBe(false)
     expect(parsed.stdout).toBe(raw)
     expect(parsed.exitCode).toBeUndefined()
-    expect(bashResultRowStatus('done', parsed, raw).extra?.text).toBe('status unknown')
+    expect(bashResultRowStatus('done', parsed).extra?.text).toBe('status unknown')
   })
 
   it('uses a plain string as stdout when the result is not JSON', () => {
@@ -56,13 +58,18 @@ describe('parseBashToolResult', () => {
 })
 
 describe('bashResultRowStatus', () => {
-  it('uses Denied and Failed instead of Ran', () => {
+  it('uses Denied from the deny event, not from output text', () => {
     const empty = parseBashToolResult('denied')
-    expect(bashResultRowStatus('error', empty, 'denied')).toEqual({
+    expect(bashResultRowStatus('error', empty, { denied: true })).toEqual({
       verb: 'Denied',
       verbDanger: true,
     })
-    expect(bashResultRowStatus('error', parseBashToolResult('boom'), 'boom')).toMatchObject({
+    expect(bashResultRowStatus('error', empty)).toMatchObject({
+      verb: 'Failed',
+      verbDanger: true,
+      extra: { kind: 'unknown', text: 'status unknown' },
+    })
+    expect(bashResultRowStatus('error', parseBashToolResult('boom'))).toMatchObject({
       verb: 'Failed',
       verbDanger: true,
       extra: { kind: 'unknown', text: 'status unknown' },
@@ -106,16 +113,24 @@ describe('bashResultRowStatus', () => {
 })
 
 describe('timeout and trim copy', () => {
-  it('names the 60 second default', () => {
+  it('names the 60 second default and clamps at 300', () => {
     expect(BASH_DEFAULT_TIMEOUT_SECS).toBe(60)
+    expect(BASH_MAX_TIMEOUT_SECS).toBe(300)
     expect(bashTimeoutLabel()).toBe('Stops after 60 seconds.')
     expect(bashTimeoutLabel(30)).toBe('Stops after 30 seconds.')
+    expect(bashTimeoutSecs(0)).toBe(60)
+    expect(bashTimeoutSecs(-4)).toBe(60)
+    expect(bashTimeoutSecs(Number.NaN)).toBe(60)
+    expect(bashTimeoutSecs('nope')).toBe(60)
+    expect(bashTimeoutSecs('7')).toBe(7)
+    expect(bashTimeoutSecs(500)).toBe(300)
+    expect(bashTimeoutLabel(0)).toBe('Stops after 60 seconds.')
+    expect(bashTimeoutLabel('7')).toBe('Stops after 7 seconds.')
+    expect(bashTimeoutLabel(900)).toBe('Stops after 300 seconds.')
   })
 
   it('includes hidden line counts when known', () => {
-    expect(trimmedOutputNote(9994)).toBe(
-      'Output trimmed, 9,994 lines hidden (start and end shown)',
-    )
+    expect(trimmedOutputNote(9994)).toBe('9,994 lines hidden from the middle')
     expect(trimmedOutputNote()).toBe('Output trimmed (start and end shown)')
   })
 })

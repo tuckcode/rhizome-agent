@@ -12,7 +12,8 @@ import {
   type NativeApprovalChoice,
   type NativeApprovalOption,
 } from '../lib/nativeToolApproval'
-import { commandHasHiddenChars, visibleCommandParts } from '../lib/visibleCommand'
+import { commandHasHiddenChars } from '../lib/visibleCommand'
+import { VisibleCommand } from './VisibleCommand'
 
 export interface ToolApprovalCardProps {
   tool: string
@@ -207,7 +208,12 @@ export function ToolApprovalCard({
             size="sm"
             type="button"
             variant={optionVariant(option.id)}
-            className={option.id === 'deny' ? 'text-destructive hover:text-destructive' : ''}
+            className={[
+              option.id === 'deny' ? 'text-destructive hover:text-destructive' : '',
+              option.id === 'allow_once'
+                ? 'focus-visible:ring-offset-2 focus-visible:ring-offset-card'
+                : '',
+            ].filter(Boolean).join(' ')}
             data-testid={`approval-${option.id}`}
             onClick={function onChoose() {
               choose(option.id)
@@ -239,7 +245,7 @@ function BashApprovalBody({
     <div className="border-y border-border bg-muted/40 px-3 py-2">
       <div className="relative">
         <pre
-          className="max-h-64 overflow-auto whitespace-pre-wrap break-all pr-11 font-mono text-[12px] leading-5 text-foreground"
+          className="max-h-64 overflow-auto whitespace-pre-wrap [overflow-wrap:anywhere] pr-11 font-mono text-[12px] leading-5 text-foreground"
           data-testid="approval-command"
         >
           <VisibleCommand command={command} />
@@ -270,38 +276,5 @@ function BashApprovalBody({
         {bashTimeoutLabel(timeoutSecs)}
       </p>
     </div>
-  )
-}
-
-function VisibleCommand({ command }: { command: string }) {
-  return (
-    <>
-      {visibleCommandParts(command).map((part, index) => {
-        if (part.kind === 'text') return <span key={index}>{part.text}</span>
-        if (part.kind === 'newline') {
-          return (
-            <span key={index}>
-              <span
-                aria-label="newline"
-                className="ml-0.5 text-[11px] text-muted-foreground"
-                data-testid="command-newline"
-              >
-                ⏎
-              </span>
-              {'\n'}
-            </span>
-          )
-        }
-        return (
-          <span
-            key={index}
-            className="mx-0.5 inline-block rounded-sm bg-muted px-1 py-px text-[11px] text-[var(--danger-text)]"
-            data-testid="command-hidden"
-          >
-            {`\\u{${part.hex}}`}
-          </span>
-        )
-      })}
-    </>
   )
 }
