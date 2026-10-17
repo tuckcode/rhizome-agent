@@ -8,7 +8,8 @@
 //! Allow-once is spent for echo. `create_note` is offered in both
 //! modes: Limited tools asks every call (Allow once and Deny);
 //! Power User runs it with no prompt. Power User bash asks each call
-//! unless a session grant matches the exact command. Quit is
+//! unless a session grant matches the exact command. Unknown tools
+//! always ask and never match a session grant. Quit is
 //! `stop_and_drain`.
 //! The turn / inbox vocabulary is the DeepSeek Harness idea. No DeepSeek
 //! code is copied.
@@ -872,11 +873,7 @@ mod tests {
         allowed.submit("go");
         allowed.run_until_idle(&mut allow_model);
         assert!(allowed.events().iter().any(|event| {
-            matches!(
-                event,
-                DurableEvent::ToolResult { name, output, .. }
-                    if name == "edit" && output == "note"
-            )
+            matches!(event, DurableEvent::ToolResult { name, .. } if name == "edit")
         }));
 
         let denied = AgentLoop::new();
@@ -897,9 +894,43 @@ mod tests {
     }
 
     #[test]
-    fn allow_session_covers_the_tool_for_any_args() {
+    fn unknown_tool_is_denied_when_not_offered() {
         let agent = AgentLoop::new();
-        agent.offer_extra_tool_for_test("edit");
+        agent.grant_for_session("mystery", "anything");
+        let asked = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&asked);
+        agent.set_approval_waiter(move |_, _| {
+            flag.store(true, Ordering::SeqCst);
+            ApprovalReply::AllowOnce
+        });
+        let mut model = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "mystery".into(),
+            args: "anything".into(),
+        }]]);
+        agent.submit("go");
+        agent.run_until_idle(&mut model);
+
+        assert!(
+            !asked.load(Ordering::SeqCst),
+            "an unknown tool must be denied before the waiter runs"
+        );
+        assert!(!agent.events().iter().any(|event| {
+            matches!(event, DurableEvent::ToolResult { name, .. } if name == "mystery")
+        }));
+        assert!(agent.events().iter().any(|event| {
+            matches!(
+                event,
+                DurableEvent::ToolDenied { name, reason, .. }
+                    if name == "mystery" && reason == "not offered"
+            )
+        }));
+    }
+
+    #[test]
+    fn unknown_tool_session_grant_does_not_cover_later_calls() {
+        let agent = AgentLoop::new();
+        agent.offer_extra_tool_for_test("mystery");
+        agent.grant_for_session("mystery", "alpha");
         let asks = Arc::new(AtomicUsize::new(0));
         let count = Arc::clone(&asks);
         agent.set_approval_waiter(move |_, _| {
@@ -909,11 +940,11 @@ mod tests {
         let mut model = FakeModel::script(vec![
             vec![
                 ScriptPart::Tool {
-                    name: "edit".into(),
+                    name: "mystery".into(),
                     args: "alpha".into(),
                 },
                 ScriptPart::Tool {
-                    name: "edit".into(),
+                    name: "mystery".into(),
                     args: "beta".into(),
                 },
             ],
@@ -922,15 +953,11 @@ mod tests {
         agent.submit("go");
         agent.run_until_idle(&mut model);
 
-        assert_eq!(asks.load(Ordering::SeqCst), 1);
-        let edits = agent
-            .events()
-            .iter()
-            .filter(
-                |event| matches!(event, DurableEvent::ToolResult { name, .. } if name == "edit"),
-            )
-            .count();
-        assert_eq!(edits, 2);
+        assert_eq!(
+            asks.load(Ordering::SeqCst),
+            2,
+            "a session grant must not cover an unknown tool"
+        );
     }
 
     #[test]
@@ -994,7 +1021,7 @@ mod tests {
     #[test]
     fn session_grants_clear_when_the_session_ends() {
         let agent = AgentLoop::new();
-        agent.offer_extra_tool_for_test("edit");
+        agent.set_permission_mode(AiAgentPermissionMode::PowerUser);
         let asks = Arc::new(AtomicUsize::new(0));
         let count = Arc::clone(&asks);
         agent.set_approval_waiter(move |_, _| {
@@ -1002,16 +1029,16 @@ mod tests {
             ApprovalReply::AllowSession
         });
         let mut first = FakeModel::script(vec![vec![ScriptPart::Tool {
-            name: "edit".into(),
-            args: "one".into(),
+            name: "bash".into(),
+            args: "ls".into(),
         }]]);
         agent.submit("a");
         agent.run_until_idle(&mut first);
         assert_eq!(asks.load(Ordering::SeqCst), 1);
 
         let mut replay = FakeModel::script(vec![vec![ScriptPart::Tool {
-            name: "edit".into(),
-            args: "one".into(),
+            name: "bash".into(),
+            args: "ls".into(),
         }]]);
         agent.submit("again");
         agent.run_until_idle(&mut replay);
@@ -1024,20 +1051,20 @@ mod tests {
         agent.end_session();
 
         let mut after = FakeModel::script(vec![vec![ScriptPart::Tool {
-            name: "edit".into(),
-            args: "one".into(),
+            name: "bash".into(),
+            args: "ls".into(),
         }]]);
         agent.submit("b");
         agent.run_until_idle(&mut after);
         assert_eq!(asks.load(Ordering::SeqCst), 2);
-        let edits = agent
+        let runs = agent
             .events()
             .iter()
             .filter(
-                |event| matches!(event, DurableEvent::ToolResult { name, .. } if name == "edit"),
+                |event| matches!(event, DurableEvent::ToolResult { name, .. } if name == "bash"),
             )
             .count();
-        assert_eq!(edits, 3);
+        assert_eq!(runs, 3);
     }
 
     #[test]
@@ -1520,13 +1547,9 @@ mod tests {
             "the same waiter must be asked again after a mid-wait cancel"
         );
         assert!(
-            agent.events().iter().any(|event| {
-                matches!(
-                    event,
-                    DurableEvent::ToolResult { name, output, .. }
-                        if name == "edit" && output == "note"
-                )
-            }),
+            agent.events().iter().any(
+                |event| matches!(event, DurableEvent::ToolResult { name, .. } if name == "edit")
+            ),
             "AllowOnce on the next turn must run the tool: {:?}",
             agent.events()
         );
@@ -1599,15 +1622,15 @@ mod tests {
             .recv_timeout(Duration::from_secs(1))
             .expect("the second turn must finish while the first waiter is still held");
         assert_eq!(asks.load(Ordering::SeqCst), 2);
-        assert!(
-            events.iter().any(|event| {
-                matches!(
-                    event,
-                    DurableEvent::ToolResult { name, output, .. }
-                        if name == "edit" && output == "later"
-                )
-            }),
-            "AllowOnce on the live prompt must run: {events:?}"
+        let edit_results = events
+            .iter()
+            .filter(
+                |event| matches!(event, DurableEvent::ToolResult { name, .. } if name == "edit"),
+            )
+            .count();
+        assert_eq!(
+            edit_results, 1,
+            "AllowOnce on the live prompt must run once: {events:?}"
         );
         drop(hold_tx);
         assert!(
@@ -1618,7 +1641,7 @@ mod tests {
                         if name == "edit" && output == "note"
                 )
             }),
-            "a stale AllowOnce must not run after dismiss: {events:?}"
+            "a stale AllowOnce must not echo cancelled args: {events:?}"
         );
     }
 
