@@ -27,8 +27,9 @@ pub fn native_chat_channel(session_id: &str) -> String {
     format!("native-chat:{session_id}")
 }
 
-/// Target string for "Free tier (auto)" (decision D2).
+/// Stored target id for Taproot (decision D2).
 pub const FREE_TIER_TARGET: &str = "free_tier_auto";
+/// Legacy display label; still accepted so older saved chat targets keep working.
 pub const FREE_TIER_LABEL: &str = "Free tier (auto)";
 
 /// Native sessions use a Rhizome-owned transcript path. Nothing under `~/.prime`.
@@ -54,6 +55,7 @@ enum ChatOp {
 
 pub fn resolve_native_target(target: &str) -> Result<NativeChatTarget, String> {
     let trimmed = target.trim();
+    // FREE_TIER_LABEL matches the old UI name on purpose (saved settings).
     if trimmed.eq_ignore_ascii_case(FREE_TIER_TARGET)
         || trimmed.eq_ignore_ascii_case(FREE_TIER_LABEL)
     {

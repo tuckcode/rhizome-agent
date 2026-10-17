@@ -23,7 +23,7 @@ Switch with **Chat engine** in Settings → AI Agents. When it's on, new chats u
 
 ### Rhizome's engine
 
-- **Models:** pick a catalog model, or **Free tier (auto)**. See [Free models and routing](free-models-and-routing.md). Anthropic models aren't offered here yet.
+- **Models:** pick a catalog model, or **Taproot**. See [Free models and routing](free-models-and-routing.md). Anthropic models aren't offered here yet.
 - **Tools:** `echo` and `create_note`. Power User adds `bash`. Rhizome asks you to approve each `bash` call, but `bash` doesn't run a shell yet. There are no tools to read, search or edit files, and the agent can't search the vault or old sessions.
 - **Saved chats:** each chat is saved as it goes and can be reopened after you quit. Chats get a title automatically from the first exchange.
 - **Errors:** a problem that doesn't stop the turn shows as a notice in the chat. A problem that does stop it, such as a missing key, ends the turn with a message that says what to fix.

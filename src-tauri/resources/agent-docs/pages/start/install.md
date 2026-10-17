@@ -5,17 +5,19 @@ URL: /start/install
 
 You build Rhizome from source on a Mac and run it from there. This takes a few minutes, mostly for the first build.
 
-> **Developer preview.** macOS only. There is no signed download, no Homebrew package and no in-app updater yet. See [Platforms and updates](../reference/platforms-and-updates.md).
+:::note
+**Developer preview.** macOS only. There is no signed download, no Homebrew package and no in-app updater yet. See [Platforms and updates](../reference/platforms-and-updates.md).
+:::
 
 ## Before you start
 
 You need:
 
-1. macOS with the Xcode Command Line Tools (`xcode-select --install`).
-2. Node.js `^20.19.0` or `>=22.12.0`.
-3. pnpm.
-4. Rust `1.77.2` or newer.
-5. git.
+1. macOS with the Xcode Command Line Tools (`xcode-select --install`)
+2. Node.js `^20.19.0` or `>=22.12.0`
+3. pnpm
+4. Rust `1.77.2` or newer
+5. git
 
 Prime Agent is optional. You need it only if you keep Prime as the Chat engine, which is the default.
 
@@ -37,7 +39,7 @@ pnpm tauri dev
 Chat runs on one of two engines. You can switch at any time with **Chat engine** in Settings → AI Agents.
 
 - **Prime Agent (default).** Prime runs Chat. Set it up below.
-- **Rhizome's own engine.** Turn **Chat engine** on. It doesn't need Prime. Add a provider key, or use **Free tier (auto)**. See [Set up models and keys](../guides/configure-ai-models.md).
+- **Rhizome's own engine.** Turn **Chat engine** on. It doesn't need Prime. Add a provider key, or use **Taproot**. See [Set up models and keys](../guides/configure-ai-models.md).
 
 ## Set up Prime
 

@@ -77,7 +77,7 @@ describe('RhizomeFormatModal custom formats', () => {
     // Twice on purpose: once in the list, once as the selected heading.
     await waitFor(() => expect(screen.getAllByText('Q3 Lens').length).toBeGreaterThan(0))
     // Built-ins still there — customs are added, not a replacement list.
-    expect(screen.getAllByText('Architecture Map').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Architecture map').length).toBeGreaterThan(0)
   })
 
   it('saves a format from the composer and reports the new count', async () => {
@@ -155,7 +155,7 @@ describe('RhizomeFormatModal custom formats', () => {
       expect(invoked.calls.some(c => c.cmd === 'delete_research_format' && c.args?.id === 'q3')).toBe(true)
     })
     expect(screen.queryByText('Q3 Lens')).toBeNull()
-    expect(screen.getAllByText('Architecture Map').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Architecture map').length).toBeGreaterThan(0)
   })
 
   it('surfaces a delete failure instead of removing the format silently', async () => {

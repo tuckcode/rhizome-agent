@@ -1,7 +1,7 @@
 [
   {
-    "title": "Rhizome",
-    "description": "Rhizome is a desktop app for an AI agent whose memory is a folder of Markdown notes you own.",
+    "title": "Rhizome docs",
+    "description": "A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own.",
     "path": "pages/index.md",
     "url": "/",
     "section": "home",
@@ -680,7 +680,7 @@
       "Local providers",
       "Hosted providers",
       "Keychain problems",
-      "Free tier (auto) can't route",
+      "Taproot can't route",
       "No file tools"
     ]
   },

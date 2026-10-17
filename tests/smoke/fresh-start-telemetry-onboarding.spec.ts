@@ -70,7 +70,7 @@ test('accepting telemetry consent on a fresh start opens the vault choice wizard
 
   await page.goto('/', { waitUntil: 'domcontentloaded' })
 
-  await expect(page.getByText('Help improve Tolaria')).toBeVisible()
+  await expect(page.getByText('Help improve Rhizome')).toBeVisible()
   await page.getByTestId('telemetry-accept').click()
 
   await expect(page.getByTestId('welcome-screen')).toBeVisible()
@@ -127,7 +127,7 @@ for (const action of ['accept', 'decline'] as const) {
 
     await page.goto('/', { waitUntil: 'domcontentloaded' })
 
-    await expect(page.getByText('Help improve Tolaria')).toBeVisible()
+    await expect(page.getByText('Help improve Rhizome')).toBeVisible()
     await page.getByTestId(`telemetry-${action}`).click()
 
     await expect(page.getByTestId('welcome-screen')).toBeVisible()

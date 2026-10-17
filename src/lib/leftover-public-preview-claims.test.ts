@@ -40,7 +40,10 @@ describe('leftover public-preview install claims', () => {
 
   it('states the license, the upstream credit, and the Mindwalk attribution', () => {
     expect(readme).toContain('AGPL-3.0-or-later')
-    expect(readme).toContain('by Luca Rossi (AGPL-3.0)')
+    expect(readme).toContain(
+      'Thanks to [Tolaria](https://github.com/refactoringhq/tolaria) (AGPL-3.0), whose editor code Rhizome adapted.',
+    )
+    expect(readme).not.toContain('by Luca Rossi')
     expect(readme).toContain('Mindwalk (MIT) © 2026 Ricko Yu')
     expect(preview).toContain('Mindwalk (MIT) © 2026 Ricko Yu')
   })

@@ -35,6 +35,7 @@ export function MacOSTitlebar() {
       className="fixed top-0 right-0 left-0 z-[1000] flex items-center justify-end border-b border-border bg-[var(--surface-sidebar)] pr-2 select-none"
       style={{ height: MACOS_TITLEBAR_HEIGHT }}
       data-testid="macos-titlebar"
+      data-sheet-offset-band="chrome"
     >
       <div className="flex h-full items-center" data-no-drag>
         <Button

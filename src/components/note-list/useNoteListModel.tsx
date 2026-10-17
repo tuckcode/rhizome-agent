@@ -155,6 +155,7 @@ interface UseNoteListContentParams {
   selection: SidebarSelection
   noteListFilter: NoteListFilter
   inboxPeriod: InboxPeriod
+  inboxEntries?: readonly VaultEntry[]
   modifiedFiles?: ModifiedFile[]
   modifiedSuffixes: string[]
   modifiedPathSet: Set<string>
@@ -208,6 +209,7 @@ function useNoteListContent({
   selection,
   noteListFilter,
   inboxPeriod,
+  inboxEntries,
   modifiedFiles,
   modifiedSuffixes,
   modifiedPathSet,
@@ -283,6 +285,7 @@ function useNoteListContent({
     modifiedFiles,
     subFilter,
     inboxPeriod: effectiveInboxPeriod,
+    inboxEntries,
     views,
     allNotesFileVisibility,
   })
@@ -545,6 +548,8 @@ export interface NoteListProps {
   noteListFilter: NoteListFilter
   onNoteListFilterChange: (filter: NoteListFilter) => void
   inboxPeriod?: InboxPeriod
+  /** Inbox rows. The badge counts this same array. */
+  inboxEntries?: readonly VaultEntry[]
   onInboxPeriodChange?: (period: InboxPeriod) => void
   modifiedFiles?: ModifiedFile[]
   modifiedFilesError?: string | null
@@ -683,6 +688,7 @@ export function useNoteListModel({
   noteListFilter,
   onNoteListFilterChange,
   inboxPeriod = 'all',
+  inboxEntries,
   modifiedFiles,
   modifiedFilesError,
   gitRepositories,
@@ -729,6 +735,7 @@ export function useNoteListModel({
     selection,
     noteListFilter,
     inboxPeriod,
+    inboxEntries,
     modifiedFiles,
     modifiedSuffixes,
     modifiedPathSet,

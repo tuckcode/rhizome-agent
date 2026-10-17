@@ -7,6 +7,10 @@ vi.mock('@tauri-apps/api/core', () => ({
   invoke: (...args: unknown[]) => mockInvokeFn(...args),
 }))
 
+vi.mock('../lib/callHost', () => ({
+  callHost: (...args: unknown[]) => mockInvokeFn(...args),
+}))
+
 // Tracks registered listeners by event name so tests can fire them and can
 // assert on registration order relative to invoke() — this is what exposes
 // the bug_003/006 race (listener registration must complete before invoke).

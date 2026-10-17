@@ -78,17 +78,19 @@ URL: /start/install
 
 You build Rhizome from source on a Mac and run it from there. This takes a few minutes, mostly for the first build.
 
-> **Developer preview.** macOS only. There is no signed download, no Homebrew package and no in-app updater yet. See [Platforms and updates](../reference/platforms-and-updates.md).
+:::note
+**Developer preview.** macOS only. There is no signed download, no Homebrew package and no in-app updater yet. See [Platforms and updates](../reference/platforms-and-updates.md).
+:::
 
 ## Before you start
 
 You need:
 
-1. macOS with the Xcode Command Line Tools (`xcode-select --install`).
-2. Node.js `^20.19.0` or `>=22.12.0`.
-3. pnpm.
-4. Rust `1.77.2` or newer.
-5. git.
+1. macOS with the Xcode Command Line Tools (`xcode-select --install`)
+2. Node.js `^20.19.0` or `>=22.12.0`
+3. pnpm
+4. Rust `1.77.2` or newer
+5. git
 
 Prime Agent is optional. You need it only if you keep Prime as the Chat engine, which is the default.
 
@@ -110,7 +112,7 @@ pnpm tauri dev
 Chat runs on one of two engines. You can switch at any time with **Chat engine** in Settings → AI Agents.
 
 - **Prime Agent (default).** Prime runs Chat. Set it up below.
-- **Rhizome's own engine.** Turn **Chat engine** on. It doesn't need Prime. Add a provider key, or use **Free tier (auto)**. See [Set up models and keys](../guides/configure-ai-models.md).
+- **Rhizome's own engine.** Turn **Chat engine** on. It doesn't need Prime. Add a provider key, or use **Taproot**. See [Set up models and keys](../guides/configure-ai-models.md).
 
 ## Set up Prime
 
@@ -189,7 +191,7 @@ Git is recommended when you want local history, diff views, recovery, pull, push
 Source: start/why-rhizome.md
 URL: /start/why-rhizome
 
-Rhizome gives an AI agent a memory you can see. The things worth keeping become notes in a folder you own, and you can check what the agent did to your files after the fact.
+A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own. You can check what the agent did to your files after the fact.
 
 ## The problem it solves
 
@@ -211,7 +213,7 @@ If the vault is a Git repository, every change to it can be committed, including
 
 ## Free models, routed for you
 
-**Free tier (auto)** sends a chat to free hosted models (Groq, Mistral, LLM7, OpenRouter's free models, NVIDIA NIM) in a fixed order. When one fails or runs out of free use, Rhizome moves to the next. Models whose free tier trains on your prompts are left out. You can add your own endpoint as the last stop. It builds on two open-source projects, OmniRoute and freellmapi. [Free models and routing](../concepts/free-models-and-routing.md)
+**Taproot**, Rhizome's free automatic router, sends a chat to free hosted models (Groq, Mistral, LLM7, OpenRouter's free models, NVIDIA NIM) in a fixed order. When one fails or runs out of free use, Rhizome moves to the next. Models whose free tier trains on your prompts are left out. You can add your own endpoint as the last stop. It builds on two open-source projects, OmniRoute and freellmapi. [Free models and routing](../concepts/free-models-and-routing.md)
 
 ## Rhizome runs its own loop
 

@@ -8,7 +8,7 @@ When users ask how to improve a knowledge base, structure notes, choose types, m
 
 ## Home
 
-- [Rhizome](pages/index.md): Rhizome is a desktop app for an AI agent whose memory is a folder of Markdown notes you own.
+- [Rhizome docs](pages/index.md): A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own.
 
 ## Start
 
