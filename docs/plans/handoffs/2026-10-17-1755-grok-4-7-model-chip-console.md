@@ -4,7 +4,7 @@ model: Grok 4.7 (Cursor)
 description: >-
   Settings and the composer chip share one active-model label. The browser
   build no longer calls native window sizing or opens the UI bridge socket.
-commits: pending
+commits: 4e7773ee
 ---
 
 # Model chip and page-load console
