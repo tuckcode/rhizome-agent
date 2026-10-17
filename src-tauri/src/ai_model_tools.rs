@@ -802,26 +802,46 @@ mod tests {
         assert!(!vault.path().join(".env.production").exists());
     }
 
+    /// False when this platform cannot make a symlink. The test then returns.
+    fn relative_symlink(target: &str, link: &std::path::Path) -> bool {
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(target, link).is_ok()
+        }
+        #[cfg(windows)]
+        {
+            std::os::windows::fs::symlink_file(target, link).is_ok()
+        }
+        #[cfg(not(any(unix, windows)))]
+        {
+            let _ = (target, link);
+            false
+        }
+    }
+
     #[test]
-    fn create_note_resolves_a_relative_path_against_the_vault() {
+    fn create_note_refuses_a_relative_symlink_into_git() {
         let vault = tempfile::tempdir().unwrap();
-        let other = tempfile::tempdir().unwrap();
-        fs::write(other.path().join("note"), "keep\n").unwrap();
+        let git = vault.path().join(".git");
+        fs::create_dir(&git).unwrap();
+        fs::write(git.join("config"), "keep\n").unwrap();
+        let link = vault.path().join("note");
+        if !relative_symlink(".git/config", &link) {
+            return;
+        }
         let vault_path = vault.path().to_string_lossy().into_owned();
-        let created = create_note(
+        let error = create_note(
             &json!({ "path": "note", "content": "hello\n" }),
             Some(&vault_path),
             &[],
+        )
+        .err()
+        .expect("a symlink into git is refused");
+        assert!(
+            error.contains(crate::rhizome_loop::BLOCKED_SECRET),
+            "secret path must be refused"
         );
-        created.expect("a relative note is created in the vault");
-        assert_eq!(
-            fs::read_to_string(vault.path().join("note")).unwrap(),
-            "hello\n"
-        );
-        assert_eq!(
-            fs::read_to_string(other.path().join("note")).unwrap(),
-            "keep\n"
-        );
+        assert_eq!(fs::read_to_string(git.join("config")).unwrap(), "keep\n");
     }
 
     #[cfg(windows)]

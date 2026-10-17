@@ -260,6 +260,7 @@ fn scrub_regexes() -> &'static ScrubRegexes {
             r"\bAIza[0-9A-Za-z_-]{35}\b",
             r"pplx-[A-Za-z0-9_-]{20,}",
             r"AKIA[0-9A-Z]{16}",
+            r"SG\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}",
             r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----",
             r#"(?i)"api_key"\s*:\s*"[^"]+""#,
         ]
@@ -341,14 +342,21 @@ fn assignment_name_is_secret(name: &str, quoted: bool, scrubbers: &ScrubRegexes)
 
 /// Quoted values and unquoted uppercase `*PASSWORD` / `*SECRET` / `*TOKEN` /
 /// `*API_KEY` values are secrets at 6 characters. Other unquoted values need 8.
-/// An unquoted code reference is left alone. A dotted value is still a secret
-/// unless it is one identifier reading another (`settings.apiKey`). A JWT has
-/// more than one dot.
+/// A JWT is always a secret. `process.env` and the other env readers are always
+/// code. An uppercase env name has no further code exemption. A lowercase or
+/// camelCase name may be a call, an index, or a field read.
 fn assignment_value_is_secret(raw: &str, name: &str, scrubbers: &ScrubRegexes) -> bool {
     let quoted = (raw.starts_with('"') && raw.ends_with('"') && raw.len() >= 2)
         || (raw.starts_with('\'') && raw.ends_with('\'') && raw.len() >= 2);
     let inner = if quoted { &raw[1..raw.len() - 1] } else { raw };
-    if !quoted && unquoted_value_is_code(inner) {
+    let value = inner.trim_end_matches(['}', ']', ')', ',', ';']);
+    if is_strict_jwt(value) {
+        return true;
+    }
+    if !quoted && is_env_accessor(value) {
+        return false;
+    }
+    if !quoted && !name_is_uppercase_env(name) && is_camel_case_code(value) {
         return false;
     }
     let mut chars = inner.chars();
@@ -365,41 +373,95 @@ fn assignment_value_is_secret(raw: &str, name: &str, scrubbers: &ScrubRegexes) -
     inner.chars().count() >= min
 }
 
-/// `process.env.…`, `os.environ[…]`, and `getKey()` are code. One dotted
-/// identifier is a field read. A value with more than one dot, such as a JWT,
-/// is not.
-fn unquoted_value_is_code(raw: &str) -> bool {
-    let value = raw.trim_end_matches(['}', ']', ')', ',', ';']);
-    if value.contains('(') || value.contains('[') {
-        return true;
+/// Three base64url parts, the first starting with `eyJ`, each at least 10 characters.
+fn is_strict_jwt(value: &str) -> bool {
+    let mut parts = value.split('.');
+    let Some(header) = parts.next() else {
+        return false;
+    };
+    let Some(payload) = parts.next() else {
+        return false;
+    };
+    let Some(signature) = parts.next() else {
+        return false;
+    };
+    if parts.next().is_some() {
+        return false;
     }
-    if value.starts_with("process.env.")
+    header.starts_with("eyJ")
+        && is_base64url(header)
+        && is_base64url(payload)
+        && is_base64url(signature)
+}
+
+fn is_base64url(part: &str) -> bool {
+    part.len() >= 10
+        && part
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '='))
+}
+
+fn is_env_accessor(value: &str) -> bool {
+    value.starts_with("process.env.")
         || value.starts_with("import.meta.env.")
         || value.starts_with("os.environ")
         || value.starts_with("os.getenv")
-    {
-        return true;
-    }
-    let mut parts = value.split('.');
-    let Some(first) = parts.next() else {
-        return false;
-    };
-    if !is_code_ident(first) {
-        return false;
-    }
-    let Some(second) = parts.next() else {
-        return false;
-    };
-    is_code_ident(second) && parts.next().is_none()
 }
 
-fn is_code_ident(part: &str) -> bool {
+fn name_is_uppercase_env(name: &str) -> bool {
+    !name.is_empty() && name.chars().all(|ch| ch.is_ascii_uppercase() || ch == '_')
+}
+
+/// A call, an index, or two or more identifiers split on `.` or `?.`.
+/// Each identifier has fewer than 3 digits, so `abc123.def456` stays a secret.
+fn is_camel_case_code(value: &str) -> bool {
+    if value.contains('(') || value.contains('[') {
+        return true;
+    }
+    let parts = field_parts(value);
+    parts.len() >= 2 && parts.iter().all(|part| is_field_ident(part))
+}
+
+fn field_parts(value: &str) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let bytes = value.as_bytes();
+    let mut start = 0;
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'?' && bytes.get(index + 1) == Some(&b'.') {
+            parts.push(&value[start..index]);
+            index += 2;
+            start = index;
+        } else if bytes[index] == b'.' {
+            parts.push(&value[start..index]);
+            index += 1;
+            start = index;
+        } else {
+            index += 1;
+        }
+    }
+    parts.push(&value[start..]);
+    parts
+}
+
+fn is_field_ident(part: &str) -> bool {
     let mut chars = part.chars();
     match chars.next() {
         Some(ch) if ch.is_ascii_alphabetic() || ch == '_' => {}
         _ => return false,
     }
-    chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
+    let mut digits = 0;
+    for ch in chars {
+        if ch.is_ascii_digit() {
+            digits += 1;
+            if digits >= 3 {
+                return false;
+            }
+        } else if !(ch.is_ascii_alphabetic() || ch == '_') {
+            return false;
+        }
+    }
+    true
 }
 
 /// `Bearer authentication` is a sentence. A token needs a digit or `. _ - / + =`.
@@ -1388,6 +1450,15 @@ mod tests {
     }
 
     #[test]
+    fn scrub_secrets_redacts_bearer_tokens_with_marks() {
+        for mark in ['.', '_', '-', '/', '+', '='] {
+            let token = format!("abcd{mark}wxy");
+            assert_eq!(token.len(), 8);
+            assert_redacted(&format!("Authorization: Bearer {token}"), &token);
+        }
+    }
+
+    #[test]
     fn scrub_secrets_leaves_bearer_authentication_prose() {
         assert_unchanged("uses Bearer authentication");
     }
@@ -1451,8 +1522,34 @@ mod tests {
 
     #[test]
     fn scrub_secrets_redacts_a_jwt_after_api_key() {
-        let jwt = format!("{}.{}.{}", "aaaaBBBB", "ccccDDDD", "eeee12ff");
+        let header = format!("eyJ{}", "aaaaaaa");
+        let jwt = format!("{header}.{}.{}", "bbbbbbbbbb", "cccccccccc");
+        assert!(header.len() >= 10);
         assert_redacted(&format!("apiKey: {jwt}"), &jwt);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_vault_token() {
+        let value = format!("hvs.{}{}", "CAESI", "abc123XYZdefGHI456");
+        assert_redacted(&format!("VAULT_TOKEN={value}"), &value);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_sendgrid_key() {
+        let key = format!("SG.{}.{}", "abcdefghijABCDEF", "klmnopqrstUVWXYZ");
+        assert_redacted(&key, &key);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_dotted_lowercase_api_key() {
+        let value = format!("{}.{}", "abc123", "def456ghi789");
+        assert_redacted(&format!("api_key={value}"), &value);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_an_uppercase_api_key_call() {
+        let value = format!("abc({}{})xyz", "12", "3");
+        assert_redacted(&format!("API_KEY={value}"), &value);
     }
 
     #[test]
@@ -1463,6 +1560,31 @@ mod tests {
     #[test]
     fn scrub_secrets_leaves_an_api_key_field_read() {
         assert_unchanged("{ apiKey: settings.apiKey }");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_a_longer_api_key_field_chain() {
+        assert_unchanged("apiKey: config.auth.apiKey");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_a_this_config_field_read() {
+        assert_unchanged("apiKey: this.config.key");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_an_optional_api_key_field_read() {
+        assert_unchanged("apiKey: settings?.apiKey");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_an_import_meta_env_read() {
+        assert_unchanged("apiKey: import.meta.env.X");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_an_os_getenv_call() {
+        assert_unchanged(r#"apiKey: os.getenv("X")"#);
     }
 
     #[test]
