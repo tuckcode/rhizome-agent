@@ -35,8 +35,10 @@ export type UpdateCheckResult =
   | ({ kind: 'available' } & UpdateVersionInfo)
   | { kind: 'error'; message: string }
 
+export type UpdateCheckInitiator = 'manual' | 'background'
+
 export interface UpdateActions {
-  checkForUpdates: () => Promise<UpdateCheckResult>
+  checkForUpdates: (options?: { initiator?: UpdateCheckInitiator }) => Promise<UpdateCheckResult>
   startDownload: () => void
   openReleaseNotes: () => void
   dismiss: () => void
@@ -126,9 +128,12 @@ export function useUpdater(
   const [status, setStatus] = useState<UpdateStatus>({ state: 'idle' })
   const updateRef = useRef<AppUpdateMetadata | null>(null)
 
-  const checkForUpdates = useCallback(async (): Promise<UpdateCheckResult> => {
+  const checkForUpdates = useCallback(async (
+    options?: { initiator?: UpdateCheckInitiator },
+  ): Promise<UpdateCheckResult> => {
     if (!isTauri()) return { kind: 'up-to-date' }
 
+    const initiator = options?.initiator ?? 'manual'
     setStatus({ state: 'checking' })
 
     try {
@@ -145,7 +150,11 @@ export function useUpdater(
       return { kind: 'available', ...versionInfo }
     } catch (error) {
       const message = buildUpdateCheckErrorMessage(error)
-      setStatus({ state: 'error', message })
+      if (initiator === 'background') {
+        setStatus({ state: 'idle' })
+      } else {
+        setStatus({ state: 'error', message })
+      }
       return { kind: 'error', message }
     }
   }, [releaseChannel])
@@ -153,7 +162,9 @@ export function useUpdater(
   useEffect(() => {
     if (!automaticChecksEnabled) return
     if (!isTauri()) return
-    const timer = setTimeout(() => { checkForUpdates() }, 3000)
+    const timer = setTimeout(() => {
+      void checkForUpdates({ initiator: 'background' })
+    }, 3000)
     return () => clearTimeout(timer)
   }, [automaticChecksEnabled, checkForUpdates])
 

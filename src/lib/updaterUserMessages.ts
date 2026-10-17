@@ -13,6 +13,14 @@ export const UPDATER_INSTALL_FAILED_MESSAGE = updaterUserMessages.installFailed
 /** Link label shared across updater sentences that point at manual downloads. */
 export const UPDATER_RELEASES_PAGE_LABEL = 'Releases page'
 
+/** `{found}` token in version-changed copy must look like a release version, not free text. */
+export const UPDATER_VERSION_CHANGED_FOUND_PATTERN = /^v?\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?$/
+
+const UPDATER_MESSAGES_WITH_RELEASES_PAGE_LINK = new Set<string>([
+  updaterUserMessages.inAppUpdatesUnavailable,
+  updaterUserMessages.installFailed,
+])
+
 /** Exact strings `check_for_app_update` may return to the manual check UI. */
 export const UPDATER_ALLOWLISTED_CHECK_ERROR_MESSAGES = new Set<string>([
   updaterUserMessages.inAppUpdatesUnavailable,
@@ -31,15 +39,27 @@ export function isAllowlistedUpdaterCheckError(detail: string): boolean {
   return UPDATER_ALLOWLISTED_CHECK_ERROR_MESSAGES.has(detail)
 }
 
-export function isAllowlistedUpdaterVersionChangedMessage(detail: string): boolean {
+export function parseVersionChangedFoundToken(detail: string): string | null {
   const template = updaterUserMessages.versionChangedWhileDownloading
   const marker = '{found}'
   const markerIndex = template.indexOf(marker)
-  if (markerIndex === -1) return false
+  if (markerIndex === -1) return null
 
   const prefix = template.slice(0, markerIndex)
   const suffix = template.slice(markerIndex + marker.length)
-  return detail.startsWith(prefix) && detail.endsWith(suffix)
+  if (!detail.startsWith(prefix) || !detail.endsWith(suffix)) return null
+
+  return detail.slice(prefix.length, detail.length - suffix.length)
+}
+
+export function isValidVersionChangedFoundToken(found: string): boolean {
+  return UPDATER_VERSION_CHANGED_FOUND_PATTERN.test(found.trim())
+}
+
+export function isAllowlistedUpdaterVersionChangedMessage(detail: string): boolean {
+  const found = parseVersionChangedFoundToken(detail)
+  if (!found) return false
+  return isValidVersionChangedFoundToken(found)
 }
 
 export function isAllowlistedUpdaterInstallError(detail: string): boolean {
@@ -47,11 +67,20 @@ export function isAllowlistedUpdaterInstallError(detail: string): boolean {
     || isAllowlistedUpdaterVersionChangedMessage(detail)
 }
 
+/** Only exact updater copy (not arbitrary toast text) may link the Releases page label. */
+export function shouldLinkUpdaterReleasesPage(message: string): boolean {
+  return UPDATER_MESSAGES_WITH_RELEASES_PAGE_LINK.has(message)
+}
+
 /** Releases page URL for updater copy that points people at manual downloads. */
 export { RELEASE_DOWNLOAD_PAGE_URL }
 
-export function renderUpdaterUserMessage(message: string): ReactNode {
-  if (!message.includes(UPDATER_RELEASES_PAGE_LABEL)) return message
+export function renderUpdaterUserMessage(
+  message: string,
+  options?: { linkReleasesPage?: boolean },
+): ReactNode {
+  const linkReleasesPage = options?.linkReleasesPage ?? shouldLinkUpdaterReleasesPage(message)
+  if (!linkReleasesPage || !message.includes(UPDATER_RELEASES_PAGE_LABEL)) return message
 
   const segments = message.split(UPDATER_RELEASES_PAGE_LABEL)
   const children: ReactNode[] = []

@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react'
 import { ArrowSquareOut as ExternalLink, ArrowsClockwise as RefreshCw, Download, X } from '@phosphor-icons/react'
 import type { UpdateStatus, UpdateActions } from '../hooks/useUpdater'
 import { restartApp } from '../hooks/useUpdater'
-import { renderUpdaterUserMessage } from '../lib/updaterUserMessages'
+import { renderUpdaterUserMessage, shouldLinkUpdaterReleasesPage } from '../lib/updaterUserMessages'
 import { Button } from './ui/button'
 import { translate, type AppLocale } from '../lib/i18n'
 
@@ -168,7 +168,7 @@ function renderReadyContent(status: Extract<VisibleUpdateStatus, { state: 'ready
 function renderErrorContent(status: Extract<VisibleUpdateStatus, { state: 'error' }>, actions: UpdateActions) {
   return (
     <>
-      <span>{renderUpdaterUserMessage(status.message)}</span>
+      <span>{renderUpdaterUserMessage(status.message, { linkReleasesPage: shouldLinkUpdaterReleasesPage(status.message) })}</span>
       <Button
         type="button"
         variant="ghost"
