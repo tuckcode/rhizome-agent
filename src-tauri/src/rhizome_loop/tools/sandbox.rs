@@ -311,7 +311,10 @@ fn component_is_git(component: std::path::Component<'_>) -> bool {
     // Windows keeps the short 8.3 name and a trailing-dot alias for `.git`.
     #[cfg(windows)]
     {
-        name.eq_ignore_ascii_case(".git.") || name.eq_ignore_ascii_case("GIT~1")
+        name.eq_ignore_ascii_case(".git.")
+            || name.eq_ignore_ascii_case(".git..")
+            || name.eq_ignore_ascii_case(".git ")
+            || name.eq_ignore_ascii_case("GIT~1")
     }
     #[cfg(not(windows))]
     false

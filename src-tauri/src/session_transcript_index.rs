@@ -38,6 +38,10 @@ fn with_index_lock<T>(body: impl FnOnce() -> T) -> T {
 #[serde(rename_all = "camelCase")]
 pub struct SessionTranscriptIndexDocument {
     pub version: u32,
+    /// Set after this file has been run through the secret scrubber.
+    /// Missing on indexes written before the marker existed.
+    #[serde(default)]
+    pub secrets_scrubbed: bool,
     pub sessions: Vec<PersistedSessionRecord>,
 }
 
@@ -63,6 +67,7 @@ impl SessionTranscriptIndexDocument {
     fn empty() -> Self {
         Self {
             version: INDEX_VERSION,
+            secrets_scrubbed: true,
             sessions: Vec::new(),
         }
     }
@@ -70,7 +75,8 @@ impl SessionTranscriptIndexDocument {
 
 /// Load the persisted index. A missing file is an empty index, not an error.
 /// An index left by the old writer (mode 0644, or a `v1.json.tmp` copy) is
-/// locked down and rewritten with secrets removed on this read.
+/// locked down. A file without `secretsScrubbed` is rewritten once with
+/// secrets removed, including a file that is already mode 0600.
 pub fn load() -> Result<SessionTranscriptIndexDocument, String> {
     with_index_lock(load_locked)
 }
@@ -177,7 +183,9 @@ pub fn save(document: &SessionTranscriptIndexDocument) -> Result<(), String> {
     with_index_lock(|| {
         let index = index_path()?;
         secure_existing_index(&index)?;
-        save_to(index, &scrub_document_once(document))
+        let mut document = scrub_document_once(document);
+        document.secrets_scrubbed = true;
+        save_to(index, &document)
     })
 }
 
@@ -192,6 +200,12 @@ fn load_from(path: PathBuf) -> Result<SessionTranscriptIndexDocument, String> {
     if document.version != INDEX_VERSION {
         return Ok(SessionTranscriptIndexDocument::empty());
     }
+    if document.secrets_scrubbed {
+        return Ok(document);
+    }
+    let mut document = scrub_document_once(&document);
+    document.secrets_scrubbed = true;
+    save_to(path, &document)?;
     Ok(document)
 }
 
@@ -227,8 +241,9 @@ fn scrub_document_once(
     document
 }
 
-/// Lock down an index written before the owner-only format. A world-readable
-/// file is rewritten with secrets removed. A leftover `v1.json.tmp` is deleted.
+/// Lock down an index written before the owner-only format. A leftover
+/// `v1.json.tmp` is deleted. Scrubbing is decided by `secretsScrubbed`, not
+/// by the file mode, so a 0600 file and a Windows file are still rewritten.
 fn secure_existing_index(path: &Path) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         if parent.exists() {
@@ -244,26 +259,7 @@ fn secure_existing_index(path: &Path) -> Result<(), String> {
             )
         })?;
     }
-    if !path.exists() || file_is_owner_only(path) {
-        return Ok(());
-    }
-    let document = scrub_document_once(&load_from(path.to_path_buf())?);
-    save_to(path.to_path_buf(), &document)
-}
-
-fn file_is_owner_only(path: &Path) -> bool {
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::metadata(path)
-            .map(|meta| meta.permissions().mode() & 0o777 == 0o600)
-            .unwrap_or(false)
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = path;
-        true
-    }
+    Ok(())
 }
 
 fn set_owner_only_dir(path: &Path) -> Result<(), String> {
@@ -353,6 +349,7 @@ mod tests {
     fn sample_document() -> SessionTranscriptIndexDocument {
         SessionTranscriptIndexDocument {
             version: INDEX_VERSION,
+            secrets_scrubbed: true,
             sessions: vec![PersistedSessionRecord {
                 path: "/Users/mock/.prime/agent/sessions/daemon.jsonl".into(),
                 stamp: "10".into(),
@@ -522,6 +519,49 @@ mod tests {
                 !session.turns[0].text.contains(key),
                 "{}",
                 session.turns[0].text
+            );
+        });
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn load_rescrubs_an_owner_only_index_without_a_scrub_marker() {
+        use std::os::unix::fs::PermissionsExt;
+
+        with_cache_dir(|_| {
+            let key = "sk-proj-abcdefghijklmnopqrstuvwxyz";
+            let path = index_path().expect("index path");
+            let dir = path.parent().expect("index dir");
+            fs::create_dir_all(dir).expect("create dir");
+            fs::set_permissions(dir, fs::Permissions::from_mode(0o700)).expect("dir mode");
+            let body = format!(
+                r#"{{"version":1,"sessions":[{{"path":"rhizome-native:old","stamp":"1","id":"old","title":"kept","turns":[{{"messageIndex":0,"role":"assistant","text":"saw {key}"}}]}}]}}"#
+            );
+            fs::write(&path, body).expect("write old index");
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).expect("file mode");
+
+            let loaded = load().expect("load unmarked index");
+
+            let raw = fs::read_to_string(&path).expect("read scrubbed index");
+            assert!(!raw.contains(key), "{raw}");
+            assert!(raw.contains("\"secretsScrubbed\":true"), "{raw}");
+            assert!(
+                !loaded.sessions[0].turns[0].text.contains(key),
+                "{}",
+                loaded.sessions[0].turns[0].text
+            );
+            let file_mode = fs::metadata(&path).expect("file").permissions().mode() & 0o777;
+            assert_eq!(file_mode, 0o600);
+
+            let marked = format!(
+                r#"{{"version":1,"secretsScrubbed":true,"sessions":[{{"path":"rhizome-native:old","stamp":"1","id":"old","title":"kept","turns":[{{"messageIndex":0,"role":"assistant","text":"saw {key}"}}]}}]}}"#
+            );
+            fs::write(&path, marked).expect("write marked index");
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).expect("file mode");
+            let again = load().expect("load marked index");
+            assert!(
+                again.sessions[0].turns[0].text.contains(key),
+                "a marked index is scrubbed once"
             );
         });
     }

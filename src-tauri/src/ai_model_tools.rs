@@ -802,12 +802,48 @@ mod tests {
         assert!(!vault.path().join(".env.production").exists());
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn create_note_resolves_a_relative_path_against_the_vault() {
+        let vault = tempfile::tempdir().unwrap();
+        let cwd = tempfile::tempdir().unwrap();
+        let git = cwd.path().join(".git");
+        fs::create_dir(&git).unwrap();
+        fs::write(git.join("config"), "keep\n").unwrap();
+        std::os::unix::fs::symlink(git.join("config"), cwd.path().join("note")).unwrap();
+        struct RestoreCwd(std::path::PathBuf);
+        impl Drop for RestoreCwd {
+            fn drop(&mut self) {
+                let _ = std::env::set_current_dir(&self.0);
+            }
+        }
+        let _restore = RestoreCwd(std::env::current_dir().unwrap());
+        std::env::set_current_dir(cwd.path()).unwrap();
+        let vault_path = vault.path().to_string_lossy().into_owned();
+        let created = create_note(
+            &json!({ "path": "note", "content": "hello\n" }),
+            Some(&vault_path),
+            &[],
+        );
+        created.expect("a relative note is created in the vault");
+        assert_eq!(
+            fs::read_to_string(vault.path().join("note")).unwrap(),
+            "hello\n"
+        );
+        assert_eq!(fs::read_to_string(git.join("config")).unwrap(), "keep\n");
+    }
+
     #[cfg(windows)]
     #[test]
     fn create_note_refuses_windows_git_short_names() {
         let vault = tempfile::tempdir().unwrap();
         let vault_path = vault.path().to_string_lossy().into_owned();
-        for requested in [".git./config", "GIT~1/config"] {
+        for requested in [
+            ".git./config",
+            "GIT~1/config",
+            ".git /config",
+            ".git../config",
+        ] {
             let error = create_note(
                 &json!({ "path": requested, "content": "no\n" }),
                 Some(&vault_path),

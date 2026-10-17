@@ -175,28 +175,41 @@ pub fn create_note_content(
     content: String,
     vault_path: Option<PathBuf>,
 ) -> Result<(), String> {
-    // Check the path as given first. `..` makes the vault boundary reject
-    // `.git/../.git/x` before the validated path is built, and that shape
-    // is still a secret path.
-    if crate::rhizome_loop::write_target_is_secret(&path) {
-        return Err(format!(
-            "{} Requested path: {}",
-            crate::rhizome_loop::BLOCKED_SECRET,
-            path.display()
-        ));
-    }
-    with_writable_note_path(path, vault_path, |validated_path, vault_root| {
-        if crate::rhizome_loop::write_target_is_secret(Path::new(validated_path)) {
+    let raw_path = path.to_string_lossy().into_owned();
+    let raw_vault_path = vault_path
+        .as_ref()
+        .map(|value| value.to_string_lossy().into_owned());
+    with_boundary(raw_vault_path.as_deref(), |boundary| {
+        // Join a relative path to the vault. `canonicalize` on the raw
+        // relative path would use the process working directory.
+        // `.git/../.git/x` is still a secret path before the boundary
+        // rejects the `..` component.
+        let candidate = if path.is_absolute() {
+            path.clone()
+        } else {
+            boundary.requested_root().join(&path)
+        };
+        if crate::rhizome_loop::write_target_is_secret(&candidate) {
+            return Err(format!(
+                "{} Requested path: {}",
+                crate::rhizome_loop::BLOCKED_SECRET,
+                candidate.display()
+            ));
+        }
+        let validated_path = boundary.validate_writable_path(&raw_path)?;
+        if crate::rhizome_loop::write_target_is_secret(Path::new(&validated_path)) {
             return Err(format!(
                 "{} Requested path: {validated_path}",
                 crate::rhizome_loop::BLOCKED_SECRET
             ));
         }
-        vault::create_note_content(validated_path, &content)?;
-        let artifact_path =
-            crate::rhizome_write_location::relative_to_vault(vault_root, Path::new(validated_path));
+        vault::create_note_content(&validated_path, &content)?;
+        let artifact_path = crate::rhizome_write_location::relative_to_vault(
+            boundary.requested_root(),
+            Path::new(&validated_path),
+        );
         crate::rhizome_distill::append_vault_event_best_effort(
-            vault_root,
+            boundary.requested_root(),
             "create",
             None,
             "manual_edit",
