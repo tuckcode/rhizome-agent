@@ -11,8 +11,12 @@
 //!   `stop` for a step that called tools.
 //! - An error after partial text or tool calls is the single terminal event.
 //!   Open calls get no `ToolCallEnd`.
+//! - `reasoning_content` is kept in memory for the current replay session.
+//!   It is not a model event, so it cannot reach the native session log.
 
-use std::collections::BTreeMap;
+use std::cell::RefCell;
+use std::collections::{BTreeMap, HashMap};
+use std::sync::{Mutex, OnceLock};
 
 use serde_json::Value;
 
@@ -34,6 +38,105 @@ pub(crate) struct OpenAiStreamParser {
     /// Keyed by the wire `index`, so ends come out in index order.
     calls: BTreeMap<u64, ToolCallState>,
     finished: bool,
+    /// Assistant text from this completion. A key for reasoning replay
+    /// when the step called no tools.
+    assistant_text: String,
+    /// DeepSeek thinking deltas for this completion. Replay only.
+    reasoning: String,
+}
+
+/// Drops the thread-local replay session when the stream worker ends.
+#[must_use]
+pub(crate) struct ReasoningReplayGuard;
+
+impl Drop for ReasoningReplayGuard {
+    fn drop(&mut self) {
+        set_replay_session(None);
+    }
+}
+
+/// Remembers `reasoning_content` for one in-memory session.
+///
+/// The map lives for the process. It is not written to disk or to the
+/// native session log. A reopened chat has a new session and misses.
+#[derive(Default)]
+struct ReplayBucket {
+    by_call: HashMap<String, String>,
+    by_text: HashMap<String, String>,
+}
+
+fn reasoning_replay() -> &'static Mutex<HashMap<String, ReplayBucket>> {
+    static REPLAY: OnceLock<Mutex<HashMap<String, ReplayBucket>>> = OnceLock::new();
+    REPLAY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+thread_local! {
+    static REPLAY_SESSION: RefCell<Option<String>> = const { RefCell::new(None) };
+}
+
+pub(crate) fn enter_reasoning_replay_session(session: String) -> ReasoningReplayGuard {
+    set_replay_session(Some(session));
+    ReasoningReplayGuard
+}
+
+fn set_replay_session(session: Option<String>) {
+    REPLAY_SESSION.with(|slot| *slot.borrow_mut() = session);
+}
+
+fn current_replay_session() -> Option<String> {
+    REPLAY_SESSION.with(|slot| slot.borrow().clone())
+}
+
+/// Stores reasoning captured for `session`. Empty reasoning is not stored.
+pub(crate) fn note_reasoning(session: &str, call_ids: &[String], text: &str, reasoning: &str) {
+    if session.is_empty() || reasoning.is_empty() {
+        return;
+    }
+    if call_ids.is_empty() && text.is_empty() {
+        return;
+    }
+    let mut sessions = reasoning_replay()
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+    let bucket = sessions.entry(session.to_string()).or_default();
+    for id in call_ids {
+        if !id.is_empty() {
+            bucket.by_call.insert(id.clone(), reasoning.to_string());
+        }
+    }
+    if !text.is_empty() {
+        bucket
+            .by_text
+            .insert(text.to_string(), reasoning.to_string());
+    }
+}
+
+/// Reasoning captured for this session, if this step produced any.
+///
+/// Tool-call ids win. `text` is the fallback for a step with no calls.
+/// A miss means the turn was reopened or came from another provider.
+pub(crate) fn recall_reasoning(session: &str, call_ids: &[String], text: &str) -> Option<String> {
+    if session.is_empty() {
+        return None;
+    }
+    let sessions = reasoning_replay()
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+    let bucket = sessions.get(session)?;
+    if let Some(found) = call_ids.iter().find_map(|id| bucket.by_call.get(id)) {
+        return Some(found.clone());
+    }
+    if text.is_empty() {
+        return None;
+    }
+    bucket.by_text.get(text).cloned()
+}
+
+fn store_current_reasoning(call_ids: &[String], text: &str, reasoning: &str) {
+    let Some(session) = current_replay_session() else {
+        return;
+    };
+    note_reasoning(&session, call_ids, text, reasoning);
 }
 
 impl OpenAiStreamParser {
@@ -102,7 +205,16 @@ impl OpenAiStreamParser {
         let choice = &chunk["choices"][0];
         let delta = &choice["delta"];
         if let Some(text) = delta["content"].as_str().filter(|text| !text.is_empty()) {
+            self.assistant_text.push_str(text);
             events.push(ModelEvent::TextDelta { text: text.into() });
+        }
+        // DeepSeek thinking mode streams this beside `content`. It stays
+        // out of `ModelEvent` so the native log format does not change.
+        if let Some(text) = delta["reasoning_content"]
+            .as_str()
+            .filter(|text| !text.is_empty())
+        {
+            self.reasoning.push_str(text);
         }
         if let Some(calls) = delta["tool_calls"].as_array() {
             for (position, call) in calls.iter().enumerate() {
@@ -150,6 +262,7 @@ impl OpenAiStreamParser {
     }
 
     fn finish(&mut self, reason: Option<&str>) -> Vec<ModelEvent> {
+        self.store_reasoning();
         let calls = std::mem::take(&mut self.calls);
         let called_tools = !calls.is_empty();
         let mut events = Vec::new();
@@ -174,6 +287,22 @@ impl OpenAiStreamParser {
             reason: finish_reason(reason, called_tools),
         });
         events
+    }
+
+    /// Associates this completion's thinking text with its tool-call ids
+    /// and its visible answer. The next DeepSeek request reads it back.
+    fn store_reasoning(&mut self) {
+        let reasoning = std::mem::take(&mut self.reasoning);
+        let text = std::mem::take(&mut self.assistant_text);
+        if reasoning.is_empty() {
+            return;
+        }
+        let ids = self
+            .calls
+            .values()
+            .filter_map(|call| call.id.clone())
+            .collect::<Vec<_>>();
+        store_current_reasoning(&ids, &text, &reasoning);
     }
 
     fn fail(&mut self, error: ModelError) -> Vec<ModelEvent> {
@@ -555,6 +684,82 @@ mod tests {
         );
         assert!(parser.is_finished());
         assert!(parser.end_of_stream().is_empty());
+    }
+
+    #[test]
+    fn reasoning_content_is_not_a_model_event() {
+        // The native log is built from model events. Keeping thinking
+        // text out of the event list keeps it out of the log.
+        let events = run(&[
+            r#"{"choices":[{"delta":{"reasoning_content":"hidden thought"}}]}"#,
+            r#"{"choices":[{"delta":{"content":"Hi"},"finish_reason":"stop"}]}"#,
+            "[DONE]",
+        ]);
+
+        assert_eq!(events, vec![text("Hi"), finish(FinishReason::Stop)]);
+        let logged = format!("{events:?}");
+        assert!(
+            !logged.contains("hidden thought"),
+            "thinking text must not ride a model event: {logged}"
+        );
+    }
+
+    #[test]
+    fn reasoning_content_is_stored_for_the_replay_session_only() {
+        let _guard = enter_reasoning_replay_session("parser-session".into());
+        let events = run(&[
+            r#"{"choices":[{"delta":{"reasoning_content":"need "}}]}"#,
+            r#"{"choices":[{"delta":{"reasoning_content":"the tool","content":"Looking."}}]}"#,
+            r#"{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_a","function":{"name":"echo","arguments":"{}"}},{"index":1,"id":"call_b","function":{"name":"echo","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}"#,
+        ]);
+
+        assert_eq!(
+            events,
+            vec![
+                text("Looking."),
+                start("call_a", "echo"),
+                args("call_a", "{}"),
+                start("call_b", "echo"),
+                args("call_b", "{}"),
+                end("call_a"),
+                end("call_b"),
+                finish(FinishReason::ToolCalls),
+            ]
+        );
+        assert_eq!(
+            recall_reasoning("parser-session", &["call_b".into()], ""),
+            Some("need the tool".into())
+        );
+        assert_eq!(
+            recall_reasoning("parser-session", &[], "Looking."),
+            Some("need the tool".into())
+        );
+        assert_eq!(
+            recall_reasoning("other-session", &["call_a".into()], "Looking."),
+            None
+        );
+    }
+
+    #[test]
+    fn a_whole_completion_keeps_reasoning_content_out_of_events() {
+        let _guard = enter_reasoning_replay_session("completion-session".into());
+        let mut parser = OpenAiStreamParser::default();
+        let events = parser.push_completion(&json!({
+            "choices": [{
+                "message": {
+                    "role": "assistant",
+                    "content": "Done.",
+                    "reasoning_content": "checked the tool"
+                },
+                "finish_reason": "stop"
+            }]
+        }));
+
+        assert_eq!(events, vec![text("Done."), finish(FinishReason::Stop)]);
+        assert_eq!(
+            recall_reasoning("completion-session", &[], "Done."),
+            Some("checked the tool".into())
+        );
     }
 
     #[test]

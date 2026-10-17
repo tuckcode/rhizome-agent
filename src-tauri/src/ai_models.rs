@@ -8,6 +8,10 @@ mod openai_stream;
 #[cfg(test)]
 pub(crate) mod test_server;
 
+#[cfg(test)]
+pub(crate) use openai_stream::note_reasoning;
+pub(crate) use openai_stream::{enter_reasoning_replay_session, recall_reasoning};
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum AiModelProviderKind {
