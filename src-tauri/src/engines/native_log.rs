@@ -260,9 +260,9 @@ fn scrub_regexes() -> &'static ScrubRegexes {
             .expect("prefixed key name");
         let bearer = regex::Regex::new(r"(?i)bearer\s+(?P<token>[A-Za-z0-9._\-+/=]{8,})")
             .expect("bearer token");
-        // `[\s\S]` is a real newline. `\\n` is the two-character escape.
+        // `[\s\S]` matches a real newline and each character of a `\n` escape.
         let pem = regex::Regex::new(
-            r"-----BEGIN [A-Z ]*PRIVATE KEY-----(?:\\n|[\s\S])*?-----END [A-Z ]*PRIVATE KEY-----",
+            r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----",
         )
         .expect("pem block");
         let patterns = [
@@ -326,9 +326,12 @@ fn scrub_assignments(text: &str, scrubbers: &ScrubRegexes) -> String {
             .name("quote")
             .is_some_and(|quote| !quote.as_str().is_empty());
         let comparison = sep.as_str() == "=" && text.as_bytes().get(sep.end()) == Some(&b'=');
+        // The regex stops at an escaped quote, at 512, or at the first space
+        // of an unclosed quote. The secret check uses the real quoted span.
+        let checked = value_text_for_secret_check(text, value.as_str(), value.start());
         let redact = !comparison
             && assignment_name_is_secret(name.as_str(), quoted, scrubbers)
-            && assignment_value_is_secret(value.as_str(), name.as_str(), scrubbers);
+            && assignment_value_is_secret(checked, name.as_str(), scrubbers);
         if redact {
             let end = secret_span_end(text, value.start(), value.end());
             out.push_str(&text[copied..value.start()]);
@@ -423,7 +426,9 @@ fn first_secret_value_restart(
 
 /// True when this assignment must be handled by the main scan. A value that
 /// starts with `$`, `{`, `<`, or `[` is not a secret even if the cap cut it.
-/// A short prefix that runs into the cap might grow into one.
+/// A short prefix that runs into the cap might grow into one. A quoted value
+/// is judged on its own span, so compact JSON like `"token":"$"` does not
+/// look like one long spaceless token and force a rescan of every field.
 fn secret_value_needs_rescan(
     window: &str,
     value_rel: usize,
@@ -433,19 +438,45 @@ fn secret_value_needs_rescan(
     let Some(rest) = window.get(value_rel..) else {
         return true;
     };
+    let Some(first) = rest.chars().next() else {
+        return true;
+    };
+    if matches!(first, '{' | '$' | '<' | '[') {
+        return false;
+    }
+    if first == '"' || first == '\'' {
+        let (end, closed) = quoted_span(rest, 0, first);
+        let span = rest.get(..end).unwrap_or(rest);
+        if assignment_value_is_secret(span, name, scrubbers) {
+            return true;
+        }
+        if closed {
+            return false;
+        }
+        let inner = span.get(first.len_utf8()..).unwrap_or("");
+        return !value_rejected_by_first_char(inner);
+    }
+    // A spaceless tail has no natural end. A short prefix is enough to tell
+    // a real secret from a value the cap merely cut off.
+    const RESCAN_PREFIX: usize = 64;
     let mut end = rest.len();
+    let mut stopped = false;
     for (offset, ch) in rest.char_indices() {
         if ch.is_whitespace() || ch == '#' {
+            end = offset;
+            stopped = true;
+            break;
+        }
+        if offset >= RESCAN_PREFIX {
             end = offset;
             break;
         }
     }
     let visible = &rest[..end];
-    let hits_window_end = end == rest.len();
     if assignment_value_is_secret(visible, name, scrubbers) {
         return true;
     }
-    hits_window_end && !value_rejected_by_first_char(visible)
+    !stopped && end == rest.len() && !value_rejected_by_first_char(visible)
 }
 
 fn value_rejected_by_first_char(value: &str) -> bool {
@@ -478,6 +509,12 @@ fn name_touching_separator(value: &str, sep: usize) -> Option<(&str, bool, usize
 fn rewind_to_name_start(text: &str, index: usize) -> usize {
     let bytes = text.as_bytes();
     let mut start = index.min(bytes.len());
+    // The cap can land on the closing quote of a quoted name. Skip that
+    // quote before walking the letters, or the restart sits on the last
+    // letter and the name never matches.
+    if start > 0 && (bytes[start - 1] == b'"' || bytes[start - 1] == b'\'') {
+        start -= 1;
+    }
     while start > 0 && (bytes[start - 1].is_ascii_alphanumeric() || bytes[start - 1] == b'_') {
         start -= 1;
     }
@@ -530,12 +567,18 @@ fn secret_span_end(text: &str, value_start: usize, value_end: usize) -> usize {
 }
 
 fn quoted_value_end(text: &str, value_start: usize, quote: char) -> usize {
+    quoted_span(text, value_start, quote).0
+}
+
+/// `(end, closed)`. A quote ends at its closer. An unclosed quote ends at
+/// the newline or at the end of the text, and `closed` is false.
+fn quoted_span(text: &str, value_start: usize, quote: char) -> (usize, bool) {
     let Some(rest) = text.get(value_start..) else {
-        return text.len();
+        return (text.len(), false);
     };
     let mut chars = rest.char_indices();
     if chars.next().is_none() {
-        return text.len();
+        return (text.len(), false);
     }
     let mut escaped = false;
     for (offset, ch) in chars {
@@ -548,15 +591,29 @@ fn quoted_value_end(text: &str, value_start: usize, quote: char) -> usize {
             continue;
         }
         if ch == '\n' || ch == '\r' {
-            return value_start + offset;
+            return (value_start + offset, false);
         }
         if ch == quote {
-            return value_start + offset + ch.len_utf8();
+            return (value_start + offset + ch.len_utf8(), true);
         }
     }
-    text.len()
+    (text.len(), false)
 }
 
+fn value_text_for_secret_check<'a>(text: &'a str, matched: &'a str, value_start: usize) -> &'a str {
+    let Some(first) = matched.chars().next() else {
+        return matched;
+    };
+    if first != '"' && first != '\'' {
+        return matched;
+    }
+    let end = quoted_value_end(text, value_start, first);
+    text.get(value_start..end).unwrap_or(matched)
+}
+
+/// `&`, `,`, and `}` stop a capped value only when a new field follows.
+/// A tail that looks like a field is kept on purpose: `API_KEY=<secret>&x=TAIL`
+/// leaves `&x=TAIL`. A tail that is not a field stays inside the redaction.
 fn unquoted_value_end(text: &str, from: usize) -> usize {
     let Some(rest) = text.get(from..) else {
         return text.len();
@@ -665,9 +722,17 @@ fn assignment_name_is_secret(name: &str, quoted: bool, scrubbers: &ScrubRegexes)
 /// code. An uppercase env name has no further code exemption. A lowercase or
 /// camelCase name may be a call, an index, or a field read.
 fn assignment_value_is_secret(raw: &str, name: &str, scrubbers: &ScrubRegexes) -> bool {
-    let quoted = (raw.starts_with('"') && raw.ends_with('"') && raw.len() >= 2)
-        || (raw.starts_with('\'') && raw.ends_with('\'') && raw.len() >= 2);
-    let inner = if quoted { &raw[1..raw.len() - 1] } else { raw };
+    // An opening quote is enough. The span may be unclosed, or longer than
+    // the regex match because of an escaped quote.
+    let opening = raw.chars().next().filter(|ch| *ch == '"' || *ch == '\'');
+    let quoted = opening.is_some();
+    let inner = if let Some(quote) = opening {
+        let body = &raw[quote.len_utf8()..];
+        let close: &str = if quote == '"' { "\"" } else { "'" };
+        body.strip_suffix(close).unwrap_or(body)
+    } else {
+        raw
+    };
     let value = inner.trim_end_matches(['}', ']', ')', ',', ';']);
     if is_strict_jwt(value) {
         return true;
@@ -2267,6 +2332,86 @@ mod tests {
         assert!(
             !scrubbed.contains("TAILVALUE"),
             "a json string tail must be redacted"
+        );
+        assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_quoted_name_when_the_cap_lands_on_its_closing_quote() {
+        let secret = "hunter2hunter2";
+        for name in ["password", "token", "client_secret"] {
+            for quote in ['"', '\''] {
+                let head = "1,\"name\":\"";
+                let tail = format!("\",{quote}{name}{quote}");
+                let pad = "p".repeat(512 - head.len() - tail.len());
+                let value = format!("{head}{pad}{tail}");
+                assert_eq!(value.len(), 512, "the id value is the assignment cap");
+                assert!(
+                    value.ends_with(quote),
+                    "the cap lands on the name's closing quote"
+                );
+                let input = format!(
+                    "{{\"id\":{value}:{quote}{secret}{quote},\"items\":[{}]}}",
+                    "1,".repeat(40)
+                );
+                let scrubbed = scrub_secrets(&input);
+                assert!(
+                    !scrubbed.contains(secret),
+                    "a quoted name whose closing quote is the cap must be redacted"
+                );
+                assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
+                assert!(scrubbed.contains("\"items\""), "later fields stay");
+            }
+        }
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_quoted_value_with_an_escaped_quote() {
+        let input = r#""password":"ab\"cdefgh ijk""#;
+        let scrubbed = scrub_secrets(input);
+        assert!(
+            !scrubbed.contains("cdefgh"),
+            "text after an escaped quote must be redacted"
+        );
+        assert!(
+            !scrubbed.contains("ijk"),
+            "the rest of the quote must be redacted"
+        );
+        assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_an_unclosed_quoted_secret() {
+        let input = "API_KEY=\"abc defghij";
+        let scrubbed = scrub_secrets(input);
+        assert!(
+            !scrubbed.contains("defghij"),
+            "an unclosed quoted secret must be redacted"
+        );
+        assert!(
+            scrubbed.starts_with("API_KEY=[redacted]"),
+            "the assignment is redacted"
+        );
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_long_quoted_secret_with_a_short_first_word() {
+        let tail = "Q".repeat(520);
+        let input = format!("PASSWORD=\"ab {tail}\"");
+        let scrubbed = scrub_secrets(&input);
+        assert!(
+            !scrubbed.contains(tail.as_str()),
+            "a long quoted secret must be redacted past its short first word"
+        );
+        assert!(
+            scrubbed.starts_with("PASSWORD=[redacted]"),
+            "the assignment is redacted"
+        );
+        let json = format!("\"password\":\"hi {tail}\"");
+        let scrubbed = scrub_secrets(&json);
+        assert!(
+            !scrubbed.contains(tail.as_str()),
+            "a long json string must be redacted past its short first word"
         );
         assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
     }
