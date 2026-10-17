@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react'
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import { AiPanel } from './AiPanel'
 import { PrimeSessionSubhead } from './PrimeSessionSubhead'
 import { AgentActivityBand } from './AgentActivityBand'
@@ -154,6 +154,10 @@ export default function ChatHome({
   }
   const effectiveEngine = resolveEffectiveChatEngine(engineInput)
   const showPrimeChrome = isPrimeChat && chatTarget?.kind !== 'api_model' && effectiveEngine === 'prime'
+  // The title strip and Command Palette are Chat chrome, not Prime-only.
+  // Tying them to `effectiveEngine === 'prime'` hid the whole top bar on
+  // Rhizome's native engine, including the header.
+  const showChatTopBar = isPrimeChat && chatTarget?.kind !== 'api_model'
   const rhizomeCatalog = effectiveEngine === 'native'
   const showComposerDeck = isPrimeChat && (showPrimeChrome || rhizomeCatalog)
   if (startedEngine === null && shouldLockEffectiveChatEngine(engineInput)) {
@@ -163,7 +167,20 @@ export default function ChatHome({
     setConversationId(newChatConversationId())
     setEngineLock(null)
   }
-  const sessionTitle = usePrimeActiveSessionTitle(primeHost?.sessionPath ?? null, primeHost?.isStreaming)
+  const [sessionMeta, setSessionMeta] = useState<{ path: string | null; title: string | null }>({
+    path: null,
+    title: null,
+  })
+  const handleSessionHeader = useCallback((next: { path: string | null; title: string | null }) => {
+    setSessionMeta((current) => (
+      current.path === next.path && current.title === next.title ? current : next
+    ))
+  }, [])
+  const listedTitle = usePrimeActiveSessionTitle(
+    sessionMeta.path ?? primeHost?.sessionPath ?? null,
+    [primeHost?.isStreaming, sessionMeta.path],
+  )
+  const sessionTitle = listedTitle ?? sessionMeta.title
   const newChatRef = useRef<(() => void) | null>(null)
   const [openNote, setOpenNote] = useState<{ path: string; label: string } | null>(null)
   // One read of the open note, shared by the pane and the agent. Chat used to
@@ -203,7 +220,7 @@ export default function ChatHome({
       data-testid="chat-home"
       data-chat-engine={effectiveEngine}
     >
-      {showPrimeChrome ? (
+      {showChatTopBar ? (
         <PrimeSessionSubhead
           railLayoutWidth={railLayoutWidth}
           locale={locale}
@@ -215,6 +232,7 @@ export default function ChatHome({
           sessionTitle={sessionTitle}
           onNewChat={() => {
             clearEngineLock()
+            setSessionMeta({ path: null, title: null })
             newChatRef.current?.()
           }}
           onOpenFootprint={
@@ -259,6 +277,7 @@ export default function ChatHome({
           sessionsRailSlot={sessionsRailSlot}
           onRailSessionPicked={onRailSessionPicked}
           onConversationReset={clearEngineLock}
+          onSessionHeader={handleSessionHeader}
           forkTargetsPrimeEntry={effectiveEngine === 'prime'}
           newChatRef={newChatRef}
           onOpenMycelium={onOpenSessionFootprint}

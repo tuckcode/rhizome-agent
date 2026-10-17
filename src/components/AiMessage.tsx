@@ -344,53 +344,87 @@ function ActionCardsList({ actions, onOpenNote, expandedIds, onToggleExpand }: {
   )
 }
 
+function pendingApprovalActions(actions: AiAction[]): AiAction[] {
+  return actions.filter((action) => action.approval && action.status === 'pending')
+}
+
+function ApprovalRowActions({ actions }: { actions: AiAction[] }) {
+  return (
+    <div
+      className="flex flex-wrap items-center justify-end gap-1.5"
+      data-testid="tool-use-approval-actions"
+      onClick={(event) => event.stopPropagation()}
+      onKeyDown={(event) => event.stopPropagation()}
+    >
+      {actions.flatMap((action) => (
+        (action.approval?.options ?? []).map((option) => (
+          <Button
+            key={`${action.toolId}-${option.id}`}
+            disabled={action.approval?.busy}
+            size="sm"
+            type="button"
+            variant={option.id === 'allow_once' ? 'default' : option.id === 'deny' ? 'ghost' : 'outline'}
+            className={option.id === 'deny' ? 'text-destructive hover:text-destructive' : ''}
+            data-testid={`approval-${option.id}`}
+            onClick={() => action.approval?.onReply?.(option.id as NativeApprovalChoice)}
+          >
+            {option.label}
+          </Button>
+        ))
+      ))}
+    </div>
+  )
+}
+
 function ToolUseBlock({
   actions,
-  expanded,
   expandedActionIds,
   locale,
   onOpenNote,
-  onToggle,
   onToggleAction,
 }: {
   actions: AiAction[]
-  expanded: boolean
   expandedActionIds: Set<string>
   locale: AppLocale
   onOpenNote?: (path: string) => void
-  onToggle: () => void
   onToggleAction: (toolId: string) => void
 }) {
   const pending = actions.some((action) => action.status === 'pending')
+  const approvals = pendingApprovalActions(actions)
+  const [userExpanded, setUserExpanded] = useState<boolean | null>(null)
+  const expanded = userExpanded ?? approvals.length > 0
 
   return (
     <div style={{ marginBottom: 8 }}>
-      <button
-        type="button"
-        className="flex w-full cursor-pointer items-center gap-1.5 border-none bg-transparent p-0 text-muted-foreground transition-colors hover:text-foreground"
-        style={{ fontSize: 12, padding: '4px 0' }}
-        aria-expanded={expanded}
-        onClick={onToggle}
-        data-testid="tool-use-toggle"
-      >
-        <Terminal size={14} />
-        <span>{translate(locale, 'ai.message.toolUse')}</span>
-        <span
-          className={`inline-flex h-4 min-w-4 items-center justify-center rounded-full ${pending ? 'animate-pulse' : ''}`}
-          style={{
-            background: 'var(--state-hover)',
-            color: 'var(--muted-foreground)',
-            fontSize: 10,
-            fontWeight: 600,
-            padding: '0 5px',
-          }}
-          data-pending={pending || undefined}
-          data-testid="tool-use-count"
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 border-none bg-transparent p-0 text-muted-foreground transition-colors hover:text-foreground"
+          style={{ fontSize: 12, padding: '4px 0' }}
+          aria-expanded={expanded}
+          onClick={() => setUserExpanded(!(userExpanded ?? approvals.length > 0))}
+          data-testid="tool-use-toggle"
         >
-          {actions.length}
-        </span>
-        {expanded ? <CaretDown size={12} /> : <CaretRight size={12} />}
-      </button>
+          <Terminal size={14} />
+          <span>{translate(locale, 'ai.message.toolUse')}</span>
+          <span
+            className={`inline-flex h-4 min-w-4 items-center justify-center rounded-full ${pending ? 'animate-pulse' : ''}`}
+            style={{
+              background: 'var(--state-hover)',
+              color: 'var(--muted-foreground)',
+              fontSize: 10,
+              fontWeight: 600,
+              padding: '0 5px',
+            }}
+            data-pending={pending || undefined}
+            data-testid="tool-use-count"
+          >
+            {actions.length}
+          </span>
+          {expanded ? <CaretDown size={12} /> : <CaretRight size={12} />}
+        </button>
+        {!expanded && approvals.length > 0 ? <ApprovalRowActions actions={approvals} /> : null}
+      </div>
       {expanded && (
         <div data-testid="tool-use-content" style={{ marginTop: 4 }}>
           <ActionCardsList
@@ -702,8 +736,6 @@ function ConversationMessage({ userMessage, images, references, locale = 'en', m
   // Manual override: null = follow auto behavior, true/false = user forced
   const [userOverride, setUserOverride] = useState<boolean | null>(null)
   const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set())
-  const [toolUseExpanded, setToolUseExpanded] = useState(false)
-
   // Auto: expanded while reasoning streams, collapsed once done
   // User can manually toggle to override the auto state
   // Once the user has decided, their choice holds. The override used to be a plain
@@ -761,11 +793,9 @@ function ConversationMessage({ userMessage, images, references, locale = 'en', m
       {actions.length > 0 && (
         <ToolUseBlock
           actions={actions}
-          expanded={toolUseExpanded}
           expandedActionIds={expandedActions}
           locale={locale}
           onOpenNote={onOpenNote}
-          onToggle={() => setToolUseExpanded((current) => !current)}
           onToggleAction={toggleAction}
         />
       )}

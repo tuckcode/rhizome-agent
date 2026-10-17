@@ -92,6 +92,24 @@ describe('usePrimeActiveSessionTitle', () => {
     await waitFor(() => expect(result.current).toBe('Plan the launch'))
   })
 
+  it('resolves a native session title from the native list', async () => {
+    invoked.sessions = [
+      {
+        sessionId: 'n1',
+        createdAt: '2026-10-17T00:00:00.000Z',
+        target: 'free_tier_auto',
+        title: 'Explain this repo',
+      },
+    ]
+
+    const { result } = renderHook(() => usePrimeActiveSessionTitle('rhizome-native:n1'))
+
+    await waitFor(() => {
+      expect(result.current).toBe('Explain this repo')
+    })
+    expect(invoked.calls).toEqual(['native_chat_list'])
+  })
+
   it('never shows the previous session title after a switch', async () => {
     invoked.sessions = [
       { id: 'a', path: '/mock/sessions/a.jsonl', title: 'Old chat' },

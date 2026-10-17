@@ -337,7 +337,31 @@ describe('AiPanel', () => {
 
   it('renders empty state without context', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
-    expect(screen.getAllByText('Ask Prime').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Ask Rhizome').length).toBeGreaterThan(0)
+  })
+
+  it('prefills the composer from an empty-state starter', () => {
+    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Explain this repo' }))
+    expect(screen.getByTestId('agent-input')).toHaveTextContent('Explain this repo')
+  })
+
+  it('reports the first user message as the session header title', async () => {
+    mockMessages = [{
+      id: 'm1',
+      userMessage: 'Explain this repo',
+      response: 'ok',
+      actions: [],
+    }]
+    const onSessionHeader = vi.fn()
+    render(
+      <AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" onSessionHeader={onSessionHeader} />,
+    )
+    await waitFor(() => {
+      expect(onSessionHeader).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Explain this repo' }),
+      )
+    })
   })
 
   it('names a native-engine empty chat Rhizome', () => {
@@ -359,7 +383,7 @@ describe('AiPanel', () => {
     render(
       <AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" activeEntry={entry} entries={[entry]} />
     )
-    expect(screen.getByText('Ask Prime about this note')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Ask Rhizome' })).toBeTruthy()
   })
 
   it('does not render a context bar for the active entry', () => {

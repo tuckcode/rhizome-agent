@@ -100,6 +100,8 @@ interface AiPanelProps {
   onRailSessionPicked?: () => void
   /** Chat-home engine lock is per conversation; New Chat and session picks clear it. */
   onConversationReset?: () => void
+  /** Chat header title: selected path plus the first user turn when the list has no name yet. */
+  onSessionHeader?: (session: { path: string | null; title: string | null }) => void
   onForkMessage?: (entryId: string) => void
   /** Fork branches the Prime session rather than copying the conversation. */
   forkTargetsPrimeEntry?: boolean
@@ -143,6 +145,7 @@ interface AiPanelViewProps {
   sessionsRailSlot?: HTMLElement | null
   onRailSessionPicked?: () => void
   onConversationReset?: () => void
+  onSessionHeader?: (session: { path: string | null; title: string | null }) => void
   onForkMessage?: (messageId: string) => void
   forkTargetsPrimeEntry?: boolean
   onQueuedPromptTarget?: (targetId: string) => void
@@ -258,6 +261,7 @@ export function AiPanelView({
   sessionsRailSlot,
   onRailSessionPicked,
   onConversationReset,
+  onSessionHeader,
   onForkMessage,
   forkTargetsPrimeEntry,
   onQueuedPromptTarget,
@@ -402,6 +406,18 @@ export function AiPanelView({
     onConversationReset?.()
     return handleSelectSession(...args)
   }
+  useEffect(() => {
+    if (!onSessionHeader) return
+    const nativeId = agent.getNativeSession().sessionId
+    const path = activeSessionPath
+      ?? primeHost.sessionPath
+      ?? (nativeId ? nativeSessionPath(nativeId) : null)
+    const firstTurn = agent.messages.find((message) => message.userMessage?.trim())
+    onSessionHeader({
+      path: path ?? null,
+      title: firstTurn?.userMessage.trim() ?? null,
+    })
+  }, [activeSessionPath, agent, onSessionHeader, primeHost.sessionPath])
   const handleNativeFork = async (messageId: string) => {
     try {
       const sessionId = await persistNativeFork({
@@ -694,6 +710,7 @@ export function AiPanel({
   sessionsRailSlot,
   onRailSessionPicked,
   onConversationReset,
+  onSessionHeader,
   onOpenMycelium,
 }: AiPanelProps) {
   const defaultAiAgentReadiness = chatEngineAllowsSendWithoutPrime(chatEngine)
@@ -738,6 +755,7 @@ export function AiPanel({
       sessionsRailSlot={sessionsRailSlot}
       onRailSessionPicked={onRailSessionPicked}
       onConversationReset={onConversationReset}
+      onSessionHeader={onSessionHeader}
       onOpenMycelium={onOpenMycelium}
       onClose={onClose}
       onOpenNote={onOpenNote}

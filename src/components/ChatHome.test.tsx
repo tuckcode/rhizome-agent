@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MutableRefObject } from 'react'
 
 const startNewChat = vi.fn()
+const sessionTitleMock = vi.hoisted(() => ({ title: null as string | null }))
 const primeHostMock = vi.hoisted(() => ({
   enabled: true,
   status: {
@@ -28,6 +29,7 @@ vi.mock('./AiPanel', () => ({
     newChatRef,
     onOpenNote,
     onConversationReset,
+    onSessionHeader,
     notePane,
     activeEntry,
     activeNoteContent,
@@ -38,6 +40,7 @@ vi.mock('./AiPanel', () => ({
     newChatRef?: MutableRefObject<(() => void) | null>
     onOpenNote?: (path: string) => void
     onConversationReset?: () => void
+    onSessionHeader?: (session: { path: string | null; title: string | null }) => void
     notePane?: React.ReactNode
     activeEntry?: { path: string } | null
     activeNoteContent?: string | null
@@ -48,6 +51,12 @@ vi.mock('./AiPanel', () => ({
     if (newChatRef) newChatRef.current = startNewChat
     return (
       <div data-testid="ai-panel-stub">
+        <button
+          type="button"
+          onClick={() => onSessionHeader?.({ path: 'rhizome-native:n1', title: 'Explain this repo' })}
+        >
+          Report session title
+        </button>
         <span data-testid="agent-active-note">{activeEntry?.path ?? 'none'}</span>
         <span data-testid="agent-note-body">{activeNoteContent ?? 'none'}</span>
         <span data-testid="agent-target-kind">{defaultAiTarget?.kind ?? 'none'}</span>
@@ -73,6 +82,10 @@ vi.mock('../hooks/usePrimeHostStatus', () => ({
   },
 }))
 
+vi.mock('../hooks/usePrimeActiveSessionTitle', () => ({
+  usePrimeActiveSessionTitle: () => sessionTitleMock.title,
+}))
+
 import ChatHome from './ChatHome'
 import { loadChatNoteContent } from '../utils/loadChatNoteContent'
 
@@ -94,6 +107,7 @@ function livePrimeHost() {
 describe('ChatHome', () => {
   beforeEach(() => {
     livePrimeHost()
+    sessionTitleMock.title = null
   })
 
   it('starts a new chat from the Frame A subhead', () => {
@@ -145,6 +159,67 @@ describe('ChatHome', () => {
     expect(screen.getByTestId('agent-target-kind')).toHaveTextContent('agent')
     expect(screen.getByTestId('composer-controls')).toHaveTextContent('yes')
     expect(screen.getByTestId('prime-session-subhead')).toBeInTheDocument()
+  })
+
+  it('keeps the chat top bar and Command Palette on the native engine', () => {
+    render(
+      <ChatHome
+        locale="en"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="ready"
+        defaultAiAgentReady
+        chatEngine="native"
+        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPaths={['/Users/jdoe/Documents/Laputa']}
+        entries={[]}
+        onExit={vi.fn()}
+        onOpenCommandPalette={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
+    expect(screen.getByTestId('prime-session-subhead')).toBeInTheDocument()
+    expect(screen.getByTestId('open-command-palette')).toHaveTextContent('Command Palette')
+  })
+
+  it('shows the session title in the header as soon as one exists', () => {
+    sessionTitleMock.title = 'Plan the launch'
+    const props = {
+      locale: 'en' as const,
+      defaultAiAgent: 'prime' as const,
+      defaultAiAgentReadiness: 'ready' as const,
+      defaultAiAgentReady: true,
+      vaultPath: '/Users/jdoe/Documents/Laputa',
+      vaultPaths: ['/Users/jdoe/Documents/Laputa'],
+      entries: [],
+      onExit: vi.fn(),
+    }
+    const { rerender } = render(<ChatHome {...props} />)
+
+    expect(screen.getByTestId('prime-session-title')).toHaveTextContent('Plan the launch')
+    sessionTitleMock.title = 'Ship the launch'
+    rerender(<ChatHome {...props} />)
+    expect(screen.getByTestId('prime-session-title')).toHaveTextContent('Ship the launch')
+  })
+
+  it('uses the open chat title when the session list has not named it yet', () => {
+    render(
+      <ChatHome
+        locale="en"
+        defaultAiAgent="prime"
+        defaultAiAgentReadiness="ready"
+        defaultAiAgentReady
+        chatEngine="native"
+        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPaths={['/Users/jdoe/Documents/Laputa']}
+        entries={[]}
+        onExit={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByTestId('prime-session-title')).toHaveTextContent('New chat')
+    fireEvent.click(screen.getByRole('button', { name: 'Report session title' }))
+    expect(screen.getByTestId('prime-session-title')).toHaveTextContent('Explain this repo')
   })
 
   it('opens and closes a note beside chat without leaving ChatHome', () => {

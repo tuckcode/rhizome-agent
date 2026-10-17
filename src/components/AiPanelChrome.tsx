@@ -49,6 +49,7 @@ import { workerStartFailureReason } from '../lib/primeWorkerStartError'
 import { afterPaint } from '../lib/sessionTranscriptHit'
 import { useScrollToTranscriptHit } from '../hooks/useScrollToTranscriptHit'
 import { ChatRunLiveStatus } from './ChatRunLiveStatus'
+import { prefillAiComposer } from '../utils/aiPromptBridge'
 
 interface AiPanelHeaderProps {
   agentLabel: string
@@ -500,6 +501,12 @@ function AiPanelTranscriptNotice({
   )
 }
 
+const EMPTY_CHAT_STARTERS = [
+  { label: 'Explain this repo', prompt: 'Explain this repo' },
+  { label: 'Find and fix a bug', prompt: 'Find and fix a bug' },
+  { label: 'Write tests for a file', prompt: 'Write tests for a file' },
+] as const
+
 function AiPanelEmptyState({
   agentLabel,
   agentReadiness,
@@ -511,7 +518,7 @@ function AiPanelEmptyState({
   if (agentReadiness === 'checking') {
     return (
       <div
-        className="flex min-h-full flex-col items-center justify-center text-center text-muted-foreground"
+        className="flex min-h-full flex-1 flex-col items-center justify-center text-center text-muted-foreground"
       >
         <p style={{ fontSize: 13, margin: '0 0 4px' }}>
           {t('ai.panel.empty.checkingTitle')}
@@ -526,7 +533,7 @@ function AiPanelEmptyState({
   if (agentReadiness === 'missing') {
     return (
       <div
-        className="flex min-h-full flex-col items-center justify-center text-center text-muted-foreground"
+        className="flex min-h-full flex-1 flex-col items-center justify-center text-center text-muted-foreground"
       >
         <p style={{ fontSize: 13, margin: '0 0 4px' }}>
           {t('ai.panel.empty.missingTitle', { agent: agentLabel })}
@@ -540,20 +547,31 @@ function AiPanelEmptyState({
 
   return (
     <div
-      className="flex min-h-full flex-col items-center justify-center text-center text-muted-foreground"
+      className="flex min-h-full flex-1 flex-col items-center justify-center px-6 text-center"
+      data-testid="ai-panel-empty-state"
     >
-      <p style={{ fontSize: 13, margin: '0 0 4px' }}>
+      <h2 className="font-sans text-xl font-medium text-foreground">
+        Ask Rhizome
+      </h2>
+      <p className="mt-2 max-w-md text-[13px] leading-5 text-muted-foreground">
         {hasContext
-          ? t('ai.panel.empty.withContextTitle', { agent: agentLabel })
-          : t('ai.panel.empty.noContextTitle', { agent: agentLabel })
-        }
+          ? 'Rhizome can work from the open note, or from the rest of this workspace.'
+          : 'Rhizome can research this workspace, edit files, and run commands.'}
       </p>
-      <p style={{ fontSize: 11, margin: 0 }}>
-        {hasContext
-          ? t('ai.panel.empty.withContextDescription')
-          : t('ai.panel.empty.noContextDescription')
-        }
-      </p>
+      <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+        {EMPTY_CHAT_STARTERS.map((starter, index) => (
+          <Button
+            key={starter.label}
+            type="button"
+            size="sm"
+            variant={index === 0 ? 'default' : 'outline'}
+            data-testid="chat-empty-starter"
+            onClick={() => prefillAiComposer(starter.prompt)}
+          >
+            {starter.label}
+          </Button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -783,8 +801,9 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
         role="log"
         aria-live="off"
         aria-relevant="additions"
+        className="flex min-h-full flex-col"
       >
-        <div className="chat-column">
+        <div className="chat-column flex min-h-full flex-col">
           {messages.length === 0 && transcriptPane(transcriptState, isActive) === 'loading' && (
             <AiPanelTranscriptNotice
               testId="ai-panel-transcript-loading"

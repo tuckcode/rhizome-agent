@@ -491,6 +491,86 @@ describe('AiMessage', () => {
     expect(screen.getAllByTestId('ai-action-card')).toHaveLength(2)
   })
 
+  const APPROVAL_OPTIONS = [
+    { id: 'allow_once', label: 'Allow once' },
+    { id: 'allow_session', label: 'Allow for session' },
+    { id: 'deny', label: 'Deny' },
+  ]
+
+  function pendingApprovalAction(
+    tool: string,
+    extra: Record<string, unknown> = {},
+  ) {
+    return {
+      tool,
+      toolId: `${tool}-1`,
+      label: tool,
+      status: 'pending' as const,
+      approval: {
+        promptId: `${tool}-prompt`,
+        options: APPROVAL_OPTIONS,
+        onReply: vi.fn(),
+        ...extra,
+      },
+    }
+  }
+
+  it('auto-expands a pending bash approval so Allow and Deny stay visible', () => {
+    render(
+      <AiMessage
+        userMessage="Run it"
+        actions={[pendingApprovalAction('bash')]}
+      />,
+    )
+
+    expect(screen.getByTestId('tool-use-toggle')).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: 'Allow once' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Deny' })).toBeVisible()
+    expect(screen.getByTestId('tool-approval-card')).toBeInTheDocument()
+  })
+
+  it('auto-expands pending file edit and write approvals', () => {
+    const { rerender } = render(
+      <AiMessage
+        userMessage="Edit"
+        actions={[pendingApprovalAction('edit_file', { path: 'notes/plan.md', preview: '@@\n-a\n+b' })]}
+      />,
+    )
+    expect(screen.getByTestId('tool-approval-card')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Allow once' })).toBeVisible()
+
+    rerender(
+      <AiMessage
+        userMessage="Write"
+        actions={[pendingApprovalAction('write_file', { path: 'notes/fresh.md', created: true, preview: '--- /dev/null\n+++ notes/fresh.md' })]}
+      />,
+    )
+    expect(screen.getByTestId('tool-approval-card')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Allow once' })).toBeVisible()
+  })
+
+  it('keeps Allow and Deny focusable on the collapsed tool-use row', () => {
+    render(
+      <AiMessage
+        userMessage="Run it"
+        actions={[pendingApprovalAction('bash')]}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByTestId('tool-use-toggle')).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('tool-approval-card')).toBeNull()
+
+    const allow = screen.getByRole('button', { name: 'Allow once' })
+    const deny = screen.getByRole('button', { name: 'Deny' })
+    expect(allow).toBeVisible()
+    expect(deny).toBeVisible()
+    expect(allow).not.toBeDisabled()
+    expect(deny).not.toBeDisabled()
+    allow.focus()
+    expect(allow).toHaveFocus()
+  })
+
   it('groups five identical tool names into one counted row', () => {
     render(
       <AiMessage
