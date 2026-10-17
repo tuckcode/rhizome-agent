@@ -1121,6 +1121,16 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     syncWindowContent()
     return null
   },
+  // Browser and test builds have no conflict check. The checked save goes
+  // through the save handler installed now, so fixtures and test hooks on
+  // save_note_content still see every save.
+  save_note_content_checked: async (args: { path: string; content: string }) => {
+    const installed = typeof window === 'undefined'
+      ? undefined
+      : Reflect.get(window.__mockHandlers ?? {}, 'save_note_content') as ((value: typeof args) => unknown) | undefined
+    await (installed ?? mockHandlers.save_note_content)(args)
+    return { contentHash: '', splicedContent: null }
+  },
   save_image: (args: { vault_path?: string; filename: string; data: string }) => {
     const vault = args.vault_path ?? '/Users/mock/Vault'
     return `${vault}/attachments/${Date.now()}-${args.filename}`

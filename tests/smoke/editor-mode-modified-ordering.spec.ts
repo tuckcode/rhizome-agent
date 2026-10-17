@@ -96,7 +96,7 @@ async function installSaveTracker(page: Page) {
     const originalInvoke = internals.invoke.bind(internals)
 
     internals.invoke = async (command: string, args?: Record<string, unknown>) => {
-      if (command === 'save_note_content') {
+      if (command === 'save_note_content' || command === 'save_note_content_checked') {
         trackedSaveCount += 1
       }
       return originalInvoke(command, args)
