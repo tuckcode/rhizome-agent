@@ -17,6 +17,10 @@ commits: 4e7773ee
 - `applyMainWindowSizeConstraints` returns before `invoke` when `isTauri()` is false. The browser has no `__TAURI_INTERNALS__.invoke`, which threw `TypeError: Cannot read properties of undefined (reading 'invoke')` and was logged as "Size constraints failed".
 - `useAiActivity` opens `ws://localhost:9711` only inside the desktop app. A failed socket logs at debug and reconnects with exponential backoff from 3s.
 
+## Hold follow-up
+
+The chip shows the model display name and truncates with CSS. The tooltip is `Provider · Model` plus the raw id in mono. The accessible name starts with the visible text. A bridge that connects and then drops stops after five drops. #218 had not merged, so the Settings engine wiring stays until that rebase.
+
 ## Not in this change
 
 Hot files held by other PRs stayed untouched: `src/App.tsx`, `src/lib/locales/en.json`, `src/types.ts`, `src-tauri/src/rhizome_loop/mod.rs`, `src-tauri/src/rhizome_loop/tools/mod.rs`, `AiMessage.tsx`, `ChatHome.tsx`.

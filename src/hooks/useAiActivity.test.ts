@@ -14,6 +14,7 @@ class MockWebSocket {
   onmessage: ((event: MessageEvent) => void) | null = null
   onerror: (() => void) | null = null
   onclose: (() => void) | null = null
+  onopen: (() => void) | null = null
   close = vi.fn()
   url: string
 
@@ -75,6 +76,24 @@ describe('useAiActivity', () => {
     expect(lastWsInstance).toBe(second)
     act(() => { vi.advanceTimersByTime(1) })
     expect(lastWsInstance).not.toBe(second)
+    debug.mockRestore()
+  })
+
+  it('stops reconnecting after the bridge accepts and then keeps dropping', () => {
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
+    renderHook(() => useAiActivity())
+    act(() => { lastWsInstance?.onopen?.() })
+    for (let drop = 0; drop < 4; drop += 1) {
+      const current = lastWsInstance
+      act(() => { current?.onclose?.() })
+      act(() => { vi.advanceTimersByTime(30_000) })
+      expect(lastWsInstance).not.toBe(current)
+    }
+    const last = lastWsInstance
+    act(() => { last?.onclose?.() })
+    act(() => { vi.advanceTimersByTime(30_000) })
+    expect(lastWsInstance).toBe(last)
+    expect(debug).toHaveBeenCalledWith('[ai-activity] UI bridge dropped; stopped reconnecting')
     debug.mockRestore()
   })
 

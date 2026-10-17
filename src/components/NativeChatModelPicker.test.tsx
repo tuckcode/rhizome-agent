@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AiModelProvider } from '../lib/aiTargets'
 import { NATIVE_CHAT_MODEL_CHIP_MAX_WIDTH_CLASS } from '../lib/composerMenuSide'
@@ -227,7 +227,7 @@ describe('NativeChatModelPicker', () => {
     })
   })
 
-  it('names the chip Model: current name and keeps a compact muted control', () => {
+  it('names the chip with the visible model first and keeps a compact muted control', async () => {
     render(
       <NativeChatModelPicker
         variant="chip"
@@ -239,9 +239,14 @@ describe('NativeChatModelPicker', () => {
 
     const chip = screen.getByTestId('native-chat-model-trigger')
     expect(chip.tagName).toBe('BUTTON')
-    expect(chip).toHaveAccessibleName('Model: Work OpenAI · GPT-4o')
-    expect(chip).toHaveAttribute('title', 'Model: Work OpenAI · GPT-4o')
-    expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveTextContent('Work Open…· GPT-4o')
+    expect(chip).toHaveAccessibleName('GPT-4o, Work OpenAI, gpt-4o')
+    expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveTextContent('GPT-4o')
+    chip.focus()
+    const tooltip = (await screen.findAllByTestId('native-chat-model-tooltip'))[0]
+    expect(tooltip).toHaveTextContent('Work OpenAI · GPT-4o')
+    const tooltipId = within(tooltip).getAllByTestId('native-chat-model-tooltip-id')[0]
+    expect(tooltipId).toHaveTextContent('gpt-4o')
+    expect(tooltipId).toHaveClass('font-mono')
     expect(chip).toHaveClass('rounded-md')
     expect(chip).toHaveClass('h-6')
     expect(chip).toHaveClass('self-center')
@@ -313,9 +318,10 @@ describe('NativeChatModelPicker', () => {
 
     const chip = screen.getByTestId('native-chat-model-trigger')
     expect(chip).toHaveClass(NATIVE_CHAT_MODEL_CHIP_MAX_WIDTH_CLASS)
-    expect(chip).toHaveAttribute('title', `Model: ${LONG_NAME}`)
-    expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveTextContent('Work Open…-long-id')
+    expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveTextContent('anthropic-claude-opus-4-very-long-id')
     expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveClass('truncate')
+    chip.focus()
+    expect(await screen.findByTestId('native-chat-model-tooltip')).toHaveTextContent(LONG_NAME)
 
     openMenu()
     await waitFor(() => {
@@ -628,7 +634,8 @@ describe('NativeChatModelPicker', () => {
       />,
     )
 
-    expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveTextContent('Gemini · ….5-flash')
+    expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveTextContent('gemini-2.5-flash')
+    expect(screen.getByTestId('native-chat-model-trigger')).toHaveAccessibleName(/^gemini-2\.5-flash,/)
     openMenu()
     await waitFor(() => {
       expect(screen.getByTestId('native-chat-model-gemini/gemini-2.5-flash')).toBeInTheDocument()

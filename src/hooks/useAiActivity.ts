@@ -24,6 +24,8 @@ const WS_UI_URL = 'ws://localhost:9711'
 const HIGHLIGHT_DURATION_MS = 800
 const RECONNECT_BASE_MS = 3000
 const RECONNECT_MAX_MS = 30_000
+/** A bridge that connects and then dies does not reconnect forever. */
+const MAX_DROPS_AFTER_OPEN = 5
 
 function reconnectDelay(attempt: number): number {
   return Math.min(RECONNECT_MAX_MS, RECONNECT_BASE_MS * 2 ** attempt)
@@ -161,6 +163,8 @@ function useUiActionSocket(handleMessage: (event: MessageEvent) => void, clearHi
     let ws: WebSocket | null = null
     let mounted = true
     let attempt = 0
+    let opened = false
+    let dropsAfterOpen = 0
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null
 
     function scheduleReconnect() {
@@ -179,9 +183,17 @@ function useUiActionSocket(handleMessage: (event: MessageEvent) => void, clearHi
         ws = new WebSocket(WS_UI_URL)
         ws.onmessage = handleMessage
         ws.onopen = () => {
+          opened = true
           attempt = 0
         }
         ws.onclose = () => {
+          if (opened) {
+            dropsAfterOpen += 1
+            if (dropsAfterOpen >= MAX_DROPS_AFTER_OPEN) {
+              console.debug('[ai-activity] UI bridge dropped; stopped reconnecting')
+              return
+            }
+          }
           scheduleReconnect()
         }
         ws.onerror = () => {
