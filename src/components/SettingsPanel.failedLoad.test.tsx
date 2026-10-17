@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import type { Settings } from '../types'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { SettingsPanel } from './SettingsPanel'
 import { useSettings } from '../hooks/useSettings'
 
@@ -38,14 +39,16 @@ vi.mock('../mock-tauri', () => ({
 function Harness() {
   const { settings, loadError, saveSettingsPatch } = useSettings()
   return (
-    <SettingsPanel
-      open={true}
-      settings={settings}
-      loadError={loadError}
-      onSave={() => { throw new Error('full settings save') }}
-      onSavePatch={(patch) => { void saveSettingsPatch(patch) }}
-      onClose={() => {}}
-    />
+    <TooltipProvider>
+      <SettingsPanel
+        open={true}
+        settings={settings}
+        loadError={loadError}
+        onSave={() => { throw new Error('full settings save') }}
+        onSavePatch={(patch) => { void saveSettingsPatch(patch) }}
+        onClose={() => {}}
+      />
+    </TooltipProvider>
   )
 }
 
