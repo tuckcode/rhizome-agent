@@ -27,10 +27,12 @@ mod text;
 mod walk;
 mod write_file;
 
+pub(crate) use atomic::preflight;
 pub(crate) use atomic::write_atomic;
 #[cfg(test)]
 pub(crate) use sandbox::override_secret_block;
 pub use sandbox::resolve_for_write;
+pub(crate) use sandbox::{allowed_roots, relative_to_root, resolve_file_for_write};
 pub(crate) use sandbox::{write_target_is_secret, BLOCKED_SECRET};
 #[cfg(test)]
 pub(crate) use shell::command_from_args;
