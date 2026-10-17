@@ -13,24 +13,26 @@
 //! which always applies the denylist. Reads use `resolve_for_read`.
 
 mod args;
-pub(crate) mod atomic;
+mod atomic;
 mod edit_file;
 mod glob;
 mod grep;
 mod list_dir;
 mod preview;
 mod read_file;
-pub(crate) mod sandbox;
+mod sandbox;
 mod scan;
 mod shell;
 mod text;
 mod walk;
 mod write_file;
 
+pub(crate) use atomic::preflight;
 pub(crate) use atomic::write_atomic;
 #[cfg(test)]
 pub(crate) use sandbox::override_secret_block;
 pub use sandbox::resolve_for_write;
+pub(crate) use sandbox::{allowed_roots, relative_to_root, resolve_file_for_write};
 pub(crate) use sandbox::{write_target_is_secret, BLOCKED_SECRET};
 #[cfg(test)]
 pub(crate) use shell::command_from_args;

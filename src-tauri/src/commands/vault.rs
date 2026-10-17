@@ -1,4 +1,4 @@
-pub(crate) mod boundary;
+mod boundary;
 mod file_cmds;
 mod frontmatter_cmds;
 mod lifecycle_cmds;
@@ -6,6 +6,7 @@ mod rename_cmds;
 mod scan_cmds;
 mod view_cmds;
 
+pub(crate) use boundary::validate_view_filename;
 pub(super) use boundary::{with_registered_boundary, VaultBoundary};
 pub use file_cmds::*;
 pub use frontmatter_cmds::*;

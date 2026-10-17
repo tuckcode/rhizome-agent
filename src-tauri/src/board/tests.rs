@@ -4,8 +4,9 @@ use std::time::{Duration, UNIX_EPOCH};
 
 use tempfile::TempDir;
 
-use super::status::StatusEdit;
+use super::status::{StatusEdit, MAX_STATUS_CHARS};
 use super::*;
+use crate::rhizome_loop::BLOCKED_SECRET;
 
 const BOARD_VIEW: &str = "name: Work\npresentation:\n  type: board\nfilters:\n  all: []\n";
 
@@ -195,7 +196,6 @@ fn never_adds_a_duplicate_key() {
     for input in [
         "---\nStatus: Done\n---\n",
         "---\nstatus: Done\n---\n",
-        "---\nSTATUS: Done\n---\n",
         "---\ntitle: A\n---\n",
         "plain\n",
     ] {
@@ -233,13 +233,55 @@ fn same_status_writes_the_same_bytes() {
     assert_eq!(edit(input, "Done").content, input);
 }
 
+#[test]
+fn matches_only_status_and_lowercase_status() {
+    let out = edit("---\nSTATUS: Done\n---\n", "Blocked");
+    assert_eq!(out.content, "---\nSTATUS: Done\nStatus: Blocked\n---\n");
+    assert_eq!(out.from, None);
+    let out = edit("---\nstatus: Done\n---\n", "Blocked");
+    assert_eq!(out.content, "---\nstatus: Blocked\n---\n");
+}
+
+#[test]
+fn keeps_blank_lines_inside_a_block_scalar_status() {
+    let out = edit(
+        "---\nStatus: |\n  Done\n\n  more\ntitle: A\n---\n",
+        "Blocked",
+    );
+    assert_eq!(out.content, "---\nStatus: Blocked\ntitle: A\n---\n");
+    let out = edit("---\nStatus: Done\n\ntitle: A\n---\n", "Blocked");
+    assert_eq!(out.content, "---\nStatus: Blocked\n\ntitle: A\n---\n");
+}
+
+#[test]
+fn only_dashes_close_the_frontmatter() {
+    assert!(set_status("---\nStatus: Done\n...\nbody\n", "Blocked").is_err());
+}
+
+#[test]
+fn caps_the_status_length() {
+    let longest = "x".repeat(MAX_STATUS_CHARS);
+    assert!(set_status("---\n---\n", &longest).is_ok());
+    assert!(set_status("---\n---\n", &format!("{longest}x")).is_err());
+}
+
 // ---- move_card: path safety ----
+
+fn no_tmp_left(dir: &Path) {
+    let leftovers: Vec<_> = fs::read_dir(dir)
+        .unwrap()
+        .flatten()
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .filter(|name| name.starts_with(".rhz") && name.ends_with(".tmp"))
+        .collect();
+    assert!(leftovers.is_empty(), "leftover temp files: {leftovers:?}");
+}
 
 #[test]
 fn move_card_writes_only_the_status_line() {
     let dir = TempDir::new().unwrap();
     let path = write(dir.path(), "a.md", "---\nStatus: Not started\n---\n# A\n");
-    let moved = move_card(dir.path(), "a.md", "Done").unwrap();
+    let moved = move_card(dir.path(), "a.md", "Done", None).unwrap();
     assert_eq!(
         fs::read_to_string(&path).unwrap(),
         "---\nStatus: Done\n---\n# A\n"
@@ -247,6 +289,35 @@ fn move_card_writes_only_the_status_line() {
     assert_eq!(moved.path, "a.md");
     assert_eq!(moved.from.as_deref(), Some("Not started"));
     assert_eq!(moved.to, "Done");
+    no_tmp_left(dir.path());
+}
+
+#[test]
+fn move_card_to_the_same_status_does_not_touch_the_file() {
+    let dir = TempDir::new().unwrap();
+    let path = write(dir.path(), "a.md", "---\nStatus: Done\n---\n");
+    set_mtime(&path, 1_000);
+    let moved = move_card(dir.path(), "a.md", "Done", None).unwrap();
+    assert_eq!(moved.from.as_deref(), Some("Done"));
+    let mtime = fs::metadata(&path).unwrap().modified().unwrap();
+    assert_eq!(mtime, UNIX_EPOCH + Duration::from_secs(1_000));
+}
+
+#[test]
+fn move_card_checks_the_precondition() {
+    let dir = TempDir::new().unwrap();
+    let content = "---\nStatus: Done\n---\n";
+    let path = write(dir.path(), "a.md", content);
+    let stale = Precondition::ContentHash("0".repeat(64));
+    assert!(move_card(dir.path(), "a.md", "Blocked", Some(&stale)).is_err());
+    assert_eq!(fs::read_to_string(&path).unwrap(), content);
+    let hash = format!("{:x}", Sha256::digest(content.as_bytes()));
+    let fresh = Precondition::ContentHash(hash);
+    move_card(dir.path(), "a.md", "Blocked", Some(&fresh)).unwrap();
+    assert_eq!(
+        fs::read_to_string(&path).unwrap(),
+        "---\nStatus: Blocked\n---\n"
+    );
 }
 
 #[test]
@@ -255,7 +326,8 @@ fn move_card_refuses_parent_paths() {
     let vault = root.path().join("vault");
     fs::create_dir(&vault).unwrap();
     let outside = write(root.path(), "outside.md", "---\nStatus: Done\n---\n");
-    assert!(move_card(&vault, "../outside.md", "Blocked").is_err());
+    assert!(move_card(&vault, "../outside.md", "Blocked", None).is_err());
+    assert!(move_card(&vault, "..\\outside.md", "Blocked", None).is_err());
     assert_eq!(
         fs::read_to_string(outside).unwrap(),
         "---\nStatus: Done\n---\n"
@@ -267,7 +339,38 @@ fn move_card_refuses_absolute_paths_outside_the_vault() {
     let vault = TempDir::new().unwrap();
     let other = TempDir::new().unwrap();
     let outside = write(other.path(), "note.md", "x\n");
-    assert!(move_card(vault.path(), outside.to_str().unwrap(), "Done").is_err());
+    assert!(move_card(vault.path(), outside.to_str().unwrap(), "Done", None).is_err());
+    assert_eq!(fs::read_to_string(outside).unwrap(), "x\n");
+}
+
+#[test]
+fn move_card_accepts_an_absolute_path_inside_the_vault() {
+    let dir = TempDir::new().unwrap();
+    let path = write(dir.path(), "sub/a.md", "---\nStatus: Done\n---\n");
+    let moved = move_card(dir.path(), path.to_str().unwrap(), "Blocked", None).unwrap();
+    assert_eq!(moved.path, "sub/a.md");
+    assert_eq!(
+        fs::read_to_string(&path).unwrap(),
+        "---\nStatus: Blocked\n---\n"
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn move_card_handles_windows_paths() {
+    let root = TempDir::new().unwrap();
+    let vault = root.path().join("vault");
+    let inside = write(&vault, "sub\\a.md", "---\nStatus: Done\n---\n");
+    let outside = write(root.path(), "outside.md", "x\n");
+    let moved = move_card(&vault, "sub\\a.md", "Blocked", None).unwrap();
+    assert_eq!(moved.path, "sub/a.md");
+    assert_eq!(
+        fs::read_to_string(&inside).unwrap(),
+        "---\nStatus: Blocked\n---\n"
+    );
+    let drive_path = outside.to_str().unwrap().replace('/', "\\");
+    assert!(move_card(&vault, &drive_path, "Done", None).is_err());
+    assert!(move_card(&vault, "..\\outside.md", "Done", None).is_err());
     assert_eq!(fs::read_to_string(outside).unwrap(), "x\n");
 }
 
@@ -278,25 +381,51 @@ fn move_card_refuses_a_symlink_that_leaves_the_vault() {
     let other = TempDir::new().unwrap();
     let outside = write(other.path(), "note.md", "x\n");
     std::os::unix::fs::symlink(&outside, vault.path().join("link.md")).unwrap();
-    assert!(move_card(vault.path(), "link.md", "Done").is_err());
+    assert!(move_card(vault.path(), "link.md", "Done", None).is_err());
     assert_eq!(fs::read_to_string(outside).unwrap(), "x\n");
+}
+
+#[cfg(unix)]
+#[test]
+fn move_card_follows_a_symlink_that_stays_in_the_vault() {
+    let dir = TempDir::new().unwrap();
+    let target = write(dir.path(), "notes/a.md", "---\nStatus: Done\n---\n");
+    let link = dir.path().join("link.md");
+    std::os::unix::fs::symlink(&target, &link).unwrap();
+    let moved = move_card(dir.path(), "link.md", "Blocked", None).unwrap();
+    assert_eq!(moved.path, "notes/a.md");
+    assert_eq!(
+        fs::read_to_string(&target).unwrap(),
+        "---\nStatus: Blocked\n---\n"
+    );
+    assert!(fs::symlink_metadata(&link)
+        .unwrap()
+        .file_type()
+        .is_symlink());
 }
 
 #[test]
 fn move_card_refuses_secret_and_git_paths() {
     let dir = TempDir::new().unwrap();
     write(dir.path(), ".env", "KEY=1\n");
+    write(dir.path(), ".env.md", "---\nStatus: Done\n---\n");
     write(dir.path(), ".git/config", "[core]\n");
     write(dir.path(), ".git/notes.md", "x\n");
     for requested in [".env", ".git/config", ".git/notes.md"] {
         assert!(
-            move_card(dir.path(), requested, "Done").is_err(),
+            move_card(dir.path(), requested, "Done", None).is_err(),
             "{requested}"
         );
     }
+    let error = move_card(dir.path(), ".env.md", "Blocked", None).unwrap_err();
+    assert!(error.contains(BLOCKED_SECRET), "{error}");
     assert_eq!(
         fs::read_to_string(dir.path().join(".env")).unwrap(),
         "KEY=1\n"
+    );
+    assert_eq!(
+        fs::read_to_string(dir.path().join(".env.md")).unwrap(),
+        "---\nStatus: Done\n---\n"
     );
 }
 
@@ -305,7 +434,10 @@ fn move_card_refuses_non_markdown_files() {
     let dir = TempDir::new().unwrap();
     for name in ["notes.txt", "notes.markdown", "board.yml", "notes"] {
         write(dir.path(), name, "Status: Done\n");
-        assert!(move_card(dir.path(), name, "Blocked").is_err(), "{name}");
+        assert!(
+            move_card(dir.path(), name, "Blocked", None).is_err(),
+            "{name}"
+        );
         assert_eq!(
             fs::read_to_string(dir.path().join(name)).unwrap(),
             "Status: Done\n"
@@ -316,7 +448,7 @@ fn move_card_refuses_non_markdown_files() {
 #[test]
 fn move_card_refuses_a_missing_note() {
     let dir = TempDir::new().unwrap();
-    assert!(move_card(dir.path(), "missing.md", "Done").is_err());
+    assert!(move_card(dir.path(), "missing.md", "Done", None).is_err());
     assert!(!dir.path().join("missing.md").exists());
 }
 
@@ -327,13 +459,14 @@ fn move_card_refuses_a_read_only_note() {
     let dir = TempDir::new().unwrap();
     let path = write(dir.path(), "a.md", "---\nStatus: Done\n---\n");
     fs::set_permissions(&path, fs::Permissions::from_mode(0o444)).unwrap();
-    let result = move_card(dir.path(), "a.md", "Blocked");
+    let result = move_card(dir.path(), "a.md", "Blocked", None);
     fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
     assert!(result.is_err());
     assert_eq!(
         fs::read_to_string(&path).unwrap(),
         "---\nStatus: Done\n---\n"
     );
+    no_tmp_left(dir.path());
 }
 
 #[cfg(unix)]
@@ -344,16 +477,29 @@ fn move_card_refuses_a_read_only_vault_folder() {
     let folder = dir.path().join("locked");
     let path = write(dir.path(), "locked/a.md", "---\nStatus: Done\n---\n");
     fs::set_permissions(&folder, fs::Permissions::from_mode(0o555)).unwrap();
-    let result = move_card(dir.path(), "locked/a.md", "Blocked");
+    let result = move_card(dir.path(), "locked/a.md", "Blocked", None);
     fs::set_permissions(&folder, fs::Permissions::from_mode(0o755)).unwrap();
     assert!(result.is_err());
     assert_eq!(
         fs::read_to_string(&path).unwrap(),
         "---\nStatus: Done\n---\n"
     );
+    no_tmp_left(&folder);
 }
 
 // ---- Boards ----
+
+fn column_named<'a>(board: &'a Board, name: &str) -> &'a Column {
+    board
+        .columns
+        .iter()
+        .find(|column| column.name == name)
+        .unwrap_or_else(|| panic!("no column {name}"))
+}
+
+fn board_view_with(presentation_extra: &str) -> String {
+    format!("name: Work\npresentation:\n  type: board\n{presentation_extra}filters:\n  all: []\n")
+}
 
 #[test]
 fn list_boards_keeps_only_board_views() {
@@ -370,6 +516,11 @@ fn list_boards_keeps_only_board_views() {
         "views/odd.yml",
         "name: Odd\npresentation: board\nfilters:\n  all: []\n",
     );
+    write(
+        dir.path(),
+        "views/owner.yml",
+        &board_view_with("  groupBy: Owner\n"),
+    );
     let boards = list_boards(dir.path());
     assert_eq!(
         boards,
@@ -378,6 +529,42 @@ fn list_boards_keeps_only_board_views() {
             name: "Work".into()
         }]
     );
+}
+
+#[test]
+fn group_by_must_be_status() {
+    let dir = TempDir::new().unwrap();
+    write(
+        dir.path(),
+        "views/a.yml",
+        &board_view_with("  groupBy: Status\n"),
+    );
+    write(
+        dir.path(),
+        "views/b.yml",
+        &board_view_with("  groupBy: status\n"),
+    );
+    write(
+        dir.path(),
+        "views/c.yml",
+        &board_view_with("  groupBy: STATUS\n"),
+    );
+    write(
+        dir.path(),
+        "views/d.yml",
+        &board_view_with("  groupBy: Owner\n"),
+    );
+    write(
+        dir.path(),
+        "views/e.yml",
+        &board_view_with("  groupBy: [Status]\n"),
+    );
+    let names: Vec<String> = list_boards(dir.path())
+        .into_iter()
+        .map(|b| b.filename)
+        .collect();
+    assert_eq!(names, vec!["a.yml", "b.yml"]);
+    assert!(load_board(dir.path(), "d.yml", None).is_err());
 }
 
 #[test]
@@ -395,6 +582,48 @@ fn load_board_refuses_bad_names_and_non_boards() {
 }
 
 #[test]
+fn columns_default_to_the_suggested_statuses() {
+    let dir = TempDir::new().unwrap();
+    write(dir.path(), "views/work.yml", BOARD_VIEW);
+    write(
+        dir.path(),
+        "views/text.yml",
+        &board_view_with("  columns: Done\n"),
+    );
+    write(
+        dir.path(),
+        "views/empty.yml",
+        &board_view_with("  columns: [' ', '']\n"),
+    );
+    card_note(dir.path(), "a", Some("Done"), 1_000);
+    for view in ["work.yml", "text.yml", "empty.yml"] {
+        let board = load_board(dir.path(), view, None).unwrap();
+        assert_eq!(column_names(&board), SUGGESTED_STATUSES.to_vec(), "{view}");
+    }
+}
+
+#[test]
+fn columns_follow_the_view_order() {
+    let dir = TempDir::new().unwrap();
+    write(
+        dir.path(),
+        "views/work.yml",
+        &board_view_with("  columns: [' Done ', Review, done, Backlog]\n"),
+    );
+    card_note(dir.path(), "a", Some("Backlog"), 1_000);
+    card_note(dir.path(), "b", Some("done"), 1_000);
+    card_note(dir.path(), "c", Some("Not started"), 1_000);
+    let board = load_board(dir.path(), "work.yml", None).unwrap();
+    assert_eq!(
+        column_names(&board),
+        vec!["Done", "Review", "Backlog", "Not started"]
+    );
+    assert_eq!(titles(column_named(&board, "Done")), vec!["b"]);
+    assert_eq!(column_named(&board, "Review").total, 0);
+    assert!(column_named(&board, "Review").cards.is_empty());
+}
+
+#[test]
 fn load_board_groups_cards_into_columns() {
     let dir = TempDir::new().unwrap();
     write(dir.path(), "views/work.yml", BOARD_VIEW);
@@ -402,26 +631,35 @@ fn load_board_groups_cards_into_columns() {
     card_note(dir.path(), "b", Some("done"), 3_000);
     card_note(dir.path(), "c", Some("In progress"), 2_000);
     card_note(dir.path(), "d", Some("Waiting"), 2_000);
-    card_note(dir.path(), "e", Some("Archive"), 2_000);
+    card_note(dir.path(), "e", Some("Later"), 2_000);
     card_note(dir.path(), "f", None, 2_000);
     write(dir.path(), "notes.txt", "Status: Done\n");
 
     let board = load_board(dir.path(), "work.yml", None).unwrap();
-    assert_eq!(
-        column_names(&board),
-        vec![
-            "Not started",
-            "In progress",
-            "Blocked",
-            "Done",
-            "Archive",
-            "Waiting",
-            "No status"
-        ]
+    let mut expected = SUGGESTED_STATUSES.to_vec();
+    expected.extend(["Later", "Waiting", "No status"]);
+    assert_eq!(column_names(&board), expected);
+    assert_eq!(titles(column_named(&board, "Done")), vec!["b", "a"]);
+    assert_eq!(column_named(&board, "Not started").total, 0);
+    assert_eq!(titles(column_named(&board, "No status")), vec!["f"]);
+}
+
+#[test]
+fn card_paths_are_vault_relative() {
+    let dir = TempDir::new().unwrap();
+    write(dir.path(), "views/work.yml", BOARD_VIEW);
+    write(
+        dir.path(),
+        "notes/deep/a.md",
+        "---\nStatus: Done\n---\n# a\n",
     );
-    assert_eq!(titles(&board.columns[3]), vec!["b", "a"]);
-    assert_eq!(board.columns[0].total, 0);
-    assert_eq!(titles(&board.columns[6]), vec!["f"]);
+    let board = load_board(dir.path(), "work.yml", None).unwrap();
+    let paths: Vec<&str> = column_named(&board, "Done")
+        .cards
+        .iter()
+        .map(|card| card.path.as_str())
+        .collect();
+    assert_eq!(paths, vec!["notes/deep/a.md"]);
 }
 
 #[test]
@@ -430,7 +668,7 @@ fn load_board_omits_the_no_status_column_when_empty() {
     write(dir.path(), "views/work.yml", BOARD_VIEW);
     card_note(dir.path(), "a", Some("Done"), 1_000);
     let board = load_board(dir.path(), "work.yml", None).unwrap();
-    assert_eq!(column_names(&board), BOARD_COLUMNS.to_vec());
+    assert!(!column_names(&board).contains(&NO_STATUS_COLUMN));
 }
 
 #[test]
@@ -445,7 +683,10 @@ fn load_board_follows_the_view_sort() {
     card_note(dir.path(), "alpha", Some("Done"), 1_000);
     card_note(dir.path(), "Bravo", Some("Done"), 2_000);
     let board = load_board(dir.path(), "work.yml", None).unwrap();
-    assert_eq!(titles(&board.columns[3]), vec!["alpha", "Bravo", "Charlie"]);
+    assert_eq!(
+        titles(column_named(&board, "Done")),
+        vec!["alpha", "Bravo", "Charlie"]
+    );
 }
 
 #[test]
@@ -459,8 +700,8 @@ fn load_board_applies_the_view_filters() {
     card_note(dir.path(), "a", Some("Done"), 1_000);
     card_note(dir.path(), "b", Some("Blocked"), 1_000);
     let board = load_board(dir.path(), "work.yml", None).unwrap();
-    assert_eq!(titles(&board.columns[2]), vec!["b"]);
-    assert_eq!(board.columns[3].total, 0);
+    assert_eq!(titles(column_named(&board, "Blocked")), vec!["b"]);
+    assert_eq!(column_named(&board, "Done").total, 0);
 }
 
 #[test]
@@ -476,11 +717,12 @@ fn load_board_caps_each_column() {
         );
     }
     let board = load_board(dir.path(), "work.yml", None).unwrap();
-    assert_eq!(board.columns[3].cards.len(), DEFAULT_COLUMN_LIMIT);
-    assert_eq!(board.columns[3].total, 60);
-    assert_eq!(board.columns[3].cards[0].title, "n59");
+    let done = column_named(&board, "Done");
+    assert_eq!(done.cards.len(), DEFAULT_COLUMN_LIMIT);
+    assert_eq!(done.total, 60);
+    assert_eq!(done.cards[0].title, "n59");
     let small = load_board(dir.path(), "work.yml", Some(5)).unwrap();
-    assert_eq!(small.columns[3].cards.len(), 5);
+    assert_eq!(column_named(&small, "Done").cards.len(), 5);
 }
 
 #[test]
@@ -488,10 +730,10 @@ fn moved_card_shows_in_its_new_column() {
     let dir = TempDir::new().unwrap();
     write(dir.path(), "views/work.yml", BOARD_VIEW);
     card_note(dir.path(), "a", Some("Not started"), 1_000);
-    move_card(dir.path(), "a.md", "Blocked").unwrap();
+    move_card(dir.path(), "a.md", "Blocked", None).unwrap();
     let board = load_board(dir.path(), "work.yml", None).unwrap();
-    assert_eq!(titles(&board.columns[2]), vec!["a"]);
-    assert_eq!(board.columns[0].total, 0);
+    assert_eq!(titles(column_named(&board, "Blocked")), vec!["a"]);
+    assert_eq!(column_named(&board, "Not started").total, 0);
 }
 
 #[test]
@@ -538,15 +780,17 @@ fn property_sort_puts_missing_values_last() {
         );
     }
     let board = load_board(dir.path(), "work.yml", None).unwrap();
-    assert_eq!(titles(&board.columns[3]), vec!["c", "a", "b"]);
+    assert_eq!(titles(column_named(&board, "Done")), vec!["c", "a", "b"]);
 }
 
-/// Run with `cargo test --release -- --ignored board_with_5000_notes`.
 #[test]
-#[ignore]
 fn board_with_5000_notes_caps_output() {
     let dir = TempDir::new().unwrap();
-    write(dir.path(), "views/work.yml", BOARD_VIEW);
+    write(
+        dir.path(),
+        "views/work.yml",
+        &board_view_with("  columns: [Not started, In progress, Blocked, Done]\n"),
+    );
     let statuses = ["Not started", "In progress", "Blocked", "Done", "Later"];
     for index in 0..5_000 {
         let status = statuses[index % statuses.len()];
@@ -556,13 +800,10 @@ fn board_with_5000_notes_caps_output() {
             &format!("---\nStatus: {status}\n---\n# n{index}\n"),
         );
     }
-    let started = std::time::Instant::now();
     let board = load_board(dir.path(), "work.yml", None).unwrap();
-    let elapsed = started.elapsed();
-    assert_eq!(board.columns.len(), 5);
+    assert_eq!(column_names(&board), statuses.to_vec());
     for column in &board.columns {
         assert_eq!(column.total, 1_000);
         assert_eq!(column.cards.len(), DEFAULT_COLUMN_LIMIT);
     }
-    eprintln!("5000-note board loaded in {elapsed:?}");
 }

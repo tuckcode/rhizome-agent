@@ -9,6 +9,8 @@
 
 const BOM: char = '\u{FEFF}';
 const FENCE: &str = "---";
+/// Longest status value a move accepts, in characters.
+pub const MAX_STATUS_CHARS: usize = 120;
 
 /// Result of one status write: the new note text and the old value.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -47,6 +49,11 @@ fn validate_status(status: &str) -> Result<&str, String> {
     }
     if trimmed.chars().any(char::is_control) {
         return Err("Status must be one line with no control characters.".into());
+    }
+    if trimmed.chars().count() > MAX_STATUS_CHARS {
+        return Err(format!(
+            "Status must be {MAX_STATUS_CHARS} characters or fewer."
+        ));
     }
     Ok(trimmed)
 }
@@ -96,9 +103,10 @@ fn frontmatter_end(lines: &[Line<'_>]) -> Result<Option<usize>, String> {
         .ok_or_else(|| "Frontmatter has no closing `---` line.".to_string())
 }
 
+/// Only `---` closes the block, the same as the vault's frontmatter
+/// parser. YAML's `...` document end does not.
 fn is_close_fence(text: &str) -> bool {
-    let trimmed = text.trim_end();
-    trimmed == FENCE || trimmed == "..."
+    text.trim_end() == FENCE
 }
 
 fn prepend_block(body: &str, status: &str) -> StatusEdit {
@@ -194,12 +202,17 @@ fn status_spans(lines: &[Line<'_>]) -> Vec<Span> {
             continue;
         };
         let end = value_end(lines, index, key.value);
-        if key_name(text).is_some_and(|name| name.eq_ignore_ascii_case("status")) {
+        if key_name(text).is_some_and(is_status_key) {
             spans.push(Span { start: index, end });
         }
         index = end + 1;
     }
     spans
+}
+
+/// `Status` or `status`, the two spellings the vault parser reads.
+fn is_status_key(name: &str) -> bool {
+    matches!(name, "Status" | "status")
 }
 
 /// Last line that belongs to the value that starts on `lines[start]`.
@@ -215,12 +228,20 @@ fn value_end(lines: &[Line<'_>], start: usize, value: &str) -> usize {
         return index;
     }
     // Block scalars, nested maps, and lists: indented lines, plus `- `
-    // items at column 0 (YAML's compact sequence form).
+    // items at column 0 (YAML's compact sequence form). A blank line
+    // belongs to the value only when a continuation line follows it.
     let mut index = start;
-    while index + 1 < lines.len() && is_continuation(lines[index + 1].text, trimmed.is_empty()) {
-        index += 1;
+    loop {
+        let mut next = index + 1;
+        while next < lines.len() && lines[next].text.trim().is_empty() {
+            next += 1;
+        }
+        if next < lines.len() && is_continuation(lines[next].text, trimmed.is_empty()) {
+            index = next;
+        } else {
+            return index;
+        }
     }
-    index
 }
 
 fn is_continuation(text: &str, empty_value: bool) -> bool {
