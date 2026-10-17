@@ -509,6 +509,49 @@ describe('AiMessage', () => {
     expect(screen.getByText('ipython ×5')).toBeTruthy()
   })
 
+  it('shows the Run command card and bash result row', () => {
+    const { rerender } = render(
+      <AiMessage
+        userMessage="list files"
+        actions={[{
+          tool: 'bash',
+          toolId: 't1',
+          label: 'ls',
+          status: 'pending',
+          input: '{"command":"ls"}',
+          approval: {
+            promptId: 'p1',
+            options: [
+              { id: 'allow_once', label: 'Allow once' },
+              { id: 'allow_session', label: 'Allow for session' },
+              { id: 'deny', label: 'Deny' },
+            ],
+          },
+        }]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByText('Run command')).toBeTruthy()
+    expect(screen.getByTestId('approval-command')).toHaveTextContent('ls')
+
+    rerender(
+      <AiMessage
+        userMessage="list files"
+        actions={[{
+          tool: 'bash',
+          toolId: 't1',
+          label: 'ls',
+          status: 'done',
+          input: '{"command":"ls"}',
+          output: JSON.stringify({ stdout: 'notes\n', stderr: '', exit_code: 0 }),
+        }]}
+      />,
+    )
+    expect(screen.getByTestId('bash-result-card')).toBeTruthy()
+    expect(screen.getByTestId('bash-result-exit')).toHaveTextContent('exit 0')
+    expect(screen.queryByTestId('tool-approval-card')).toBeNull()
+  })
+
   it('passes onOpenNote to action cards', () => {
     const onOpenNote = vi.fn()
     render(

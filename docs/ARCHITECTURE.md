@@ -531,7 +531,11 @@ a session grant already covers that tool and path. `edit_file` refuses
 files over 2 MiB rather than loading them whole. The Chat approval card
 shows the path and a unified-style preview computed once with `similar`
 (250ms deadline, 40/40 cap, leftover notes). A symlink target is labelled
-`real.md via link.md`.
+`real.md via link.md`. Power User `bash` uses the same Allow once / session /
+Deny footer; the card title is Run command and the body is the command, not
+a diff. After the tool finishes, Chat shows a collapsed row with the
+command and exit status, expandable to stdout and stderr. There is no live
+streaming in this view.
 Secret-path blocking (`.env*` except `.env.example`, `.git/`, `*.pem` /
 `*.key` / `*.p12` / `*.pfx`, known private-key basenames and their
 backups) is a safety net, not a wall. It covers the native file tools

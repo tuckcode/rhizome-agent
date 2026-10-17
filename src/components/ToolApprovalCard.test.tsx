@@ -209,6 +209,43 @@ describe('ToolApprovalCard', () => {
     expect(screen.getByTestId('approval-show-all')).toHaveTextContent('Show full preview')
   })
 
+  it('shows a Run command card with the bash command block', () => {
+    render(
+      <ToolApprovalCard
+        tool="bash"
+        command={'rg TODO wiki/\n  --glob "!archive/**"'}
+        timeoutSecs={30}
+        options={OPTIONS}
+        onReply={vi.fn()}
+      />,
+    )
+    expect(screen.getByText('Run command')).toBeInTheDocument()
+    expect(screen.getByTestId('approval-command')).toHaveTextContent('rg TODO wiki/')
+    expect(screen.getByTestId('approval-command')).toHaveClass('font-mono')
+    expect(screen.getByTestId('approval-vault-note')).toHaveTextContent(
+      'Runs in your vault folder. Output is shown when it finishes.',
+    )
+    expect(screen.getByTestId('approval-timeout')).toHaveTextContent('30')
+    expect(screen.queryByTestId('approval-diff')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Allow once' })).toHaveClass('bg-primary')
+    expect(screen.getByRole('button', { name: 'Allow for session' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Deny' })).toBeInTheDocument()
+  })
+
+  it('hides the timeout line when timeout_secs is unset', () => {
+    render(
+      <ToolApprovalCard
+        tool="bash"
+        command="ls"
+        options={OPTIONS}
+        onReply={vi.fn()}
+      />,
+    )
+    expect(screen.getByText('Run command')).toBeInTheDocument()
+    expect(screen.getByTestId('approval-command')).toHaveTextContent('ls')
+    expect(screen.queryByTestId('approval-timeout')).not.toBeInTheDocument()
+  })
+
   it('sends allow once, allow for session, and deny', () => {
     const onReply = vi.fn()
     render(

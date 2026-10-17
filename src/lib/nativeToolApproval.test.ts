@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { approvalTitle, pathFromToolArgs, previewLooksCreated } from './nativeToolApproval'
+import {
+  approvalTitle,
+  commandFromToolArgs,
+  pathFromToolArgs,
+  previewLooksCreated,
+  timeoutSecsFromToolArgs,
+} from './nativeToolApproval'
 
 describe('native tool approval helpers', () => {
   it('reads the path from tool args', () => {
@@ -11,6 +17,16 @@ describe('native tool approval helpers', () => {
     expect(approvalTitle('write_file', true)).toBe('Create file')
     expect(approvalTitle('write_file', false)).toBe('Write file')
     expect(approvalTitle('edit_file', false)).toBe('Edit file')
+    expect(approvalTitle('bash', false)).toBe('Run command')
+  })
+
+  it('reads the command and timeout from bash args', () => {
+    expect(commandFromToolArgs('{"command":"rg foo wiki/","timeout_secs":30}')).toBe('rg foo wiki/')
+    expect(timeoutSecsFromToolArgs('{"command":"rg foo wiki/","timeout_secs":30}')).toBe(30)
+    expect(timeoutSecsFromToolArgs('{"command":"ls"}')).toBeUndefined()
+    expect(commandFromToolArgs('ls')).toBe('ls')
+    expect(commandFromToolArgs('not-json')).toBe('not-json')
+    expect(commandFromToolArgs('')).toBeUndefined()
   })
 
   it('detects a new-file preview', () => {
