@@ -13,12 +13,14 @@ const shots = [
   ['graphite', 'error-details'],
   ['graphite', 'retry-focus'],
   ['graphite', 'disabled-generate'],
+  ['graphite', 'generate-enabled'],
   ['earth', 'empty'],
   ['earth', 'depth-open'],
   ['earth', 'error'],
   ['earth', 'error-details'],
   ['earth', 'retry-focus'],
   ['earth', 'disabled-generate'],
+  ['earth', 'generate-enabled'],
 ]
 
 const browser = await chromium.launch()
@@ -26,13 +28,17 @@ const page = await browser.newPage({ viewport: { width: 1100, height: 860 } })
 for (const [theme, state] of shots) {
   await page.goto(`${base}?theme=${theme}&state=${state}`, { waitUntil: 'networkidle' })
   await page.evaluate(() => document.fonts.ready)
-  if (state === 'empty' || state === 'depth-open' || state === 'disabled-generate') {
+  if (state === 'empty' || state === 'depth-open' || state === 'disabled-generate' || state === 'generate-enabled') {
     await page.getByTestId('research-generate-empty').waitFor()
   } else {
     await page.getByTestId('research-library-scan-error').waitFor()
   }
   if (state === 'disabled-generate') {
     await page.getByTestId('research-generate-hint').waitFor()
+    await page.getByRole('button', { name: /generate into vault/i }).waitFor()
+  }
+  if (state === 'generate-enabled') {
+    await page.getByPlaceholder('GitHub URL, owner/repo, or local path').fill('owner/repo')
     await page.getByRole('button', { name: /generate into vault/i }).waitFor()
   }
   if (state === 'depth-open') {

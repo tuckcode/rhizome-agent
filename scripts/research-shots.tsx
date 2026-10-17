@@ -7,7 +7,7 @@ import '../src/App.css'
 import './research-shots.css'
 
 type ShotTheme = 'graphite' | 'earth'
-type ShotState = 'empty' | 'depth-open' | 'error' | 'error-details' | 'retry-focus' | 'disabled-generate'
+type ShotState = 'empty' | 'depth-open' | 'error' | 'error-details' | 'retry-focus' | 'disabled-generate' | 'generate-enabled'
 
 const params = new URLSearchParams(window.location.search)
 const theme = (params.get('theme') === 'earth' ? 'earth' : 'graphite') as ShotTheme
@@ -18,6 +18,7 @@ const state = ([
   'error-details',
   'retry-focus',
   'disabled-generate',
+  'generate-enabled',
 ].includes(params.get('state') ?? '')
   ? params.get('state')
   : 'empty') as ShotState
@@ -37,6 +38,7 @@ const labels: Record<ShotState, string> = {
   'error-details': 'scan error details',
   'retry-focus': 'retry focus',
   'disabled-generate': 'disabled Generate hint',
+  'generate-enabled': 'Generate enabled',
 }
 
 const failScan = state === 'error' || state === 'error-details' || state === 'retry-focus'

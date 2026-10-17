@@ -188,15 +188,14 @@ function ResearchLibraryScanError({
             />
           </Button>
         </div>
-        {detailsOpen ? (
-          <pre
-            id={LIBRARY_SCAN_DETAILS_ID}
-            data-testid="research-library-scan-details"
-            className="mt-2 overflow-x-auto whitespace-pre-wrap font-mono text-xs text-muted-foreground"
-          >
-            {redactedTechnical}
-          </pre>
-        ) : null}
+        <pre
+          id={LIBRARY_SCAN_DETAILS_ID}
+          hidden={!detailsOpen}
+          data-testid="research-library-scan-details"
+          className="mt-2 overflow-x-auto whitespace-pre-wrap font-mono text-xs text-muted-foreground"
+        >
+          {redactedTechnical}
+        </pre>
       </div>
     </div>
   )
@@ -335,6 +334,7 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
   const scanRequestIdRef = useRef(0)
   const scanningRef = useRef(false)
   const retryFocusRef = useRef(false)
+  const scanVaultKeyRef = useRef<string | null>(null)
   const destinationVaultPathRef = useRef(destinationVaultPath)
   destinationVaultPathRef.current = destinationVaultPath
   const headingRef = useRef<HTMLHeadingElement>(null)
@@ -382,10 +382,16 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
     if (!destinationVaultPath) return []
     const requestId = ++scanRequestIdRef.current
     const vaultKey = destinationVaultPath
+    const isRetryFocus = retryFocusRef.current
+    retryFocusRef.current = false
+    if (scanVaultKeyRef.current !== vaultKey) {
+      scanVaultKeyRef.current = vaultKey
+      setLibraryScanAttempt(0)
+    }
     scanningRef.current = true
     setLibraryScanning(true)
     setLibraryScanError(null)
-    if (retryFocusRef.current) headingRef.current?.focus()
+    if (isRetryFocus) headingRef.current?.focus()
     try {
       const result = await callHost<string>('call_rhizome_tool', {
         name: 'rhizome_scan_library',
@@ -410,12 +416,11 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
       }))
       setLibrary(mapped)
       setLibraryScanError(null)
-      if (retryFocusRef.current) {
-        retryFocusRef.current = false
-        headingRef.current?.focus()
-      }
+      setLibraryScanAttempt(0)
+      if (isRetryFocus) headingRef.current?.focus()
       return mapped
     } catch (err) {
+      retryFocusRef.current = false
       if (requestId !== scanRequestIdRef.current || vaultKey !== destinationVaultPathRef.current) {
         return []
       }
@@ -735,6 +740,7 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
 
           {libraryScanError ? (
             <ResearchLibraryScanError
+              key={libraryScanAttempt}
               technical={libraryScanError}
               scanning={libraryScanning}
               attempt={libraryScanAttempt}
@@ -845,12 +851,11 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
                     data-testid="research-generate-mode"
                     aria-haspopup="dialog"
                     aria-expanded={formatModalOpen}
-                    aria-label="Research format"
                     onClick={() => setFormatModalOpen(true)}
                     className="flex h-9 w-fit items-center justify-between gap-2 rounded-md border border-border bg-muted px-3 py-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-[var(--state-focus-ring)]"
                   >
                     {modeLabel}
-                    <CaretDown className="size-4 opacity-50" />
+                    <CaretDown aria-hidden className="size-4 opacity-50" />
                   </button>
 
                   <ResearchDepthSelect
@@ -874,8 +879,10 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
                     <Button
                       onClick={() => runWithDestinationConfirm(handleGenerate)}
                       disabled={!repoInput.trim() || generatePreflight.state !== 'ready'}
+                      title={!repoInput.trim() ? 'Add a repo URL or folder first' : undefined}
+                      aria-describedby={!repoInput.trim() ? 'research-generate-hint' : undefined}
                       className={!repoInput.trim() || generatePreflight.state !== 'ready'
-                        ? 'bg-muted px-5 text-muted-foreground disabled:opacity-100'
+                        ? 'bg-muted px-5 text-muted-foreground disabled:pointer-events-auto disabled:opacity-100'
                         : 'bg-primary px-5 text-primary-foreground hover:bg-muted'}
                     >
                       {`${t('research.generate.button')} into ${destinationLabel}`}
@@ -883,9 +890,9 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
                   )}
                 </div>
                 {!repoInput.trim() ? (
-                  <p data-testid="research-generate-hint" className="mb-4 text-xs text-muted-foreground">
+                  <span id="research-generate-hint" data-testid="research-generate-hint" className="sr-only">
                     Add a repo URL or folder first
-                  </p>
+                  </span>
                 ) : null}
 
                 <div className="flex items-center gap-3 mb-4">
