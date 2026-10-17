@@ -2187,9 +2187,10 @@ Rhizome has two update paths. The **app** path (`app_updater.rs`,
 `useUpdater`, `UpdateBanner`) checks the moving GitHub release tag for
 the selected channel (`alpha-latest` or `stable-latest`), then downloads
 and installs through the Tauri updater plugin. Restart stays on the
-existing Restart control. While the pubkey is
-`PLACEHOLDER_KNISPO_TAURI_UPDATER_PUBKEY`, check and install return
-before any feed request. A real key is generated outside the repo with
+existing Restart control. Production `tauri.conf.json` carries the
+minisign public key; the test fixture still uses
+`PLACEHOLDER_KNISPO_TAURI_UPDATER_PUBKEY` so unit tests refuse before
+any feed request. Generate signing material outside the repo with
 `pnpm tauri signer generate -w ~/.tauri/rhizome-updater.key`. The
 **Chat-engine** path
 (`prime_update.rs`, `usePrimeUpdate`) checks GitHub, then

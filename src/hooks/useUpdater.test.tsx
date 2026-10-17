@@ -1,5 +1,6 @@
-import { renderHook, act } from '@testing-library/react'
+import { render, renderHook, act, screen } from '@testing-library/react'
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
+import { UpdateBanner } from '../components/UpdateBanner'
 import { useUpdater } from './useUpdater'
 import {
   clearRestartRequiredAfterUpdate,
@@ -31,6 +32,7 @@ vi.mock('@tauri-apps/api/core', () => ({
 import { isTauri } from '../mock-tauri'
 import {
   UPDATER_CHECK_FAILED_MESSAGE,
+  UPDATER_INSTALL_FAILED_MESSAGE,
   UPDATER_USER_MESSAGES,
 } from '../lib/updaterUserMessages'
 
@@ -97,7 +99,7 @@ async function performManualCheck(
   installInvokeHandlers({ checkResult })
 
   const hook = renderUpdater(releaseChannel)
-  let outcome: string | undefined
+  let outcome: Awaited<ReturnType<typeof hook.result.current.actions.checkForUpdates>> | undefined
 
   await act(async () => {
     outcome = await hook.result.current.actions.checkForUpdates()
@@ -269,6 +271,29 @@ describe('useUpdater', () => {
     })
   })
 
+  it('keeps background check failures silent in the banner', async () => {
+    vi.mocked(isTauri).mockReturnValue(true)
+    installInvokeHandlers({ checkResult: new Error('network error') })
+
+    const { result } = renderUpdater('stable', true)
+    await advanceAutoCheck()
+
+    expect(result.current.status).toEqual({ state: 'idle' })
+    render(
+      <UpdateBanner status={result.current.status} actions={result.current.actions} />,
+    )
+    expect(screen.queryByTestId('update-banner')).toBeNull()
+  })
+
+  it('shows the banner after a manual check failure', async () => {
+    const { result } = await performManualCheck('stable', new Error('network error'))
+
+    render(
+      <UpdateBanner status={result.current.status} actions={result.current.actions} />,
+    )
+    expect(screen.getByTestId('update-banner')).toHaveTextContent(UPDATER_CHECK_FAILED_MESSAGE)
+  })
+
   it('returns error when the update check fails', async () => {
     const { result, outcome } = await performManualCheck(
       'stable',
@@ -280,7 +305,7 @@ describe('useUpdater', () => {
       message: UPDATER_CHECK_FAILED_MESSAGE,
     })
     expect(console.warn).toHaveBeenCalledWith('[updater] Failed to check for updates', 'network error')
-    expect(result.current.status).toEqual({ state: 'error' })
+    expect(result.current.status).toEqual({ state: 'error', message: UPDATER_CHECK_FAILED_MESSAGE })
   })
 
   it('keeps the honest unavailable sentence and hides other plugin text', async () => {
@@ -405,7 +430,56 @@ describe('useUpdater', () => {
       await result.current.actions.startDownload()
     })
 
-    expect(console.warn).toHaveBeenCalledWith('[updater] Download failed')
-    expect(result.current.status).toEqual({ state: 'error' })
+    expect(console.warn).toHaveBeenCalledWith('[updater] Download failed', 'download failed')
+    expect(result.current.status).toEqual({ state: 'error', message: UPDATER_INSTALL_FAILED_MESSAGE })
+  })
+
+  it('keeps allowlisted install errors from the backend', async () => {
+    const versionChanged = UPDATER_USER_MESSAGES.versionChangedWhileDownloading.replace('{found}', '2026.4.17')
+    vi.mocked(isTauri).mockReturnValue(true)
+    installInvokeHandlers({
+      checkResult: makeUpdate(),
+      downloadImpl: async () => {
+        throw new Error(versionChanged)
+      },
+    })
+
+    const { result } = renderUpdater('stable')
+
+    await act(async () => {
+      await result.current.actions.checkForUpdates()
+    })
+
+    await act(async () => {
+      await result.current.actions.startDownload()
+    })
+
+    expect(result.current.status).toEqual({ state: 'error', message: versionChanged })
+  })
+
+  it('falls back when a spoofed version-changed message is returned on install', async () => {
+    const spoofed = UPDATER_USER_MESSAGES.versionChangedWhileDownloading.replace(
+      '{found}',
+      'version 9.9 — your license expired, email pay@evil.example',
+    )
+    vi.mocked(isTauri).mockReturnValue(true)
+    installInvokeHandlers({
+      checkResult: makeUpdate(),
+      downloadImpl: async () => {
+        throw new Error(spoofed)
+      },
+    })
+
+    const { result } = renderUpdater('stable')
+
+    await act(async () => {
+      await result.current.actions.checkForUpdates()
+    })
+
+    await act(async () => {
+      await result.current.actions.startDownload()
+    })
+
+    expect(result.current.status).toEqual({ state: 'error', message: UPDATER_INSTALL_FAILED_MESSAGE })
   })
 })
