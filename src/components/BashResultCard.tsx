@@ -92,9 +92,9 @@ function BashResultSummary({
       </span>
       <span className="flex min-w-0 flex-1 items-center gap-1" data-testid="bash-result-summary">
         <span className={`shrink-0 ${dangerClass(verbDanger) ?? ''}`}>{verb}</span>
-        <span className="min-w-0 flex-1 truncate" data-testid="bash-result-command-clip">
+        <span className="min-w-0 truncate" data-testid="bash-result-command-clip">
           <code className="rounded-sm bg-[var(--syntax-monospace-bg)] px-0.5 font-mono text-[12px]">
-            <VisibleCommand command={command} />
+            <VisibleCommand command={command} wrap={false} />
           </code>
         </span>
         {hasHiddenChars ? (

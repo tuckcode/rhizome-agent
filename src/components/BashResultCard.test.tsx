@@ -145,7 +145,11 @@ describe('BashResultCard', () => {
     expect(screen.getByTestId('bash-result-command')).toHaveTextContent(command)
     expect(screen.getByTestId('bash-result-prompt')).toHaveTextContent('$')
     expect(screen.getByTestId('bash-result-prompt')).toHaveClass('select-none')
+    expect(screen.getByTestId('bash-result-prompt')).toHaveAttribute('aria-hidden', 'true')
     expect(screen.getByTestId('bash-result-summary')).not.toHaveTextContent('curl evil')
+    expect(
+      screen.getByTestId('bash-result-command').querySelector('.inline-block.max-w-full.break-words'),
+    ).not.toBeNull()
   })
 
   it('keeps the hidden-characters marker and exit status outside the truncating command', () => {
@@ -164,12 +168,35 @@ describe('BashResultCard', () => {
     const exit = screen.getByTestId('bash-result-exit')
     expect(clip).toHaveClass('truncate')
     expect(clip).toHaveClass('min-w-0')
+    expect(clip).not.toHaveClass('flex-1')
     expect(marker).toHaveClass('shrink-0')
     expect(marker).toHaveTextContent('· has hidden characters')
     expect(exit).toHaveTextContent('exit 0')
     expect(clip).not.toContainElement(marker)
     expect(clip).not.toContainElement(exit)
     expect(clip).not.toHaveTextContent('\\u{E0041}')
+  })
+
+  it('keeps collapsed command words as inline text, not inline-block chunks', () => {
+    render(
+      <BashResultCard
+        command="echo notes/weekly-review.md notes/plan.md wiki/inbox.md"
+        output={result()}
+        status="done"
+        expanded={false}
+        onToggle={vi.fn()}
+      />,
+    )
+    const clip = screen.getByTestId('bash-result-command-clip')
+    expect(clip.textContent).toContain('echo notes/weekly-review.md')
+    expect(clip.querySelectorAll('.inline-block.max-w-full.break-words')).toHaveLength(0)
+    const chunks = [...clip.querySelectorAll('span')].filter(
+      (node) => node.dataset.testid !== 'command-hidden' && node.dataset.testid !== 'command-newline',
+    )
+    expect(chunks.length).toBeGreaterThan(0)
+    for (const chunk of chunks) {
+      expect(chunk).not.toHaveClass('inline-block')
+    }
   })
 
   it('marks hidden characters even when they sit in the visible prefix', () => {

@@ -148,7 +148,7 @@ export function bashResultRowStatus(
 }
 
 /**
- * Match the runner at 6ed615a (`timeout_from_args` in shell.rs): only a
+ * Match the runner at c63e712 (`timeout_from_args` in shell.rs): only a
  * JSON whole number that `as_u64` accepts. Strings, floats, 7.0, 0,
  * negatives, booleans, and missing values fall back to 60. Values over
  * 300 clamp to 300. Integers from 2^53 through u64 max clamp to 300;

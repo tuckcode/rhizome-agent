@@ -1,10 +1,19 @@
 import { visibleCommandParts } from '../lib/visibleCommand'
 
-export function VisibleCommand({ command }: { command: string }) {
+export function VisibleCommand({
+  command,
+  wrap = true,
+}: {
+  command: string
+  wrap?: boolean
+}) {
   return (
     <>
       {visibleCommandParts(command).map((part, index) => {
         if (part.kind === 'text') {
+          if (!wrap) {
+            return <span key={index}>{part.text}</span>
+          }
           return (
             <span key={index}>
               {part.text.split(/(\s+)/u).map((chunk, chunkIndex) => {
