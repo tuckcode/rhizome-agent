@@ -5,6 +5,10 @@ import { createTranslator } from '../lib/i18n'
 import { DEFAULT_MODEL_CAPABILITIES, type AiModelProvider } from '../lib/aiTargets'
 import { PROVIDER_PRESETS, providerPresetById } from '../lib/providerPresets'
 
+function compatiblePresets() {
+  return PROVIDER_PRESETS.filter((preset) => preset.apiStyle === 'open_ai_compatible')
+}
+
 const { deleteApiKeyMock, saveApiKeyMock, testProviderMock } = vi.hoisted(() => ({
   deleteApiKeyMock: vi.fn(),
   saveApiKeyMock: vi.fn(),
@@ -149,7 +153,17 @@ describe('AiProviderSettings presets', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Get API key' }))
 
     expect(openExternalUrl).toHaveBeenCalledWith(providerPresetById('anthropic')?.keyPageUrl)
-    expect(openExternalUrl).toHaveBeenCalledWith(PROVIDER_PRESETS[0].keyPageUrl)
+  })
+
+  it('shows the key-page URL when the opener fails', async () => {
+    openExternalUrl.mockRejectedValueOnce(new Error('opener blocked'))
+    renderProviders()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Get API key' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('Could not open the key page.')
+    expect(alert).toHaveTextContent(providerPresetById('openai')!.keyPageUrl)
   })
 
   it('hides Get API key for a custom base URL', () => {
@@ -160,5 +174,76 @@ describe('AiProviderSettings presets', () => {
     const baseUrl = screen.getByLabelText('Base URL')
     fireEvent.change(baseUrl, { target: { value: 'https://lab.example/v1' } })
     expect(baseUrl).toHaveValue('https://lab.example/v1')
+  })
+
+  it('keeps an edited base URL when switching presets', () => {
+    renderProviders()
+
+    const baseUrl = screen.getByLabelText('Base URL')
+    fireEvent.change(baseUrl, { target: { value: 'https://lab.example/v1' } })
+    selectProviderPreset('Groq')
+
+    expect(baseUrl).toHaveValue('https://lab.example/v1')
+    expect(screen.getByLabelText('Name')).toHaveValue('Groq')
+    expect(screen.getByLabelText('Model ID')).toHaveValue('llama-3.3-70b-versatile')
+  })
+
+  it('keeps an edited Custom URL when the API style changes', () => {
+    renderProviders()
+    selectProviderPreset('Custom')
+
+    const baseUrl = screen.getByLabelText('Base URL')
+    fireEvent.change(baseUrl, { target: { value: 'https://lab.example/v1' } })
+    fireEvent.click(screen.getByRole('combobox', { name: 'API style' }))
+    fireEvent.click(screen.getByRole('option', { name: 'OpenAI' }))
+
+    expect(baseUrl).toHaveValue('https://lab.example/v1')
+    expect(screen.getByRole('combobox', { name: 'API style' })).toHaveTextContent('OpenAI')
+  })
+
+  it('clears a pasted API key when switching provider', () => {
+    renderProviders()
+
+    const apiKey = screen.getByLabelText('API key')
+    fireEvent.change(apiKey, { target: { value: 'sk-live-openai' } })
+    expect(apiKey).toHaveValue('sk-live-openai')
+
+    selectProviderPreset('xAI')
+
+    expect(screen.getByLabelText('API key')).toHaveValue('')
+    expect(screen.getByPlaceholderText('Paste your xAI key')).toBeInTheDocument()
+  })
+
+  it.each(compatiblePresets())('uses $apiKeyEnvVar for the $label compatible preset', (preset) => {
+    renderProviders()
+    selectProviderPreset(preset.label)
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'API key storage' }))
+    fireEvent.click(screen.getByRole('option', { name: 'Read from env var' }))
+
+    expect(screen.getByLabelText('API key env var')).toHaveValue(preset.apiKeyEnvVar)
+    expect(screen.getByLabelText('Model ID')).toHaveValue(preset.modelId)
+  })
+
+  it('marks Anthropic as not in Rhizome chat yet without hiding the preset', () => {
+    render(<AiProviderSettings t={t} mode="api" providers={[]} onChange={vi.fn()} />)
+
+    expect(screen.getByText('No API models yet.')).toBeInTheDocument()
+    selectProviderPreset('Anthropic')
+
+    const note = screen.getByTestId('ai-provider-anthropic-note')
+    expect(note).toHaveTextContent('Not in Rhizome chat yet')
+    expect(screen.getByLabelText('Model ID')).toHaveValue('claude-3-5-sonnet-latest')
+    expect(screen.getByRole('button', { name: 'Add API model' })).toBeDisabled()
+    expect(screen.getByTestId('ai-provider-disabled-reason')).toHaveTextContent('Paste an API key first.')
+    expect(screen.getByTestId('ai-provider-test-model')).toBeDisabled()
+  })
+
+  it('fills a real model id from the default OpenAI preset', () => {
+    renderProviders()
+
+    expect(screen.getByLabelText('Model ID')).toHaveValue('gpt-4.1-mini')
+    expect(screen.getByPlaceholderText('Paste your OpenAI key')).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'API key storage' })).toHaveTextContent('System keychain')
   })
 })

@@ -6,6 +6,8 @@ import {
   defaultApiProviderPreset,
   draftPatchForCustomProvider,
   draftPatchForProviderPreset,
+  mergeProviderPresetPatch,
+  providerApiKeyPlaceholder,
   providerPresetById,
   type ProviderApiStyle,
   type ProviderPreset,
@@ -19,6 +21,17 @@ const API_STYLES = new Set<ProviderApiStyle>([
   'gemini',
 ])
 
+const PRESET_ENV_VARS = {
+  openai: 'OPENAI_API_KEY',
+  anthropic: 'ANTHROPIC_API_KEY',
+  xai: 'XAI_API_KEY',
+  gemini: 'GEMINI_API_KEY',
+  openrouter: 'OPENROUTER_API_KEY',
+  groq: 'GROQ_API_KEY',
+  mistral: 'MISTRAL_API_KEY',
+  deepseek: 'DEEPSEEK_API_KEY',
+} as const
+
 function isHttpsUrl(value: string): boolean {
   try {
     const parsed = new URL(value)
@@ -29,10 +42,10 @@ function isHttpsUrl(value: string): boolean {
 }
 
 describe('provider preset table', () => {
-  it('keeps one typed row per popular provider', () => {
+  it('keeps OpenAI first and one typed row per popular provider', () => {
     expect(PROVIDER_PRESETS.map((preset) => preset.id)).toEqual([
-      'anthropic',
       'openai',
+      'anthropic',
       'xai',
       'gemini',
       'openrouter',
@@ -42,7 +55,7 @@ describe('provider preset table', () => {
     ])
   })
 
-  it('requires id, label, base URL, key page, and API style on every row', () => {
+  it('requires id, label, base URL, key page, API style, model id, and env var on every row', () => {
     const ids = new Set<string>()
     const labels = new Set<string>()
 
@@ -53,6 +66,8 @@ describe('provider preset table', () => {
       expect(isHttpsUrl(row.baseUrl)).toBe(true)
       expect(isHttpsUrl(row.keyPageUrl)).toBe(true)
       expect(API_STYLES.has(row.apiStyle)).toBe(true)
+      expect(row.apiKeyEnvVar.trim()).not.toBe('')
+      expect(row.modelId.trim()).not.toBe('')
       expect(ids.has(row.id)).toBe(false)
       expect(labels.has(row.label)).toBe(false)
       ids.add(row.id)
@@ -63,14 +78,29 @@ describe('provider preset table', () => {
     expect(ids.has(CUSTOM_PROVIDER_PRESET_ID)).toBe(false)
   })
 
+  it.each(PROVIDER_PRESETS)('$id uses its own $apiKeyEnvVar and never inherits another vendor key', (preset) => {
+    expect(preset.apiKeyEnvVar).toBe(PRESET_ENV_VARS[preset.id])
+    expect(draftPatchForProviderPreset(preset).apiKeyEnvVar).toBe(PRESET_ENV_VARS[preset.id])
+    if (preset.apiStyle === 'open_ai_compatible') {
+      expect(preset.apiKeyEnvVar).not.toBe(aiModelProviderCatalogEntry(preset.apiStyle).api_key_env_var)
+      expect(preset.apiKeyEnvVar).not.toBe('OPENAI_API_KEY')
+    }
+  })
+
   it('looks up a preset by id and starts API setup on OpenAI', () => {
     expect(providerPresetById('groq')).toMatchObject({
       label: 'Groq',
       baseUrl: 'https://api.groq.com/openai/v1',
       keyPageUrl: 'https://console.groq.com/keys',
       apiStyle: 'open_ai_compatible',
+      apiKeyEnvVar: 'GROQ_API_KEY',
+      modelId: 'llama-3.3-70b-versatile',
     })
     expect(providerPresetById('missing')).toBeNull()
+    expect(defaultApiProviderPreset()).toMatchObject({
+      id: 'openai',
+      apiKeyEnvVar: 'OPENAI_API_KEY',
+    })
     expect(defaultApiProviderPreset().id).toBe('openai')
   })
 
@@ -80,6 +110,7 @@ describe('provider preset table', () => {
       kind: 'anthropic',
       name: 'Anthropic',
       baseUrl: 'https://api.anthropic.com/v1',
+      modelId: 'claude-3-5-sonnet-latest',
       apiKeyStorage: 'local_file',
       apiKeyEnvVar: 'ANTHROPIC_API_KEY',
     })
@@ -88,8 +119,40 @@ describe('provider preset table', () => {
       kind: 'open_ai_compatible',
       name: 'Custom provider',
       baseUrl: 'https://lab.example/v1',
+      modelId: '',
       apiKeyStorage: 'local_file',
       apiKeyEnvVar: 'OPENAI_API_KEY',
     })
+  })
+
+  it('keeps edited fields when merging a later preset and clears the pasted key', () => {
+    const current = {
+      presetId: 'openai',
+      kind: 'open_ai' as const,
+      name: 'Lab OpenAI',
+      baseUrl: 'https://lab.example/v1',
+      modelId: 'gpt-4.1-mini',
+      apiKeyStorage: 'local_file' as const,
+      apiKeyEnvVar: 'OPENAI_API_KEY',
+      apiKey: 'sk-live-openai',
+    }
+    const groq = draftPatchForProviderPreset(providerPresetById('groq')!)
+    expect(mergeProviderPresetPatch(current, groq, {
+      name: true,
+      baseUrl: true,
+      modelId: false,
+    }, true)).toMatchObject({
+      presetId: 'groq',
+      kind: 'open_ai_compatible',
+      name: 'Lab OpenAI',
+      baseUrl: 'https://lab.example/v1',
+      modelId: 'llama-3.3-70b-versatile',
+      apiKeyEnvVar: 'GROQ_API_KEY',
+      apiKey: '',
+    })
+  })
+
+  it('names the API key placeholder after the provider', () => {
+    expect(providerApiKeyPlaceholder('OpenAI')).toBe('Paste your OpenAI key')
   })
 })

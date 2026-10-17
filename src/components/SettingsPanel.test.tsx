@@ -339,7 +339,7 @@ describe('SettingsPanel', () => {
     fireEvent.click(screen.getByRole('option', { name: 'Google Gemini' }))
     expect(screen.getByDisplayValue('Google Gemini')).toBeInTheDocument()
     expect(screen.getByDisplayValue('https://generativelanguage.googleapis.com/v1beta/openai')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('gemini-2.5-flash')).toBeInTheDocument()
+    expect(screen.getByLabelText('Model ID')).toHaveValue('gemini-2.5-flash')
   })
 
   it('does not offer a global keep-sessions-running-on-quit toggle', () => {
