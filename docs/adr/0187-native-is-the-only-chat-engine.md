@@ -7,6 +7,7 @@ date: 2026-10-16
 ---
 
 **Origin:** Cursor Grok 4.6 · 2026-10-16 · knispo
+**Amended 2026-10-17:** decisions 3, 4 and 5 are replaced by [ADR-0189](0189-no-ties-to-outside-harnesses.md) (Prime and Hermes come out completely). The core tool policy stands.
 **Builds on:** [ADR-0180](0180-rhizome-is-its-own-harness.md) (9 Oct: Rhizome is its own harness with its own agent loop)
 
 ## Context
