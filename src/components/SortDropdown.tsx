@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import { ArrowUp, ArrowDown } from '@phosphor-icons/react'
 import { translate, type AppLocale, type TranslationKey } from '../lib/i18n'
 import { type SortOption, type SortDirection, getDefaultDirection, SORT_OPTIONS } from '../utils/noteListHelpers'
+import { SETTINGS_MENU_Z_CLASS } from '../lib/settingsMenuLayer'
 import { getAnchoredDropdownStyle, useAnchoredDropdownPosition } from './anchoredDropdown'
 
 interface SortItem {
@@ -274,7 +275,7 @@ function SortDropdownMenu({
       ref={menuRef}
       role="menu"
       aria-label={translate(locale, 'noteList.sort.menu', { label: groupLabel })}
-      className="fixed z-[12000] rounded-md border border-border bg-popover p-1 shadow-md"
+      className={`fixed ${SETTINGS_MENU_Z_CLASS} rounded-md border border-border bg-popover p-1 shadow-md`}
       style={{
         ...getAnchoredDropdownStyle(null, SORT_MENU_WIDTH),
         maxHeight: SORT_MENU_MAX_HEIGHT,

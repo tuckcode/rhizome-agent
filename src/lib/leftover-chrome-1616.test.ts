@@ -82,7 +82,11 @@ describe('leftover chrome 1616', () => {
       `${process.cwd()}/src/components/PrimeProviderStatusSection.tsx`,
       'utf8',
     )
-    expect(providers).toContain("xai: 'xAI (Grok)'")
+    const labels = readFileSync(
+      `${process.cwd()}/src/lib/primeProviderLabels.ts`,
+      'utf8',
+    )
+    expect(labels).toContain("xai: 'xAI (Grok)'")
     expect(providers).toContain(
       "Copied the NOUS_API_KEY line. Paste it in Terminal, then Add to Chat list.",
     )
@@ -114,5 +118,17 @@ describe('leftover chrome 1616', () => {
     expect(view).toContain("return { version: 1, active: { id: 'chat', widths: {} }, savedWidths: {} }")
     expect(view).not.toContain("getAppStorageItem('viewMode')")
     expect(meta).toContain("if (options.working) return 'Working · tools'")
+  })
+
+  it('keeps singular provider copy on the native chip footer', () => {
+    const picker = readFileSync(
+      `${process.cwd()}/src/components/NativeChatModelPicker.tsx`,
+      'utf8',
+    )
+    const en = readFileSync(`${process.cwd()}/src/lib/locales/en.json`, 'utf8')
+    expect(picker).not.toContain('${keylessCount} providers need a key')
+    expect(picker).toContain("t('ai.composer.providerNeedsKey')")
+    expect(picker).toContain("t('ai.composer.providersNeedKey'")
+    expect(en).toContain('"ai.composer.providerNeedsKey": "1 provider needs a key"')
   })
 })

@@ -367,12 +367,17 @@ export function rhizomeModelRowLabel(
   return collided ? `${model.providerName} · ${name}` : name
 }
 
-/** Providers with no key stay out of the picker list. */
+/** Providers with no key stay out of the picker list, except the current pick. */
 export function excludeKeylessRhizomeModels(
   models: RhizomeChatModel[],
   providers?: AiModelProvider[] | null,
+  selectedId?: string | null,
 ): RhizomeChatModel[] {
-  return models.filter((model) => !rhizomeProviderNeedsApiKey(model.providerKind, providers))
+  const selected = resolveRhizomeChatModel(models, selectedId)
+  return models.filter((model) => {
+    if (selected && model.id === selected.id) return true
+    return !rhizomeProviderNeedsApiKey(model.providerKind, providers)
+  })
 }
 
 export function countKeylessRhizomeProviders(

@@ -66,6 +66,33 @@ describe('chat theme contrast tokens (B2–B4)', () => {
     expect(token(light, '--popover')).toBe('var(--surface-popover)')
   })
 
+  it('gives hovered and selected menu rows a 3:1 accent bar and a lighter hover fill', () => {
+    for (const [name, block] of [
+      ['Earth light', light],
+      ['Graphite', graphite],
+      ['Earth dark', dark],
+    ] as const) {
+      const hover = token(block, '--state-menu-hover')
+      const selected = token(block, '--state-menu-selected')
+      const popover = token(block, '--surface-popover')
+      const accent = token(block, '--accent-blue')
+      expect(hover === selected, `${name} hover equals selected`).toBe(false)
+      expect(relativeLuminance(hover), `${name} hover luminance`).toBeGreaterThan(relativeLuminance(selected))
+      expect(contrastRatio(accent, popover), `${name} accent bar`).toBeGreaterThanOrEqual(3)
+      expect(
+        contrastRatio(token(block, '--text-primary'), hover),
+        `${name} primary on hover`,
+      ).toBeGreaterThanOrEqual(4.5)
+      expect(
+        contrastRatio(token(block, '--text-primary'), selected),
+        `${name} primary on selected`,
+      ).toBeGreaterThanOrEqual(4.5)
+    }
+    expect(
+      contrastRatio(token(graphite, '--text-muted'), token(graphite, '--state-menu-hover')),
+    ).toBeLessThan(4.5)
+  })
+
   it('gives muted, faint, and tertiary at least 4.5:1 on selected-strong', () => {
     for (const block of [light, dark, graphite]) {
       const selected = token(block, '--state-selected-strong')

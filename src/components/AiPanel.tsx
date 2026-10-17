@@ -24,7 +24,7 @@ import { translate } from '../lib/i18n'
 import PrimeSessionList from './PrimeSessionList'
 import {
   DEFAULT_AI_AGENT,
-  getAiAgentDefinition,
+  composerAgentLabel,
   type AiAgentId,
   type AiAgentReadiness,
 } from '../lib/aiAgents'
@@ -181,17 +181,23 @@ function resolveAiPanelViewModel({
   defaultAiAgentReadiness,
   defaultAiAgentReady,
   defaultAiTarget,
+  chatEngine,
 }: {
   defaultAiAgent?: AiAgentId
   defaultAiAgentReadiness?: AiAgentReadiness
   defaultAiAgentReady?: boolean
   defaultAiTarget?: AiTarget
+  chatEngine?: 'prime' | 'native'
 }): AiPanelViewModel {
   const resolvedAgent = defaultAiAgent ?? DEFAULT_AI_AGENT
   const resolvedReadiness = defaultAiAgentReadiness ?? readinessFromReadyFlag(defaultAiAgentReady)
 
   return {
-    agentLabel: defaultAiTarget?.label ?? getAiAgentDefinition(resolvedAgent).label,
+    agentLabel: composerAgentLabel({
+      chatEngine,
+      agent: resolvedAgent,
+      targetLabel: defaultAiTarget?.label,
+    }),
     defaultAiAgent: resolvedAgent,
     defaultAiAgentReadiness: resolvedReadiness,
     targetKind: defaultAiTarget?.kind ?? 'agent',
@@ -267,6 +273,7 @@ export function AiPanelView({
     defaultAiAgentReadiness: providedDefaultAiAgentReadiness,
     defaultAiAgentReady: providedDefaultAiAgentReady,
     defaultAiTarget,
+    chatEngine,
   })
   const inputRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLElement>(null)
@@ -602,7 +609,7 @@ export function AiPanelView({
         } : undefined}
         onOpenGoal={isPrimeTarget ? goalDialog.openDialog : undefined}
         onOpenSchedule={isPrimeTarget ? () => scheduleDialog.onOpenChange(true) : undefined}
-        foot={(isPrimeTarget || chatEngine === 'native') ? (
+        foot={(isPrimeTarget || (view.defaultAiAgent === 'prime' && chatEngine === 'native')) ? (
           <ChatComposerBar
             locale={locale}
             deck={composerDeck}

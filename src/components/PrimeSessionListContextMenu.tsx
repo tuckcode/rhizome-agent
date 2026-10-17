@@ -9,6 +9,7 @@ import {
   type Icon,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
+import { SETTINGS_MENU_Z_CLASS } from '../lib/settingsMenuLayer'
 import { getContextMenuPositionStyle } from './contextMenuPosition'
 import type { PrimeSessionSummary } from '../lib/primeSessionMeta'
 
@@ -133,7 +134,7 @@ export function PrimeSessionListContextMenu({
   return (
     <div
       ref={ctxMenuRef}
-      className="fixed z-[12000] rounded-md border bg-popover p-1 shadow-md"
+      className={`fixed ${SETTINGS_MENU_Z_CLASS} rounded-md border bg-popover p-1 shadow-md`}
       style={getContextMenuPositionStyle(ctxMenu, { minWidth: 200 })}
       data-testid="prime-session-context-menu"
     >

@@ -238,4 +238,35 @@ describe('resolveRhizomeChatModel', () => {
     expect(keyed.some((model) => model.id === 'work-openai/gpt-4o')).toBe(true)
     expect(countKeylessRhizomeProviders(listed, configured)).toBeGreaterThan(0)
   })
+
+  it('counts one keyless provider when every remote catalog kind except Gemini has a key', () => {
+    const keyedExceptGemini: AiModelProvider[] = [
+      ...configured,
+      {
+        id: 'work-router',
+        name: 'Work OpenRouter',
+        kind: 'open_router',
+        base_url: 'https://openrouter.ai/api/v1',
+        api_key_storage: 'local_file',
+        models: [{ id: 'openai/gpt-4.1-mini', display_name: 'GPT-4.1 mini', capabilities }],
+      },
+      {
+        id: 'work-compat',
+        name: 'Work custom',
+        kind: 'open_ai_compatible',
+        base_url: 'https://api.example.com/v1',
+        api_key_storage: 'local_file',
+        models: [{ id: 'gpt-4.1-mini', display_name: 'GPT-4.1 mini', capabilities }],
+      },
+    ]
+    const listed = seedRhizomeChatModels(keyedExceptGemini)
+    expect(countKeylessRhizomeProviders(listed, keyedExceptGemini)).toBe(1)
+  })
+
+  it('keeps the selected model when its provider has no key', () => {
+    const listed = seedRhizomeChatModels([])
+    const keyed = excludeKeylessRhizomeModels(listed, [], 'gemini/gemini-2.5-flash')
+    expect(keyed.some((model) => model.id === 'gemini/gemini-2.5-flash')).toBe(true)
+    expect(keyed.some((model) => model.providerKind === 'open_ai')).toBe(false)
+  })
 })

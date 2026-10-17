@@ -7,9 +7,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { AiModelProvider } from '../lib/aiTargets'
+import { callHost } from '../lib/callHost'
 import { CHAT_FOCUS_RING_CLASS } from '../lib/chatFocusRing'
 import {
   COMPOSER_MENU_COLLISION_PADDING_PX,
@@ -22,6 +22,9 @@ import {
 } from '../lib/composerMenuSide'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { middleEllipsis, NATIVE_CHAT_MODEL_CHIP_LABEL_MAX_CHARS } from '../lib/middleEllipsis'
+import { loadPrimeModelCatalog } from '../lib/primeModelCatalog'
+import { groupModelsByProvider, modelKey, type PrimeModel } from '../lib/primeModels'
+import { primeProviderLabel } from '../lib/primeProviderLabels'
 import {
   liveProviderHeadingNames,
   loadLiveRhizomeChatModels,
@@ -43,7 +46,9 @@ import {
   type RhizomeChatModel,
 } from '../lib/rhizomeChatModels'
 import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
-import { trackRhizomeModelChanged } from '../lib/productAnalytics'
+import { SETTINGS_MENU_Z_CLASS } from '../lib/settingsMenuLayer'
+import { trackPrimeModelChanged, trackRhizomeModelChanged } from '../lib/productAnalytics'
+import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
 
 const FILTER_PLACEHOLDER = 'Filter models'
 const EMPTY_MATCH = 'No models match'
@@ -58,15 +63,24 @@ const MENU_PANEL_CLASS = cn(
 )
 
 const ROW_CLASS = cn(
-  'h-8 px-2 rounded-md text-[13px]',
-  'hover:bg-accent hover:text-accent-foreground',
-  'focus:bg-accent focus:text-accent-foreground',
-  'data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground',
+  'h-8 px-2 rounded-md text-[13px] text-foreground',
+  'hover:bg-[var(--state-menu-hover)] hover:text-foreground',
+  'focus:bg-[var(--state-menu-hover)] focus:text-foreground',
+  'data-[highlighted]:bg-[var(--state-menu-hover)] data-[highlighted]:text-foreground',
+  'data-[selected=true]:bg-[var(--state-menu-selected)] data-[selected=true]:text-foreground',
+  'data-[selected=true]:hover:bg-[var(--state-menu-selected)]',
+  'data-[selected=true]:data-[highlighted]:bg-[var(--state-menu-selected)]',
+  'shadow-[inset_2px_0_0_transparent]',
+  'hover:shadow-[inset_2px_0_0_var(--accent-blue)]',
+  'focus:shadow-[inset_2px_0_0_var(--accent-blue)]',
+  'data-[highlighted]:shadow-[inset_2px_0_0_var(--accent-blue)]',
+  'data-[selected=true]:shadow-[inset_2px_0_0_var(--accent-blue)]',
+  '[&_svg]:text-foreground',
 )
 
 const GROUP_SEP_CLASS = 'my-1 h-px w-full bg-[var(--border-input)]'
 
-function modelAccessibleName(model: RhizomeChatModel): string {
+function modelAccessibleName(model: { label: string; providerName: string; modelId: string }): string {
   if (model.label === REMOVED_PROVIDER_LABEL) return REMOVED_PROVIDER_LABEL
   return `${model.providerName} · ${model.modelId}`
 }
@@ -96,7 +110,7 @@ function findComposerBox(trigger: HTMLElement | null): HTMLElement | null {
   return global instanceof HTMLElement ? global : null
 }
 
-/** One picker: Rhizome catalog from Settings through the composer. Not an engine control. */
+/** One picker: Rhizome catalog on the native engine, Prime catalog on a Prime chat. */
 export function NativeChatModelPicker({
   value,
   onChange,
@@ -104,6 +118,8 @@ export function NativeChatModelPicker({
   variant = 'row',
   locale = 'en',
   onOpenProviders,
+  engine = 'native',
+  vaultPath,
 }: {
   value: string | null | undefined
   onChange: (target: string) => void
@@ -111,6 +127,8 @@ export function NativeChatModelPicker({
   variant?: 'row' | 'chip'
   locale?: AppLocale
   onOpenProviders?: () => void
+  engine?: 'native' | 'prime'
+  vaultPath?: string
 }) {
   const t = createTranslator(locale)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -119,28 +137,71 @@ export function NativeChatModelPicker({
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [models, setModels] = useState<RhizomeChatModel[]>(() => seedRhizomeChatModels(providers))
+  const [primeModels, setPrimeModels] = useState<PrimeModel[]>([])
   const [loadingNames, setLoadingNames] = useState<string[]>([])
   const [offlineNames, setOfflineNames] = useState<string[]>([])
   const [menuSide, setMenuSide] = useState<ComposerMenuSide>(variant === 'chip' ? 'top' : 'bottom')
   const [sideOffset, setSideOffset] = useState(4)
-  const selectedId = resolveNativeChatTarget(value, providers)
+  const primeHost = usePrimeHostStatus(engine === 'prime', vaultPath)
+  const prime = engine === 'prime'
+  const primeSelectedId = primeHost.modelProvider && primeHost.modelId
+    ? `${primeHost.modelProvider}/${primeHost.modelId}`
+    : null
+  const selectedId = prime
+    ? (primeSelectedId ?? resolveNativeChatTarget(value, providers))
+    : resolveNativeChatTarget(value, providers)
   const listed = includeRemovedProviderModel(models, selectedId)
-  const selected = resolveRhizomeChatModel(listed, selectedId)
-  const visibleName = selected ? rhizomeModelVisibleName(selected) : selectedId
+  const selectedRhizome = resolveRhizomeChatModel(listed, selectedId)
+  const selectedPrime = primeModels.find((model) => modelKey(model) === selectedId) ?? null
+  const visibleName = prime
+    ? (primeModelLabel(primeHost) ?? selectedPrime?.name ?? selectedId)
+    : (selectedRhizome ? rhizomeModelVisibleName(selectedRhizome) : selectedId)
   const triggerLabel = variant === 'chip'
     ? middleEllipsis(visibleName, NATIVE_CHAT_MODEL_CHIP_LABEL_MAX_CHARS)
-    : (selected?.label ?? visibleName)
-  const accessibleName = selected ? modelAccessibleName(selected) : selectedId
-  const keyed = excludeKeylessRhizomeModels(listed, providers)
-  const visible = filterRhizomeChatModels(keyed, query)
-  const groups = groupsWithLiveHeadings(
-    groupRhizomeChatModels(visible),
-    liveProviderHeadingNames(providers),
-    query,
-  )
-  const keylessCount = countKeylessRhizomeProviders(listed, providers)
-  const removed = selected?.label === REMOVED_PROVIDER_LABEL
+    : (prime ? visibleName : (selectedRhizome?.label ?? visibleName))
+  const accessibleName = prime
+    ? (selectedPrime
+      ? `${selectedPrime.provider} · ${selectedPrime.id}`
+      : visibleName)
+    : (selectedRhizome ? modelAccessibleName(selectedRhizome) : selectedId)
+  const keyed = excludeKeylessRhizomeModels(listed, providers, selectedId)
+  const visibleRhizome = filterRhizomeChatModels(keyed, query)
+  const needle = query.trim().toLowerCase()
+  const visiblePrime = needle
+    ? primeModels.filter((model) =>
+      [model.provider, model.name, model.id].some((field) => field.toLowerCase().includes(needle)))
+    : primeModels
+  const primeGroups = groupModelsByProvider(visiblePrime)
+  const liveNames = liveProviderHeadingNames(providers)
+  const groups = prime
+    ? primeGroups.map((group) => ({
+      provider: primeProviderLabel(group.provider),
+      live: false,
+      models: group.models.map((model) => ({
+        id: modelKey(model),
+        modelId: model.id,
+        label: model.name || model.id,
+        providerKind: model.provider,
+      })),
+    }))
+    : groupsWithLiveHeadings(
+      groupRhizomeChatModels(visibleRhizome),
+      liveNames,
+      query,
+    ).map((group) => ({
+      provider: group.provider,
+      live: liveNames.includes(group.provider),
+      models: group.models.map((model) => ({
+        id: model.id,
+        modelId: model.modelId,
+        label: rhizomeModelRowLabel(model, keyed),
+        providerKind: model.providerKind,
+      })),
+    }))
+  const keylessCount = prime ? 0 : countKeylessRhizomeProviders(listed, providers)
+  const removed = !prime && selectedRhizome?.label === REMOVED_PROVIDER_LABEL
   const chip = variant === 'chip'
+  const showFooter = chip && !prime
 
   useEffect(() => {
     setModels(seedRhizomeChatModels(providers))
@@ -152,6 +213,14 @@ export function NativeChatModelPicker({
       return
     }
     let cancelled = false
+    if (prime) {
+      void loadPrimeModelCatalog().then((next) => {
+        if (!cancelled) setPrimeModels(next)
+      })
+      return () => {
+        cancelled = true
+      }
+    }
     setLoadingNames(pendingLiveProviderNames(providers))
     void loadLiveRhizomeChatModels(providers).then((next) => {
       if (cancelled) return
@@ -162,7 +231,7 @@ export function NativeChatModelPicker({
     return () => {
       cancelled = true
     }
-  }, [open, providers])
+  }, [open, prime, providers])
 
   useEffect(() => {
     if (open) filterRef.current?.focus()
@@ -201,6 +270,20 @@ export function NativeChatModelPicker({
     )
   }
 
+  const pick = async (id: string, providerKind: string) => {
+    if (prime) {
+      const model = primeModels.find((entry) => modelKey(entry) === id)
+      if (!model) return
+      const vault = vaultPath?.trim()
+      if (vault) await callHost('ensure_prime_session_host', { vaultPath: vault })
+      await callHost('set_prime_model', { provider: model.provider, modelId: model.id })
+      trackPrimeModelChanged(model.provider)
+      return
+    }
+    onChange(id)
+    trackRhizomeModelChanged(providerKind)
+  }
+
   return (
     <div
       className={
@@ -209,6 +292,7 @@ export function NativeChatModelPicker({
           : 'flex items-center gap-2 px-3 py-2'
       }
       data-testid="native-chat-model-picker"
+      data-engine={engine}
     >
       {chip ? null : <span className="text-xs text-muted-foreground">{t('ai.composer.modelLabel')}</span>}
       <DropdownMenu
@@ -217,7 +301,7 @@ export function NativeChatModelPicker({
           if (next) {
             updateMenuPlacement()
             setQuery('')
-            setLoadingNames(pendingLiveProviderNames(providers))
+            setLoadingNames(prime ? [] : pendingLiveProviderNames(providers))
           }
           setOpen(next)
         }}
@@ -264,7 +348,7 @@ export function NativeChatModelPicker({
             event.preventDefault()
             triggerRef.current?.focus()
           }}
-          className={cn(MENU_PANEL_CLASS, chip ? undefined : 'z-[12000]')}
+          className={cn(MENU_PANEL_CLASS, chip ? undefined : SETTINGS_MENU_Z_CLASS)}
           data-testid="native-chat-model-menu"
           data-settings-panel-portal={chip ? undefined : 'true'}
         >
@@ -323,9 +407,7 @@ export function NativeChatModelPicker({
                     data-testid="native-chat-model-provider"
                   >
                     <span>{group.provider}</span>
-                    {(() => {
-                      const live = liveProviderHeadingNames(providers).includes(group.provider)
-                      if (!live) return null
+                    {prime || !group.live ? null : (() => {
                       const loading = loadingNames.includes(group.provider)
                       const offline = !loading && offlineNames.includes(group.provider)
                       const status = loading ? LOADING_STATUS : offline ? OFFLINE_STATUS : LOADING_STATUS
@@ -350,7 +432,6 @@ export function NativeChatModelPicker({
                     })()}
                   </DropdownMenuLabel>
                   {group.models.map((model) => {
-                    const label = rhizomeModelRowLabel(model, keyed)
                     const isSelected = model.id === selectedId
                     return (
                       <DropdownMenuItem
@@ -361,11 +442,12 @@ export function NativeChatModelPicker({
                         data-testid={`native-chat-model-${model.id}`}
                         data-selected={isSelected ? 'true' : undefined}
                         onSelect={() => {
-                          onChange(model.id)
-                          trackRhizomeModelChanged(model.providerKind)
+                          void pick(model.id, model.providerKind)
                         }}
                       >
-                        <span className="min-w-0 flex-1 truncate">{label}</span>
+                        <span className="min-w-0 flex-1 truncate text-foreground" title={model.modelId}>
+                          {model.label}
+                        </span>
                         {isSelected ? (
                           <Check
                             size={16}
@@ -381,7 +463,7 @@ export function NativeChatModelPicker({
               ))
             )}
           </div>
-          {chip ? (
+          {showFooter ? (
             <div className="shrink-0" data-testid="native-chat-model-footer">
               <div className={GROUP_SEP_CLASS} data-testid="native-chat-model-footer-sep" />
               {keylessCount > 0 ? (
@@ -390,12 +472,17 @@ export function NativeChatModelPicker({
                   data-testid="native-chat-model-open-providers"
                 >
                   <span className="text-muted-foreground" data-testid="native-chat-model-keyless-note">
-                    {`${keylessCount} providers need a key · `}
+                    {keylessCount === 1
+                      ? `${t('ai.composer.providerNeedsKey')} · `
+                      : `${t('ai.composer.providersNeedKey', { count: String(keylessCount) })} · `}
                   </span>
-                  <Button
+                  <button
                     type="button"
-                    variant="link"
-                    className="h-auto p-0 text-[12px] font-normal text-primary underline-offset-4"
+                    className={cn(
+                      'rounded-sm text-[12px] font-normal text-[var(--link-color)] underline-offset-2',
+                      'hover:underline',
+                      CHAT_FOCUS_RING_CLASS,
+                    )}
                     data-testid="native-chat-model-open-settings"
                     onPointerDown={(event) => {
                       event.preventDefault()
@@ -405,8 +492,8 @@ export function NativeChatModelPicker({
                       setOpen(false)
                     }}
                   >
-                    Open settings
-                  </Button>
+                    {t('ai.composer.openSettings')}
+                  </button>
                 </div>
               ) : null}
               <p

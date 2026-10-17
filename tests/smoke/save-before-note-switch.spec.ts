@@ -4,6 +4,7 @@ import { test, expect, type Page } from '@playwright/test'
 import {
   createFixtureVaultCopy,
   openFixtureVaultDesktopHarness,
+  openNotesPanelFromClosedShell,
   removeFixtureVaultCopy,
 } from '../helpers/fixtureVault'
 import { executeCommand, openCommandPalette, SMOKE_UI_READY_TIMEOUT } from './helpers'
@@ -48,12 +49,7 @@ async function openNote(page: Page, title: string) {
     try {
       await noteList.waitFor({ state: 'visible', timeout: 5_000 })
     } catch {
-      const restore = page.getByTestId('vault-panel-restore')
-      if (await restore.isVisible().catch(() => false)) {
-        await restore.click()
-      } else if (!(await page.getByTestId('vault-panel').isVisible().catch(() => false))) {
-        await page.getByTestId('vault-panel-restore').click()
-      }
+      await openNotesPanelFromClosedShell(page)
       await expect(noteList).toBeVisible()
     }
   }
@@ -222,7 +218,7 @@ test('@smoke switching notes persists unsaved raw edits without waiting for the 
 
   await openNote(page, 'Alpha Project')
 
-  await expect(page.getByTestId('breadcrumb-filename-trigger')).toContainText('alpha-project', { timeout: 5_000 })
+  await expect(page.getByTestId('breadcrumb-filename-trigger')).toHaveAttribute('title', 'alpha-project')
   await expect.poll(async () => getRawEditorContent(page)).toContain('# Alpha Project')
   await expect.poll(
     () => fs.readFileSync(noteBPath, 'utf8'),
@@ -255,7 +251,7 @@ test('@smoke switching notes during a slow rich-editor save writes once and open
   await expect.poll(() => delayedSaveCount(page), { timeout: 5_000 }).toBe(1)
   await releaseDelayedSave(page)
 
-  await expect(page.getByTestId('breadcrumb-filename-trigger')).toContainText('note-c', { timeout: 10_000 })
+  await expect(page.getByTestId('breadcrumb-filename-trigger')).toHaveAttribute('title', 'note-c')
   await expect.poll(
     () => fs.readFileSync(noteBPath, 'utf8'),
     { timeout: 10_000 },
@@ -271,7 +267,7 @@ test('@smoke deleting a property after switching notes keeps the current note ed
   await expect(page.getByTestId('editable-property').filter({ hasText: 'Status' })).toBeVisible()
 
   await openNote(page, 'Alpha Project')
-  await expect(page.getByTestId('breadcrumb-filename-trigger')).toContainText('alpha-project', { timeout: 5_000 })
+  await expect(page.getByTestId('breadcrumb-filename-trigger')).toHaveAttribute('title', 'alpha-project')
 
   const ownerRow = page.getByTestId('editable-property').filter({ hasText: 'Owner' })
   await expect(ownerRow).toBeVisible()
@@ -279,7 +275,7 @@ test('@smoke deleting a property after switching notes keeps the current note ed
   await ownerRow.getByTitle('Delete property').click({ force: true })
 
   await expect(ownerRow).toHaveCount(0)
-  await expect(page.getByTestId('breadcrumb-filename-trigger')).toContainText('alpha-project')
+  await expect(page.getByTestId('breadcrumb-filename-trigger')).toHaveAttribute('title', 'alpha-project')
   await expect.poll(
     () => fs.readFileSync(alphaPath, 'utf8'),
     { timeout: 1_000, intervals: [50, 100, 200, 300, 350] },

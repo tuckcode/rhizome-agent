@@ -13,7 +13,7 @@ import { ChatNotePane } from './ChatNotePane'
 import { useChatNoteContent } from '../hooks/useChatNoteContent'
 import { usePanelWidth } from '../hooks/usePanelWidth'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
-import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
+import { usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
 import { usePrimeActiveSessionTitle } from '../hooks/usePrimeActiveSessionTitle'
 import { resolveChatOpenNote } from '../utils/resolveChatOpenNote'
 import { agentTargets, type AiModelProvider, type AiTarget } from '../lib/aiTargets'
@@ -155,6 +155,7 @@ export default function ChatHome({
   const effectiveEngine = resolveEffectiveChatEngine(engineInput)
   const showPrimeChrome = isPrimeChat && chatTarget?.kind !== 'api_model' && effectiveEngine === 'prime'
   const rhizomeCatalog = effectiveEngine === 'native'
+  const showComposerDeck = isPrimeChat && (showPrimeChrome || rhizomeCatalog)
   if (startedEngine === null && shouldLockEffectiveChatEngine(engineInput)) {
     setEngineLock({ engine: effectiveEngine, ...lockScope })
   }
@@ -308,11 +309,10 @@ export default function ChatHome({
             ) : undefined
           }
           composerDeck={
-            isPrimeChat && (showPrimeChrome || rhizomeCatalog) ? (
+            showComposerDeck ? (
               <ChatComposerDeck
                 locale={locale}
                 vaultPath={vaultPath}
-                hostReady={Boolean(primeHost?.running)}
                 catalog={rhizomeCatalog ? 'rhizome' : 'prime'}
                 nativeTarget={nativeTarget}
                 onNativeTargetChange={onNativeTargetChange}
@@ -322,7 +322,6 @@ export default function ChatHome({
                 onCloseContext={() => {
                   setOpenNote(null)
                 }}
-                model={primeModelLabel(primeHost)}
                 thinkingLevel={primeHost?.thinkingLevel ?? null}
                 activity={
                   // Idle agents are the normal state; only working ones earn

@@ -41,10 +41,12 @@ describe('AiPanelComposer collapsed box', () => {
     expect(box).toHaveAttribute('data-multiline', 'false')
     expect(box).toContainElement(send)
     expect(box.className.split(/\s+/)).toEqual(
-      expect.arrayContaining(['items-center', 'p-1', 'data-[multiline=true]:items-end']),
+      expect.arrayContaining(['items-center', 'p-1', 'bg-background', 'data-[multiline=true]:items-end']),
     )
     expect(box.className).not.toMatch(/px-1\.5/)
     expect(box.className).not.toMatch(/py-0\.5/)
+    expect(box.className).toMatch(/shadow-xs/)
+    expect(box.closest('.chat-column')).not.toHaveClass('bg-background')
 
     expect(editor.className).toMatch(/min-h-\[30px\]/)
     expect(editor.className).not.toMatch(/min-h-\[34px\]/)

@@ -2,6 +2,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test'
 import {
   createFixtureVaultCopy,
   openFixtureVault,
+  openNotesPanelFromClosedShell,
   removeFixtureVaultCopy,
 } from '../helpers/fixtureVault'
 import { sendShortcut, SMOKE_UI_READY_TIMEOUT, waitForKeyboardShortcutsReady } from './helpers'
@@ -17,13 +18,18 @@ async function expectMinimumTarget(locator: Locator, size = 32): Promise<void> {
 }
 
 async function openAlphaProject(page: Page): Promise<void> {
-  const restore = page.getByTestId('vault-panel-restore')
-  if (await restore.isVisible().catch(() => false)) {
-    await restore.click()
-  }
+  await openNotesPanelFromClosedShell(page)
   const noteList = page.getByTestId('note-list-container')
   await noteList.getByText('Alpha Project', { exact: true }).click()
   await expect(page.locator('.app__note-editor:not(.app__note-editor--idle)')).toBeVisible()
+}
+
+async function collapseOpenNotesPanel(page: Page): Promise<void> {
+  const trigger = page.getByTestId('notes-panel-mode-trigger')
+  await expect(trigger).toBeVisible()
+  await trigger.click()
+  await page.getByTestId('notes-panel-mode-rail').click()
+  await expect(page.getByTestId('vault-panel')).toHaveCount(0)
 }
 
 test.describe('Unified shell geometry', () => {
@@ -43,22 +49,23 @@ test.describe('Unified shell geometry', () => {
     await expect(page.getByTestId('command-rail-chat')).toHaveCount(0)
     await expect(page.getByTestId('command-rail-research')).toHaveCount(1)
     await expect(page.getByTestId('command-rail-inbox')).toHaveCount(0)
-    // Fresh launch is Chat with the existing Show Notes restore strip.
+    // Fresh launch is Chat with the Notes rail (#184).
     await expect(page.getByTestId('vault-panel')).toHaveCount(0)
-    await expect(page.getByTestId('vault-panel-restore')).toBeVisible()
+    await expect(page.getByTestId('notes-panel-rail')).toBeVisible()
+    await expectMinimumTarget(page.getByTestId('notes-rail-all'))
     await expect(page.getByTestId('vault-panel-navigation')).toHaveCount(0)
 
     await openFixtureVault(page, tempVaultDir)
     // openFixtureVault already opens Notes so the list is ready.
     const vaultPanel = page.getByTestId('vault-panel')
     const browse = page.getByTestId('vault-panel-browse-toggle')
-    const collapse = page.getByTestId('vault-panel-collapse')
+    const mode = page.getByTestId('notes-panel-mode-trigger')
 
     await expect(vaultPanel).toBeVisible()
     await expect(page.getByTestId('vault-panel-navigation')).toHaveCount(0)
     await expect(page.getByTestId('note-list-container')).toBeVisible()
     await expectMinimumTarget(browse)
-    await expectMinimumTarget(collapse)
+    await expectMinimumTarget(mode, 24)
 
     await browse.click()
     const navigation = page.getByTestId('vault-panel-navigation')
@@ -69,12 +76,9 @@ test.describe('Unified shell geometry', () => {
     await expect(navigation.getByText('Projects', { exact: true }).first()).toBeVisible()
     await expect(page.getByTestId('note-list-container')).toBeVisible()
 
-    const collapseBox = await collapse.boundingBox()
-    if (!collapseBox) throw new Error('Vault collapse button has no bounding box')
-    await collapse.click({ position: { x: collapseBox.width - 1, y: collapseBox.height / 2 } })
-    await expect(vaultPanel).toHaveCount(0)
+    await collapseOpenNotesPanel(page)
 
-    await page.getByTestId('vault-panel-restore').click()
+    await openNotesPanelFromClosedShell(page)
     await expect(page.getByTestId('vault-panel')).toBeVisible()
     await expect(page.getByTestId('vault-panel-navigation')).toHaveCount(0)
     await expect(page.getByTestId('note-list-container')).toBeVisible()
@@ -110,10 +114,9 @@ test.describe('Unified shell geometry', () => {
     await expect(noteEditor).toBeVisible()
     expect(await shell.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1)
 
-    await page.getByTestId('vault-panel-collapse').click()
-    await expect(page.getByTestId('vault-panel')).toHaveCount(0)
-    await expectMinimumTarget(page.getByTestId('vault-panel-restore'))
-    await page.getByTestId('vault-panel-restore').click()
+    await collapseOpenNotesPanel(page)
+    await expectMinimumTarget(page.getByTestId('notes-rail-all'))
+    await openNotesPanelFromClosedShell(page)
     await expect(page.getByTestId('vault-panel')).toBeVisible()
 
     await page.setViewportSize({ width: 1500, height: 900 })
@@ -122,8 +125,7 @@ test.describe('Unified shell geometry', () => {
     await rail.hover()
     await expect(page.getByTestId('prime-session-list')).toBeVisible()
 
-    await page.getByTestId('vault-panel-collapse').click()
-    await expect(page.getByTestId('vault-panel')).toHaveCount(0)
+    await collapseOpenNotesPanel(page)
     await waitForKeyboardShortcutsReady(page)
     await sendShortcut(page, '2', ['Control'])
     await expect(page.getByTestId('vault-panel')).toBeVisible({ timeout: SMOKE_UI_READY_TIMEOUT })
@@ -149,7 +151,7 @@ test.describe('Unified shell geometry', () => {
     await expect(shell).toHaveAttribute('data-compact-vault', 'false')
     await expect(page.getByTestId('chat-note-editor-resize')).toHaveAttribute('aria-orientation', 'vertical')
     await expect(page.getByTestId('vault-panel')).toHaveCount(0)
-    await expectMinimumTarget(page.getByTestId('vault-panel-restore'))
+    await expectMinimumTarget(page.getByTestId('notes-rail-all'))
 
     const noteEditor = page.locator('.app__note-editor:not(.app__note-editor--idle)')
     const noteBox = await noteEditor.boundingBox()
@@ -209,7 +211,7 @@ test.describe('Unified shell geometry', () => {
     await page.screenshot({ path: '/tmp/pane-presets-workbench.png' })
     await page.evaluate(() => window.dispatchEvent(new CustomEvent('laputa:dispatch-command', { detail: 'view-reset-layout' })))
     await expect(shell).toHaveAttribute('data-pane-preset', 'chat')
-    await expect(page.getByTestId('vault-panel-restore')).toBeVisible()
+    await expect(page.getByTestId('notes-panel-rail')).toBeVisible()
     await sendShortcut(page, '3', ['Control'])
     await expect.poll(async () => (await notes.boundingBox())?.width).toBe(240)
     await expect.poll(async () => (await page.getByTestId('vault-panel-navigation').boundingBox())?.width).toBe(240)

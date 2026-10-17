@@ -1,7 +1,7 @@
 import fs from 'fs'
 import { test, expect, type Page } from '@playwright/test'
 import { createFixtureVaultCopy, openFixtureVaultTauri, removeFixtureVaultCopy } from '../helpers/fixtureVault'
-import { SMOKE_UI_READY_TIMEOUT } from './helpers'
+import { expectBreadcrumbFilename, SMOKE_UI_READY_TIMEOUT } from './helpers'
 import { triggerMenuCommand } from './testBridge'
 
 interface CreateNoteProbe {
@@ -142,9 +142,7 @@ test('@smoke creating a note writes its backing file before reload can read it',
   await triggerMenuCommand(page, 'file-new-note')
   await triggerMenuCommand(page, 'vault-reload')
 
-  await expect(page.getByTestId('breadcrumb-filename-trigger')).toContainText(/untitled-note-\d+/i, {
-    timeout: SMOKE_UI_READY_TIMEOUT,
-  })
+  await expectBreadcrumbFilename(page, /untitled-note-\d+/i)
   await expect.poll(() => readProbe(page), { timeout: 5_000 }).toMatchObject({
     createCalls: [expect.stringMatching(/untitled-note-\d+\.md$/)],
     getBeforeCreate: [],

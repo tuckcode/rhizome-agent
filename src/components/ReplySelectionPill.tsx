@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ChatTeardropText } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
+import { SETTINGS_MENU_Z_CLASS } from '../lib/settingsMenuLayer'
 
 interface QuoteAnchor {
   text: string
@@ -57,7 +58,7 @@ export function ReplySelectionPill({ children, onAdd }: ReplySelectionPillProps)
           type="button"
           size="xs"
           variant="secondary"
-          className="fixed z-[12000] -translate-x-1/2 -translate-y-full rounded-full shadow-md"
+          className={`fixed ${SETTINGS_MENU_Z_CLASS} -translate-x-1/2 -translate-y-full rounded-full shadow-md`}
           style={{ top: Math.max(quote.top - 6, 8), left: quote.left }}
           data-testid="reply-selection-pill"
           onMouseDown={(event) => event.preventDefault()}

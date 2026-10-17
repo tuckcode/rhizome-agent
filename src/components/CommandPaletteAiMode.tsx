@@ -1,6 +1,7 @@
 import { Sparkle } from '@phosphor-icons/react'
 import type { VaultEntry } from '../types'
 import type { NoteReference } from '../utils/ai-context'
+import { createTranslator } from '../lib/i18n'
 import { InlineWikilinkInput } from './InlineWikilinkInput'
 
 interface CommandPaletteAiModeProps {
@@ -26,6 +27,7 @@ export function CommandPaletteAiMode({
   onChange,
   onSubmit,
 }: CommandPaletteAiModeProps) {
+  const t = createTranslator()
   return (
     <InlineWikilinkInput
       entries={entries}
@@ -34,7 +36,7 @@ export function CommandPaletteAiMode({
       onChange={onChange}
       onSubmit={(text, references) => onSubmit(stripLeadingSpace(text), references)}
       submitOnEmpty={true}
-      placeholder={`Ask ${aiAgentLabel}...`}
+      placeholder={t('ai.panel.placeholder.ready', { agent: aiAgentLabel })}
       dataTestId="command-palette-ai-input"
       editorClassName="border-none px-0 py-0 text-[15px]"
       suggestionListVariant="palette"

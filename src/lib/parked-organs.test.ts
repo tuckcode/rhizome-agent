@@ -356,8 +356,12 @@ describe('parked organs leftover', () => {
       `${process.cwd()}/src/components/PrimeProviderStatusSection.tsx`,
       'utf8',
     )
-    expect(providers).toContain("anthropic: 'Anthropic'")
-    expect(providers).toContain("deepseek: 'DeepSeek'")
+    const labels = readFileSync(
+      `${process.cwd()}/src/lib/primeProviderLabels.ts`,
+      'utf8',
+    )
+    expect(labels).toContain("anthropic: 'Anthropic'")
+    expect(labels).toContain("deepseek: 'DeepSeek'")
     expect(providers).toContain("connected || provider.expired ? 'Reconnect' : 'Sign in'")
     expect(providers).toContain("return 'Add key'")
   })
@@ -376,14 +380,13 @@ describe('parked organs leftover', () => {
     expect(gs).toContain("'Failed to create scaffold folder'")
   })
 
-  it('keeps model-picker provider labels at text-primary contrast', () => {
+  it('keeps native model-picker group labels sentence-case muted', () => {
     const picker = readFileSync(
-      `${process.cwd()}/src/components/PrimeModelPicker.tsx`,
+      `${process.cwd()}/src/components/NativeChatModelPicker.tsx`,
       'utf8',
     )
-    expect(picker).toContain(
-      "const PROVIDER_LABEL_CLASS = 'font-mono text-[10px] uppercase tracking-[0.1em] text-primary'",
-    )
+    expect(picker).toContain('text-[11px] font-medium text-muted-foreground normal-case tracking-normal')
+    expect(picker).not.toMatch(/uppercase tracking-\[0\.1em\] text-primary/)
   })
 
   it('keeps queued follow-ups visible and does not speak mutate_queued_message', () => {
@@ -1005,15 +1008,15 @@ describe('parked organs leftover', () => {
       'utf8',
     )
     const picker = readFileSync(
-      `${process.cwd()}/src/components/PrimeModelPicker.tsx`,
+      `${process.cwd()}/src/components/NativeChatModelPicker.tsx`,
       'utf8',
     )
     expect(home).toContain('newChatRef.current?.()')
     expect(home).toContain('clearEngineLock()')
     expect(home).toContain('thinkingLevel={primeHost?.thinkingLevel ?? null}')
     expect(home).not.toMatch(/if \(!vaultPath\) return/)
-    expect(picker).toContain('if (!hostReady && vaultPath)')
-    expect(picker).toContain("await callHost('ensure_prime_session_host', { vaultPath })")
+    expect(picker).not.toMatch(/if \(!vaultPath\)/)
+    expect(picker).toContain('data-testid="native-chat-model-picker"')
   })
 
   it('keeps the composer deck optional-vault and does not invent a sheet lock', () => {

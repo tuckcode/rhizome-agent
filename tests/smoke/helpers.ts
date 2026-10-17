@@ -1,4 +1,5 @@
 import { type Page, expect } from '@playwright/test'
+import { openNotesPanelFromClosedShell } from '../helpers/fixtureVault'
 
 const COMMAND_INPUT = 'input[placeholder="Type a command..."]'
 const QUICK_OPEN_INPUT = 'input[placeholder="Search notes..."]'
@@ -7,6 +8,15 @@ const COMMAND_MODIFIER: KeyboardModifier = process.platform === 'darwin' ? 'Meta
 
 /** How long a smoke test waits for a control that is the readiness condition. */
 export const SMOKE_UI_READY_TIMEOUT = 15_000
+
+/** The chip shows the note title; the filename stays on the title attribute. */
+export async function expectBreadcrumbFilename(
+  page: Page,
+  filename: string | RegExp,
+  timeout = SMOKE_UI_READY_TIMEOUT,
+): Promise<void> {
+  await expect(page.getByTestId('breadcrumb-filename-trigger')).toHaveAttribute('title', filename, { timeout })
+}
 
 /**
  * SearchPanel drops a second ArrowUp/ArrowDown when the two keydowns land
@@ -175,29 +185,21 @@ export async function sendShortcut(
 }
 
 /**
- * Chat is the default centre canvas (ADR-0166). C72 opens Notes (editor-list)
- * on fresh launch; rail Inbox toggles that column. Only click Inbox / restore
- * when the note list is not already visible.
+ * Chat is the default centre canvas (ADR-0166). Fresh launch shows the Notes
+ * rail (#184). Only click the rail Open control when the note list is hidden.
  */
 export async function ensureNotesPanelOpen(page: Page) {
   const noteList = page.getByTestId('note-list-container')
   if (await noteList.isVisible().catch(() => false)) return noteList
 
-  // C72: Notes often opens as editor-list. Rail Inbox toggles — do not click it
-  // while the vault panel shell is already present (that would close Notes).
   try {
     await noteList.waitFor({ state: 'visible', timeout: 5_000 })
     return noteList
   } catch {
-    // fall through to restore / open
+    // fall through to the rail / restore control
   }
 
-  const restore = page.getByTestId('vault-panel-restore')
-  if (await restore.isVisible().catch(() => false)) {
-    await restore.click()
-  } else if (!(await page.getByTestId('vault-panel').isVisible().catch(() => false))) {
-    await page.getByTestId('vault-panel-restore').click()
-  }
+  await openNotesPanelFromClosedShell(page)
   await expect(noteList).toBeVisible({ timeout: 10_000 })
   return noteList
 }
