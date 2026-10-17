@@ -176,62 +176,109 @@ fn checksum_value(seq: u64, value: &serde_json::Value) -> String {
         .collect()
 }
 
-pub fn scrub_secrets(text: &str) -> String {
-    let mut out = text.to_string();
-    for secret in saved_secret_values() {
-        if secret.len() >= 8 {
-            out = out.replace(&secret, "[redacted]");
-        }
-    }
-    // `\bapi_key` misses `OPENAI_API_KEY` because `_` is a word character.
-    // Keep the character before the name so a newline in `cat .env` output stays.
-    let env_assignment = r#"(?P<prefix>(?:^|[^A-Za-z0-9])(?:(?:export|set)[ \t]+)?)(?P<name>(?:[A-Z][A-Z0-9_]*(?:API_KEY|TOKEN|SECRET)(?:_[A-Z0-9]+)*|api_key)[ \t]*=[ \t]*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^[:space:]#]+)"#;
-    if let Ok(regex) = regex::Regex::new(env_assignment) {
-        out = regex
-            .replace_all(&out, "${prefix}${name}[redacted]")
-            .into_owned();
-    }
-    let patterns = [
-        r"(?:sk-proj-|sk-or-v1-|sk-ant-|gsk_)[A-Za-z0-9_-]{8,}",
-        r"(?:sk_live_|sk_test_|sk-|ghp_|gho_|ghs_|ghu_|ghr_|github_pat_|glpat-|gsk_|npm_|xox[abprse]-)[A-Za-z0-9_-]{20,}",
-        r"hf_[A-Za-z0-9]{20,}",
-        r"xai-[A-Za-z0-9]{20,}",
-        r"nvapi-[A-Za-z0-9_-]{20,}",
-        r"AIza[0-9A-Za-z_-]{20,}",
-        r"pplx-[A-Za-z0-9]{20,}",
-        r"AKIA[0-9A-Z]{16}",
-        r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----",
-        r"(?i)bearer\s+[A-Za-z0-9._\-+/=]+",
-        r#"(?i)"api_key"\s*:\s*"[^"]+""#,
-    ];
-    for pattern in patterns {
-        if let Ok(regex) = regex::Regex::new(pattern) {
-            out = regex.replace_all(&out, "[redacted]").into_owned();
-        }
-    }
-    scrub_bare_mistral_keys(&out)
+/// One read of saved provider keys, reused across every string in a call.
+pub(crate) struct SecretScrub {
+    values: Vec<String>,
 }
 
-/// Mistral keys are 32 alphanumeric characters with no prefix. Redact one
-/// only when `mistral` (or `api.mistral.ai`) sits within 200 characters,
-/// so a checksum in ordinary text stays.
-fn scrub_bare_mistral_keys(text: &str) -> String {
-    let Ok(context) = regex::Regex::new(r"(?i)mistral|api\.mistral\.ai") else {
-        return text.to_string();
-    };
-    let Ok(key) = regex::Regex::new(r"\b[A-Za-z0-9]{32}\b") else {
-        return text.to_string();
-    };
-    let contexts: Vec<(usize, usize)> = context
+impl SecretScrub {
+    pub(crate) fn capture() -> Self {
+        Self {
+            values: saved_secret_values(),
+        }
+    }
+
+    pub(crate) fn apply(&self, text: &str) -> String {
+        apply_scrub(text, &self.values)
+    }
+}
+
+pub fn scrub_secrets(text: &str) -> String {
+    SecretScrub::capture().apply(text)
+}
+
+fn apply_scrub(text: &str, saved: &[String]) -> String {
+    let mut out = text.to_string();
+    for secret in saved {
+        if secret.len() >= 8 {
+            out = out.replace(secret, "[redacted]");
+        }
+    }
+    let scrubbers = scrub_regexes();
+    out = scrubbers
+        .assignment
+        .replace_all(&out, "${head}[redacted]")
+        .into_owned();
+    for pattern in &scrubbers.patterns {
+        out = pattern.replace_all(&out, "[redacted]").into_owned();
+    }
+    scrub_bare_mistral_keys(&out, scrubbers)
+}
+
+struct ScrubRegexes {
+    assignment: regex::Regex,
+    patterns: Vec<regex::Regex>,
+    mistral_context: regex::Regex,
+    mistral_key: regex::Regex,
+}
+
+fn scrub_regexes() -> &'static ScrubRegexes {
+    // OnceLock, not LazyLock: LazyLock needs Rust 1.80 and this crate's MSRV is 1.77.2.
+    static SCRUBBERS: std::sync::OnceLock<ScrubRegexes> = std::sync::OnceLock::new();
+    SCRUBBERS.get_or_init(|| {
+        // The prefix before `_` is optional, so bare `API_KEY` matches.
+        // `api_key` is any case. `=` and `:` both count, including `"X_API_KEY": "v"`.
+        let assignment = regex::Regex::new(
+            r#"(?P<head>(?:^|[^A-Za-z0-9])(?:(?:export|set)[ \t]+)?["']?(?i:(?:[A-Z][A-Z0-9_]*_)?(?:API_KEY|PASSWORD|SECRET|TOKEN|KEY)(?:_[A-Z0-9]+)*)["']?[ \t]*[:=][ \t]*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^[:space:]#]+)"#,
+        )
+        .expect("assignment scrubber");
+        let patterns = [
+            r"(?:sk-proj-|sk-or-v1-|sk-ant-|gsk_)[A-Za-z0-9_-]{8,}",
+            r"(?:sk_live_|sk_test_|sk-|ghp_|gho_|ghs_|ghu_|ghr_|github_pat_|glpat-|gsk_|npm_|xox[abprse]-)[A-Za-z0-9_-]{20,}",
+            r"hf_[A-Za-z0-9]{20,}",
+            r"xai-[A-Za-z0-9]{20,}",
+            r"nvapi-[A-Za-z0-9_-]{20,}",
+            r"\bAIza[0-9A-Za-z_-]{35}\b",
+            r"pplx-[A-Za-z0-9_-]{20,}",
+            r"AKIA[0-9A-Z]{16}",
+            r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----",
+            r"(?i)bearer\s+[A-Za-z0-9._\-+/=]+",
+            r#"(?i)"api_key"\s*:\s*"[^"]+""#,
+        ]
+        .into_iter()
+        .map(|pattern| regex::Regex::new(pattern).expect(pattern))
+        .collect();
+        ScrubRegexes {
+            assignment,
+            patterns,
+            mistral_context: regex::Regex::new(r"(?i)mistral|api\.mistral\.ai")
+                .expect("mistral context"),
+            mistral_key: regex::Regex::new(r"\b[A-Za-z0-9]{32}\b").expect("mistral key"),
+        }
+    })
+}
+
+/// A bare Mistral key is 32 letters and digits with both cases, and only
+/// when `mistral` is within 200 bytes. An MD5, a dashless UUID, and a
+/// 40-hex SHA stay.
+fn scrub_bare_mistral_keys(text: &str, scrubbers: &ScrubRegexes) -> String {
+    let contexts: Vec<(usize, usize)> = scrubbers
+        .mistral_context
         .find_iter(text)
-        .map(|m| (m.start(), m.end()))
+        .map(|matched| (matched.start(), matched.end()))
         .collect();
     if contexts.is_empty() {
         return text.to_string();
     }
     let mut out = String::with_capacity(text.len());
     let mut last = 0;
-    for matched in key.find_iter(text) {
+    for matched in scrubbers.mistral_key.find_iter(text) {
+        let token = matched.as_str();
+        let mixed_case = token.chars().any(|ch| ch.is_ascii_uppercase())
+            && token.chars().any(|ch| ch.is_ascii_lowercase());
+        if !mixed_case {
+            continue;
+        }
         let near = contexts.iter().any(|&(start, end)| {
             let gap = if matched.end() < start {
                 start - matched.end()
@@ -279,30 +326,31 @@ fn saved_secret_values() -> Vec<String> {
 }
 
 fn scrub_event(event: &DurableEvent) -> DurableEvent {
+    let scrub = SecretScrub::capture();
     match event.clone() {
         DurableEvent::User { text } => DurableEvent::User {
-            text: scrub_secrets(&text),
+            text: scrub.apply(&text),
         },
         DurableEvent::Assistant { text } => DurableEvent::Assistant {
-            text: scrub_secrets(&text),
+            text: scrub.apply(&text),
         },
         DurableEvent::ToolCall { id, name, args } => DurableEvent::ToolCall {
             id,
             name,
-            args: scrub_secrets(&args),
+            args: scrub.apply(&args),
         },
         DurableEvent::ToolResult { id, name, output } => DurableEvent::ToolResult {
             id,
             name,
-            output: cap_tool_result(scrub_secrets(&output)),
+            output: cap_tool_result(scrub.apply(&output)),
         },
         DurableEvent::ToolDenied { id, name, reason } => DurableEvent::ToolDenied {
             id,
             name,
-            reason: scrub_secrets(&reason),
+            reason: scrub.apply(&reason),
         },
         DurableEvent::ModelFailed { message } => DurableEvent::ModelFailed {
-            message: scrub_secrets(&message),
+            message: scrub.apply(&message),
         },
         other => other,
     }
@@ -1054,8 +1102,8 @@ mod tests {
                 "hf_abcdefghijklmnopqrstuvwxyz",
             ),
             (
-                "pplx-abcdefghijklmnopqrstuvwxyz",
-                "pplx-abcdefghijklmnopqrstuvwxyz",
+                "pplx-abcd_efgh-ijklmnopqrstuvwx",
+                "pplx-abcd_efgh-ijklmnopqrstuvwx",
             ),
         ];
         for (input, secret) in cases {
@@ -1066,6 +1114,82 @@ mod tests {
     }
 
     #[test]
+    fn scrub_secrets_redacts_api_key_assignment() {
+        assert_redacted("API_KEY=supersecret", "supersecret");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_exported_api_key_assignment() {
+        assert_redacted("export API_KEY=supersecret", "supersecret");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_mixed_case_api_key_assignment() {
+        assert_redacted("Api_Key=supersecret", "supersecret");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_token_assignment() {
+        assert_redacted("TOKEN=supersecret", "supersecret");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_secret_assignment() {
+        assert_redacted("SECRET=supersecret", "supersecret");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_secret_key_base_assignment() {
+        assert_redacted("SECRET_KEY_BASE=supersecret", "supersecret");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_openai_key_assignment() {
+        assert_redacted("OPENAI_KEY=supersecret", "supersecret");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_db_password_assignment() {
+        assert_redacted("DB_PASSWORD=supersecret", "supersecret");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_yaml_api_key() {
+        assert_redacted("X_API_KEY: supersecret", "supersecret");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_json_api_key() {
+        assert_redacted(r#""X_API_KEY": "supersecret""#, "supersecret");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_aiza_after_a_boundary_only() {
+        let key = "AIzaSyABCDEFGHIJKLMNOPQRSTUVWXYZ1234567";
+        assert_redacted(&format!("?key={key}"), key);
+        let glued = format!("thin{key}");
+        assert_eq!(scrub_secrets(&glued), glued);
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_mistral_model_names_md5_and_shas() {
+        assert_eq!(scrub_secrets("mistral-large-2411"), "mistral-large-2411");
+        let md5 = format!("{}{}", "d41d8cd98f00b204", "e9800998ecf8427e");
+        let near_md5 = format!("mistral commit {md5}");
+        assert_eq!(scrub_secrets(&near_md5), near_md5);
+        let sha = "0123456789abcdef0123456789abcdef01234567";
+        assert_eq!(sha.len(), 40);
+        let near_sha = format!("mistral {sha}");
+        assert_eq!(scrub_secrets(&near_sha), near_sha);
+    }
+
+    fn assert_redacted(input: &str, secret: &str) {
+        let scrubbed = scrub_secrets(input);
+        assert!(!scrubbed.contains(secret), "{input} -> {scrubbed}");
+        assert!(scrubbed.contains("[redacted]"), "{input} -> {scrubbed}");
+    }
+
+    #[test]
     fn scrub_secrets_keeps_ordinary_text_and_redacts_dotenv_output() {
         let mistral = bare_mistral_sample();
         let checksum = format!("checksum {mistral} stays");
@@ -1073,7 +1197,7 @@ mod tests {
             "The garden needs water before noon.",
             "use hf_hub_download to fetch the file",
             "Set the token in the settings screen.",
-            "secret=sauce is a recipe",
+            "the secret sauce is a recipe",
             "OPENAI_API_KEY is the variable name",
             "The word AIza appears in a short note.",
             "PATH=/usr/bin",
