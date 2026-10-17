@@ -185,17 +185,20 @@ pub async fn save_note_content_checked(
                 &content,
                 expected_content.as_deref(),
             )?;
-            let artifact_path = crate::rhizome_write_location::relative_to_vault(
-                vault_root,
-                Path::new(validated_path),
-            );
-            crate::rhizome_distill::append_vault_event_best_effort(
-                vault_root,
-                "edit",
-                None,
-                "manual_edit",
-                &artifact_path,
-            );
+            // A save that wrote nothing is not an edit.
+            if outcome.written {
+                let artifact_path = crate::rhizome_write_location::relative_to_vault(
+                    vault_root,
+                    Path::new(validated_path),
+                );
+                crate::rhizome_distill::append_vault_event_best_effort(
+                    vault_root,
+                    "edit",
+                    None,
+                    "manual_edit",
+                    &artifact_path,
+                );
+            }
             Ok(outcome)
         })
     })

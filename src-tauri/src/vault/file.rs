@@ -18,6 +18,9 @@ pub struct SaveOutcome {
     /// Set when the on-disk `Status` was spliced into the buffer. The
     /// editor must take this text as its new buffer.
     pub spliced_content: Option<String>,
+    /// False when the disk already held the text, so nothing was written.
+    #[serde(skip)]
+    pub written: bool,
 }
 
 /// Read file metadata (modified_at timestamp, created_at timestamp, file size).
@@ -51,13 +54,15 @@ fn is_retryable_save_error(error: &Error) -> bool {
         || (cfg!(windows) && error.raw_os_error() == Some(5))
 }
 
-fn write_with_retry(
-    mut write_once: impl FnMut() -> Result<(), Error>,
+/// Runs one file operation, retrying the errors antivirus scanners and
+/// sync clients (Windows Defender, OneDrive) cause for a moment.
+fn write_with_retry<T>(
+    mut write_once: impl FnMut() -> Result<T, Error>,
     mut wait_before_retry: impl FnMut(u64),
-) -> Result<(), Error> {
+) -> Result<T, Error> {
     for delay in SAVE_RETRY_DELAYS_MS {
         match write_once() {
-            Ok(()) => return Ok(()),
+            Ok(value) => return Ok(value),
             Err(error) if is_retryable_save_error(&error) => wait_before_retry(delay),
             Err(error) => return Err(error),
         }
@@ -202,7 +207,10 @@ pub fn save_note_content_expecting(
         return Ok(saved(content));
     };
     let normalized_path = RawNotePath(path).normalized_for_file_io();
-    let disk = match fs::read(Path::new(normalized_path.as_ref())) {
+    let disk = match write_with_retry(
+        || fs::read(Path::new(normalized_path.as_ref())),
+        |delay| thread::sleep(Duration::from_millis(delay)),
+    ) {
         Ok(bytes) => bytes,
         Err(error) if error.kind() == ErrorKind::NotFound => {
             return Err(conflict(path, "was deleted or moved"));
@@ -222,7 +230,10 @@ pub fn save_note_content_expecting(
         return Ok(saved(content));
     }
     if disk == content {
-        return Ok(saved(content));
+        return Ok(SaveOutcome {
+            written: false,
+            ..saved(content)
+        });
     }
     match crate::board::splice_disk_status(&disk, content, expected) {
         Some(spliced) => {
@@ -230,6 +241,7 @@ pub fn save_note_content_expecting(
             Ok(SaveOutcome {
                 content_hash: crate::board::content_hash(&spliced),
                 spliced_content: Some(spliced),
+                written: true,
             })
         }
         None => Err(conflict(path, "changed on disk since the editor read it")),
@@ -240,6 +252,7 @@ fn saved(content: &str) -> SaveOutcome {
     SaveOutcome {
         content_hash: crate::board::content_hash(content),
         spliced_content: None,
+        written: true,
     }
 }
 
@@ -355,6 +368,7 @@ mod tests {
             let dir = TempDir::new().unwrap();
             let path = note(&dir, OPENED);
             let outcome = save_note_content_expecting(&path, "changed\n", None).unwrap();
+            assert!(outcome.written);
             assert_eq!(disk(&path), "changed\n");
             assert_eq!(outcome.content_hash, content_hash("changed\n"));
             assert_eq!(outcome.spliced_content, None);
@@ -471,6 +485,7 @@ mod tests {
             let path = note(&dir, &buffer);
             let outcome = save_note_content_expecting(&path, &buffer, Some(OPENED)).unwrap();
             assert_eq!(outcome.spliced_content, None);
+            assert!(!outcome.written);
             assert_eq!(disk(&path), buffer);
         }
 

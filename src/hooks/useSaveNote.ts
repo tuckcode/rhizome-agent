@@ -11,14 +11,6 @@ export interface SaveOutcome {
   splicedContent: string | null
 }
 
-export async function persistContent(path: string, content: string): Promise<void> {
-  if (isTauri()) {
-    await invoke('save_note_content', { path, content })
-  } else {
-    await mockInvoke('save_note_content', { path, content })
-  }
-}
-
 /**
  * Save with the conflict check. Returns the text now on disk: the buffer,
  * or the buffer with a Status a board move wrote. A real conflict throws

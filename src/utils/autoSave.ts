@@ -1,4 +1,5 @@
-import { persistContent } from '../hooks/useSaveNote'
+import { setSaveBaseline } from '../hooks/noteContentCache'
+import { persistContentChecked } from '../hooks/useSaveNote'
 
 export interface FlushDeps {
   savePendingForPath: (path: string) => Promise<boolean>
@@ -22,7 +23,10 @@ export async function flushEditorContent(path: string, deps: FlushDeps): Promise
   if (tabContent === undefined) return
 
   if (deps.isUnsaved(path)) {
-    await persistContent(path, tabContent)
-    deps.onSaved?.(path, tabContent)
+    // Same conflict check as the editor save, so a destructive action
+    // never writes over a newer note on disk.
+    const saved = await persistContentChecked(path, tabContent)
+    setSaveBaseline(path, saved)
+    deps.onSaved?.(path, saved)
   }
 }
