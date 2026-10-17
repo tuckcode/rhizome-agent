@@ -248,7 +248,7 @@ export function AiWorkspaceWindowApp() {
     aiWorkspaceWindowSharedContextSnapshot,
     aiWorkspaceWindowSharedContextSnapshot,
   )
-  const { settings, loaded: settingsLoaded, saveSettings } = useSettings()
+  const { settings, loaded: settingsLoaded, loadError, saveSettings } = useSettings()
   const aiAgentsStatus = useAiAgentsStatus()
   const preferences = useAppPreferences({
     aiAgentsStatus,
@@ -342,7 +342,7 @@ export function AiWorkspaceWindowApp() {
             chatEngine={settingsLoaded ? chatEngineFromSettings(settings) : undefined}
             nativeTarget={settingsLoaded ? settings.native_chat_target ?? undefined : undefined}
             conversationSettings={settings.ai_workspace_conversations ?? null}
-            conversationSettingsReady={settingsLoaded}
+            conversationSettingsReady={settingsLoaded && loadError == null}
             defaultAiAgent={preferences.aiAgentPreferences.defaultAiAgent}
             defaultAiTarget={preferences.aiAgentPreferences.defaultAiTarget}
             defaultAiAgentReadiness={preferences.aiAgentPreferences.defaultAiAgentReadiness}

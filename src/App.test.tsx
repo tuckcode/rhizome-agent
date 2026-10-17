@@ -1473,6 +1473,64 @@ describe('App', () => {
     expect(streamAiAgent).not.toHaveBeenCalled()
   })
 
+  it('does not write settings when get_settings throws and No thanks is clicked', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mockCommandResults.get_settings = () => Promise.reject(new Error('disk'))
+
+    render(<App />)
+
+    await screen.findByText('All Notes', {}, { timeout: SLOW_APP_READY_TIMEOUT_MS })
+    // A failed load used to show this button and save the empty settings.
+    // The prompt now waits for a successful load, so the click cannot wipe the file.
+    const decline = screen.queryByTestId('telemetry-decline')
+    if (decline) fireEvent.click(decline)
+
+    expect(decline).not.toBeInTheDocument()
+    expect(vi.mocked(invoke).mock.calls.filter((call) => call[0] === 'save_settings')).toHaveLength(0)
+    warnSpy.mockRestore()
+  })
+
+  it('merges a chat target change onto disk after a failed load retries', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    sessionStorage.removeItem(AGENT_CHAT_OPENED_SESSION_KEY)
+    let reads = 0
+    const stored = createSettings({
+      telemetry_consent: true,
+      theme_mode: 'dark',
+      chat_engine: 'native',
+      native_chat_target: 'openai/gpt-4.1-mini',
+      auto_pull_interval_minutes: 15,
+    })
+    mockCommandResults.get_settings = () => {
+      reads += 1
+      if (reads === 1) return Promise.reject(new Error('disk'))
+      return stored
+    }
+
+    render(<App />)
+
+    fireEvent.pointerDown(
+      await screen.findByTestId('native-chat-model-trigger', {}, { timeout: SLOW_APP_READY_TIMEOUT_MS }),
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+    fireEvent.click(await screen.findByTestId('native-chat-model-free_tier_auto'))
+
+    await waitFor(() => {
+      const saves = vi.mocked(invoke).mock.calls.filter((call) => call[0] === 'save_settings')
+      expect(saves).toHaveLength(1)
+      expect(saves[0]?.[1]).toEqual(expect.objectContaining({
+        settings: expect.objectContaining({
+          native_chat_target: 'free_tier_auto',
+          theme_mode: 'dark',
+          telemetry_consent: true,
+          auto_pull_interval_minutes: 15,
+          chat_engine: 'native',
+        }),
+      }))
+    })
+    warnSpy.mockRestore()
+  })
+
   it('shows onboarding after telemetry consent when no active vault is configured', async () => {
     mockCommandResults.get_settings = createSettings({ telemetry_consent: null })
     mockCommandResults.load_vault_list = { vaults: [], active_vault: null, hidden_defaults: [] }
