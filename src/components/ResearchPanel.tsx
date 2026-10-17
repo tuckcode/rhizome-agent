@@ -148,6 +148,7 @@ function ResearchLibraryScanError({
       <div className="mt-2 flex items-center gap-2">
         <Button
           type="button"
+          variant="outline"
           size="sm"
           onClick={onRetry}
           data-testid="research-library-scan-retry"

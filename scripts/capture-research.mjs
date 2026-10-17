@@ -38,8 +38,9 @@ for (const [theme, state] of shots) {
     await page.getByText('ENOENT: library root is missing').waitFor()
   }
   if (state === 'retry-focus') {
-    await page.getByRole('button', { name: 'Details' }).focus()
-    await page.keyboard.press('Shift+Tab')
+    await page.waitForFunction(() => (
+      document.activeElement?.getAttribute('data-testid') === 'research-library-scan-retry'
+    ))
   }
   await page.waitForTimeout(200)
   const file = path.join(outDir, `${theme}-${state}.png`)

@@ -28,7 +28,18 @@ the label Regular, with a one-line description each (Regular = typical
 coverage for most repos). Destination and Local use the Phosphor Folder
 icon. Format title is sentence case: Architecture map.
 
-Review shots: `docs/review-shots/audit-research/`.
+Review shots in `docs/review-shots/audit-research/` (Graphite dark + Earth light):
+
+- `*-empty.png`
+- `*-depth-open.png`
+- `*-error.png`
+- `*-error-details.png`
+- `*-retry-focus.png`
+
+Regenerate: `pnpm exec vite --port 4178` then
+`node scripts/capture-research.mjs http://127.0.0.1:4178/scripts/research-shots.html docs/review-shots/audit-research`.
+
+Gates: `pnpm lint`, `pnpm typecheck`, `pnpm test` — 7460 passed, 1 skipped.
 
 Localization: none — English only (C18).
 PostHog: no event needed because this is scan recovery and empty-state copy.

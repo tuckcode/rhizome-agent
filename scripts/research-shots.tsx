@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ResearchPanel } from '../src/components/ResearchPanel'
 import '../src/index.css'
@@ -52,6 +53,28 @@ if (failScan) {
 }
 
 export function Shot() {
+  useEffect(() => {
+    const style = document.createElement('style')
+    style.textContent = `
+      [data-state="retry-focus"] [data-testid="research-library-scan-retry"]:focus {
+        box-shadow: 0 0 0 2px var(--state-focus-ring) !important;
+        border-color: var(--ring) !important;
+      }
+    `
+    document.head.appendChild(style)
+    if (state !== 'retry-focus') return () => style.remove()
+    const id = window.setInterval(() => {
+      const button = document.querySelector<HTMLButtonElement>('[data-testid="research-library-scan-retry"]')
+      if (!button) return
+      button.focus({ focusVisible: true })
+      window.clearInterval(id)
+    }, 50)
+    return () => {
+      window.clearInterval(id)
+      style.remove()
+    }
+  }, [])
+
   return (
     <div
       data-testid="research-shot"
