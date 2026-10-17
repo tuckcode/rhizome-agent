@@ -42,7 +42,11 @@ fn dest_permissions(path: &Path) -> Result<Option<std::fs::Permissions>, String>
             }
             Ok(Some(meta.permissions()))
         }
-        Err(_) => Ok(None),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(format!(
+            "Failed to read file info for {}: {error}",
+            path.display()
+        )),
     }
 }
 
@@ -140,6 +144,21 @@ fn open_exclusive_tmp(
     }
 }
 
+fn copy_xattr_value(to: &Path, name: &std::ffi::OsStr, value: &[u8]) {
+    #[cfg(unix)]
+    if let Err(error) = xattr::set(to, name, value) {
+        log::warn!(
+            "Could not copy extended attribute {} onto {}: {error}",
+            name.to_string_lossy(),
+            to.display()
+        );
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = (to, name, value);
+    }
+}
+
 fn copy_xattrs(from: &Path, to: &Path) {
     #[cfg(unix)]
     {
@@ -151,7 +170,7 @@ fn copy_xattrs(from: &Path, to: &Path) {
         };
         for name in attrs {
             if let Ok(Some(value)) = xattr::get(from, &name) {
-                let _ = xattr::set(to, &name, &value);
+                copy_xattr_value(to, &name, &value);
             }
         }
     }
@@ -303,5 +322,30 @@ mod tests {
             Some(&b"tag"[..])
         );
         assert_eq!(fs::read_to_string(&dest).unwrap(), "new\n");
+    }
+
+    #[test]
+    fn only_a_missing_file_counts_as_new() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(dest_permissions(&dir.path().join("fresh.md"))
+            .unwrap()
+            .is_none());
+        let too_long = dir.path().join("a".repeat(300));
+        let error = dest_permissions(&too_long).unwrap_err();
+        assert!(error.contains("Failed to read file info"), "{error}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_failed_extended_attribute_copy_is_logged_and_keeps_the_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("note.md");
+        fs::write(&dest, "ok\n").unwrap();
+        copy_xattr_value(&dest, std::ffi::OsStr::new("not a valid xattr"), b"x");
+        assert_eq!(fs::read_to_string(&dest).unwrap(), "ok\n");
+        assert!(xattr::get(&dest, "not a valid xattr")
+            .ok()
+            .flatten()
+            .is_none());
     }
 }

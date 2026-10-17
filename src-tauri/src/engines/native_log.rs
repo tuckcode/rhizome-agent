@@ -6,7 +6,7 @@
 
 use std::collections::HashSet;
 use std::fs::{self, File, OpenOptions};
-use std::io::Write;
+use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -110,6 +110,9 @@ pub struct NativeSessionWriter {
     len: u64,
     header: SessionHeader,
     fail_io: bool,
+    /// Test hook: write this many bytes of the next line, then fail.
+    #[cfg(test)]
+    partial_write_limit: Option<usize>,
     _lock: SessionLock,
 }
 
@@ -416,9 +419,6 @@ pub fn open_session_log(session_id: &str) -> Result<OpenedNativeLog, String> {
     let mut expected_seq = 1u64;
     let mut saw_damage = false;
     for line in lines {
-        if saw_damage {
-            continue;
-        }
         let Ok(text) = line else {
             saw_damage = true;
             continue;
@@ -431,6 +431,8 @@ pub fn open_session_log(session_id: &str) -> Result<OpenedNativeLog, String> {
                 events.push(event);
                 expected_seq += 1;
             }
+            // A torn line must not hide a later line that still has the
+            // next sequence number.
             _ => saw_damage = true,
         }
     }
@@ -549,6 +551,8 @@ pub fn create_session_log(header: &SessionHeader) -> Result<NativeSessionWriter,
         len,
         header: header.clone(),
         fail_io: false,
+        #[cfg(test)]
+        partial_write_limit: None,
         _lock: lock,
     })
 }
@@ -571,11 +575,43 @@ pub fn open_session_writer(session_id: &str, next_seq: u64) -> Result<NativeSess
         len,
         header,
         fail_io: false,
+        #[cfg(test)]
+        partial_write_limit: None,
         _lock: lock,
     })
 }
 
 fn write_line(file: &mut File, line: &str) -> Result<(), String> {
+    let good_len = file.metadata().ok().map(|meta| meta.len());
+    write_line_from(file, line, good_len, None)
+}
+
+/// Writes one JSONL line. On any write error the file is truncated back to
+/// `good_len` so a short write cannot sit in front of a later good line.
+fn write_line_from(
+    file: &mut File,
+    line: &str,
+    good_len: Option<u64>,
+    partial_limit: Option<usize>,
+) -> Result<(), String> {
+    let outcome = write_payload(file, line, partial_limit);
+    if outcome.is_err() {
+        if let Some(good_len) = good_len {
+            let _ = file.set_len(good_len);
+            let _ = file.seek(SeekFrom::Start(good_len));
+        }
+    }
+    outcome
+}
+
+fn write_payload(file: &mut File, line: &str, partial_limit: Option<usize>) -> Result<(), String> {
+    if let Some(limit) = partial_limit {
+        let bytes = line.as_bytes();
+        let count = limit.min(bytes.len());
+        file.write_all(&bytes[..count])
+            .map_err(|error| format!("flush native session line: {error}"))?;
+        return Err("flush native session line: short write".into());
+    }
     file.write_all(line.as_bytes())
         .and_then(|_| file.write_all(b"\n"))
         .and_then(|_| file.flush())
@@ -600,6 +636,12 @@ impl NativeSessionWriter {
     #[cfg(test)]
     pub fn fail_next_io(&mut self) {
         self.fail_io = true;
+    }
+
+    /// The next append writes `bytes` of the line, then fails and truncates.
+    #[cfg(test)]
+    pub fn fail_after_partial_write(&mut self, bytes: usize) {
+        self.partial_write_limit = Some(bytes);
     }
 
     pub fn append(&mut self, event: &DurableEvent) -> Result<(), AppendError> {
@@ -628,7 +670,12 @@ impl NativeSessionWriter {
         if self.len + add + reserve > SESSION_SIZE_CAP {
             return Err(AppendError::Full);
         }
-        write_line(&mut self.file, &encoded).map_err(AppendError::Io)?;
+        #[cfg(test)]
+        let partial = self.partial_write_limit.take();
+        #[cfg(not(test))]
+        let partial = None;
+        write_line_from(&mut self.file, &encoded, Some(self.len), partial)
+            .map_err(AppendError::Io)?;
         self.len += add;
         self.next_seq += 1;
         Ok(())
@@ -1084,6 +1131,116 @@ mod tests {
                 .any(|event| matches!(event, DurableEvent::User { text } if text == "nope")),
             "a failed save must not pretend the event was stored"
         );
+    }
+
+    #[test]
+    fn a_partial_write_is_truncated_so_later_events_reopen() {
+        let _home = temp_home();
+        let id = uuid::Uuid::new_v4().to_string();
+        let header = SessionHeader {
+            version: NATIVE_LOG_VERSION,
+            session_id: id.clone(),
+            created_at: "2026-10-10T00:00:00Z".into(),
+            target: "openai/gpt-4o-mini".into(),
+            permission_mode: "safe".into(),
+            vault_path: None,
+            vault_paths: Vec::new(),
+            system_prompt: None,
+        };
+        let mut writer = create_session_log(&header).unwrap();
+        append_or_roll(
+            &mut writer,
+            &DurableEvent::User {
+                text: "first".into(),
+            },
+        )
+        .unwrap();
+        let good_len = std::fs::metadata(writer.path()).unwrap().len();
+        writer.fail_after_partial_write(8);
+        let error = append_or_roll(
+            &mut writer,
+            &DurableEvent::User {
+                text: "torn-secret".into(),
+            },
+        )
+        .expect_err("short write");
+        assert_eq!(error, LOG_SAVE_NOTICE);
+        assert_eq!(
+            std::fs::metadata(writer.path()).unwrap().len(),
+            good_len,
+            "a short write must be truncated back to the last good line"
+        );
+        let bytes = std::fs::read(writer.path()).unwrap();
+        assert!(
+            !bytes.windows(8).any(|window| window == b"torn-sec"),
+            "the torn text must not remain in the log"
+        );
+        append_or_roll(
+            &mut writer,
+            &DurableEvent::User {
+                text: "second".into(),
+            },
+        )
+        .unwrap();
+        drop(writer);
+
+        let opened = open_session_log(&id).unwrap();
+        let texts: Vec<_> = opened
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                DurableEvent::User { text } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(texts, ["first", "second"]);
+        assert_eq!(opened.warning, None);
+    }
+
+    #[test]
+    fn a_torn_line_does_not_hide_a_later_good_line() {
+        let _home = temp_home();
+        let id = uuid::Uuid::new_v4().to_string();
+        let header = SessionHeader {
+            version: NATIVE_LOG_VERSION,
+            session_id: id.clone(),
+            created_at: "2026-10-10T00:00:00Z".into(),
+            target: "openai/gpt-4o-mini".into(),
+            permission_mode: "safe".into(),
+            vault_path: None,
+            vault_paths: Vec::new(),
+            system_prompt: None,
+        };
+        let path = write_fixture(
+            &header,
+            &[
+                DurableEvent::User {
+                    text: "before".into(),
+                },
+                DurableEvent::User {
+                    text: "after".into(),
+                },
+            ],
+            &[],
+        )
+        .unwrap();
+        let raw = std::fs::read_to_string(&path).unwrap();
+        let mut lines: Vec<&str> = raw.lines().collect();
+        assert!(lines.len() >= 3, "header plus two events: {raw}");
+        lines.insert(2, "{\"seq\":2,\"checksum\":\"dead\",\"event\":");
+        std::fs::write(&path, format!("{}\n", lines.join("\n"))).unwrap();
+
+        let opened = open_session_log(&id).unwrap();
+        let texts: Vec<_> = opened
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                DurableEvent::User { text } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(texts, ["before", "after"]);
+        assert!(opened.warning.is_some());
     }
 
     #[test]
