@@ -41,7 +41,6 @@ import {
   REMOVED_PROVIDER_LABEL,
   resolveRhizomeChatModel,
   rhizomeModelRowLabel,
-  rhizomeModelVisibleName,
   seedRhizomeChatModels,
   type RhizomeChatModel,
 } from '../lib/rhizomeChatModels'
@@ -79,11 +78,6 @@ const ROW_CLASS = cn(
 )
 
 const GROUP_SEP_CLASS = 'my-1 h-px w-full bg-[var(--border-input)]'
-
-function modelAccessibleName(model: { label: string; providerName: string; modelId: string }): string {
-  if (model.label === REMOVED_PROVIDER_LABEL) return REMOVED_PROVIDER_LABEL
-  return `${model.providerName} · ${model.modelId}`
-}
 
 function groupsWithLiveHeadings(
   groups: Array<{ provider: string; models: RhizomeChatModel[] }>,
@@ -153,17 +147,19 @@ export function NativeChatModelPicker({
   const listed = includeRemovedProviderModel(models, selectedId)
   const selectedRhizome = resolveRhizomeChatModel(listed, selectedId)
   const selectedPrime = primeModels.find((model) => modelKey(model) === selectedId) ?? null
-  const visibleName = prime
-    ? (primeModelLabel(primeHost) ?? selectedPrime?.name ?? selectedId)
-    : (selectedRhizome ? rhizomeModelVisibleName(selectedRhizome) : selectedId)
+  // Settings (row) and the composer chip share this string. The chip may
+  // middle-ellipsis it; the words are still the same active model.
+  const activeLabel = prime
+    ? (primeModelLabel(primeHost) ?? selectedPrime?.name ?? selectedId ?? '')
+    : (selectedRhizome?.label ?? selectedId ?? '')
   const triggerLabel = variant === 'chip'
-    ? middleEllipsis(visibleName, NATIVE_CHAT_MODEL_CHIP_LABEL_MAX_CHARS)
-    : (prime ? visibleName : (selectedRhizome?.label ?? visibleName))
+    ? middleEllipsis(activeLabel, NATIVE_CHAT_MODEL_CHIP_LABEL_MAX_CHARS)
+    : activeLabel
   const accessibleName = prime
     ? (selectedPrime
       ? `${selectedPrime.provider} · ${selectedPrime.id}`
-      : visibleName)
-    : (selectedRhizome ? modelAccessibleName(selectedRhizome) : selectedId)
+      : activeLabel)
+    : activeLabel
   const keyed = excludeKeylessRhizomeModels(listed, providers, selectedId)
   const visibleRhizome = filterRhizomeChatModels(keyed, query)
   const needle = query.trim().toLowerCase()

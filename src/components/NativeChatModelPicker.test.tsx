@@ -239,9 +239,9 @@ describe('NativeChatModelPicker', () => {
 
     const chip = screen.getByTestId('native-chat-model-trigger')
     expect(chip.tagName).toBe('BUTTON')
-    expect(chip).toHaveAccessibleName('Model: Work OpenAI · gpt-4o')
-    expect(chip).toHaveAttribute('title', 'Model: Work OpenAI · gpt-4o')
-    expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveTextContent('GPT-4o')
+    expect(chip).toHaveAccessibleName('Model: Work OpenAI · GPT-4o')
+    expect(chip).toHaveAttribute('title', 'Model: Work OpenAI · GPT-4o')
+    expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveTextContent('Work Open…· GPT-4o')
     expect(chip).toHaveClass('rounded-md')
     expect(chip).toHaveClass('h-6')
     expect(chip).toHaveClass('self-center')
@@ -314,7 +314,7 @@ describe('NativeChatModelPicker', () => {
     const chip = screen.getByTestId('native-chat-model-trigger')
     expect(chip).toHaveClass(NATIVE_CHAT_MODEL_CHIP_MAX_WIDTH_CLASS)
     expect(chip).toHaveAttribute('title', `Model: ${LONG_NAME}`)
-    expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveTextContent('anthropic…-long-id')
+    expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveTextContent('Work Open…-long-id')
     expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveClass('truncate')
 
     openMenu()
@@ -628,7 +628,7 @@ describe('NativeChatModelPicker', () => {
       />,
     )
 
-    expect(screen.getByTestId('native-chat-model-trigger')).toHaveTextContent('gemini-2.5-flash')
+    expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveTextContent('Gemini · ….5-flash')
     openMenu()
     await waitFor(() => {
       expect(screen.getByTestId('native-chat-model-gemini/gemini-2.5-flash')).toBeInTheDocument()

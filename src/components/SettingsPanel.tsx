@@ -1581,6 +1581,8 @@ function AiAgentSettingsSection({
         <ChatEngineSettings engine={chatEngine} onChange={setChatEngine} locale={locale} />
         <NativeChatModelPicker
           locale={locale}
+          engine={chatEngine}
+          vaultPath={activeVaultPath ?? undefined}
           value={nativeChatTarget}
           onChange={setNativeChatTarget}
           providers={aiModelProviders}

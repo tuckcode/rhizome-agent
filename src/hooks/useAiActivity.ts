@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { isTauri } from '../mock-tauri'
 
 export type HighlightElement = 'editor' | 'tab' | 'properties' | 'notelist' | null
 
@@ -21,7 +22,12 @@ export interface AiActivityCallbacks {
 
 const WS_UI_URL = 'ws://localhost:9711'
 const HIGHLIGHT_DURATION_MS = 800
-const RECONNECT_DELAY_MS = 3000
+const RECONNECT_BASE_MS = 3000
+const RECONNECT_MAX_MS = 30_000
+
+function reconnectDelay(attempt: number): number {
+  return Math.min(RECONNECT_MAX_MS, RECONNECT_BASE_MS * 2 ** attempt)
+}
 
 type UiActionMessage = Record<string, unknown> & {
   action: string
@@ -146,21 +152,44 @@ function useUiActionMessageHandler(
 
 function useUiActionSocket(handleMessage: (event: MessageEvent) => void, clearHighlightTimer: () => void): void {
   useEffect(() => {
+    // Port 9711 is the desktop UI bridge. The browser build has no Tauri
+    // backend and no bridge, so opening the socket only logs a refused
+    // connection. Inside the app, a down bridge retries with backoff and
+    // stays at debug — the browser already prints its own network error.
+    if (!isTauri()) return
+
     let ws: WebSocket | null = null
     let mounted = true
+    let attempt = 0
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+
+    function scheduleReconnect() {
+      if (!mounted || reconnectTimer) return
+      const delay = reconnectDelay(attempt)
+      attempt += 1
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null
+        connect()
+      }, delay)
+    }
 
     function connect() {
       if (!mounted) return
       try {
         ws = new WebSocket(WS_UI_URL)
         ws.onmessage = handleMessage
-        ws.onclose = () => {
-          if (mounted) reconnectTimer = setTimeout(connect, RECONNECT_DELAY_MS)
+        ws.onopen = () => {
+          attempt = 0
         }
-        ws.onerror = () => { /* Silent — bridge may not be running */ }
-      } catch {
-        if (mounted) reconnectTimer = setTimeout(connect, RECONNECT_DELAY_MS)
+        ws.onclose = () => {
+          scheduleReconnect()
+        }
+        ws.onerror = () => {
+          console.debug('[ai-activity] UI bridge socket failed')
+        }
+      } catch (error) {
+        console.debug('[ai-activity] UI bridge socket failed', error)
+        scheduleReconnect()
       }
     }
 

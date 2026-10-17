@@ -6,13 +6,37 @@ import {
   useMainWindowSizeConstraints,
 } from './useMainWindowSizeConstraints'
 
-const { invoke } = vi.hoisted(() => ({
+const { invoke, tauri } = vi.hoisted(() => ({
   invoke: vi.fn<(...args: unknown[]) => Promise<void>>(),
+  tauri: { on: true },
 }))
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke,
 }))
+
+vi.mock('../mock-tauri', () => ({
+  isTauri: () => tauri.on,
+}))
+
+describe('applyMainWindowSizeConstraints', () => {
+  beforeEach(() => {
+    tauri.on = true
+    invoke.mockReset()
+    invoke.mockResolvedValue(undefined)
+  })
+
+  it('does not call the native window in the browser build', async () => {
+    tauri.on = false
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    await applyMainWindowSizeConstraints(480)
+
+    expect(invoke).not.toHaveBeenCalled()
+    expect(warn).not.toHaveBeenCalled()
+    warn.mockRestore()
+  })
+})
 
 describe('getMainWindowMinWidth', () => {
   const minWidthCases = [
@@ -93,6 +117,7 @@ describe('getMainWindowMinWidth', () => {
 
 describe('useMainWindowSizeConstraints', () => {
   beforeEach(() => {
+    tauri.on = true
     invoke.mockReset()
     invoke.mockResolvedValue()
   })

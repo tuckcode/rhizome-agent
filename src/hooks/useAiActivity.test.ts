@@ -2,6 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useAiActivity } from './useAiActivity'
 
+const tauri = vi.hoisted(() => ({ on: true }))
+
+vi.mock('../mock-tauri', () => ({
+  isTauri: () => tauri.on,
+}))
+
 let lastWsInstance: MockWebSocket | null = null
 
 class MockWebSocket {
@@ -18,6 +24,7 @@ class MockWebSocket {
 }
 
 beforeEach(() => {
+  tauri.on = true
   lastWsInstance = null
   vi.stubGlobal('WebSocket', MockWebSocket)
   vi.useFakeTimers()
@@ -39,10 +46,36 @@ describe('useAiActivity', () => {
     expect(result.current.highlightPath).toBeNull()
   })
 
-  it('connects to ws://localhost:9711', () => {
+  it('connects to ws://localhost:9711 inside the desktop app', () => {
     renderHook(() => useAiActivity())
     expect(lastWsInstance).not.toBeNull()
     expect(lastWsInstance!.url).toBe('ws://localhost:9711')
+  })
+
+  it('does not open the UI bridge socket in the browser build', () => {
+    tauri.on = false
+    renderHook(() => useAiActivity())
+    expect(lastWsInstance).toBeNull()
+  })
+
+  it('logs a bridge failure at debug and backs off before the next try', () => {
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {})
+    renderHook(() => useAiActivity())
+    const first = lastWsInstance
+    act(() => { first?.onerror?.() })
+    act(() => { first?.onclose?.() })
+    expect(debug).toHaveBeenCalled()
+    act(() => { vi.advanceTimersByTime(2999) })
+    expect(lastWsInstance).toBe(first)
+    act(() => { vi.advanceTimersByTime(1) })
+    const second = lastWsInstance
+    expect(second).not.toBe(first)
+    act(() => { second?.onclose?.() })
+    act(() => { vi.advanceTimersByTime(5999) })
+    expect(lastWsInstance).toBe(second)
+    act(() => { vi.advanceTimersByTime(1) })
+    expect(lastWsInstance).not.toBe(second)
+    debug.mockRestore()
   })
 
   it('sets highlight on ui_action highlight message', () => {
