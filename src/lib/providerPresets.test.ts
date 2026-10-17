@@ -138,13 +138,13 @@ describe('provider preset table', () => {
     }
     const groq = draftPatchForProviderPreset(providerPresetById('groq')!)
     expect(mergeProviderPresetPatch(current, groq, {
-      name: true,
-      baseUrl: true,
+      name: false,
+      baseUrl: false,
       modelId: false,
     }, true)).toMatchObject({
       presetId: 'groq',
       kind: 'open_ai_compatible',
-      name: 'Lab OpenAI',
+      name: 'Groq',
       baseUrl: 'https://api.groq.com/openai/v1',
       modelId: 'openai/gpt-oss-120b',
       apiKeyEnvVar: 'GROQ_API_KEY',
@@ -152,7 +152,7 @@ describe('provider preset table', () => {
     })
   })
 
-  it('keeps an edited URL only when keepBaseUrl is set for Custom or API style', () => {
+  it('keeps the current Custom URL when keepBaseUrl is set, even if it was not edited', () => {
     const current = {
       presetId: CUSTOM_PROVIDER_PRESET_ID,
       kind: 'open_ai_compatible' as const,
@@ -170,7 +170,7 @@ describe('provider preset table', () => {
       name: 'OpenAI',
     }, {
       name: false,
-      baseUrl: true,
+      baseUrl: false,
       modelId: false,
     }, false, true)).toMatchObject({
       baseUrl: 'https://lab.example/v1',

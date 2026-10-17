@@ -14,5 +14,7 @@ describe('destructive button contrast', () => {
     expect(usesTranslucentDestructive).toBe(false)
     expect(button.className).toContain('hover:bg-destructive/95')
     expect(button.className).toContain('disabled:opacity-50')
+    expect(button.className).toContain('aria-disabled:opacity-60')
+    expect(button.className).toContain('aria-disabled:cursor-not-allowed')
   })
 })

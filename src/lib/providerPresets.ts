@@ -175,7 +175,7 @@ export function mergeProviderPresetPatch<T extends {
     ...current,
     ...patch,
     name: touched.name ? current.name : patch.name,
-    baseUrl: keepBaseUrl && touched.baseUrl ? current.baseUrl : patch.baseUrl,
+    baseUrl: keepBaseUrl ? current.baseUrl : patch.baseUrl,
     modelId: touched.modelId ? current.modelId : patch.modelId,
     apiKey: clearApiKey ? '' : current.apiKey,
   }

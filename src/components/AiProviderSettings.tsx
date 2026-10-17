@@ -83,12 +83,17 @@ function initialDraft(mode: ProviderMode): ProviderDraft {
   return draftFromProviderKind(kind)
 }
 
+function providerKindDisplayName(kind: AiModelProviderKind): string {
+  if (kind === 'gemini') return 'Google Gemini'
+  return aiModelProviderCatalogEntry(kind).name
+}
+
 function draftFromProviderKind(kind: AiModelProviderKind): ProviderDraft {
   const defaults = aiModelProviderCatalogEntry(kind)
   return {
     presetId: CUSTOM_PROVIDER_PRESET_ID,
     kind,
-    name: defaults.name,
+    name: providerKindDisplayName(kind),
     baseUrl: defaults.base_url,
     modelId: '',
     apiKeyStorage: defaults.api_key_storage,
@@ -120,7 +125,7 @@ function providerKindPatch(kind: AiModelProviderKind): ProviderPresetDraftPatch 
     baseUrl: defaults.baseUrl,
     modelId: '',
     apiKeyStorage: defaults.apiKeyStorage,
-    apiKeyEnvVar: defaults.apiKeyEnvVar,
+    apiKeyEnvVar: '',
   }
 }
 
@@ -183,6 +188,9 @@ function disabledActionReason(draft: ProviderDraft, mode: ProviderMode): string 
   if (!draft.modelId.trim()) return 'Enter a model ID first.'
   if (mode === 'api' && draft.apiKeyStorage === 'local_file' && !draft.apiKey.trim()) {
     return 'Paste an API key first.'
+  }
+  if (mode === 'api' && draft.apiKeyStorage === 'env' && !draft.apiKeyEnvVar.trim()) {
+    return 'Enter an env var name first.'
   }
   return null
 }
@@ -395,10 +403,15 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
     setTestState('idle')
     setError(null)
   }
-  const applyPatch = (patch: ProviderPresetDraftPatch, clearApiKey: boolean, keepBaseUrl = false) => {
+  const applyPatch = (
+    patch: ProviderPresetDraftPatch,
+    clearApiKey: boolean,
+    keepBaseUrl = false,
+    nextTouched = touched,
+  ) => {
     resetTest()
     setKeyPageError(null)
-    setDraft((current) => mergeProviderPresetPatch(current, patch, touched, clearApiKey, keepBaseUrl))
+    setDraft((current) => mergeProviderPresetPatch(current, patch, nextTouched, clearApiKey, keepBaseUrl))
   }
   const updateDraft = (patch: Partial<ProviderDraft>) => {
     resetTest()
@@ -417,7 +430,11 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
       return
     }
     const preset = providerPresetById(presetId)
-    if (preset) applyPatch(draftPatchForProviderPreset(preset), true, false)
+    if (preset) {
+      const cleared = { name: false, baseUrl: false, modelId: false }
+      setTouched(cleared)
+      applyPatch(draftPatchForProviderPreset(preset), true, false, cleared)
+    }
   }
   const disabledReason = disabledActionReason(draft, mode)
   const canSave = disabledReason === null
@@ -440,7 +457,7 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
           name: current.name,
           baseUrl: current.baseUrl,
           modelId: '',
-          apiKeyEnvVar: current.kind === 'open_ai_compatible' ? '' : current.apiKeyEnvVar,
+          apiKeyEnvVar: '',
         }
       })
       setTouched({ name: false, baseUrl: false, modelId: false })
@@ -535,7 +552,7 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
         ) : (
           <LabeledInput label={t('settings.aiProviders.name')} value={draft.name} onChange={(name) => updateTouchedField('name', name)} />
         )}
-        {draft.presetId === 'anthropic' ? (
+        {draft.presetId === 'anthropic' || draft.kind === 'anthropic' ? (
           <div
             className="col-span-2 rounded-md border border-border bg-background px-3 py-2 text-xs leading-5 text-muted-foreground"
             data-testid="ai-provider-anthropic-note"
@@ -558,7 +575,9 @@ export function AiProviderSettings({ t, mode, providers, onChange }: AiProviderS
             placeholder={modelIdPlaceholder(draft.kind)}
           />
         ) : null}
-        <LabeledInput label={t('settings.aiProviders.baseUrl')} value={draft.baseUrl} onChange={(baseUrl) => updateTouchedField('baseUrl', baseUrl)} />
+        <div className={mode === 'api' && draft.presetId === CUSTOM_PROVIDER_PRESET_ID ? 'col-span-2' : undefined}>
+          <LabeledInput label={t('settings.aiProviders.baseUrl')} value={draft.baseUrl} onChange={(baseUrl) => updateTouchedField('baseUrl', baseUrl)} />
+        </div>
         {mode === 'api' && draft.presetId === CUSTOM_PROVIDER_PRESET_ID ? null : (
           <LabeledInput
             label={t('settings.aiProviders.model')}

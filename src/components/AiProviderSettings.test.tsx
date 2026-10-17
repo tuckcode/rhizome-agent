@@ -299,4 +299,72 @@ describe('AiProviderSettings presets', () => {
 
     expect(screen.getByLabelText('API key env var')).toHaveValue('')
   })
+
+  it('keeps the Custom env var blank after switching API style', () => {
+    renderProviders()
+    selectProviderPreset('Custom')
+    fireEvent.click(screen.getByRole('combobox', { name: 'API style' }))
+    fireEvent.click(screen.getByRole('option', { name: 'Google Gemini' }))
+    fireEvent.click(screen.getByRole('combobox', { name: 'API style' }))
+    fireEvent.click(screen.getByRole('option', { name: 'OpenAI-compatible' }))
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'API key storage' }))
+    fireEvent.click(screen.getByRole('option', { name: 'Read from env var' }))
+
+    expect(screen.getByLabelText('API key env var')).toHaveValue('')
+  })
+
+  it('blocks Add and Test when env storage has no var name', () => {
+    renderProviders()
+    selectProviderPreset('Custom')
+    fireEvent.change(screen.getByLabelText('Model ID'), { target: { value: 'lab-model' } })
+    fireEvent.click(screen.getByRole('combobox', { name: 'API key storage' }))
+    fireEvent.click(screen.getByRole('option', { name: 'Read from env var' }))
+
+    expect(screen.getByTestId('ai-provider-disabled-reason')).toHaveTextContent('Enter an env var name first.')
+    expect(screen.getByRole('button', { name: 'Add API model' })).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('keeps an untouched Custom URL when the API style changes', () => {
+    renderProviders()
+    selectProviderPreset('Custom')
+
+    const baseUrl = screen.getByLabelText('Base URL')
+    expect(baseUrl).toHaveValue('https://api.openai.com/v1')
+    fireEvent.click(screen.getByRole('combobox', { name: 'API style' }))
+    fireEvent.click(screen.getByRole('option', { name: 'OpenAI' }))
+    fireEvent.click(screen.getByRole('combobox', { name: 'API style' }))
+    fireEvent.click(screen.getByRole('option', { name: 'OpenAI-compatible' }))
+
+    expect(baseUrl).toHaveValue('https://api.openai.com/v1')
+  })
+
+  it('resets an edited name when switching between named presets', () => {
+    renderProviders()
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Lab OpenAI' } })
+    selectProviderPreset('Groq')
+
+    expect(screen.getByLabelText('Name')).toHaveValue('Groq')
+    expect(screen.getByLabelText('Model ID')).toHaveValue('openai/gpt-oss-120b')
+  })
+
+  it('shows the Anthropic note for Custom Anthropic API style', () => {
+    renderProviders()
+    selectProviderPreset('Custom')
+    fireEvent.click(screen.getByRole('combobox', { name: 'API style' }))
+    fireEvent.click(screen.getByRole('option', { name: 'Anthropic' }))
+
+    expect(screen.getByTestId('ai-provider-anthropic-note')).toHaveTextContent(
+      "Anthropic models won't show in the model picker until Rhizome supports Anthropic directly.",
+    )
+  })
+
+  it('names Custom Google Gemini style Google Gemini', () => {
+    renderProviders()
+    selectProviderPreset('Custom')
+    fireEvent.click(screen.getByRole('combobox', { name: 'API style' }))
+    fireEvent.click(screen.getByRole('option', { name: 'Google Gemini' }))
+
+    expect(screen.getByLabelText('Name')).toHaveValue('Google Gemini')
+  })
 })
