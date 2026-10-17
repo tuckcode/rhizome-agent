@@ -29,6 +29,7 @@ pub use fake_model::{FakeModel, ScriptPart};
 pub use model::Model;
 pub use policy::{approval_options, ApprovalOption};
 pub(crate) use tools::openai_tool_definition;
+pub use tools::resolve_for_write;
 pub use types::{DurableEvent, HistoryItem, ModelView, ToolCall, UNANSWERED_TOOL_OUTPUT};
 
 #[cfg(test)]

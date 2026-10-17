@@ -11,12 +11,15 @@ commits: HEAD
 **Origin:** Cursor Grok 4.6 · 2026-10-17 · secret-files follow-up to #195
 
 knispo 12:16 AM CT: "Yes, go with Julian's full suggestion."
+Ricky+Critiquito HOLD on #197: write path never honours the setting;
+key backups; move the toggle; copy without a shell caveat.
 
-`sandbox::is_secret` is the denylist. `sandbox::resolve` and walks use
-`is_blocked_secret`, so in-flight #196 (edit tools) picks it up on
-rebase. Default on. Settings → AI Agents toggle disables the denylist
-only; root sandboxing still applies. Safety net, not a wall: Power User
-`bash` can still read those files.
+`sandbox::is_secret` is the denylist. Read tools use `resolve` /
+`is_blocked_secret`. Write tools must call `resolve_for_write`, which
+always applies the denylist (including `.git`) even when the setting is
+off. #196 rebases onto this. Default on. Settings → AI Agents → Safety
+toggle disables the denylist for **reads** only. Safety net, not a wall:
+a future shell tool is not covered. When off, `.git/config` is readable.
 
 Patterns: exact private-key basenames in any folder, case-insensitive
 (`id_rsa`, `id_dsa`, `id_ecdsa`, `id_ecdsa_sk`, `id_ed25519`,

@@ -13,7 +13,7 @@ pub(crate) const SCHEMA: &str = r#"{
   "type": "function",
   "function": {
     "name": "list_dir",
-    "description": "List files and directories inside the user's vault roots or current workspace. Each line is `file` or `dir` then a relative path. Honours .gitignore. Secret paths (.env* except .env.example, .git/, *.pem/*.key/*.p12/*.pfx, and known private-key basenames) are omitted. Entries are sorted. Results stop at 200 entries with a truncation note. Optional depth defaults to 1 (direct children). Paths outside the allowed roots are refused.",
+    "description": "List files and directories inside the user's vault roots or current workspace. Each line is `file`, `dir`, or `link` then a relative path. Honours .gitignore. Secret paths (.env* except .env.example, .git/, *.pem/*.key/*.p12/*.pfx, and known private-key basenames) are omitted. Entries are sorted. Results stop at 200 entries with a truncation note. Optional depth defaults to 1 (direct children). Paths outside the allowed roots are refused.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -54,7 +54,8 @@ fn run_with_cap(
     }
     let depth = depth.min(MAX_DEPTH);
     let dir = sandbox::resolve_dir(requested, vault_path, vault_paths)?;
-    let (mut entries, truncated) = collect_entries(&dir, depth, cap, walk::WALK_BUDGET);
+    let block = sandbox::block_secret_files();
+    let (mut entries, truncated) = collect_entries(&dir, depth, cap, walk::WALK_BUDGET, block);
     entries.sort_by(|left, right| left.path.cmp(&right.path));
     let mut lines: Vec<String> = entries
         .into_iter()
@@ -76,22 +77,19 @@ fn collect_entries(
     depth: usize,
     cap: usize,
     walk_budget: usize,
+    block: bool,
 ) -> (Vec<Listed>, walk::Truncation) {
     let mut entries = Vec::new();
     let mut walked = 0usize;
-    for entry in walk::gitignore_walk_depth(dir, depth).flatten() {
+    for entry in walk::gitignore_walk_depth(dir, depth, block).flatten() {
         walked += 1;
         if walked > walk_budget {
             return (entries, walk::Truncation::WalkCap);
         }
-        if entry.depth() == 0 || sandbox::is_blocked_secret(entry.path()) {
+        if entry.depth() == 0 || sandbox::is_blocked_secret_with(entry.path(), block) {
             continue;
         }
-        let kind = if walk::is_dir_like_entry(&entry) {
-            "dir"
-        } else {
-            "file"
-        };
+        let kind = walk::entry_kind(&entry);
         entries.push(Listed {
             kind,
             path: relative_from(dir, entry.path()),
@@ -195,7 +193,8 @@ mod tests {
         fs::write(Path::new(&root).join("inside.md"), "ok\n").unwrap();
         let out = run(&json!({ "depth": 2 }).to_string(), Some(&root), &[]).unwrap();
         assert!(out.contains("file inside.md"), "{out}");
-        assert!(out.contains("dir out"), "{out}");
+        assert!(out.contains("link out"), "{out}");
+        assert!(!out.contains("dir out"), "{out}");
         assert!(!out.contains("file out"), "{out}");
         assert!(!out.contains("secret.md"), "{out}");
     }
@@ -207,7 +206,7 @@ mod tests {
         fs::write(root_path.join("a.md"), "a\n").unwrap();
         fs::write(root_path.join("b.md"), "b\n").unwrap();
         fs::write(root_path.join("c.md"), "c\n").unwrap();
-        let (entries, truncated) = collect_entries(root_path, 1, 200, 1);
+        let (entries, truncated) = collect_entries(root_path, 1, 200, 1, true);
         assert_eq!(truncated, walk::Truncation::WalkCap);
         assert!(entries.len() <= 1, "{}", entries.len());
         assert_eq!(

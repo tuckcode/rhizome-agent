@@ -29,16 +29,16 @@ impl Truncation {
 
 /// Walk `root` with `.gitignore` honoured and without following
 /// symlinks. Parent gitignores outside the root are ignored.
-pub fn gitignore_walk(root: &Path) -> Walk {
-    gitignore_walker(root, None)
+/// `block` is the secret-file setting for this tool call.
+pub fn gitignore_walk(root: &Path, block: bool) -> Walk {
+    gitignore_walker(root, None, block)
 }
 
-pub fn gitignore_walk_depth(root: &Path, depth: usize) -> Walk {
-    gitignore_walker(root, Some(depth))
+pub fn gitignore_walk_depth(root: &Path, depth: usize, block: bool) -> Walk {
+    gitignore_walker(root, Some(depth), block)
 }
 
-fn gitignore_walker(root: &Path, max_depth: Option<usize>) -> Walk {
-    let block = sandbox::block_secret_files();
+fn gitignore_walker(root: &Path, max_depth: Option<usize>, block: bool) -> Walk {
     let mut builder = WalkBuilder::new(root);
     builder
         .standard_filters(false)
@@ -92,10 +92,19 @@ pub fn is_dir_entry(entry: &DirEntry) -> bool {
     entry.file_type().is_some_and(|kind| kind.is_dir())
 }
 
-/// Label a directory, including a symlink whose target is a directory.
-pub fn is_dir_like_entry(entry: &DirEntry) -> bool {
-    if is_dir_entry(entry) {
-        return true;
+/// Label an entry from its own metadata. A symlink is `link` even
+/// when its target is a directory outside the allowed roots.
+pub fn entry_kind(entry: &DirEntry) -> &'static str {
+    match std::fs::symlink_metadata(entry.path()) {
+        Ok(meta) if meta.file_type().is_symlink() => "link",
+        Ok(meta) if meta.is_dir() => "dir",
+        Ok(_) => "file",
+        Err(_) => {
+            if is_dir_entry(entry) {
+                "dir"
+            } else {
+                "file"
+            }
+        }
     }
-    entry.file_type().is_some_and(|kind| kind.is_symlink()) && entry.path().is_dir()
 }

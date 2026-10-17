@@ -1,9 +1,10 @@
-import { CaretDown, CaretRight, Copy, Cube, Monitor, Moon, Stack, Sun, X } from '@phosphor-icons/react'
+import { CaretDown, CaretRight, Copy, Cube, Info, Monitor, Moon, Stack, Sun, X } from '@phosphor-icons/react'
 import {
   PRODUCT_AI_AGENT_DEFINITIONS,
   DEFAULT_AI_AGENT,
   createMissingAiAgentsStatus,
   getAiAgentAvailability,
+  type AiAgentAvailability,
   type AiAgentsStatus,
 } from '../lib/aiAgents'
 import {
@@ -62,7 +63,13 @@ import { Textarea } from './ui/textarea'
 import { AccentColorPicker } from './AccentColorPicker'
 import { normalizeReleaseChannel, serializeReleaseChannel, type ReleaseChannel } from '../lib/releaseChannel'
 import { shouldHideGitignoredFiles } from '../lib/gitignoredVisibility'
-import { shouldBlockSecretFiles } from '../lib/secretFiles'
+import {
+  SECRET_FILE_PATTERN_LINES,
+  SECRET_FILES_HELPER_OFF,
+  SECRET_FILES_HELPER_ON,
+  SECRET_FILES_LABEL,
+  shouldBlockSecretFiles,
+} from '../lib/secretFiles'
 import { areGitFeaturesEnabled } from '../lib/gitSettings'
 import { areAutomaticUpdateChecksEnabled } from '../lib/automaticUpdateChecks'
 import { trackAllNotesVisibilityChanged } from '../lib/productAnalytics'
@@ -109,6 +116,7 @@ import {
 } from '../utils/dateDisplay'
 import { BridgeTokenRow } from './BridgeTokenRow'
 import { Button } from './ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import type { NoteWidthMode } from '../types'
 import type { VaultOption } from './status-bar/types'
@@ -1570,20 +1578,13 @@ function AiAgentSettingsSection({
 
       <SettingsGroup>
         <ChatEngineSettings engine={chatEngine} onChange={setChatEngine} locale={locale} />
-        <SettingsSwitchRow
-          label="Block secret files"
-          description="Native read tools skip private keys, .env files, and similar names. The shell tool can still read them."
-          checked={blockSecretFiles}
-          onChange={setBlockSecretFiles}
-          testId="settings-block-secret-files"
-        />
         <NativeChatModelPicker
           locale={locale}
           value={nativeChatTarget}
           onChange={setNativeChatTarget}
           providers={aiModelProviders}
         />
-        {chatEngine === 'native' ? null : (
+        {chatEngine === 'native' || isMockPrimeInstall(primeStatus) ? null : (
           <div className="px-3 pb-3 text-xs text-muted-foreground" data-testid="settings-prime-chat-engine">
             Prime Agent
             {primeStatus.status === 'installed'
@@ -1592,6 +1593,13 @@ function AiAgentSettingsSection({
           </div>
         )}
       </SettingsGroup>
+
+      <div className="flex flex-col gap-2">
+        <div className="text-sm font-medium text-foreground">Safety</div>
+        <SettingsGroup>
+          <SecretFilesSettingRow checked={blockSecretFiles} onChange={setBlockSecretFiles} />
+        </SettingsGroup>
+      </div>
 
       <SettingsGroup>
         <SettingsRow
@@ -1620,6 +1628,75 @@ function AiAgentSettingsSection({
         vaultPath={activeVaultPath}
       />
     </>
+  )
+}
+
+function isMockPrimeInstall(status: AiAgentAvailability): boolean {
+  return status.status === 'installed' && (status.version ?? '').trim().toLowerCase() === 'mock'
+}
+
+function SecretFilesSettingRow({
+  checked,
+  onChange,
+}: {
+  checked: boolean
+  onChange: (value: boolean) => void
+}) {
+  const switchId = 'settings-block-secret-files-switch'
+
+  return (
+    <div
+      className="border-b border-border px-4 py-3 last:border-b-0 flex flex-col gap-3 lg:flex-row lg:items-center"
+      data-testid="settings-block-secret-files"
+    >
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex items-center gap-1.5">
+          <label htmlFor={switchId} className="text-sm font-medium text-foreground">
+            {SECRET_FILES_LABEL}
+          </label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Which names are hidden"
+                data-testid="settings-block-secret-files-patterns"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <Info />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-80 text-xs leading-5">
+              <div className="font-medium text-sm">Hidden names</div>
+              <ul className="mt-2 list-disc space-y-1.5 pl-4 text-muted-foreground">
+                {SECRET_FILE_PATTERN_LINES.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </PopoverContent>
+          </Popover>
+        </div>
+        <div
+          className={
+            checked
+              ? 'text-xs leading-5 text-muted-foreground'
+              : 'text-xs leading-5 text-[var(--feedback-warning-text)]'
+          }
+          data-testid="settings-block-secret-files-help"
+        >
+          {checked ? SECRET_FILES_HELPER_ON : SECRET_FILES_HELPER_OFF}
+        </div>
+      </div>
+      <div className="flex justify-start lg:shrink-0 lg:justify-end">
+        <SettingsSwitchControl
+          id={switchId}
+          label={SECRET_FILES_LABEL}
+          checked={checked}
+          onChange={onChange}
+        />
+      </div>
+    </div>
   )
 }
 

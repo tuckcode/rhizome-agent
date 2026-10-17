@@ -56,6 +56,7 @@ fn run_with_cap(
     };
     let mut matches = Vec::new();
     let mut truncated = walk::Truncation::None;
+    let block = sandbox::block_secret_files();
     for start in starts {
         truncated = collect_matches(
             &start,
@@ -63,6 +64,7 @@ fn run_with_cap(
             &glob_set,
             cap,
             walk::WALK_BUDGET,
+            block,
             &mut matches,
         );
         if truncated != walk::Truncation::None {
@@ -83,10 +85,11 @@ fn collect_matches(
     glob_set: &globset::GlobSet,
     cap: usize,
     walk_budget: usize,
+    block: bool,
     matches: &mut Vec<String>,
 ) -> walk::Truncation {
     let mut walked = 0usize;
-    for entry in walk::gitignore_walk(start).flatten() {
+    for entry in walk::gitignore_walk(start, block).flatten() {
         walked += 1;
         if walked > walk_budget {
             return walk::Truncation::WalkCap;
@@ -95,7 +98,7 @@ fn collect_matches(
             continue;
         }
         let path = entry.path();
-        if sandbox::is_blocked_secret(path) {
+        if sandbox::is_blocked_secret_with(path, block) {
             continue;
         }
         if !roots.all.iter().any(|root| sandbox::is_within(path, root)) {
@@ -249,7 +252,15 @@ mod tests {
         fs::write(Path::new(&root).join("a.md"), "a\n").unwrap();
         fs::write(Path::new(&root).join("b.md"), "b\n").unwrap();
         let mut matches = Vec::new();
-        let truncated = collect_matches(Path::new(&root), &roots, &glob_set, 200, 1, &mut matches);
+        let truncated = collect_matches(
+            Path::new(&root),
+            &roots,
+            &glob_set,
+            200,
+            1,
+            true,
+            &mut matches,
+        );
         assert_eq!(truncated, walk::Truncation::WalkCap);
         assert_eq!(
             truncated.note(200).as_deref(),

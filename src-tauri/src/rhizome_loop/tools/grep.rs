@@ -76,16 +76,18 @@ struct Budget<'a> {
     files: usize,
     output_bytes: usize,
     note: Option<String>,
+    block: bool,
 }
 
 impl<'a> Budget<'a> {
-    fn new(limits: &'a Limits) -> Self {
+    fn new(limits: &'a Limits, block: bool) -> Self {
         Self {
             limits,
             started: Instant::now(),
             files: 0,
             output_bytes: 0,
             note: None,
+            block,
         }
     }
 
@@ -159,7 +161,7 @@ fn run_with_limits(
     let roots = sandbox::allowed_roots(vault_path, vault_paths)?;
     let starts = search_starts(search_path, vault_path, vault_paths, &roots)?;
     let mut lines = Vec::new();
-    let mut budget = Budget::new(&limits);
+    let mut budget = Budget::new(&limits, sandbox::block_secret_files());
     let mut line_scan_truncated = false;
     for start in starts {
         if grep_start(
@@ -221,7 +223,7 @@ fn grep_start(
     line_scan_truncated: &mut bool,
 ) -> bool {
     if start.is_file() {
-        if sandbox::is_blocked_secret(start) {
+        if sandbox::is_blocked_secret_with(start, budget.block) {
             return false;
         }
         return grep_file(
@@ -238,7 +240,7 @@ fn grep_start(
         return false;
     }
     let mut walked = 0usize;
-    for entry in walk::gitignore_walk(start).flatten() {
+    for entry in walk::gitignore_walk(start, budget.block).flatten() {
         walked += 1;
         if walked > walk::WALK_BUDGET {
             budget.note = Some(format!("walk cap is {} entries", walk::WALK_BUDGET));
@@ -251,7 +253,7 @@ fn grep_start(
             continue;
         }
         let path = entry.path();
-        if sandbox::is_blocked_secret(path) {
+        if sandbox::is_blocked_secret_with(path, budget.block) {
             continue;
         }
         if !roots.all.iter().any(|root| sandbox::is_within(path, root)) {
@@ -300,10 +302,11 @@ fn grep_file(
         1,
         Some(deadline),
         |number, text, truncated| {
-            if truncated {
+            let matched = regex.is_match(text);
+            if truncated && !matched {
                 *line_scan_truncated = true;
             }
-            if regex.is_match(text) {
+            if matched {
                 let clipped = scan::clip_chars(text, MAX_MATCH_CHARS);
                 let line = format!("{relative}:{number}:{clipped}");
                 if budget.output_bytes + line.len() > budget.limits.output_bytes {
@@ -458,7 +461,7 @@ mod tests {
         .unwrap();
         assert!(out.contains("huge.md:1:needle"), "{out}");
         assert!(
-            out.contains("[truncated: line scan cap is 2000 bytes]"),
+            !out.contains("[truncated: line scan cap is 2000 bytes]"),
             "{out}"
         );
         let text = out.lines().next().unwrap().splitn(3, ':').nth(2).unwrap();

@@ -1,8 +1,13 @@
-//! Canonical path lock for native read tools.
+//! Canonical path lock for native file tools.
 //!
 //! A path must resolve inside the current workspace or another mounted
 //! vault root. `..` and symlinks are followed first. Anything outside
 //! those roots is refused with a message the model can read.
+//!
+//! Read tools use [`resolve`], which honours `block_secret_files`.
+//! Write tools must use [`resolve_for_write`]: that path always applies
+//! the secret denylist and always refuses any `.git` component, even
+//! when the setting is off.
 
 use std::cell::Cell;
 use std::ffi::OsString;
@@ -80,6 +85,28 @@ pub fn resolve(
 }
 
 pub fn resolve_in(requested: &str, roots: &Roots) -> Result<PathBuf, String> {
+    resolve_in_with(requested, roots, false)
+}
+
+/// Resolve a path for a write tool.
+///
+/// Always applies the full secret denylist, including any `.git` path
+/// component, even when `block_secret_files` is off. Read tools must
+/// keep using [`resolve`]. Future edit tools (#196) call this.
+pub fn resolve_for_write(
+    requested: &str,
+    vault_path: Option<&str>,
+    vault_paths: &[String],
+) -> Result<PathBuf, String> {
+    let roots = allowed_roots(vault_path, vault_paths)?;
+    resolve_in_with(requested, &roots, true)
+}
+
+fn resolve_in_with(
+    requested: &str,
+    roots: &Roots,
+    always_block_secrets: bool,
+) -> Result<PathBuf, String> {
     let trimmed = requested.trim();
     if trimmed.is_empty() {
         return Err("Path is required.".into());
@@ -99,7 +126,12 @@ pub fn resolve_in(requested: &str, roots: &Roots) -> Result<PathBuf, String> {
     if !roots.all.iter().any(|root| is_within(&resolved, root)) {
         return Err(format!("{OUTSIDE_ROOTS} Requested path: {trimmed}"));
     }
-    if is_blocked_secret(&resolved) {
+    let blocked = if always_block_secrets {
+        is_secret(&resolved)
+    } else {
+        is_blocked_secret(&resolved)
+    };
+    if blocked {
         return Err(format!("{BLOCKED_SECRET} Requested path: {trimmed}"));
     }
     Ok(resolved)
@@ -166,13 +198,14 @@ pub fn is_within(candidate: &Path, root: &Path) -> bool {
 }
 
 /// Deny `.env*` (except `.env.example`), anything under `.git/`,
-/// `*.pem` / `*.key` / `*.p12` / `*.pfx`, and known private-key
-/// basenames. Basename match is case-insensitive. Checked on the
-/// path as given and on its canonical target so a symlink cannot
-/// hide a secret.
+/// `*.pem` / `*.key` / `*.p12` / `*.pfx` (including backup suffixes),
+/// and known private-key basenames plus backups. Basename match is
+/// case-insensitive. Checked on the path as given and on its
+/// canonical target so a symlink cannot hide a secret.
 ///
-/// This is the denylist. Callers that honour the user override
-/// should use [`is_blocked_secret`].
+/// This is the denylist. Read callers that honour the user override
+/// should use [`is_blocked_secret`]. Write callers use
+/// [`resolve_for_write`], which always consults this list.
 pub fn is_secret(path: &Path) -> bool {
     if looks_secret(path) {
         return true;
@@ -203,9 +236,38 @@ fn looks_secret(path: &Path) -> bool {
     if lower == ".env.example" {
         return false;
     }
-    lower.starts_with(".env")
-        || SECRET_EXTENSIONS.iter().any(|ext| lower.ends_with(ext))
-        || PRIVATE_KEY_NAMES.contains(&lower.as_str())
+    lower.starts_with(".env") || has_secret_extension(&lower) || is_private_key_basename(&lower)
+}
+
+fn is_private_key_basename(lower: &str) -> bool {
+    let stripped = lower.trim_start_matches(['.', '#']);
+    if stripped.ends_with(".pub") {
+        return false;
+    }
+    PRIVATE_KEY_NAMES
+        .iter()
+        .any(|key| stripped.starts_with(key))
+}
+
+fn has_secret_extension(lower: &str) -> bool {
+    SECRET_EXTENSIONS.iter().any(|ext| {
+        let mut rest = lower;
+        while let Some(idx) = rest.find(ext) {
+            if is_backup_suffix(&rest[idx + ext.len()..]) {
+                return true;
+            }
+            rest = &rest[idx + 1..];
+        }
+        false
+    })
+}
+
+fn is_backup_suffix(rest: &str) -> bool {
+    if rest.is_empty() || rest == "~" {
+        return true;
+    }
+    let rest = rest.strip_suffix('~').unwrap_or(rest);
+    matches!(rest, ".bak" | ".old" | ".orig" | ".backup" | ".1" | ".swp")
 }
 
 fn component_is_git(component: std::path::Component<'_>) -> bool {
@@ -623,5 +685,91 @@ mod tests {
         assert!(!is_secret(&root_path.join("env.md")));
         assert!(!is_secret(&root_path.join("identity.md")));
         assert!(!is_secret(&root_path.join("id_card.md")));
+    }
+
+    #[test]
+    fn key_backup_names_are_blocked() {
+        let (_dir, root) = vault();
+        let root_path = Path::new(&root);
+        for name in [
+            "id_rsa.bak",
+            "id_rsa~",
+            "id_rsa.old",
+            "id_rsa.orig",
+            "id_rsa.backup",
+            "id_rsa.1",
+            "id_rsa.swp",
+            ".id_rsa.swp",
+            "#id_rsa#",
+            "id_ed25519 copy",
+            "id_ed25519.ppk",
+            "ID_RSA.BAK",
+        ] {
+            plant(root_path, name);
+            assert_blocked(&root, name);
+            assert!(is_secret(&root_path.join(name)), "{name}");
+        }
+        plant(root_path, "id_rsa-cert.pub");
+        resolve("id_rsa-cert.pub", Some(&root), &[]).unwrap();
+        assert!(!is_secret(&root_path.join("id_rsa-cert.pub")));
+        assert!(!is_secret(&root_path.join("id_card.md")));
+    }
+
+    #[test]
+    fn secret_extension_backups_are_blocked() {
+        let (_dir, root) = vault();
+        let root_path = Path::new(&root);
+        for name in [
+            "a.pem.bak",
+            "a.key.old",
+            "a.pem~",
+            "a.key.swp",
+            "a.p12.orig",
+            "a.pfx.backup",
+            "a.pem.1",
+            "A.KEY.BAK",
+        ] {
+            plant(root_path, name);
+            assert_blocked(&root, name);
+            assert!(is_secret(&root_path.join(name)), "{name}");
+        }
+        plant(root_path, "notes.key.md");
+        plant(root_path, "my.keyring");
+        resolve("notes.key.md", Some(&root), &[]).unwrap();
+        resolve("my.keyring", Some(&root), &[]).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn env_example_symlink_to_env_is_blocked() {
+        let (_dir, root) = vault();
+        plant(Path::new(&root), ".env");
+        std::os::unix::fs::symlink(
+            Path::new(&root).join(".env"),
+            Path::new(&root).join(".env.example"),
+        )
+        .unwrap();
+        assert_blocked(&root, ".env.example");
+        assert!(is_secret(&PathBuf::from(&root).join(".env.example")));
+    }
+
+    #[test]
+    fn resolve_for_write_refuses_secrets_when_the_setting_is_off() {
+        let (_dir, root) = vault();
+        let root_path = Path::new(&root);
+        plant(root_path, ".git/hooks/pre-commit");
+        plant(root_path, ".git/config");
+        plant(root_path, ".env");
+        plant(root_path, "id_rsa");
+        let _guard = override_secret_block(false);
+        resolve(".env", Some(&root), &[]).unwrap();
+        resolve("id_rsa", Some(&root), &[]).unwrap();
+        for requested in [".git/hooks/pre-commit", ".git/config", ".env", "id_rsa"] {
+            let error = resolve_for_write(requested, Some(&root), &[]).unwrap_err();
+            assert!(
+                error.contains(BLOCKED_SECRET),
+                "write must keep blocking {requested} with the setting off: {error}"
+            );
+        }
     }
 }

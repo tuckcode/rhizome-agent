@@ -630,6 +630,8 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   get_conflict_files: (): string[] => [],
   check_claude_cli: () => ({ installed: false, version: null }),
   get_ai_agents_status: () => ({
+    // Browser mock only. A native build reports the real Prime version.
+    // Settings hides this line when the version is the string `mock`.
     prime: { installed: true, version: 'mock' },
     claude_code: { installed: false, version: null },
     codex: { installed: false, version: null },

@@ -156,10 +156,10 @@ pub struct Settings {
     pub ai_model_providers: Option<Vec<AiModelProvider>>,
     pub ai_workspace_conversations: Option<Vec<AiWorkspaceConversationSetting>>,
     pub hide_gitignored_files: Option<bool>,
-    /// When true (the default, including `None`), native file tools
-    /// refuse secret paths. Off disables that denylist only. Root
-    /// sandboxing still applies.
-    #[serde(default)]
+    /// When true (the default, including `None`), native read tools
+    /// refuse secret paths. Off disables that denylist for reads only.
+    /// Write tools always apply it. A malformed value counts as on.
+    #[serde(default, deserialize_with = "deserialize_optional_bool_on_malformed")]
     pub block_secret_files: Option<bool>,
     pub all_notes_show_pdfs: Option<bool>,
     pub all_notes_show_images: Option<bool>,
@@ -233,6 +233,18 @@ pub struct Settings {
     /// Absent uses the catalog default. Anthropic ids are dropped until 6a.
     #[serde(default)]
     pub native_chat_target: Option<String>,
+}
+
+fn deserialize_optional_bool_on_malformed<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = Option::<serde_json::Value>::deserialize(deserializer)?;
+    match value {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(serde_json::Value::Bool(flag)) => Ok(Some(flag)),
+        Some(_) => Ok(None),
+    }
 }
 
 /// Return the persisted bridge token, generating and saving one the first
@@ -428,6 +440,8 @@ pub fn hide_gitignored_files_enabled() -> bool {
         .unwrap_or(DEFAULT_HIDE_GITIGNORED_FILES)
 }
 
+/// Reads honour this flag. Write tools use `resolve_for_write` and
+/// ignore it.
 pub fn should_block_secret_files(settings: &Settings) -> bool {
     settings
         .block_secret_files
@@ -1157,6 +1171,15 @@ mod tests {
         assert_eq!(loaded.block_secret_files, Some(false));
         let missing = serde_json::from_str::<Settings>("{}").unwrap();
         assert!(should_block_secret_files(&missing));
+    }
+
+    #[test]
+    fn malformed_block_secret_files_counts_as_on() {
+        let parsed: Settings = serde_json::from_str(r#"{"block_secret_files":"nope"}"#).unwrap();
+        assert_eq!(parsed.block_secret_files, None);
+        assert!(should_block_secret_files(&parsed));
+        let number: Settings = serde_json::from_str(r#"{"block_secret_files":1}"#).unwrap();
+        assert!(should_block_secret_files(&number));
     }
 
     #[test]

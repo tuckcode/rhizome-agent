@@ -976,22 +976,73 @@ describe('SettingsPanel', () => {
     expect(screen.queryByTestId('settings-default-ai-agent')).not.toBeInTheDocument()
   })
 
-  it('blocks secret files by default and saves the override', () => {
-    render(
+  it('hides secret files by default, warns when off, and reloads the saved value', () => {
+    const { rerender } = render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
 
     const row = screen.getByTestId('settings-block-secret-files')
-    expect(row).toHaveTextContent('Block secret files')
-    expect(row).toHaveTextContent('The shell tool can still read them')
+    expect(row).toHaveTextContent('Hide secret files from the agent')
+    expect(row).toHaveTextContent("The agent's file tools skip private keys")
+    expect(row).not.toHaveTextContent('shell tool')
     expect(within(row).getByRole('switch')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByTestId('settings-block-secret-files-patterns')).toHaveAttribute(
+      'aria-label',
+      'Which names are hidden',
+    )
 
-    fireEvent.click(row)
+    fireEvent.click(within(row).getByRole('switch'))
+    expect(screen.getByTestId('settings-block-secret-files-help')).toHaveTextContent(
+      "Off: the agent's file tools can open private keys and .env files.",
+    )
     fireEvent.click(screen.getByTestId('settings-save'))
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
       block_secret_files: false,
     }))
+
+    rerender(
+      <SettingsPanel
+        open={true}
+        settings={{ ...emptySettings, block_secret_files: false }}
+        onSave={onSave}
+        onClose={onClose}
+      />,
+    )
+    const reloaded = screen.getByTestId('settings-block-secret-files')
+    expect(within(reloaded).getByRole('switch')).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByTestId('settings-block-secret-files-help')).toHaveTextContent(
+      "Off: the agent's file tools can open private keys and .env files.",
+    )
+  })
+
+  it('lists denylist patterns in the info popover without toggling the switch', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+    fireEvent.click(screen.getByTestId('settings-block-secret-files-patterns'))
+    expect(screen.getByText('Hidden names')).toBeInTheDocument()
+    expect(screen.getByText(/id_rsa/)).toBeInTheDocument()
+    expect(screen.getByText(/\.env\.example/)).toBeInTheDocument()
+    expect(within(screen.getByTestId('settings-block-secret-files')).getByRole('switch')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    )
+  })
+
+  it('hides the Prime engine line when mock-tauri reports version mock', () => {
+    const status = createMissingAiAgentsStatus()
+    status.prime = createAiAgentAvailability('installed', 'mock')
+    render(
+      <SettingsPanel
+        open={true}
+        settings={emptySettings}
+        onSave={onSave}
+        onClose={onClose}
+        aiAgentsStatus={status}
+      />,
+    )
+    expect(screen.queryByTestId('settings-prime-chat-engine')).not.toBeInTheDocument()
   })
 
   /**
