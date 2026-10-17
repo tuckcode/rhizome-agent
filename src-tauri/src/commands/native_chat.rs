@@ -463,7 +463,7 @@ fn index_native_turn(
             text: assistant,
         },
     ];
-    let _ = match index_file {
+    let indexed = match index_file {
         Some(file) => session_transcript_index::append_native_turns_to(
             file,
             session_path,
@@ -478,6 +478,9 @@ fn index_native_turn(
             turns,
         ),
     };
+    if let Err(error) = indexed {
+        log::warn!("session transcript index update failed: {error}");
+    }
 }
 
 fn join_with_bound(worker: thread::JoinHandle<()>, bound: Duration) -> bool {

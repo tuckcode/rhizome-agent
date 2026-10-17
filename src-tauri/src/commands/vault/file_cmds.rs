@@ -176,6 +176,12 @@ pub fn create_note_content(
     vault_path: Option<PathBuf>,
 ) -> Result<(), String> {
     with_writable_note_path(path, vault_path, |validated_path, vault_root| {
+        if crate::rhizome_loop::write_target_is_secret(Path::new(validated_path)) {
+            return Err(format!(
+                "{} Requested path: {validated_path}",
+                crate::rhizome_loop::BLOCKED_SECRET
+            ));
+        }
         vault::create_note_content(validated_path, &content)?;
         let artifact_path =
             crate::rhizome_write_location::relative_to_vault(vault_root, Path::new(validated_path));

@@ -233,6 +233,19 @@ pub fn is_secret(path: &Path) -> bool {
     }
 }
 
+/// Same denylist as [`is_secret`], after resolving a missing leaf through
+/// an existing symlink. `create_note` uses this so `gitlink/note.md` cannot
+/// land inside `.git` when `gitlink` points there.
+pub fn write_target_is_secret(path: &Path) -> bool {
+    if is_secret(path) {
+        return true;
+    }
+    match canonicalize_path(path) {
+        Ok(resolved) => looks_secret(&resolved),
+        Err(_) => false,
+    }
+}
+
 /// Denylist match, gated by the persisted secret-file setting.
 pub fn is_blocked_secret(path: &Path) -> bool {
     is_blocked_secret_with(path, block_secret_files())

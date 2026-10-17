@@ -7,6 +7,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 #[cfg(test)]
 use std::cell::RefCell;
@@ -21,6 +22,17 @@ thread_local! {
 
 const INDEX_VERSION: u32 = 1;
 const INDEX_FILE_NAME: &str = "v1.json";
+
+/// One writer at a time. Append is read-modify-write, and two of those
+/// on the same file used to drop a turn.
+static INDEX_LOCK: Mutex<()> = Mutex::new(());
+
+fn with_index_lock<T>(body: impl FnOnce() -> T) -> T {
+    let _guard = INDEX_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    body()
+}
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -79,6 +91,16 @@ pub(crate) fn append_native_turns_to(
     title: &str,
     new_turns: Vec<IndexedTranscriptTurn>,
 ) -> Result<(), String> {
+    with_index_lock(|| append_native_turns_locked(index_file, path, id, title, new_turns))
+}
+
+fn append_native_turns_locked(
+    index_file: &Path,
+    path: &str,
+    id: &str,
+    title: &str,
+    new_turns: Vec<IndexedTranscriptTurn>,
+) -> Result<(), String> {
     let mut document = load_from(index_file.to_path_buf())?;
     if let Some(session) = document
         .sessions
@@ -117,9 +139,11 @@ pub(crate) fn append_native_turns_to(
 
 /// Remove a native session from the index. Missing is success.
 pub fn remove_session(path: &str) -> Result<(), String> {
-    let mut document = load()?;
-    document.sessions.retain(|session| session.path != path);
-    save(&document)
+    with_index_lock(|| {
+        let mut document = load()?;
+        document.sessions.retain(|session| session.path != path);
+        save_to(index_path()?, &document)
+    })
 }
 
 /// Replace the persisted index with an atomic write.
@@ -130,7 +154,7 @@ pub fn save(document: &SessionTranscriptIndexDocument) -> Result<(), String> {
             document.version
         ));
     }
-    save_to(index_path()?, document)
+    with_index_lock(|| save_to(index_path()?, document))
 }
 
 fn load_from(path: PathBuf) -> Result<SessionTranscriptIndexDocument, String> {
@@ -155,22 +179,61 @@ fn save_to(path: PathBuf, document: &SessionTranscriptIndexDocument) -> Result<(
                 parent.display()
             )
         })?;
+        set_owner_only_dir(parent)?;
     }
-    let data = serde_json::to_vec(document)
+    let document = scrub_document(document);
+    let data = serde_json::to_vec(&document)
         .map_err(|error| format!("serialize session transcript index: {error}"))?;
-    let temp_path = path.with_extension("json.tmp");
-    fs::write(&temp_path, data).map_err(|error| {
-        format!(
-            "write session transcript index {}: {error}",
-            temp_path.display()
-        )
-    })?;
-    fs::rename(&temp_path, &path).map_err(|error| {
-        format!(
-            "replace session transcript index {}: {error}",
-            path.display()
-        )
-    })?;
+    crate::rhizome_loop::write_atomic(&path, &data)
+        .map_err(|error| format!("write session transcript index {}: {error}", path.display()))?;
+    set_owner_only_file(&path)?;
+    Ok(())
+}
+
+fn scrub_document(document: &SessionTranscriptIndexDocument) -> SessionTranscriptIndexDocument {
+    let mut document = document.clone();
+    for session in &mut document.sessions {
+        session.title = crate::engines::native_log::scrub_secrets(&session.title);
+        for turn in &mut session.turns {
+            turn.text = crate::engines::native_log::scrub_secrets(&turn.text);
+        }
+    }
+    document
+}
+
+fn set_owner_only_dir(path: &Path) -> Result<(), String> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o700)).map_err(|error| {
+            format!(
+                "restrict session transcript index dir {}: {error}",
+                path.display()
+            )
+        })?;
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+    }
+    Ok(())
+}
+
+fn set_owner_only_file(path: &Path) -> Result<(), String> {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(path, fs::Permissions::from_mode(0o600)).map_err(|error| {
+            format!(
+                "restrict session transcript index {}: {error}",
+                path.display()
+            )
+        })?;
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+    }
     Ok(())
 }
 
@@ -296,6 +359,94 @@ mod tests {
             fs::write(&path, r#"{"version":9,"sessions":[]}"#).expect("write stale index");
             let loaded = load().expect("load stale index");
             assert_eq!(loaded, SessionTranscriptIndexDocument::empty());
+        });
+    }
+
+    #[test]
+    fn a_pasted_key_is_scrubbed_from_the_index() {
+        with_cache_dir(|_| {
+            let key = "sk-proj-abcdefghijklmnopqrstuvwxyz";
+            append_native_turns(
+                "rhizome-native:pasted",
+                "pasted",
+                "notes",
+                vec![IndexedTranscriptTurn {
+                    message_index: 0,
+                    role: "user".into(),
+                    text: format!("please look at {key}"),
+                }],
+            )
+            .expect("append");
+            let raw = fs::read_to_string(index_path().expect("index path")).expect("read index");
+            assert!(!raw.contains(key), "{raw}");
+            assert!(raw.contains("[redacted]"), "{raw}");
+        });
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_index_file_is_owner_only() {
+        use std::os::unix::fs::PermissionsExt;
+
+        with_cache_dir(|_| {
+            save(&sample_document()).expect("save index");
+            let path = index_path().expect("index path");
+            let file_mode = fs::metadata(&path)
+                .expect("file metadata")
+                .permissions()
+                .mode()
+                & 0o777;
+            let dir_mode = fs::metadata(path.parent().expect("index dir"))
+                .expect("dir metadata")
+                .permissions()
+                .mode()
+                & 0o777;
+            assert_eq!(file_mode, 0o600);
+            assert_eq!(dir_mode, 0o700);
+        });
+    }
+
+    #[test]
+    fn concurrent_appends_keep_both_updates() {
+        use std::sync::{Arc, Barrier};
+        use std::thread;
+
+        with_cache_dir(|_| {
+            for round in 0..8 {
+                let barrier = Arc::new(Barrier::new(2));
+                let left_path = format!("rhizome-native:left-{round}");
+                let right_path = format!("rhizome-native:right-{round}");
+                let left_marker = format!("alpha-marker-{round}");
+                let right_marker = format!("beta-marker-{round}");
+                let spawn = |path: String, marker: String, barrier: Arc<Barrier>| {
+                    thread::spawn(move || {
+                        barrier.wait();
+                        append_native_turns(
+                            &path,
+                            &path,
+                            &marker,
+                            vec![IndexedTranscriptTurn {
+                                message_index: 0,
+                                role: "user".into(),
+                                text: marker.clone(),
+                            }],
+                        )
+                        .expect("append");
+                    })
+                };
+                let left = spawn(left_path, left_marker.clone(), Arc::clone(&barrier));
+                let right = spawn(right_path, right_marker.clone(), barrier);
+                left.join().expect("left thread");
+                right.join().expect("right thread");
+                let raw =
+                    fs::read_to_string(index_path().expect("index path")).expect("read index");
+                assert!(raw.contains(&left_marker), "round {round}: {raw}");
+                assert!(raw.contains(&right_marker), "round {round}: {raw}");
+                assert!(
+                    !raw.contains("v1.json.tmp"),
+                    "round {round} left the fixed temp name in the document"
+                );
+            }
         });
     }
 }
