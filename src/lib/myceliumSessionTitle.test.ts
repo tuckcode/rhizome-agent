@@ -47,6 +47,24 @@ describe('myceliumSessionTitle', () => {
     ])
   })
 
+  it('adds a short id only when duplicate titles share an age', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-17T12:00:00Z'))
+    const now = Date.now()
+    const twoHours = now - 2 * 60 * 60 * 1000
+    expect(myceliumSessionTitles([
+      { id: '01a0252e-b6b9-749a-ad79-4c8c33e521f9', mtimeMs: twoHours },
+      { id: '01a0252e-c4d1-7fa2-9b10-77c1de904ab3', mtimeMs: twoHours - 30 * 60 * 1000 },
+      { id: '01a0208e-3494-73a9-a6a2-2b890838aaaa', title: 'Draft' },
+      { id: '01a0208e-3494-73a9-a6a2-2b890838bbbb', title: 'Draft', mtimeMs: Number.NaN },
+    ])).toEqual([
+      'Untitled session · 2h ago · e521f9',
+      'Untitled session · 2h ago · 904ab3',
+      'Draft · undated · 38aaaa',
+      'Draft · undated · 38bbbb',
+    ])
+  })
+
   it('clips a long title on grapheme boundaries', () => {
     const family = '👨‍👩‍👧‍👦'
     expect(family.length).toBeGreaterThan(2)

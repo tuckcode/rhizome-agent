@@ -33,7 +33,10 @@ export function myceliumSessionTitles(sessions: readonly MyceliumTitleSource[]):
     title: myceliumSessionTitle(session.title),
     mtimeMs: session.mtimeMs,
   }))
-  return disambiguateTitles(rows, (row) => myceliumAgeSuffix(row.mtimeMs)).map((row) => row.title)
+  const aged = disambiguateTitles(rows, (row) => myceliumAgeSuffix(row.mtimeMs))
+  // "2h ago" covers a whole hour, and a missing mtime is "undated".
+  // Those labels can still match, so only that collision adds the short id.
+  return disambiguateTitles(aged, (row) => row.id.slice(-6)).map((row) => row.title)
 }
 
 /** Relative time for a duplicate row, from the session file's mtime. */

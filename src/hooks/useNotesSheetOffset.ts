@@ -61,11 +61,13 @@ export function useNotesSheetOffset() {
     const mutations = typeof MutationObserver === 'undefined'
       ? null
       : new MutationObserver(sync)
+    // Size changes belong to the ResizeObserver. Watching style and class
+    // on the whole tree measured the sheet on every composer keystroke.
     mutations?.observe(document.body, {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['style', 'class', SHEET_OFFSET_BAND_ATTR],
+      attributeFilter: [SHEET_OFFSET_BAND_ATTR],
     })
 
     return () => {

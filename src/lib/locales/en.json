@@ -1193,7 +1193,6 @@
   "ai.panel.skills.withVault": "Skills · {skills}",
   "rail.mycelium": "Mycelium",
   "mycelium.title": "Mycelium",
-  "mycelium.subtitle": "Agent run footprint",
   "mycelium.overviewSubtitle": "Footprints across Prime sessions",
   "mycelium.thisSessionSubtitle": "Footprints in this session",
   "mycelium.thisSessionHint": "Showing {name} only. Not the session list.",
