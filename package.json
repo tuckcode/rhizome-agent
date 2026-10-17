@@ -98,6 +98,7 @@
     "@tauri-apps/cli": "^2.10.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.8",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
@@ -119,5 +120,5 @@
     "vitest": "^4.1.11",
     "ws": "^8.19.0"
   },
-  "description": "Rhizome \u2014 desktop chat shell (not Rhizome Desktop)."
+  "description": "Rhizome — desktop chat shell (not Rhizome Desktop)."
 }

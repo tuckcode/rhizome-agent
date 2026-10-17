@@ -668,6 +668,231 @@ mod tests {
     }
 
     #[test]
+    fn create_note_refuses_secret_and_git_paths() {
+        let vault = tempfile::tempdir().unwrap();
+        let vault_path = vault.path().to_string_lossy().into_owned();
+        for requested in [
+            ".env",
+            ".env.local",
+            "key.pem",
+            "id_rsa",
+            "nested/.git/config",
+        ] {
+            let error = create_note(
+                &json!({ "path": requested, "content": "no\n" }),
+                Some(&vault_path),
+                &[],
+            )
+            .err()
+            .expect("secret path");
+            assert!(
+                error.contains(crate::rhizome_loop::BLOCKED_SECRET),
+                "{requested}: {error}"
+            );
+            assert!(
+                !vault.path().join(requested).exists(),
+                "{requested} must not be created"
+            );
+        }
+        assert!(
+            !vault.path().join("nested").exists(),
+            "create_note must not create a .git parent"
+        );
+
+        create_note(
+            &json!({ "path": ".env.example", "content": "EXAMPLE=1\n" }),
+            Some(&vault_path),
+            &[],
+        )
+        .expect(".env.example is not a secret");
+        assert_eq!(
+            fs::read_to_string(vault.path().join(".env.example")).unwrap(),
+            "EXAMPLE=1\n"
+        );
+    }
+
+    #[test]
+    fn create_note_stays_blocked_when_the_secret_setting_is_off() {
+        let vault = tempfile::tempdir().unwrap();
+        let vault_path = vault.path().to_string_lossy().into_owned();
+        fs::create_dir_all(vault.path().join(".git").join("hooks")).unwrap();
+        fs::write(
+            vault.path().join(".git").join("hooks").join("pre-commit"),
+            "keep\n",
+        )
+        .unwrap();
+        fs::write(vault.path().join(".env"), "SECRET=keep\n").unwrap();
+        let _guard = crate::rhizome_loop::override_secret_block(false);
+        for requested in [".git/hooks/pre-commit", ".env", "id_ed25519"] {
+            let error = create_note(
+                &json!({ "path": requested, "content": "no\n" }),
+                Some(&vault_path),
+                &[],
+            )
+            .err()
+            .expect("secret path");
+            assert!(
+                error.contains(crate::rhizome_loop::BLOCKED_SECRET),
+                "create_note must keep blocking {requested} with the setting off: {error}"
+            );
+            if requested != "id_ed25519" {
+                assert_eq!(
+                    fs::read_to_string(vault.path().join(requested)).unwrap(),
+                    if requested == ".env" {
+                        "SECRET=keep\n"
+                    } else {
+                        "keep\n"
+                    },
+                    "{requested} must stay unchanged"
+                );
+            } else {
+                assert!(!vault.path().join(requested).exists());
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn create_note_refuses_a_symlink_into_git() {
+        let vault = tempfile::tempdir().unwrap();
+        let vault_path = vault.path().to_string_lossy().into_owned();
+        fs::create_dir_all(vault.path().join(".git")).unwrap();
+        fs::write(vault.path().join(".git").join("config"), "keep\n").unwrap();
+        std::os::unix::fs::symlink(vault.path().join(".git"), vault.path().join("gitlink"))
+            .unwrap();
+        let error = create_note(
+            &json!({ "path": "gitlink/config", "content": "no\n" }),
+            Some(&vault_path),
+            &[],
+        )
+        .err()
+        .expect("symlink into .git");
+        assert!(
+            error.contains(crate::rhizome_loop::BLOCKED_SECRET),
+            "{error}"
+        );
+        assert_eq!(
+            fs::read_to_string(vault.path().join(".git").join("config")).unwrap(),
+            "keep\n"
+        );
+    }
+
+    #[test]
+    fn create_note_refuses_git_and_env_aliases() {
+        let vault = tempfile::tempdir().unwrap();
+        let vault_path = vault.path().to_string_lossy().into_owned();
+        for requested in [".GIT/x", ".ENV.LOCAL", ".git/../.git/x", ".env.production"] {
+            let error = create_note(
+                &json!({ "path": requested, "content": "no\n" }),
+                Some(&vault_path),
+                &[],
+            )
+            .err()
+            .expect("secret path");
+            assert!(
+                error.contains(crate::rhizome_loop::BLOCKED_SECRET),
+                "{requested}: {error}"
+            );
+            assert!(
+                !vault.path().join(requested).exists(),
+                "{requested} must not be created"
+            );
+        }
+        assert!(!vault.path().join(".git").join("x").exists());
+        assert!(!vault.path().join(".env.production").exists());
+    }
+
+    /// `CI` counts only when it is set to a real value. An empty string,
+    /// `false` in any ASCII case, and `0` are the same as unset.
+    fn ci_is_set() -> bool {
+        std::env::var("CI").ok().is_some_and(|value| {
+            let value = value.trim();
+            !value.is_empty() && !value.eq_ignore_ascii_case("false") && value != "0"
+        })
+    }
+
+    /// False when this platform cannot make a symlink. The test then returns.
+    fn relative_symlink(target: &str, link: &std::path::Path) -> bool {
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(target, link).is_ok()
+        }
+        #[cfg(windows)]
+        {
+            std::os::windows::fs::symlink_file(target, link).is_ok()
+        }
+        #[cfg(not(any(unix, windows)))]
+        {
+            let _ = (target, link);
+            false
+        }
+    }
+
+    #[test]
+    fn create_note_refuses_a_relative_symlink_into_git() {
+        let vault = tempfile::tempdir().unwrap();
+        let git = vault.path().join(".git");
+        fs::create_dir(&git).unwrap();
+        fs::write(git.join("config"), "keep\n").unwrap();
+        let link = vault.path().join("note");
+        #[cfg(windows)]
+        let target = ".git\\config";
+        #[cfg(not(windows))]
+        let target = ".git/config";
+        if !relative_symlink(target, &link) {
+            if ci_is_set() {
+                panic!("symlink support is required when CI is set");
+            }
+            eprintln!(
+                "skipping create_note_refuses_a_relative_symlink_into_git: this platform cannot create a symlink"
+            );
+            return;
+        }
+        let vault_path = vault.path().to_string_lossy().into_owned();
+        let error = create_note(
+            &json!({ "path": "note", "content": "hello\n" }),
+            Some(&vault_path),
+            &[],
+        )
+        .err()
+        .expect("a symlink into git is refused");
+        assert!(
+            error.contains(crate::rhizome_loop::BLOCKED_SECRET),
+            "secret path must be refused"
+        );
+        assert_eq!(fs::read_to_string(git.join("config")).unwrap(), "keep\n");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn create_note_refuses_windows_git_short_names() {
+        let vault = tempfile::tempdir().unwrap();
+        let vault_path = vault.path().to_string_lossy().into_owned();
+        for requested in [
+            ".git./config",
+            "GIT~1/config",
+            ".git /config",
+            ".git../config",
+            ".git.../config",
+            ".git. /config",
+            ".git::$INDEX_ALLOCATION/config",
+        ] {
+            let error = create_note(
+                &json!({ "path": requested, "content": "no\n" }),
+                Some(&vault_path),
+                &[],
+            )
+            .err()
+            .expect("windows git alias");
+            assert!(
+                error.contains(crate::rhizome_loop::BLOCKED_SECRET),
+                "{requested}: {error}"
+            );
+            assert!(!vault.path().join(requested).exists(), "{requested}");
+        }
+    }
+
+    #[test]
     fn create_note_refuses_an_inactive_vault_and_a_missing_vault() {
         let active = tempfile::tempdir().unwrap();
         let inactive = tempfile::tempdir().unwrap();

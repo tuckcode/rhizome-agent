@@ -573,6 +573,13 @@ describe('PrimeSessionList', () => {
     expect(await screen.findByText(/No Prime sessions yet/)).toBeInTheDocument()
   })
 
+  it('uses Rhizome wording for an empty native session list', async () => {
+    render(<PrimeSessionList engine="native" now={NOW} />)
+
+    expect(await screen.findByText('No Rhizome sessions yet. Start a conversation and it will appear here.')).toBeInTheDocument()
+    expect(screen.queryByText(/No Prime sessions yet/)).not.toBeInTheDocument()
+  })
+
   it('surfaces a read failure instead of looking empty', async () => {
     invoked.fail = 'permission denied'
 
