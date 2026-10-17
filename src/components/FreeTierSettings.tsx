@@ -68,7 +68,11 @@ export function FreeTierSettings() {
       />
       <StrictModeRow strict={overview.strict} busy={state.busy} onChange={state.setStrict} />
       <FallbackOrder overview={overview} />
-      {overview.usable ? null : (
+      {overview.keychainError ? (
+        <div className="text-xs text-destructive" data-testid="free-tier-keychain-error" role="alert">
+          {overview.keychainError}
+        </div>
+      ) : overview.usable ? null : (
         <div className="text-xs text-muted-foreground">
           Add a key to at least one provider to use Free tier (auto).
         </div>

@@ -61,6 +61,7 @@ function mockFreeTierOverview() {
     strict: mockFreeTierSettings.strict,
     routeOrder: mockFreeTierSettings.ownEndpoint ? [...routeOrder, 'custom'] : routeOrder,
     usable: Boolean(mockFreeTierSettings.ownEndpoint) || providers.some((provider) => provider.enabled && provider.hasKey),
+    keychainError: null,
     ownEndpoint: mockFreeTierSettings.ownEndpoint,
     ownEndpointModel: mockFreeTierSettings.ownEndpointModel,
     endpointChoices: [{ id: 'lm_studio-mock', name: 'LM Studio (mock)', models: ['qwen', 'llama'] }],

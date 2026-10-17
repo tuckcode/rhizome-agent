@@ -40,6 +40,8 @@ export interface FreeTierOverview {
   strict: boolean
   routeOrder: string[]
   usable: boolean
+  /** Set when the keychain is locked or access was denied. */
+  keychainError: string | null
   /** Null when nothing is chosen, or the chosen provider was deleted. */
   ownEndpoint: string | null
   ownEndpointModel: string | null

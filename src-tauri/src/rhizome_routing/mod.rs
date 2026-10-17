@@ -34,6 +34,10 @@ use health::{Attempt, Health, Millis};
 /// freellmapi checklist: the overall retry budget for one step.
 pub const RETRY_BUDGET: Millis = 45_000;
 
+/// Shown when the keychain cannot be read. Distinct from a missing key, so
+/// the picker and chat do not tell the user that no key is set.
+pub const KEYCHAIN_LOCKED_OR_DENIED: &str = "The keychain is locked or access was denied.";
+
 /// One provider's secret. Cloudflare also needs the account id.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Credential {
@@ -188,13 +192,19 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
         let started = clock.now_ms();
         let mut tried = 0;
         let mut keyed = false;
+        let mut keychain_blocked = false;
         let mut reopens_at: Option<Millis> = None;
         let mut last_error: Option<ModelError> = None;
 
         for target in catalog.targets(options) {
             let provider = &catalog.providers[target.provider];
-            let Some((credential, base_url)) = reachable(provider, keys) else {
-                continue;
+            let (credential, base_url) = match reach(provider, keys) {
+                Reach::Ready(credential, base_url) => (credential, base_url),
+                Reach::Unavailable => continue,
+                Reach::Keychain => {
+                    keychain_blocked = true;
+                    continue;
+                }
             };
             keyed = true;
             let attempt = Attempt {
@@ -260,7 +270,13 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
             }
         }
 
-        let error = exhausted(last_error, reopens_at, keyed, clock.now_ms());
+        let error = exhausted(
+            last_error,
+            reopens_at,
+            keyed,
+            keychain_blocked,
+            clock.now_ms(),
+        );
         report(ProviderAttempt::Exhausted {
             reason: error.kind.clone(),
         });
@@ -269,39 +285,81 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
     }
 }
 
+/// Why Free tier can or cannot be offered. A locked keychain is not a
+/// missing key: the picker stays up and says the keychain could not be read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TargetAccess {
+    /// At least one target can be called.
+    Usable,
+    /// Keys were read, and none of the routed targets can be called.
+    NoKey,
+    /// A key read failed because the keychain is locked or access was denied.
+    KeychainUnavailable,
+}
+
 /// True when at least one target can be tried: its provider is on, and it
-/// has the key (and account id) it needs, or needs none. The Chat picker
-/// shows "Free tier (auto)" only then (D11). A keyless user endpoint counts.
+/// has the key (and account id) it needs, or needs none. A keyless user
+/// endpoint counts. A locked keychain is not usable; see [`target_access`].
 pub fn has_usable_target(
     catalog: &Catalog,
     options: &RoutingOptions,
     keys: &impl KeyStore,
 ) -> bool {
-    catalog
-        .targets(options)
-        .iter()
-        .any(|target| reachable(&catalog.providers[target.provider], keys).is_some())
+    matches!(target_access(catalog, options, keys), TargetAccess::Usable)
 }
 
-/// The credential and base URL for one provider, or `None` when it cannot
-/// be called: a key it needs is missing, or its URL needs an account id the
-/// credential lacks. The router and `has_usable_target` share this rule.
-fn reachable(
-    provider: &CatalogProvider,
+/// The picker shows "Free tier (auto)" for [`TargetAccess::Usable`] and for
+/// [`TargetAccess::KeychainUnavailable`] (D11). Only [`TargetAccess::NoKey`]
+/// hides it.
+pub fn target_access(
+    catalog: &Catalog,
+    options: &RoutingOptions,
     keys: &impl KeyStore,
-) -> Option<(Option<Credential>, String)> {
+) -> TargetAccess {
+    let mut keychain_blocked = false;
+    for target in catalog.targets(options) {
+        match reach(&catalog.providers[target.provider], keys) {
+            Reach::Ready(_, _) => return TargetAccess::Usable,
+            Reach::Keychain => keychain_blocked = true,
+            Reach::Unavailable => {}
+        }
+    }
+    if keychain_blocked {
+        TargetAccess::KeychainUnavailable
+    } else {
+        TargetAccess::NoKey
+    }
+}
+
+enum Reach {
+    Ready(Option<Credential>, String),
+    Unavailable,
+    Keychain,
+}
+
+/// The credential and base URL for one provider. `Unavailable` when it
+/// cannot be called: a key it needs is missing, or its URL needs an account
+/// id the credential lacks. `Keychain` when the store could not be read.
+/// The router and [`target_access`] share this rule.
+fn reach(provider: &CatalogProvider, keys: &impl KeyStore) -> Reach {
     let credential = match &provider.api_key {
-        Some(api_key) => Some(Credential {
+        Some(api_key) => Ok(Some(Credential {
             api_key: api_key.clone(),
             account_id: None,
-        }),
-        None => keys.credential(provider.key_id.as_deref().unwrap_or(&provider.id)),
+        })),
+        None => keys.try_credential(provider.key_id.as_deref().unwrap_or(&provider.id)),
+    };
+    let credential = match credential {
+        Ok(credential) => credential,
+        Err(_) => return Reach::Keychain,
     };
     if provider.key_required && credential.is_none() {
-        return None;
+        return Reach::Unavailable;
     }
-    let base_url = resolve_base_url(&provider.base_url, credential.as_ref())?;
-    Some((credential, base_url))
+    match resolve_base_url(&provider.base_url, credential.as_ref()) {
+        Some(base_url) => Reach::Ready(credential, base_url),
+        None => Reach::Unavailable,
+    }
 }
 
 enum Outcome {
@@ -350,6 +408,7 @@ fn exhausted(
     last_error: Option<ModelError>,
     reopens_at: Option<Millis>,
     keyed: bool,
+    keychain_blocked: bool,
     now: Millis,
 ) -> ModelError {
     let failure = |kind, message: &str| ModelError {
@@ -362,6 +421,9 @@ fn exhausted(
             message: format!("Every free-tier provider failed. Last: {}", error.message),
             ..error
         };
+    }
+    if !keyed && keychain_blocked {
+        return failure(ModelErrorKind::Auth, KEYCHAIN_LOCKED_OR_DENIED);
     }
     if !keyed {
         return failure(ModelErrorKind::Auth, "No free-tier provider key is set.");
@@ -605,6 +667,71 @@ mod tests {
         assert!(has_usable_target(&catalog, &options, &keys(&["b"])));
     }
 
+    struct LockedStore;
+
+    impl KeyStore for LockedStore {
+        fn credential(&self, _: &str) -> Option<Credential> {
+            None
+        }
+
+        fn try_credential(&self, _: &str) -> Result<Option<Credential>, String> {
+            Err("locked".into())
+        }
+    }
+
+    struct MixedStore;
+
+    impl KeyStore for MixedStore {
+        fn credential(&self, provider_id: &str) -> Option<Credential> {
+            self.try_credential(provider_id).ok().flatten()
+        }
+
+        fn try_credential(&self, provider_id: &str) -> Result<Option<Credential>, String> {
+            if provider_id == "a" {
+                return Err("locked".into());
+            }
+            Ok(Some(Credential {
+                api_key: "test-b".into(),
+                account_id: None,
+            }))
+        }
+    }
+
+    #[test]
+    fn a_locked_keychain_is_not_a_missing_key() {
+        let catalog = catalog(&[("a", "http://a.test/v1")]);
+        let options = RoutingOptions::default();
+
+        assert_eq!(
+            target_access(&catalog, &options, &LockedStore),
+            TargetAccess::KeychainUnavailable
+        );
+        assert!(!has_usable_target(&catalog, &options, &LockedStore));
+        assert_eq!(
+            target_access(&catalog, &options, &keys(&[])),
+            TargetAccess::NoKey
+        );
+
+        let mut router = RoutingModel::new(catalog, LockedStore, FakeClock::at(T0), TEST_LIMITS);
+        let events = run(&mut router);
+        match events.last() {
+            Some(ModelEvent::Error(error)) => {
+                assert_eq!(error.message, KEYCHAIN_LOCKED_OR_DENIED);
+                assert!(!error.message.contains("No free-tier provider key"));
+            }
+            other => panic!("expected a keychain error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_readable_key_still_routes_when_another_provider_keychain_read_fails() {
+        let catalog = catalog(&[("a", "http://a.test/v1"), ("b", "http://b.test/v1")]);
+        assert_eq!(
+            target_access(&catalog, &RoutingOptions::default(), &MixedStore),
+            TargetAccess::Usable
+        );
+    }
+
     #[test]
     fn a_provider_the_user_turned_off_is_not_usable() {
         let catalog = catalog(&[("a", "http://a.test/v1")]);
@@ -642,7 +769,10 @@ mod tests {
         });
         let endpoint = catalog.providers.last().unwrap();
 
-        let (credential, _) = reachable(endpoint, &keys(&["open_ai_compatible-abc"])).unwrap();
+        let Reach::Ready(credential, _) = reach(endpoint, &keys(&["open_ai_compatible-abc"]))
+        else {
+            panic!("the saved provider key must reach the endpoint");
+        };
 
         assert_eq!(credential.unwrap().api_key, "test-open_ai_compatible-abc");
         assert_eq!(endpoint.name, "Hosted");

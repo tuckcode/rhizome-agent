@@ -14,7 +14,9 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use super::UserEndpoint;
-use super::{has_usable_target, Catalog, KeyStore, RoutingOptions};
+use super::{
+    target_access, Catalog, KeyStore, RoutingOptions, TargetAccess, KEYCHAIN_LOCKED_OR_DENIED,
+};
 use crate::ai_models::{
     provider_base_url, AiModelApiKeyStorage, AiModelProvider, AiModelProviderKind,
 };
@@ -209,8 +211,13 @@ pub struct FreeTierOverview {
     /// Ids of the providers that route now, in the order the router tries
     /// them. Read-only (ADR-0182 decision 5).
     pub route_order: Vec<String>,
-    /// The router can try at least one provider (D11).
+    /// The router can try at least one provider, or the keychain could not
+    /// be read so the picker must stay (D11). False only when keys were
+    /// read and none can route.
     pub usable: bool,
+    /// Set when the keychain is locked or access was denied. The picker
+    /// shows this instead of "no key".
+    pub keychain_error: Option<String>,
     /// The chosen saved provider. `None` when it was deleted.
     pub own_endpoint: Option<String>,
     /// The chosen model, when it is still one of the provider's models.
@@ -263,11 +270,14 @@ pub fn overview(
         .own_endpoint
         .as_deref()
         .and_then(|id| choices.iter().find(|choice| choice.id == id));
+    let access = target_access(catalog, &options, keys);
     FreeTierOverview {
         providers,
         strict: settings.strict,
         route_order,
-        usable: has_usable_target(catalog, &options, keys),
+        usable: access != TargetAccess::NoKey,
+        keychain_error: (access == TargetAccess::KeychainUnavailable)
+            .then(|| KEYCHAIN_LOCKED_OR_DENIED.to_string()),
         own_endpoint: chosen.map(|choice| choice.id.clone()),
         own_endpoint_model: chosen.and_then(|choice| {
             settings
@@ -304,7 +314,7 @@ pub fn save_at(path: &Path, settings: &FreeTierSettings) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rhizome_routing::Credential;
+    use crate::rhizome_routing::{has_usable_target, Credential};
     use std::collections::HashMap;
 
     struct Keys(HashMap<String, Credential>);
@@ -777,5 +787,13 @@ mod tests {
         let groq = row(&view, "groq");
         assert!(!groq.has_key);
         assert_eq!(groq.key_error.as_deref(), Some("The keychain is locked."));
+        assert!(
+            view.usable,
+            "a locked keychain must keep Free tier in the picker"
+        );
+        assert_eq!(
+            view.keychain_error.as_deref(),
+            Some(KEYCHAIN_LOCKED_OR_DENIED)
+        );
     }
 }

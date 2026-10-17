@@ -54,6 +54,7 @@ function overview(patch: Partial<FreeTierOverview> = {}): FreeTierOverview {
     strict: false,
     routeOrder: ['groq'],
     usable: true,
+    keychainError: null,
     ownEndpoint: null,
     ownEndpointModel: null,
     endpointChoices: [
@@ -165,6 +166,18 @@ describe('FreeTierSettings', () => {
     await renderLoaded(overview({ usable: false, routeOrder: [] }))
 
     expect(screen.getByText('Add a key to at least one provider to use Free tier (auto).')).toBeInTheDocument()
+  })
+
+  it('shows a locked keychain instead of the no-key line', async () => {
+    await renderLoaded(overview({
+      usable: true,
+      keychainError: 'The keychain is locked or access was denied.',
+    }))
+
+    expect(screen.getByTestId('free-tier-keychain-error')).toHaveTextContent(
+      'The keychain is locked or access was denied.',
+    )
+    expect(screen.queryByText('Add a key to at least one provider to use Free tier (auto).')).not.toBeInTheDocument()
   })
 
   it('picks the own endpoint from a dropdown of saved providers', async () => {
