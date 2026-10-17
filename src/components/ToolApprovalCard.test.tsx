@@ -93,6 +93,43 @@ describe('ToolApprovalCard', () => {
     expect(screen.queryByTestId('approval-show-all')).not.toBeInTheDocument()
   })
 
+  it('opens a collapsed overwrite at the hunk row with added lines still visible', () => {
+    const preview = [
+      '--- notes/weekly-review.md',
+      '+++ notes/weekly-review.md',
+      '@@ -1,40 +1,3 @@',
+      ...Array.from({ length: 40 }, (_, i) => `-old line ${i}`),
+      '+MALICIOUS',
+      '+rm -rf ~',
+      '+rewritten body',
+    ].join('\n')
+    render(
+      <ToolApprovalCard
+        tool="write_file"
+        path="notes/weekly-review.md"
+        overwrite
+        preview={preview}
+        options={OPTIONS}
+        onReply={vi.fn()}
+      />,
+    )
+    const body = screen.getByTestId('approval-diff')
+    const rows = [...body.querySelectorAll('[data-diff-kind]')]
+    expect(body.scrollTop).toBe(0)
+    expect(body).toHaveClass('overflow-hidden')
+    expect(rows[0]).toHaveAttribute('data-diff-kind', 'hunk')
+    expect(rows[0]).toHaveTextContent('@@ -1,40 +1,3 @@')
+    expect(body).toHaveTextContent('+MALICIOUS')
+    expect(body).toHaveTextContent('+rm -rf ~')
+    expect(rows.filter((row) => row.getAttribute('data-diff-kind') === 'removed')).toHaveLength(3)
+    expect(screen.getByTestId('approval-diff-fade')).toBeInTheDocument()
+    expect(screen.getByTestId('approval-show-all')).toHaveTextContent('Show all 44 lines')
+    fireEvent.click(screen.getByTestId('approval-show-all'))
+    expect(screen.queryByTestId('approval-show-all')).not.toBeInTheDocument()
+    expect(screen.getByTestId('approval-diff')).toHaveTextContent('-old line 39')
+    expect(screen.getByTestId('approval-diff')).toHaveClass('overflow-auto')
+  })
+
   it('sends allow once, allow for session, and deny', () => {
     const onReply = vi.fn()
     render(

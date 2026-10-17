@@ -435,7 +435,7 @@ mod tests {
         let after: String = (0..36)
             .map(|i| {
                 if (8..30).contains(&i) {
-                    format!("rewrite line {i} so the card scrolls\n")
+                    format!("rewrite line {i} of the weekly review\n")
                 } else {
                     format!("keep line {i} of the weekly review\n")
                 }

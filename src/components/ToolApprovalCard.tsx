@@ -1,7 +1,8 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { FilePlus, NotePencil, PencilSimple } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { DiffView } from './DiffView'
+import { APPROVAL_COLLAPSE_AFTER, compactDiffLines } from './approvalDiff'
 import {
   approvalTitle,
   previewLooksCreated,
@@ -32,15 +33,6 @@ function optionVariant(id: string): 'default' | 'outline' | 'ghost' {
   return 'outline'
 }
 
-function compactLineCount(diff: string): number {
-  return diff
-    .split('\n')
-    .filter((line) => line.length > 0 && !line.startsWith('---') && !line.startsWith('+++'))
-    .length
-}
-
-const COLLAPSE_AFTER = 12
-
 export function ToolApprovalCard({
   busy = false,
   created: createdProp,
@@ -55,19 +47,8 @@ export function ToolApprovalCard({
   const overwrite = overwriteProp ?? (tool === 'write_file' && !created)
   const title = approvalTitle(tool, created)
   const [expanded, setExpanded] = useState(false)
-  const bodyRef = useRef<HTMLDivElement>(null)
-  const lineCount = compactLineCount(preview ?? '')
-  const overflows = !expanded && lineCount > COLLAPSE_AFTER
-
-  useLayoutEffect(() => {
-    const el = bodyRef.current
-    if (!el || !overflows) return
-    const added = el.querySelector('[data-diff-kind="added"]')
-    if (!(added instanceof HTMLElement)) return
-    const parentBox = el.getBoundingClientRect()
-    const addedBox = added.getBoundingClientRect()
-    el.scrollTop += addedBox.top - parentBox.top - 52
-  }, [preview, overflows])
+  const lineCount = compactDiffLines(preview ?? '').length
+  const overflows = !expanded && lineCount > APPROVAL_COLLAPSE_AFTER
 
   return (
     <section
@@ -115,12 +96,11 @@ export function ToolApprovalCard({
       </header>
       <div className="relative border-y border-border bg-muted/40">
         <div
-          ref={bodyRef}
-          className={expanded ? 'overflow-auto' : 'max-h-64 overflow-auto'}
+          className={expanded ? 'overflow-auto' : 'max-h-64 overflow-hidden'}
           data-testid="approval-diff"
         >
           <div className={expanded || !overflows ? undefined : 'pb-14'}>
-            <DiffView compact diff={preview ?? ''} />
+            <DiffView collapsed={overflows} compact diff={preview ?? ''} />
           </div>
         </div>
         {overflows && !expanded ? (

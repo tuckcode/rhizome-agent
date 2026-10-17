@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { DiffView } from './DiffView'
+import { collapseApprovalLines, compactDiffLines } from './approvalDiff'
 
 describe('DiffView', () => {
   it('shows "No changes to display" when diff is empty', () => {
@@ -70,5 +71,24 @@ describe('DiffView', () => {
     expect(screen.getByText('1')).toBeInTheDocument()
     expect(screen.getByText('2')).toBeInTheDocument()
     expect(screen.getByText('3')).toBeInTheDocument()
+  })
+
+  it('keeps the hunk header and added lines in a collapsed overwrite', () => {
+    const lines = compactDiffLines([
+      '--- notes/weekly-review.md',
+      '+++ notes/weekly-review.md',
+      '@@ -1,40 +1,3 @@',
+      ...Array.from({ length: 40 }, (_, i) => `-old line ${i}`),
+      '+MALICIOUS',
+      '+rm -rf ~',
+      '+rewritten body',
+    ].join('\n'))
+    const collapsed = collapseApprovalLines(lines)
+    expect(collapsed[0]).toBe('@@ -1,40 +1,3 @@')
+    expect(collapsed.filter((line) => line.startsWith('-')).length).toBe(3)
+    expect(collapsed).toContain('+MALICIOUS')
+    expect(collapsed).toContain('+rm -rf ~')
+    expect(collapsed).toContain('+rewritten body')
+    expect(collapsed.length).toBeLessThan(lines.length)
   })
 })

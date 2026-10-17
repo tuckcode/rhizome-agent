@@ -1,8 +1,10 @@
 import { cn } from '@/lib/utils'
+import { collapseApprovalLines, compactDiffLines } from './approvalDiff'
 
 interface DiffViewProps {
   diff: string
   compact?: boolean
+  collapsed?: boolean
 }
 
 const DIFF_HEADER_PREFIXES = ['diff', 'index', '---', '+++', 'new file']
@@ -56,7 +58,7 @@ function visibleDiffLines(diff: string, compact: boolean): string[] {
   })
 }
 
-export function DiffView({ compact = false, diff }: DiffViewProps) {
+export function DiffView({ collapsed = false, compact = false, diff }: DiffViewProps) {
   if (!diff) {
     return (
       <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
@@ -65,7 +67,11 @@ export function DiffView({ compact = false, diff }: DiffViewProps) {
     )
   }
 
-  const lines = visibleDiffLines(diff, compact)
+  const lines = compact
+    ? collapsed
+      ? collapseApprovalLines(compactDiffLines(diff))
+      : visibleDiffLines(diff, true)
+    : visibleDiffLines(diff, false)
 
   return (
     <div className={cn('font-mono leading-relaxed', compact ? 'py-1 text-[12px]' : 'py-3 text-[13px]')}>
