@@ -100,15 +100,25 @@ function installCommitFlowMocks() {
   })
 }
 
-/** The classic shell opens Notes from the View command, as the View menu does. */
+/**
+ * The classic shell opens Notes from the View command, as the View menu
+ * does. At launch the browser mock switches from the dev-server vault to
+ * the mock vault list's active vault, and that switch resets the view.
+ * A Notes command sent before it is lost, so send it again until a note
+ * row shows.
+ */
 async function openFirstNote(page: Page) {
   await page.waitForFunction(() => window.__rhizomeFrontendReady === true)
-  await page.evaluate(() => {
-    window.dispatchEvent(new CustomEvent('laputa:dispatch-command', { detail: 'view-editor-list' }))
-  })
-  const noteList = page.locator('[data-testid="note-list-container"]')
-  await noteList.waitFor({ timeout: 5_000 })
-  await noteList.locator('.cursor-pointer').first().click()
+  const firstNote = page.locator('[data-testid="note-list-container"] [role="option"]').first()
+  await expect(async () => {
+    if (!(await firstNote.isVisible())) {
+      await page.evaluate(() => {
+        window.dispatchEvent(new CustomEvent('laputa:dispatch-command', { detail: 'view-editor-list' }))
+      })
+    }
+    await expect(firstNote).toBeVisible({ timeout: 2_000 })
+  }).toPass({ timeout: 10_000 })
+  await firstNote.click()
   await expect(page.locator('.bn-editor')).toBeVisible({ timeout: 5_000 })
 }
 

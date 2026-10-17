@@ -30,6 +30,31 @@ The same 8 tests failed on main (`041b3a7e`, and again on `462b1748`) with
 own "open Notes from the rail, expand Browse, pick All Notes" step, now
 exported and shared. `waitForFixtureVaultReady` calls it.
 
+## Hold fixes (same day, after review at `51683940`)
+
+The config's `retries: 2` hid failures. Fixed with `--retries=0` runs:
+
+- **`manual-commit-modal-autogit-off`: a test race, not an app bug.** At
+  launch the browser mock lists the dev-server vault (`__DEMO_VAULT_PATH__`),
+  then switches to the mock vault list's active vault
+  (`/Users/mock/demo-vault-v2`). The switch resets the view. A
+  `view-editor-list` sent before it is lost, and the classic list then
+  never shows. The spec now resends the command until a note row shows
+  (`expect().toPass`). Unmerged head: 1 of 3 runs failed. With the fix:
+  8 of 8 passed. The classic list itself works.
+- **`autogit-checkpoints`.** The three tests sit in one describe with a 45s
+  timeout. The fixed wait after a failed checkpoint is 2s (two 1s AutoGit
+  ticks), down from 3.5s. The commit polls allow 10s (2s idle threshold +
+  tick + save). The threshold inputs wait for `toBeEditable` before `fill`.
+- The branch merged `origin/main`, so #243's overflow-sort fix is in.
+
+Six specs, `--retries=0 --repeat-each=3`:
+
+| Run | Before | After |
+|---|---|---|
+| Serial (`--workers=1`) | 31 passed, 8 failed | 39 passed, 0 failed |
+| Parallel (`--workers=4`) | 10 passed, 3 failed | 39 passed, 0 failed |
+
 ## Open threads
 
 - **C96 — the bare mock vault cannot save edits to its own notes.** The mock's
