@@ -42,7 +42,11 @@ fn dest_permissions(path: &Path) -> Result<Option<std::fs::Permissions>, String>
             }
             Ok(Some(meta.permissions()))
         }
-        Err(_) => Ok(None),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(format!(
+            "Failed to read file metadata for {}: {error}",
+            path.display()
+        )),
     }
 }
 
@@ -140,6 +144,20 @@ fn open_exclusive_tmp(
     }
 }
 
+/// Copies one attribute. A failure is logged and returned so Finder tags
+/// and the quarantine flag are not dropped silently.
+#[cfg(unix)]
+fn copy_xattr_or_warn(to: &Path, name: &std::ffi::OsStr, value: &[u8]) -> Result<(), String> {
+    xattr::set(to, name, value).map_err(|error| {
+        let message = format!(
+            "Could not copy file attribute {}: {error}",
+            name.to_string_lossy()
+        );
+        log::warn!("{message}");
+        message
+    })
+}
+
 fn copy_xattrs(from: &Path, to: &Path) {
     #[cfg(unix)]
     {
@@ -151,7 +169,7 @@ fn copy_xattrs(from: &Path, to: &Path) {
         };
         for name in attrs {
             if let Ok(Some(value)) = xattr::get(from, &name) {
-                let _ = xattr::set(to, &name, &value);
+                let _ = copy_xattr_or_warn(to, &name, &value);
             }
         }
     }
@@ -303,5 +321,37 @@ mod tests {
             Some(&b"tag"[..])
         );
         assert_eq!(fs::read_to_string(&dest).unwrap(), "new\n");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_failed_attribute_copy_is_reported() {
+        let dir = tempfile::tempdir().unwrap();
+        let missing = dir.path().join("gone");
+        let error = copy_xattr_or_warn(&missing, std::ffi::OsStr::new("user.rhizome-test"), b"tag")
+            .expect_err("a missing file cannot take an attribute");
+        assert!(error.contains("Could not copy file attribute"), "{error}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_metadata_error_other_than_not_found_is_returned() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let parent = dir.path().join("locked");
+        fs::create_dir(&parent).unwrap();
+        let dest = parent.join("note.md");
+        fs::write(&dest, "keep\n").unwrap();
+        fs::set_permissions(&parent, fs::Permissions::from_mode(0o000)).unwrap();
+        let error = write_atomic(&dest, b"no\n");
+        fs::set_permissions(&parent, fs::Permissions::from_mode(0o755)).unwrap();
+        let error = error.expect_err("metadata must fail closed");
+        assert!(error.contains("Failed to read file metadata"), "{error}");
+        assert!(
+            error.contains("Permission denied") || error.contains("permission"),
+            "{error}"
+        );
+        assert_eq!(fs::read_to_string(&dest).unwrap(), "keep\n");
     }
 }

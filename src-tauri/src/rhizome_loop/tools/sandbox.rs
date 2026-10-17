@@ -58,8 +58,12 @@ pub fn allowed_roots(vault_path: Option<&str>, vault_paths: &[String]) -> Result
         if trimmed.is_empty() {
             continue;
         }
-        let Ok(canonical) = canonicalize_root(trimmed) else {
-            continue;
+        let canonical = match canonicalize_root(trimmed) {
+            Ok(canonical) => canonical,
+            Err(error) => {
+                log::warn!("Skipping extra vault root {trimmed}: {error}");
+                continue;
+            }
         };
         if all.iter().any(|root| root == &canonical) {
             continue;
@@ -404,6 +408,17 @@ mod tests {
         let path = dir.path().canonicalize().unwrap();
         fs::write(path.join("inside.md"), "ok\n").unwrap();
         (dir, path.to_string_lossy().into_owned())
+    }
+
+    #[test]
+    fn a_missing_extra_root_is_skipped() {
+        let (_dir, root) = vault();
+        let missing = root.clone() + "-missing-extra-root";
+        let roots = allowed_roots(Some(&root), std::slice::from_ref(&missing)).unwrap();
+        assert_eq!(roots.all.len(), 1);
+        assert_eq!(roots.all[0], PathBuf::from(&root));
+        let resolved = resolve_for_read("inside.md", Some(&root), &[missing]).unwrap();
+        assert_eq!(resolved, PathBuf::from(&root).join("inside.md"));
     }
 
     #[test]
