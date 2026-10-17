@@ -53,6 +53,11 @@ vi.mock('@tauri-apps/api/core', () => ({
   invoke: (...args: unknown[]) => mockInvokeFn(...args),
 }))
 
+vi.mock('../lib/callHost', () => ({
+  callHost: (...args: unknown[]) => mockInvokeFn(...args),
+  callHostOr: async (_command: string, fallback: unknown) => fallback,
+}))
+
 vi.mock('@tauri-apps/plugin-dialog', () => ({
   open: (...args: unknown[]) => mockDialogOpen(...args),
 }))
@@ -955,5 +960,69 @@ describe('ResearchPanel', () => {
     fireEvent.click(item)
 
     expect(mockTrackEvent).toHaveBeenCalledWith('research_library_open', { type: 'wiki' })
+  })
+
+  it('shows the generate empty state before any run', async () => {
+    render(
+      <ResearchPanel open={true} onClose={onClose} vaultPath="/vault" onOpenNote={onOpenNote} />
+    )
+
+    expect(await screen.findByTestId('research-generate-empty')).toHaveTextContent(
+      'Paste a repo URL or pick a local folder to map it',
+    )
+    expect(screen.queryByText(/Library scan error/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Library loaded/i)).not.toBeInTheDocument()
+  })
+
+  it('shows a plain library scan error instead of a raw TypeError', async () => {
+    mockInvokeFn.mockImplementation((command: string, payload?: Record<string, unknown>) => {
+      if ((payload as { name?: string })?.name === 'rhizome_scan_library') {
+        return Promise.reject(new TypeError("Cannot read properties of undefined (reading 'invoke')"))
+      }
+      return Promise.resolve('{}')
+    })
+
+    render(
+      <ResearchPanel open={true} onClose={onClose} vaultPath="/vault" onOpenNote={onOpenNote} />
+    )
+
+    const error = await screen.findByTestId('research-library-scan-error')
+    expect(error).toHaveTextContent("Couldn't scan this library.")
+    expect(error).toHaveTextContent('The vault listing did not finish.')
+    expect(error).not.toHaveTextContent('TypeError')
+    expect(screen.queryByText(/Library scan error/i)).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Details' }))
+    expect(error).toHaveTextContent("Cannot read properties of undefined (reading 'invoke')")
+  })
+
+  it('retries the library scan from the error state', async () => {
+    let scanCalls = 0
+    mockInvokeFn.mockImplementation((command: string, payload?: Record<string, unknown>) => {
+      if ((payload as { name?: string })?.name === 'rhizome_scan_library') {
+        scanCalls += 1
+        if (scanCalls === 1) {
+          return Promise.reject(new Error('disk offline'))
+        }
+        return Promise.resolve(JSON.stringify(libraryItems))
+      }
+      return Promise.resolve('{}')
+    })
+
+    render(
+      <ResearchPanel open={true} onClose={onClose} vaultPath="/vault" onOpenNote={onOpenNote} />
+    )
+
+    const retry = await screen.findByRole('button', { name: 'Retry' })
+    expect(scanCalls).toBe(1)
+    fireEvent.click(retry)
+
+    await waitFor(() => {
+      expect(scanCalls).toBe(2)
+      expect(screen.queryByTestId('research-library-scan-error')).not.toBeInTheDocument()
+    })
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /library/i }), { button: 0, ctrlKey: false })
+    expect(await screen.findByText('my repo')).toBeInTheDocument()
   })
 })

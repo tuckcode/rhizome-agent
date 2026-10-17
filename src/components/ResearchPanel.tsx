@@ -1,5 +1,4 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
-import { invoke } from '@tauri-apps/api/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -17,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { createTranslator, type AppLocale } from '../lib/i18n'
+import { callHost } from '../lib/callHost'
 import { trackEvent } from '../lib/telemetry'
 import { trackVaultCredentialsHandled } from '../lib/productAnalytics'
 import { redactCredentialTokens } from '../lib/sensitiveTextRedaction'
@@ -27,7 +27,7 @@ import { openExternalUrl } from '../utils/url'
 import type { Settings } from '../types'
 import {
   RocketLaunch, PuzzlePiece, Brain,
-  MagnifyingGlass, Code, FileText,
+  MagnifyingGlass, Code, FileText, Folder,
   BookOpenText, Sparkle, Question,
   ClockClockwise, WarningCircle
 } from '@phosphor-icons/react'
@@ -89,6 +89,89 @@ const EMPTY_SETTINGS: Settings = {
 const ALL_AGENTS_INSTALLED_STATUS: AiAgentsStatus = Object.fromEntries(
   AI_AGENT_DEFINITIONS.map((definition) => [definition.id, createAiAgentAvailability('installed')]),
 ) as AiAgentsStatus
+
+const RESEARCH_DEPTHS = [
+  { value: 'fast', label: 'Fast', description: 'Quicker skim, less detail' },
+  { value: 'regular', label: 'Regular', description: 'Typical coverage for most repos' },
+  { value: 'deep', label: 'Deep', description: 'Slower, more thorough' },
+] as const
+
+function ResearchDepthSelect({
+  value,
+  onValueChange,
+  testId,
+}: {
+  value: string
+  onValueChange: (value: string) => void
+  testId?: string
+}) {
+  const selected = RESEARCH_DEPTHS.find((depth) => depth.value === value) ?? RESEARCH_DEPTHS[1]
+  return (
+    <Select value={value} onValueChange={onValueChange}>
+      <SelectTrigger
+        data-testid={testId}
+        aria-label="Research depth"
+        className="bg-muted border-border text-foreground text-sm"
+      >
+        <SelectValue>{selected.label}</SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        {RESEARCH_DEPTHS.map((depth) => (
+          <SelectItem key={depth.value} value={depth.value} textValue={depth.label}>
+            <span className="flex flex-col items-start gap-0.5 py-0.5">
+              <span>{depth.label}</span>
+              <span className="text-xs text-muted-foreground">{depth.description}</span>
+            </span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  )
+}
+
+function ResearchLibraryScanError({
+  technical,
+  onRetry,
+}: {
+  technical: string
+  onRetry: () => void
+}) {
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  return (
+    <div
+      data-testid="research-library-scan-error"
+      role="alert"
+      className="mx-5 mt-3 rounded-lg border border-border bg-muted px-3 py-2.5"
+    >
+      <p className="text-sm font-medium text-foreground">Couldn&apos;t scan this library.</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">The vault listing did not finish.</p>
+      <div className="mt-2 flex items-center gap-2">
+        <Button
+          type="button"
+          size="sm"
+          onClick={onRetry}
+          data-testid="research-library-scan-retry"
+        >
+          Retry
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-expanded={detailsOpen}
+          onClick={() => setDetailsOpen((open) => !open)}
+        >
+          Details
+        </Button>
+      </div>
+      {detailsOpen ? (
+        <pre className="mt-2 overflow-x-auto whitespace-pre-wrap font-mono text-xs text-muted-foreground">
+          {technical}
+        </pre>
+      ) : null}
+    </div>
+  )
+}
 
 function labelForVaultPath(path: string, vaults: VaultOption[]): string {
   const match = vaults.find(v => v.path === path)
@@ -216,7 +299,8 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
   const [status, setStatus] = useState<string | null>(null)
   const [events, setEvents] = useState<string[]>([])
   const [library, setLibrary] = useState<LibraryItem[]>([])
-  const [modeLabel, setModeLabel] = useState('Architecture Map')
+  const [modeLabel, setModeLabel] = useState('Architecture map')
+  const [libraryScanError, setLibraryScanError] = useState<string | null>(null)
   const [askInput, setAskInput] = useState('')
   const [askRepo, setAskRepo] = useState('')
   const [askDepth, setAskDepth] = useState('regular')
@@ -260,10 +344,10 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
   const loadLibrary = useCallback(async (): Promise<LibraryItem[]> => {
     if (!destinationVaultPath) return []
     try {
-      const result = await invoke('call_rhizome_tool', {
+      const result = await callHost<string>('call_rhizome_tool', {
         name: 'rhizome_scan_library',
         args: { vaultPath: destinationVaultPath }
-      }) as string
+      })
       const items = JSON.parse(result) as Array<{
         id: string; path: string; title: string; description: string;
         type: string; tag: string; date: number
@@ -279,13 +363,13 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
         path: item.path,
       }))
       setLibrary(mapped)
-      addEvent(t('research.event.libraryLoaded', { count: items.length }))
+      setLibraryScanError(null)
       return mapped
     } catch (err) {
-      addEvent(t('research.event.libraryScanError', { error: String(err) }))
+      setLibraryScanError(err instanceof Error ? err.message : String(err))
       return []
     }
-  }, [destinationVaultPath, addEvent, t])
+  }, [destinationVaultPath])
 
   /** Reload the library and open the newest artifact created after `prevMaxEpoch`, if any. */
   const reloadAndAutoOpen = useCallback(async (prevMaxEpoch: number) => {
@@ -472,10 +556,10 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
 
     try {
       const askLimit = askDepth === 'deep' ? '10' : askDepth === 'fast' ? '3' : '5'
-      const result = await invoke('call_rhizome_tool', {
+      const result = await callHost<string>('call_rhizome_tool', {
         name: 'rhizome_search',
         args: { query: askInput, vaultPath: destinationVaultPath, limit: askLimit }
-      }) as string
+      })
       const repoFilter = askRepo.trim().toLowerCase()
       const results = parseAskResults(result)
         .filter(r => !repoFilter || (r.path?.toLowerCase().includes(repoFilter) ?? false))
@@ -507,10 +591,10 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
   const loadHistory = useCallback(async () => {
     if (!destinationVaultPath) return
     try {
-      const result = await invoke('call_rhizome_tool', {
+      const result = await callHost<string>('call_rhizome_tool', {
         name: 'rhizome_read_events',
         args: { vaultPath: destinationVaultPath }
-      }) as string
+      })
       const items = JSON.parse(result) as Array<Record<string, unknown>>
       setHistoryEvents(items.map((e) =>
         `[${(e.timestamp as string | undefined)?.slice(0, 19)?.replace('T', ' ') || '?'}] ${e.type}: ${JSON.stringify(Object.fromEntries(Object.entries(e).filter(([k]) => k !== 'timestamp'))) || '(empty)'}`
@@ -545,7 +629,7 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
             </div>
             {destinationVaultPath ? (
               <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                <span>📁</span>
+                <Folder weight="bold" className="h-3.5 w-3.5" aria-hidden />
                 <Select
                   value={destinationVaultPath}
                   onValueChange={(path) => {
@@ -584,6 +668,13 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
               <p className="text-xs text-[#ff9f0a] mt-1">⚠ {t('research.noVaultWarning')}</p>
             )}
           </div>
+
+          {libraryScanError ? (
+            <ResearchLibraryScanError
+              technical={libraryScanError}
+              onRetry={() => { void loadLibrary() }}
+            />
+          ) : null}
 
           {preflightBlocked && (
             <div
@@ -674,7 +765,7 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
                     onClick={handleLocalRepoPick}
                     className="bg-muted border-border text-foreground hover:bg-accent"
                   >
-                    <FolderIcon /> {t('research.generate.local')}
+                    <Folder weight="bold" className="h-4 w-4" /> {t('research.generate.local')}
                   </Button>
                 </div>
 
@@ -687,16 +778,11 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
                     {modeLabel}
                   </Button>
 
-                  <Select value={generateDepth} onValueChange={setGenerateDepth}>
-                    <SelectTrigger className="bg-muted border-border text-foreground text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="fast">{t('research.depth.fast')}</SelectItem>
-                      <SelectItem value="regular">{t('research.depth.regular')}</SelectItem>
-                      <SelectItem value="deep">{t('research.depth.deep')}</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <ResearchDepthSelect
+                    value={generateDepth}
+                    onValueChange={setGenerateDepth}
+                    testId="research-generate-depth"
+                  />
 
                   <div className="flex-1" />
 
@@ -733,17 +819,23 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
                   <div className="text-sm text-muted-foreground mb-2">{status}</div>
                 )}
 
-                <ScrollArea className="flex-1 rounded-lg bg-muted p-3">
-                  {events.length === 0 ? (
-                    <p className="text-sm text-muted-foreground/70 text-center py-8">
-                      {t('research.generate.emptyState')}
+                {events.length === 0 ? (
+                  <div
+                    data-testid="research-generate-empty"
+                    className="flex flex-1 flex-col items-center justify-center text-center"
+                  >
+                    <RocketLaunch weight="thin" className="mb-3 h-12 w-12 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground/70">
+                      Paste a repo URL or pick a local folder to map it
                     </p>
-                  ) : (
-                    events.map((ev, i) => (
+                  </div>
+                ) : (
+                  <ScrollArea className="flex-1 rounded-lg bg-muted p-3">
+                    {events.map((ev, i) => (
                       <div key={i} className="text-xs text-muted-foreground py-0.5 font-mono">{ev}</div>
-                    ))
-                  )}
-                </ScrollArea>
+                    ))}
+                  </ScrollArea>
+                )}
               </TabsContent>
 
               {/* IMPORT TAB */}
@@ -982,16 +1074,11 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
                     placeholder={t('research.ask.repoPlaceholder')}
                     className="flex-1 bg-muted border-border text-foreground placeholder:text-muted-foreground/70"
                   />
-                  <Select value={askDepth} onValueChange={setAskDepth}>
-                    <SelectTrigger className="bg-muted border-border text-foreground text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="fast">{t('research.depth.fast')}</SelectItem>
-                      <SelectItem value="regular">{t('research.depth.regular')}</SelectItem>
-                      <SelectItem value="deep">{t('research.depth.deep')}</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <ResearchDepthSelect
+                    value={askDepth}
+                    onValueChange={setAskDepth}
+                    testId="research-ask-depth"
+                  />
                   <div className="flex-1" />
                   <Button
                     onClick={handleAsk}
@@ -1107,13 +1194,5 @@ export function ResearchPanel({ open, onClose, vaultPath, agentMemoryVaultPath, 
         </DialogContent>
       </Dialog>
     </>
-  )
-}
-
-function FolderIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="mr-1">
-      <path d="M2 4.5C2 3.94772 2.44772 3.5 3 3.5H6L7.5 5H13C13.5523 5 14 5.44772 14 6V11.5C14 12.0523 13.5523 12.5 13 12.5H3C2.44772 12.5 2 12.0523 2 11.5V4.5Z" />
-    </svg>
   )
 }

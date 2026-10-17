@@ -33,7 +33,7 @@ export interface ResearchMode {
 const RESEARCH_MODES: ResearchMode[] = [
   {
     id: 'architecture',
-    title: 'Architecture Map',
+    title: 'Architecture map',
     description: 'A comprehensive developer reference for entry points, data flow, abstractions, and key components.',
     category: 'technical',
     categoryLabel: 'Technical',
