@@ -5,9 +5,27 @@ use ignore::{DirEntry, Walk, WalkBuilder};
 
 use super::sandbox;
 
-/// Stop walking after this many directory entries, even if the
-/// result cap has not been hit (gitignore skips still cost).
+/// Stop walking after this many yielded entries, even if the
+/// result cap has not been hit. Gitignored and secret paths are
+/// omitted by the walker and do not count.
 pub const WALK_BUDGET: usize = 10_000;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Truncation {
+    None,
+    ResultCap,
+    WalkCap,
+}
+
+impl Truncation {
+    pub fn note(self, cap: usize) -> Option<String> {
+        match self {
+            Self::None => None,
+            Self::ResultCap => Some(format!("[truncated: result cap is {cap}]")),
+            Self::WalkCap => Some(format!("[truncated: walk cap is {WALK_BUDGET} entries]")),
+        }
+    }
+}
 
 /// Walk `root` with `.gitignore` honoured and without following
 /// symlinks. Parent gitignores outside the root are ignored.
@@ -20,6 +38,7 @@ pub fn gitignore_walk_depth(root: &Path, depth: usize) -> Walk {
 }
 
 fn gitignore_walker(root: &Path, max_depth: Option<usize>) -> Walk {
+    let block = sandbox::block_secret_files();
     let mut builder = WalkBuilder::new(root);
     builder
         .standard_filters(false)
@@ -30,15 +49,15 @@ fn gitignore_walker(root: &Path, max_depth: Option<usize>) -> Walk {
         .git_exclude(false)
         .parents(false)
         .follow_links(false)
-        .filter_entry(keep_entry);
+        .filter_entry(move |entry| keep_entry(entry, block));
     if let Some(depth) = max_depth {
         builder.max_depth(Some(depth));
     }
     builder.build()
 }
 
-fn keep_entry(entry: &DirEntry) -> bool {
-    entry.depth() == 0 || !sandbox::is_secret(entry.path())
+fn keep_entry(entry: &DirEntry, block: bool) -> bool {
+    entry.depth() == 0 || !sandbox::is_blocked_secret_with(entry.path(), block)
 }
 
 /// Compile a glob. A pattern with no `/` also matches at any depth
@@ -71,4 +90,12 @@ pub fn is_file_entry(entry: &DirEntry) -> bool {
 
 pub fn is_dir_entry(entry: &DirEntry) -> bool {
     entry.file_type().is_some_and(|kind| kind.is_dir())
+}
+
+/// Label a directory, including a symlink whose target is a directory.
+pub fn is_dir_like_entry(entry: &DirEntry) -> bool {
+    if is_dir_entry(entry) {
+        return true;
+    }
+    entry.file_type().is_some_and(|kind| kind.is_symlink()) && entry.path().is_dir()
 }

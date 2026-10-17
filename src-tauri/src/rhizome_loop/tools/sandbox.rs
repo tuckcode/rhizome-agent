@@ -4,12 +4,28 @@
 //! vault root. `..` and symlinks are followed first. Anything outside
 //! those roots is refused with a message the model can read.
 
+use std::cell::Cell;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 pub const OUTSIDE_ROOTS: &str = "Path is outside the allowed vault and workspace roots.";
 pub const NO_ROOTS: &str = "No active vault or workspace is available.";
 pub const BLOCKED_SECRET: &str = "blocked: secret file";
+
+const PRIVATE_KEY_NAMES: &[&str] = &[
+    "id_rsa",
+    "id_dsa",
+    "id_ecdsa",
+    "id_ecdsa_sk",
+    "id_ed25519",
+    "id_ed25519_sk",
+    "id_mldsa44_ed25519",
+];
+const SECRET_EXTENSIONS: &[&str] = &[".pem", ".key", ".p12", ".pfx"];
+
+thread_local! {
+    static BLOCK_SECRETS_OVERRIDE: Cell<Option<bool>> = const { Cell::new(None) };
+}
 
 /// Canonical vault / workspace roots for one tool call.
 #[derive(Debug, Clone)]
@@ -83,10 +99,39 @@ pub fn resolve_in(requested: &str, roots: &Roots) -> Result<PathBuf, String> {
     if !roots.all.iter().any(|root| is_within(&resolved, root)) {
         return Err(format!("{OUTSIDE_ROOTS} Requested path: {trimmed}"));
     }
-    if is_secret(&resolved) {
+    if is_blocked_secret(&resolved) {
         return Err(format!("{BLOCKED_SECRET} Requested path: {trimmed}"));
     }
     Ok(resolved)
+}
+
+/// Whether native tools refuse secret paths. Default on.
+///
+/// A test can pin the value for one thread. Production reads the
+/// persisted setting. Root sandboxing still applies when this is off.
+pub fn block_secret_files() -> bool {
+    if let Some(forced) = BLOCK_SECRETS_OVERRIDE.with(Cell::get) {
+        return forced;
+    }
+    crate::settings::block_secret_files_enabled()
+}
+
+/// Pin the secret-file block for the current test thread.
+#[cfg(test)]
+pub fn override_secret_block(block: bool) -> SecretBlockGuard {
+    BLOCK_SECRETS_OVERRIDE.with(|cell| cell.set(Some(block)));
+    SecretBlockGuard
+}
+
+/// Restores the secret-file override when dropped.
+#[cfg(test)]
+pub struct SecretBlockGuard;
+
+#[cfg(test)]
+impl Drop for SecretBlockGuard {
+    fn drop(&mut self) {
+        BLOCK_SECRETS_OVERRIDE.with(|cell| cell.set(None));
+    }
 }
 
 pub fn resolve_file(
@@ -120,9 +165,14 @@ pub fn is_within(candidate: &Path, root: &Path) -> bool {
     candidate.strip_prefix(root).is_ok()
 }
 
-/// Deny `.env*`, anything under `.git/`, `*.pem`, and `id_*`.
-/// Basename match is case-insensitive. Checked on the path as given
-/// and on its canonical target so a symlink cannot hide a secret.
+/// Deny `.env*` (except `.env.example`), anything under `.git/`,
+/// `*.pem` / `*.key` / `*.p12` / `*.pfx`, and known private-key
+/// basenames. Basename match is case-insensitive. Checked on the
+/// path as given and on its canonical target so a symlink cannot
+/// hide a secret.
+///
+/// This is the denylist. Callers that honour the user override
+/// should use [`is_blocked_secret`].
 pub fn is_secret(path: &Path) -> bool {
     if looks_secret(path) {
         return true;
@@ -133,6 +183,15 @@ pub fn is_secret(path: &Path) -> bool {
     }
 }
 
+/// Denylist match, gated by the persisted secret-file setting.
+pub fn is_blocked_secret(path: &Path) -> bool {
+    is_blocked_secret_with(path, block_secret_files())
+}
+
+pub fn is_blocked_secret_with(path: &Path, block: bool) -> bool {
+    block && is_secret(path)
+}
+
 fn looks_secret(path: &Path) -> bool {
     if path.components().any(component_is_git) {
         return true;
@@ -141,7 +200,12 @@ fn looks_secret(path: &Path) -> bool {
         return false;
     };
     let lower = name.to_string_lossy().to_ascii_lowercase();
-    lower.starts_with(".env") || lower.ends_with(".pem") || lower.starts_with("id_")
+    if lower == ".env.example" {
+        return false;
+    }
+    lower.starts_with(".env")
+        || SECRET_EXTENSIONS.iter().any(|ext| lower.ends_with(ext))
+        || PRIVATE_KEY_NAMES.contains(&lower.as_str())
 }
 
 fn component_is_git(component: std::path::Component<'_>) -> bool {
@@ -395,11 +459,82 @@ mod tests {
     }
 
     #[test]
-    fn id_prefix_file_is_blocked() {
+    fn each_private_key_basename_is_blocked() {
         let (_dir, root) = vault();
-        plant(Path::new(&root), "id_rsa");
-        assert_blocked(&root, "id_rsa");
-        assert!(is_secret(&PathBuf::from(&root).join("id_rsa")));
+        let root_path = Path::new(&root);
+        for name in [
+            "id_rsa",
+            "id_dsa",
+            "id_ecdsa",
+            "id_ecdsa_sk",
+            "id_ed25519",
+            "id_ed25519_sk",
+            "id_mldsa44_ed25519",
+        ] {
+            plant(root_path, name);
+            assert_blocked(&root, name);
+            assert!(is_secret(&root_path.join(name)));
+        }
+    }
+
+    #[test]
+    fn nested_private_key_is_blocked() {
+        let (_dir, root) = vault();
+        plant(Path::new(&root), "ssh/keys/id_ed25519");
+        assert_blocked(&root, "ssh/keys/id_ed25519");
+        assert!(is_secret(
+            &PathBuf::from(&root)
+                .join("ssh")
+                .join("keys")
+                .join("id_ed25519")
+        ));
+    }
+
+    #[test]
+    fn public_key_and_id_card_are_allowed() {
+        let (_dir, root) = vault();
+        let root_path = Path::new(&root);
+        plant(root_path, "id_rsa.pub");
+        plant(root_path, "id_ed25519.pub");
+        plant(root_path, "id_card.md");
+        plant(root_path, "notes/id_rsa.pub");
+        resolve("id_rsa.pub", Some(&root), &[]).unwrap();
+        resolve("id_ed25519.pub", Some(&root), &[]).unwrap();
+        resolve("id_card.md", Some(&root), &[]).unwrap();
+        resolve("notes/id_rsa.pub", Some(&root), &[]).unwrap();
+        assert!(!is_secret(&root_path.join("id_rsa.pub")));
+        assert!(!is_secret(&root_path.join("id_ed25519.pub")));
+        assert!(!is_secret(&root_path.join("id_card.md")));
+    }
+
+    #[test]
+    fn key_p12_and_pfx_are_blocked() {
+        let (_dir, root) = vault();
+        let root_path = Path::new(&root);
+        plant(root_path, "server.key");
+        plant(root_path, "client.p12");
+        plant(root_path, "cert.pfx");
+        plant(root_path, "nested/tls/app.key");
+        assert_blocked(&root, "server.key");
+        assert_blocked(&root, "client.p12");
+        assert_blocked(&root, "cert.pfx");
+        assert_blocked(&root, "nested/tls/app.key");
+    }
+
+    #[test]
+    fn env_example_is_allowed_and_env_local_stays_blocked() {
+        let (_dir, root) = vault();
+        let root_path = Path::new(&root);
+        plant(root_path, ".env.example");
+        plant(root_path, ".env.local");
+        plant(root_path, "nested/.env.example");
+        resolve(".env.example", Some(&root), &[]).unwrap();
+        resolve("nested/.env.example", Some(&root), &[]).unwrap();
+        assert!(!is_secret(&root_path.join(".env.example")));
+        assert_blocked(&root, ".env.local");
+        assert!(is_secret(&root_path.join(".env.local")));
+        plant(root_path, ".env.example.local");
+        assert_blocked(&root, ".env.example.local");
     }
 
     #[test]
@@ -408,12 +543,53 @@ mod tests {
         let root_path = Path::new(&root);
         plant(root_path, ".ENV.LOCAL");
         plant(root_path, "KEY.PEM");
+        plant(root_path, "SERVER.KEY");
+        plant(root_path, "CLIENT.P12");
+        plant(root_path, "CERT.PFX");
         plant(root_path, "ID_ED25519");
         plant(root_path, "nested/.GIT/config");
+        plant(root_path, ".ENV.EXAMPLE");
+        plant(root_path, "ID_RSA.PUB");
         assert_blocked(&root, ".ENV.LOCAL");
         assert_blocked(&root, "KEY.PEM");
+        assert_blocked(&root, "SERVER.KEY");
+        assert_blocked(&root, "CLIENT.P12");
+        assert_blocked(&root, "CERT.PFX");
         assert_blocked(&root, "ID_ED25519");
         assert_blocked(&root, "nested/.GIT/config");
+        resolve(".ENV.EXAMPLE", Some(&root), &[]).unwrap();
+        resolve("ID_RSA.PUB", Some(&root), &[]).unwrap();
+    }
+
+    #[test]
+    fn override_off_allows_secret_names_inside_roots() {
+        let (_dir, root) = vault();
+        let root_path = Path::new(&root);
+        plant(root_path, "id_rsa");
+        plant(root_path, ".env.local");
+        plant(root_path, "server.key");
+        let _guard = override_secret_block(false);
+        resolve("id_rsa", Some(&root), &[]).unwrap();
+        resolve(".env.local", Some(&root), &[]).unwrap();
+        resolve("server.key", Some(&root), &[]).unwrap();
+        assert!(is_secret(&root_path.join("id_rsa")));
+        assert!(!is_blocked_secret(&root_path.join("id_rsa")));
+    }
+
+    #[test]
+    fn override_off_still_refuses_paths_outside_roots() {
+        let parent = tempfile::tempdir().unwrap();
+        let vault = parent.path().join("vault");
+        fs::create_dir(&vault).unwrap();
+        fs::write(parent.path().join("id_rsa"), "no\n").unwrap();
+        let root = vault.canonicalize().unwrap();
+        let _guard = override_secret_block(false);
+        let error = resolve("../id_rsa", Some(root.to_str().unwrap()), &[]).unwrap_err();
+        assert!(
+            error.contains(OUTSIDE_ROOTS),
+            "override must not weaken root sandboxing: {error}"
+        );
+        assert!(!error.contains(BLOCKED_SECRET), "{error}");
     }
 
     #[cfg(unix)]
@@ -438,11 +614,14 @@ mod tests {
         plant(root_path, "identity.md");
         plant(root_path, "pem.txt");
         plant(root_path, "gitconfig.md");
+        plant(root_path, "id_card.md");
         resolve("env.md", Some(&root), &[]).unwrap();
         resolve("identity.md", Some(&root), &[]).unwrap();
         resolve("pem.txt", Some(&root), &[]).unwrap();
         resolve("gitconfig.md", Some(&root), &[]).unwrap();
+        resolve("id_card.md", Some(&root), &[]).unwrap();
         assert!(!is_secret(&root_path.join("env.md")));
         assert!(!is_secret(&root_path.join("identity.md")));
+        assert!(!is_secret(&root_path.join("id_card.md")));
     }
 }

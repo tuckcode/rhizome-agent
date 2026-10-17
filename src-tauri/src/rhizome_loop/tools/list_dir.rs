@@ -13,7 +13,7 @@ pub(crate) const SCHEMA: &str = r#"{
   "type": "function",
   "function": {
     "name": "list_dir",
-    "description": "List files and directories inside the user's vault roots or current workspace. Each line is `file` or `dir` then a relative path. Honours .gitignore. Secret paths (.env*, .git/, *.pem, id_*) are omitted. Entries are sorted. Results stop at 200 entries with a truncation note. Optional depth defaults to 1 (direct children). Paths outside the allowed roots are refused.",
+    "description": "List files and directories inside the user's vault roots or current workspace. Each line is `file` or `dir` then a relative path. Honours .gitignore. Secret paths (.env* except .env.example, .git/, *.pem/*.key/*.p12/*.pfx, and known private-key basenames) are omitted. Entries are sorted. Results stop at 200 entries with a truncation note. Optional depth defaults to 1 (direct children). Paths outside the allowed roots are refused.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -54,14 +54,14 @@ fn run_with_cap(
     }
     let depth = depth.min(MAX_DEPTH);
     let dir = sandbox::resolve_dir(requested, vault_path, vault_paths)?;
-    let (mut entries, truncated) = collect_entries(&dir, depth, cap);
+    let (mut entries, truncated) = collect_entries(&dir, depth, cap, walk::WALK_BUDGET);
     entries.sort_by(|left, right| left.path.cmp(&right.path));
     let mut lines: Vec<String> = entries
         .into_iter()
         .map(|entry| format!("{} {}", entry.kind, entry.path))
         .collect();
-    if truncated {
-        lines.push(format!("[truncated: result cap is {cap}]"));
+    if let Some(note) = truncated.note(cap) {
+        lines.push(note);
     }
     Ok(lines.join("\n"))
 }
@@ -71,18 +71,23 @@ struct Listed {
     path: String,
 }
 
-fn collect_entries(dir: &Path, depth: usize, cap: usize) -> (Vec<Listed>, bool) {
+fn collect_entries(
+    dir: &Path,
+    depth: usize,
+    cap: usize,
+    walk_budget: usize,
+) -> (Vec<Listed>, walk::Truncation) {
     let mut entries = Vec::new();
     let mut walked = 0usize;
     for entry in walk::gitignore_walk_depth(dir, depth).flatten() {
         walked += 1;
-        if walked > walk::WALK_BUDGET {
-            return (entries, true);
+        if walked > walk_budget {
+            return (entries, walk::Truncation::WalkCap);
         }
-        if entry.depth() == 0 || sandbox::is_secret(entry.path()) {
+        if entry.depth() == 0 || sandbox::is_blocked_secret(entry.path()) {
             continue;
         }
-        let kind = if walk::is_dir_entry(&entry) {
+        let kind = if walk::is_dir_like_entry(&entry) {
             "dir"
         } else {
             "file"
@@ -92,10 +97,10 @@ fn collect_entries(dir: &Path, depth: usize, cap: usize) -> (Vec<Listed>, bool) 
             path: relative_from(dir, entry.path()),
         });
         if entries.len() >= cap {
-            return (entries, true);
+            return (entries, walk::Truncation::ResultCap);
         }
     }
-    (entries, false)
+    (entries, walk::Truncation::None)
 }
 
 fn relative_from(dir: &Path, path: &Path) -> String {
@@ -190,8 +195,25 @@ mod tests {
         fs::write(Path::new(&root).join("inside.md"), "ok\n").unwrap();
         let out = run(&json!({ "depth": 2 }).to_string(), Some(&root), &[]).unwrap();
         assert!(out.contains("file inside.md"), "{out}");
-        assert!(out.contains("file out") || out.contains("dir out"), "{out}");
+        assert!(out.contains("dir out"), "{out}");
+        assert!(!out.contains("file out"), "{out}");
         assert!(!out.contains("secret.md"), "{out}");
+    }
+
+    #[test]
+    fn walk_cap_note_names_the_walk_budget() {
+        let (_dir, root) = vault();
+        let root_path = Path::new(&root);
+        fs::write(root_path.join("a.md"), "a\n").unwrap();
+        fs::write(root_path.join("b.md"), "b\n").unwrap();
+        fs::write(root_path.join("c.md"), "c\n").unwrap();
+        let (entries, truncated) = collect_entries(root_path, 1, 200, 1);
+        assert_eq!(truncated, walk::Truncation::WalkCap);
+        assert!(entries.len() <= 1, "{}", entries.len());
+        assert_eq!(
+            truncated.note(200).as_deref(),
+            Some("[truncated: walk cap is 10000 entries]")
+        );
     }
 
     #[test]
@@ -224,14 +246,44 @@ mod tests {
         plant(root_path, "nested/.git/config");
         plant(root_path, "key.pem");
         plant(root_path, "id_rsa");
+        plant(root_path, "server.key");
+        plant(root_path, "client.p12");
+        plant(root_path, "cert.pfx");
+        plant(root_path, ".env.example");
+        plant(root_path, "id_rsa.pub");
+        plant(root_path, "id_card.md");
         fs::write(root_path.join("open.md"), "ok\n").unwrap();
         let out = run(&json!({ "depth": 4 }).to_string(), Some(&root), &[]).unwrap();
         assert!(out.contains("file open.md"), "{out}");
+        assert!(out.contains("file .env.example"), "{out}");
+        assert!(out.contains("file id_rsa.pub"), "{out}");
+        assert!(out.contains("file id_card.md"), "{out}");
         assert!(!out.contains(sandbox::BLOCKED_SECRET), "{out}");
-        assert!(!out.contains(".env"), "{out}");
+        assert!(!out.contains(".env.local"), "{out}");
+        assert!(
+            !out.contains(".env\n") && !out.contains("file .env "),
+            "{out}"
+        );
         assert!(!out.contains("config"), "{out}");
         assert!(!out.contains("key.pem"), "{out}");
-        assert!(!out.contains("id_rsa"), "{out}");
+        assert!(
+            !out.contains("file id_rsa\n") && !out.contains("file id_rsa "),
+            "{out}"
+        );
+        assert!(!out.contains("server.key"), "{out}");
+        assert!(!out.contains("client.p12"), "{out}");
+        assert!(!out.contains("cert.pfx"), "{out}");
+    }
+
+    #[test]
+    fn override_off_lists_secret_names() {
+        let (_dir, root) = vault();
+        plant(Path::new(&root), "id_rsa");
+        fs::write(Path::new(&root).join("open.md"), "ok\n").unwrap();
+        let _guard = sandbox::override_secret_block(false);
+        let out = run(&json!({}).to_string(), Some(&root), &[]).unwrap();
+        assert!(out.contains("file id_rsa"), "{out}");
+        assert!(out.contains("file open.md"), "{out}");
     }
 
     #[cfg(unix)]

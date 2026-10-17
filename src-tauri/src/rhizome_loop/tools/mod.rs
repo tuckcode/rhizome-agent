@@ -4,7 +4,8 @@
 //! `bash` is not a process. Limited tools never call it.
 //! `create_note` writes through `ai_model_tools::run_create_note_tool`.
 //! Read-only file tools stay inside canonical vault and workspace roots
-//! and auto-run in both permission modes.
+//! and auto-run in both permission modes. Secret-path blocking is a
+//! safety net, not a wall: `bash` can still read those files.
 
 mod args;
 mod glob;

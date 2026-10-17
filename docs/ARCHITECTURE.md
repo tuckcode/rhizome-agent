@@ -524,6 +524,11 @@ The loop registry (`rhizome_loop/tools`) offers `echo`, read-only file tools
 (`read_file`, `list_dir`, `grep`, `glob`), `create_note`, and Power User `bash`.
 Read-only tools stay inside canonical vault and workspace roots and auto-run;
 they do not open an approval card.
+Secret-path blocking (`.env*` except `.env.example`, `.git/`, `*.pem` /
+`*.key` / `*.p12` / `*.pfx`, and known private-key basenames) is a safety
+net, not a wall: Power User `bash` can still read those files. Settings →
+AI Agents has a toggle (on by default) that disables the denylist only;
+root sandboxing still applies.
 `rhizome_routing/` wraps it with free-tier fallback over a pinned OmniRoute
 catalog (ADR-0182). Anthropic models stay refused until step 6a.
 ADR-0168 (amended) is the borrow-care rule. Prime is an optional engine

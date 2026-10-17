@@ -17,6 +17,8 @@ const SUPPORTED_DEFAULT_AI_AGENTS: &[&str] = &[
     "hermes",
 ];
 pub const DEFAULT_HIDE_GITIGNORED_FILES: bool = true;
+/// Native read tools refuse secret paths unless the user turns this off.
+pub const DEFAULT_BLOCK_SECRET_FILES: bool = true;
 /// A spike behind a flag; unset means OFF.
 /// See `docs/adr/0163-automatic-consolidation-l0-to-l1.md`.
 pub const DEFAULT_AUTOMATIC_CONSOLIDATION_ENABLED: bool = false;
@@ -154,6 +156,11 @@ pub struct Settings {
     pub ai_model_providers: Option<Vec<AiModelProvider>>,
     pub ai_workspace_conversations: Option<Vec<AiWorkspaceConversationSetting>>,
     pub hide_gitignored_files: Option<bool>,
+    /// When true (the default, including `None`), native file tools
+    /// refuse secret paths. Off disables that denylist only. Root
+    /// sandboxing still applies.
+    #[serde(default)]
+    pub block_secret_files: Option<bool>,
     pub all_notes_show_pdfs: Option<bool>,
     pub all_notes_show_images: Option<bool>,
     pub all_notes_show_unsupported: Option<bool>,
@@ -421,6 +428,18 @@ pub fn hide_gitignored_files_enabled() -> bool {
         .unwrap_or(DEFAULT_HIDE_GITIGNORED_FILES)
 }
 
+pub fn should_block_secret_files(settings: &Settings) -> bool {
+    settings
+        .block_secret_files
+        .unwrap_or(DEFAULT_BLOCK_SECRET_FILES)
+}
+
+pub fn block_secret_files_enabled() -> bool {
+    get_settings()
+        .map(|settings| should_block_secret_files(&settings))
+        .unwrap_or(DEFAULT_BLOCK_SECRET_FILES)
+}
+
 /// Gate for the automatic-consolidation spike.
 pub fn automatic_consolidation_enabled(settings: &Settings) -> bool {
     settings
@@ -489,6 +508,7 @@ fn normalize_settings(settings: Settings) -> Settings {
             settings.ai_workspace_conversations,
         ),
         hide_gitignored_files: settings.hide_gitignored_files,
+        block_secret_files: settings.block_secret_files,
         all_notes_show_pdfs: settings.all_notes_show_pdfs,
         all_notes_show_images: settings.all_notes_show_images,
         all_notes_show_unsupported: settings.all_notes_show_unsupported,
@@ -1029,6 +1049,7 @@ mod tests {
             ai_model_providers: None,
             ai_workspace_conversations: None,
             hide_gitignored_files: Some(false),
+            block_secret_files: Some(false),
             multi_workspace_enabled: Some(true),
             all_notes_show_pdfs: Some(true),
             all_notes_show_images: Some(true),
@@ -1116,6 +1137,26 @@ mod tests {
             hide_gitignored_files: Some(false),
             ..Default::default()
         }));
+    }
+
+    #[test]
+    fn secret_file_block_is_on_by_default_and_roundtrips() {
+        assert!(should_block_secret_files(&Settings::default()));
+        assert!(should_block_secret_files(&Settings {
+            block_secret_files: Some(true),
+            ..Default::default()
+        }));
+        assert!(!should_block_secret_files(&Settings {
+            block_secret_files: Some(false),
+            ..Default::default()
+        }));
+        let loaded = save_and_reload(Settings {
+            block_secret_files: Some(false),
+            ..Default::default()
+        });
+        assert_eq!(loaded.block_secret_files, Some(false));
+        let missing = serde_json::from_str::<Settings>("{}").unwrap();
+        assert!(should_block_secret_files(&missing));
     }
 
     #[test]

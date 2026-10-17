@@ -12,7 +12,7 @@ pub(crate) const SCHEMA: &str = r#"{
   "type": "function",
   "function": {
     "name": "glob",
-    "description": "Find files whose paths match a glob under the user's vault roots or current workspace. Honours .gitignore. Secret paths (.env*, .git/, *.pem, id_*) are omitted. Results are sorted relative paths, one per line, and stop at 200 matches with a truncation note. A pattern without a slash also matches at any depth (`*.md` matches `notes/a.md`). Paths outside the allowed roots are refused.",
+    "description": "Find files whose paths match a glob under the user's vault roots or current workspace. Honours .gitignore. Secret paths (.env* except .env.example, .git/, *.pem/*.key/*.p12/*.pfx, and known private-key basenames) are omitted. Results are sorted relative paths, one per line, and stop at 200 matches with a truncation note. A pattern without a slash also matches at any depth (`*.md` matches `notes/a.md`). Paths outside the allowed roots are refused.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -55,40 +55,47 @@ fn run_with_cap(
         None => roots.all.clone(),
     };
     let mut matches = Vec::new();
-    let mut truncated = false;
+    let mut truncated = walk::Truncation::None;
     for start in starts {
-        if collect_matches(&start, &roots, &glob_set, cap, &mut matches) {
-            truncated = true;
+        truncated = collect_matches(
+            &start,
+            &roots,
+            &glob_set,
+            cap,
+            walk::WALK_BUDGET,
+            &mut matches,
+        );
+        if truncated != walk::Truncation::None {
             break;
         }
     }
     matches.sort();
     matches.dedup();
-    if truncated {
-        matches.push(format!("[truncated: result cap is {cap}]"));
+    if let Some(note) = truncated.note(cap) {
+        matches.push(note);
     }
     Ok(matches.join("\n"))
 }
 
-/// Returns true when a walk or result cap is hit.
 fn collect_matches(
     start: &Path,
     roots: &Roots,
     glob_set: &globset::GlobSet,
     cap: usize,
+    walk_budget: usize,
     matches: &mut Vec<String>,
-) -> bool {
+) -> walk::Truncation {
     let mut walked = 0usize;
     for entry in walk::gitignore_walk(start).flatten() {
         walked += 1;
-        if walked > walk::WALK_BUDGET {
-            return true;
+        if walked > walk_budget {
+            return walk::Truncation::WalkCap;
         }
         if !walk::is_file_entry(&entry) {
             continue;
         }
         let path = entry.path();
-        if sandbox::is_secret(path) {
+        if sandbox::is_blocked_secret(path) {
             continue;
         }
         if !roots.all.iter().any(|root| sandbox::is_within(path, root)) {
@@ -98,11 +105,11 @@ fn collect_matches(
         if glob_set.is_match(&relative) {
             matches.push(relative);
             if matches.len() >= cap {
-                return true;
+                return walk::Truncation::ResultCap;
             }
         }
     }
-    false
+    walk::Truncation::None
 }
 
 #[cfg(test)]
@@ -208,13 +215,56 @@ mod tests {
         plant(root_path, "nested/.git/config");
         plant(root_path, "key.pem");
         plant(root_path, "id_rsa");
+        plant(root_path, "server.key");
+        plant(root_path, "client.p12");
+        plant(root_path, "cert.pfx");
+        plant(root_path, ".env.example");
+        plant(root_path, "id_rsa.pub");
+        plant(root_path, "id_card.md");
         fs::write(root_path.join("open.md"), "o\n").unwrap();
         let out = run(&json!({ "pattern": "*" }).to_string(), Some(&root), &[]).unwrap();
         assert!(out.contains("open.md"), "{out}");
+        assert!(out.contains(".env.example"), "{out}");
+        assert!(out.contains("id_rsa.pub"), "{out}");
+        assert!(out.contains("id_card.md"), "{out}");
         assert!(!out.contains(sandbox::BLOCKED_SECRET), "{out}");
-        assert!(!out.contains(".env"), "{out}");
+        assert!(!out.contains(".env.local"), "{out}");
+        assert!(!out.contains(".env\n"), "{out}");
         assert!(!out.contains("config"), "{out}");
         assert!(!out.contains("key.pem"), "{out}");
-        assert!(!out.contains("id_rsa"), "{out}");
+        assert!(
+            !out.contains("id_rsa\n") && !out.lines().any(|line| line == "id_rsa"),
+            "{out}"
+        );
+        assert!(!out.contains("server.key"), "{out}");
+        assert!(!out.contains("client.p12"), "{out}");
+        assert!(!out.contains("cert.pfx"), "{out}");
+    }
+
+    #[test]
+    fn walk_cap_note_names_the_walk_budget() {
+        let (_dir, root) = vault();
+        let roots = sandbox::allowed_roots(Some(&root), &[]).unwrap();
+        let glob_set = walk::compile_globs("*").unwrap();
+        fs::write(Path::new(&root).join("a.md"), "a\n").unwrap();
+        fs::write(Path::new(&root).join("b.md"), "b\n").unwrap();
+        let mut matches = Vec::new();
+        let truncated = collect_matches(Path::new(&root), &roots, &glob_set, 200, 1, &mut matches);
+        assert_eq!(truncated, walk::Truncation::WalkCap);
+        assert_eq!(
+            truncated.note(200).as_deref(),
+            Some("[truncated: walk cap is 10000 entries]")
+        );
+    }
+
+    #[test]
+    fn override_off_includes_secret_names() {
+        let (_dir, root) = vault();
+        plant(Path::new(&root), "id_rsa");
+        fs::write(Path::new(&root).join("open.md"), "o\n").unwrap();
+        let _guard = sandbox::override_secret_block(false);
+        let out = run(&json!({ "pattern": "*" }).to_string(), Some(&root), &[]).unwrap();
+        assert!(out.contains("id_rsa"), "{out}");
+        assert!(out.contains("open.md"), "{out}");
     }
 }

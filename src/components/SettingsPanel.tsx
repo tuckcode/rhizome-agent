@@ -62,6 +62,7 @@ import { Textarea } from './ui/textarea'
 import { AccentColorPicker } from './AccentColorPicker'
 import { normalizeReleaseChannel, serializeReleaseChannel, type ReleaseChannel } from '../lib/releaseChannel'
 import { shouldHideGitignoredFiles } from '../lib/gitignoredVisibility'
+import { shouldBlockSecretFiles } from '../lib/secretFiles'
 import { areGitFeaturesEnabled } from '../lib/gitSettings'
 import { areAutomaticUpdateChecksEnabled } from '../lib/automaticUpdateChecks'
 import { trackAllNotesVisibilityChanged } from '../lib/productAnalytics'
@@ -171,6 +172,7 @@ interface SettingsDraft {
   sidebarTypePluralizationEnabled: boolean
   initialH1AutoRename: boolean
   hideGitignoredFiles: boolean
+  blockSecretFiles: boolean
   allNotesFileVisibility: AllNotesFileVisibility
   multiWorkspaceEnabled: boolean
   crashReporting: boolean
@@ -235,6 +237,8 @@ interface SettingsBodyProps {
   setInitialH1AutoRename: (value: boolean) => void
   hideGitignoredFiles: boolean
   setHideGitignoredFiles: (value: boolean) => void
+  blockSecretFiles: boolean
+  setBlockSecretFiles: (value: boolean) => void
   allNotesFileVisibility: AllNotesFileVisibility
   setAllNotesFileVisibility: (value: AllNotesFileVisibility) => void
   multiWorkspaceEnabled: boolean
@@ -312,6 +316,7 @@ function createSettingsDraft(
     sidebarTypePluralizationEnabled: settings.sidebar_type_pluralization_enabled ?? true,
     initialH1AutoRename: settings.initial_h1_auto_rename_enabled ?? true,
     hideGitignoredFiles: shouldHideGitignoredFiles(settings),
+    blockSecretFiles: shouldBlockSecretFiles(settings),
     allNotesFileVisibility: resolveAllNotesFileVisibility(settings),
     multiWorkspaceEnabled: settings.multi_workspace_enabled === true,
     crashReporting: settings.crash_reporting_enabled ?? false,
@@ -387,6 +392,7 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     default_ai_target: agentTargetId(DEFAULT_AI_AGENT),
     ai_model_providers: draft.aiModelProviders.length > 0 ? draft.aiModelProviders : null,
     hide_gitignored_files: draft.hideGitignoredFiles,
+    block_secret_files: draft.blockSecretFiles,
     multi_workspace_enabled: draft.multiWorkspaceEnabled,
   }
   return settingsWithAllNotesFileVisibility(nextSettings, draft.allNotesFileVisibility)
@@ -846,6 +852,8 @@ function SettingsBodyFromDraft({
       setInitialH1AutoRename={(value) => updateDraft('initialH1AutoRename', value)}
       hideGitignoredFiles={draft.hideGitignoredFiles}
       setHideGitignoredFiles={setHideGitignoredFiles}
+      blockSecretFiles={draft.blockSecretFiles}
+      setBlockSecretFiles={(value) => updateDraft('blockSecretFiles', value)}
       allNotesFileVisibility={draft.allNotesFileVisibility}
       setAllNotesFileVisibility={setAllNotesFileVisibility}
       initialSectionId={initialSectionId}
@@ -1079,6 +1087,8 @@ function SettingsAgentWorkflowSections({
   setAgentProfile,
   chatEngine,
   setChatEngine,
+  blockSecretFiles,
+  setBlockSecretFiles,
   nativeChatTarget,
   setNativeChatTarget,
   aiAgentsStatus,
@@ -1112,6 +1122,8 @@ function SettingsAgentWorkflowSections({
           setAgentProfile={setAgentProfile}
           chatEngine={chatEngine}
           setChatEngine={setChatEngine}
+          blockSecretFiles={blockSecretFiles}
+          setBlockSecretFiles={setBlockSecretFiles}
           nativeChatTarget={nativeChatTarget}
           setNativeChatTarget={setNativeChatTarget}
           aiAgentsStatus={aiAgentsStatus}
@@ -1496,6 +1508,8 @@ function AiAgentSettingsSection({
   setAgentProfile,
   chatEngine,
   setChatEngine,
+  blockSecretFiles,
+  setBlockSecretFiles,
   nativeChatTarget,
   setNativeChatTarget,
   aiAgentsStatus,
@@ -1515,6 +1529,8 @@ function AiAgentSettingsSection({
   | 'setAgentProfile'
   | 'chatEngine'
   | 'setChatEngine'
+  | 'blockSecretFiles'
+  | 'setBlockSecretFiles'
   | 'nativeChatTarget'
   | 'setNativeChatTarget'
   | 'aiAgentsStatus'
@@ -1554,6 +1570,13 @@ function AiAgentSettingsSection({
 
       <SettingsGroup>
         <ChatEngineSettings engine={chatEngine} onChange={setChatEngine} locale={locale} />
+        <SettingsSwitchRow
+          label="Block secret files"
+          description="Native read tools skip private keys, .env files, and similar names. The shell tool can still read them."
+          checked={blockSecretFiles}
+          onChange={setBlockSecretFiles}
+          testId="settings-block-secret-files"
+        />
         <NativeChatModelPicker
           locale={locale}
           value={nativeChatTarget}

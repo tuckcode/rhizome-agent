@@ -6,6 +6,7 @@
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::time::Instant;
 
 pub const CHUNK: usize = 8_192;
 
@@ -23,6 +24,20 @@ pub fn for_each_line(
     skip_until: usize,
     mut visit: impl FnMut(usize, &str) -> Control,
 ) -> std::io::Result<Control> {
+    for_each_line_ex(path, max_line_bytes, skip_until, None, |number, text, _| {
+        visit(number, text)
+    })
+}
+
+/// Like [`for_each_line`], with a per-chunk deadline and a flag
+/// when the current line was clipped to `max_line_bytes`.
+pub fn for_each_line_ex(
+    path: &Path,
+    max_line_bytes: usize,
+    skip_until: usize,
+    deadline: Option<Instant>,
+    mut visit: impl FnMut(usize, &str, bool) -> Control,
+) -> std::io::Result<Control> {
     let mut file = File::open(path)?;
     let mut chunk = [0u8; CHUNK];
     let cap = max_line_bytes.max(1);
@@ -34,12 +49,15 @@ pub fn for_each_line(
         if n == 0 {
             break;
         }
+        if deadline.is_some_and(|limit| Instant::now() >= limit) {
+            return Ok(Control::Stop);
+        }
         for &byte in &chunk[..n] {
             if byte == b'\n' {
                 if line_no >= skip_until {
                     trim_cr(&mut line);
                     let text = String::from_utf8_lossy(&line);
-                    if visit(line_no, text.as_ref()) == Control::Stop {
+                    if visit(line_no, text.as_ref(), overflow) == Control::Stop {
                         return Ok(Control::Stop);
                     }
                 }
@@ -61,7 +79,7 @@ pub fn for_each_line(
     if line_no >= skip_until && (!line.is_empty() || overflow) {
         trim_cr(&mut line);
         let text = String::from_utf8_lossy(&line);
-        if visit(line_no, text.as_ref()) == Control::Stop {
+        if visit(line_no, text.as_ref(), overflow) == Control::Stop {
             return Ok(Control::Stop);
         }
     }
@@ -117,5 +135,34 @@ mod tests {
         })
         .unwrap();
         assert_eq!(seen, vec!["a".repeat(16)]);
+    }
+
+    #[test]
+    fn a_clipped_line_reports_truncated() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("one.txt");
+        fs::write(&path, vec![b'a'; 50]).unwrap();
+        let mut flags = Vec::new();
+        for_each_line_ex(&path, 8, 1, None, |_, _, truncated| {
+            flags.push(truncated);
+            Control::Continue
+        })
+        .unwrap();
+        assert_eq!(flags, vec![true]);
+    }
+
+    #[test]
+    fn deadline_is_checked_after_each_chunk() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("huge.txt");
+        fs::write(&path, vec![b'x'; CHUNK * 4]).unwrap();
+        let mut visits = 0usize;
+        let control = for_each_line_ex(&path, CHUNK * 8, 1, Some(Instant::now()), |_, _, _| {
+            visits += 1;
+            Control::Continue
+        })
+        .unwrap();
+        assert_eq!(control, Control::Stop);
+        assert_eq!(visits, 0);
     }
 }

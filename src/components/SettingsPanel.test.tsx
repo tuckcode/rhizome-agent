@@ -40,6 +40,7 @@ const emptySettings: Settings = {
   date_display_format: null,
   default_ai_agent: null,
   hide_gitignored_files: null,
+  block_secret_files: null,
   all_notes_show_pdfs: null,
   all_notes_show_images: null,
   all_notes_show_unsupported: null,
@@ -383,6 +384,7 @@ describe('SettingsPanel', () => {
       note_width_mode: 'normal',
       sidebar_type_pluralization_enabled: true,
       hide_gitignored_files: true,
+      block_secret_files: true,
       all_notes_show_pdfs: false,
       all_notes_show_images: false,
       all_notes_show_unsupported: false,
@@ -972,6 +974,24 @@ describe('SettingsPanel', () => {
     expect(screen.getByTestId('settings-prime-chat-engine')).toHaveTextContent('Prime Agent')
     expect(screen.getByTestId('native-chat-model-picker')).toBeInTheDocument()
     expect(screen.queryByTestId('settings-default-ai-agent')).not.toBeInTheDocument()
+  })
+
+  it('blocks secret files by default and saves the override', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+
+    const row = screen.getByTestId('settings-block-secret-files')
+    expect(row).toHaveTextContent('Block secret files')
+    expect(row).toHaveTextContent('The shell tool can still read them')
+    expect(within(row).getByRole('switch')).toHaveAttribute('aria-checked', 'true')
+
+    fireEvent.click(row)
+    fireEvent.click(screen.getByTestId('settings-save'))
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      block_secret_files: false,
+    }))
   })
 
   /**
