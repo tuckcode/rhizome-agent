@@ -778,6 +778,52 @@ mod tests {
     }
 
     #[test]
+    fn create_note_refuses_git_and_env_aliases() {
+        let vault = tempfile::tempdir().unwrap();
+        let vault_path = vault.path().to_string_lossy().into_owned();
+        for requested in [".GIT/x", ".ENV.LOCAL", ".git/../.git/x", ".env.production"] {
+            let error = create_note(
+                &json!({ "path": requested, "content": "no\n" }),
+                Some(&vault_path),
+                &[],
+            )
+            .err()
+            .expect("secret path");
+            assert!(
+                error.contains(crate::rhizome_loop::BLOCKED_SECRET),
+                "{requested}: {error}"
+            );
+            assert!(
+                !vault.path().join(requested).exists(),
+                "{requested} must not be created"
+            );
+        }
+        assert!(!vault.path().join(".git").join("x").exists());
+        assert!(!vault.path().join(".env.production").exists());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn create_note_refuses_windows_git_short_names() {
+        let vault = tempfile::tempdir().unwrap();
+        let vault_path = vault.path().to_string_lossy().into_owned();
+        for requested in [".git./config", "GIT~1/config"] {
+            let error = create_note(
+                &json!({ "path": requested, "content": "no\n" }),
+                Some(&vault_path),
+                &[],
+            )
+            .err()
+            .expect("windows git alias");
+            assert!(
+                error.contains(crate::rhizome_loop::BLOCKED_SECRET),
+                "{requested}: {error}"
+            );
+            assert!(!vault.path().join(requested).exists(), "{requested}");
+        }
+    }
+
+    #[test]
     fn create_note_refuses_an_inactive_vault_and_a_missing_vault() {
         let active = tempfile::tempdir().unwrap();
         let inactive = tempfile::tempdir().unwrap();

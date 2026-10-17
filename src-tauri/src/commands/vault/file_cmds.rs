@@ -175,6 +175,16 @@ pub fn create_note_content(
     content: String,
     vault_path: Option<PathBuf>,
 ) -> Result<(), String> {
+    // Check the path as given first. `..` makes the vault boundary reject
+    // `.git/../.git/x` before the validated path is built, and that shape
+    // is still a secret path.
+    if crate::rhizome_loop::write_target_is_secret(&path) {
+        return Err(format!(
+            "{} Requested path: {}",
+            crate::rhizome_loop::BLOCKED_SECRET,
+            path.display()
+        ));
+    }
     with_writable_note_path(path, vault_path, |validated_path, vault_root| {
         if crate::rhizome_loop::write_target_is_secret(Path::new(validated_path)) {
             return Err(format!(

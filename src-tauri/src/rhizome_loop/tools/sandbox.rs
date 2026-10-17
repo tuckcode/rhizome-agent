@@ -301,10 +301,20 @@ fn is_backup_suffix(rest: &str) -> bool {
 }
 
 fn component_is_git(component: std::path::Component<'_>) -> bool {
-    match component {
-        std::path::Component::Normal(name) => name.to_string_lossy().eq_ignore_ascii_case(".git"),
-        _ => false,
+    let std::path::Component::Normal(name) = component else {
+        return false;
+    };
+    let name = name.to_string_lossy();
+    if name.eq_ignore_ascii_case(".git") {
+        return true;
     }
+    // Windows keeps the short 8.3 name and a trailing-dot alias for `.git`.
+    #[cfg(windows)]
+    {
+        name.eq_ignore_ascii_case(".git.") || name.eq_ignore_ascii_case("GIT~1")
+    }
+    #[cfg(not(windows))]
+    false
 }
 
 /// Canonical relative path, plus `via <requested>` when that path is a symlink.
