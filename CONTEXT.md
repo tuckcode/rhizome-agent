@@ -1,4 +1,4 @@
-# CONTEXT.md — Rhizome Agent
+# CONTEXT.md — Rhizome
 
 Single-context glossary for agents working in this repo. Product decisions live in
 `docs/plans/2026-08-09-rhizome-agent-v0-brief-and-roadmap.md`. Architecture detail
@@ -8,19 +8,15 @@ still lives in `docs/ARCHITECTURE.md` / `docs/ABSTRACTIONS.md` (Desktop inherita
 
 | Term | Meaning |
 |------|---------|
-| **Rhizome Agent** | Desktop app (`ai.rhizome.agent`, `tuckcode/rhizome-agent`): chat UI plus **Rhizome's own harness** (ADR-0180), plus a research & **memory** product. Prime and Hermes are optional engines. Not Rhizome Desktop. The word “Agent” in the app's *name* is a naming question still open — see `docs/HANDOFF.md`; it does not govern the common noun below. |
+| **Rhizome** | Desktop app (`ai.rhizome.agent`, `tuckcode/rhizome-agent`): Rhizome's own harness (ADR-0180) plus a research and **memory** product. Prime and Hermes are optional engines. Not Rhizome Desktop. The repo, bundle id, and executable still use `agent` so existing keys keep working. |
 | **Rhizome Desktop** | Separate product (`ai.rhizome.desktop`, `knispo/rhizome`): full vault/wiki shell. Do not push Agent work to Desktop origin. |
 | **v0** | Circle-ready bar: daily multi-turn Prime chat, vault tools when attached, auth via `~/.prime`, skills+status smooth; BYO `prime-agent` OK. Not full harness-desktop parity. |
 | **Trusted circle** | v0 audience: Atticus + small trusted users — not strangers-first launch. |
 
-> **Framing (2026-08-16).** Prime Agent is the primary figure. Rhizome is a
-> shell over it plus a memory product. Two consequences: (1) Rhizome renders
-> Prime's capability faithfully rather than building a parallel product on top
-> of it; (2) the differentiated work is the **memory loop**, not the harness
-> surface — the surface is the cost of the shell not being worse than Prime's
-> own terminal. See `docs/HANDOFF.md` for the ticket re-ordering this implies.
-> **Amended 2026-10-09 (ADR-0180):** Rhizome owns the loop. Prime is no
-> longer the only figure.
+> **Framing (amended 2026-10-09, ADR-0180).** Rhizome owns the agent loop.
+> Prime is an optional engine and the current Chat default. The vault is
+> durable memory. The 2026-08-16 line that called Prime the primary figure
+> is superseded.
 
 ## Harness
 

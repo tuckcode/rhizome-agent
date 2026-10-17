@@ -29,12 +29,12 @@ current without reading §2’s correction block.
 
 ## 1. What this product is
 
-This is **Rhizome Agent** (`tuckcode/rhizome-agent`, `ai.rhizome.agent`).
+This is **Rhizome** (`tuckcode/rhizome-agent`, `ai.rhizome.agent`).
 It is **not** Rhizome Desktop (`knispo/rhizome`). Do not “fix branding
 back to Desktop.” Details: [`IDENTITY.md`](IDENTITY.md).
 
-**Rhizome is the desk and durable memory. Prime is the engine.**
-Chat first, vault on purpose. Memory is gated; execution is not.
+**Rhizome is the harness and durable memory. Prime is an optional engine.**
+Chat first, vault on purpose. Memory is gated; execution is not. Settings still starts Chat on Prime until you switch.
 
 If Prime already has a mechanism, use Prime’s. Do not build a Rhizome
 twin beside it. Vault knowledge still lands as markdown — Prime’s

@@ -1,6 +1,6 @@
 # Architecture
 
-> This document describes Rhizome Agent (`ai.rhizome.agent`, `tuckcode/rhizome-agent`) — a chat UI plus Rhizome's own harness (ADR-0180). Prime and Hermes are optional engines. Not Rhizome Desktop (`knispo/rhizome`). See `docs/IDENTITY.md`. "Tolaria" below is the pre-fork product name, not renamed on every line; treat it as a synonym for "the app," not evidence of the wrong product.
+> This document describes Rhizome (`ai.rhizome.agent`, `tuckcode/rhizome-agent`) — a coding harness that runs its own agent loop (ADR-0180). Prime and Hermes are optional engines. Not Rhizome Desktop (`knispo/rhizome`). See `docs/IDENTITY.md`. "Tolaria" below is the pre-fork product name, not renamed on every line; treat it as a synonym for "the app," not evidence of the wrong product.
 
 Tolaria is a personal knowledge and life management desktop app. It reads a vault of markdown files with YAML frontmatter and presents them in a four-panel UI inspired by Bear Notes.
 
@@ -2137,7 +2137,7 @@ sequenceDiagram
 
 **Origin:** Cursor Grok 4.6 · 2026-09-20 · #26 Chat-engine apply
 
-Rhizome Agent has two update paths. The **app** path (`app_updater.rs`,
+Rhizome has two update paths. The **app** path (`app_updater.rs`,
 `useUpdater`, `UpdateBanner`) is still a stub: `check_for_app_update`
 returns none, and `download_and_install_app_update` errors, because there
 is no signed Rhizome feed yet (`tauri.conf.json` `endpoints` is empty).

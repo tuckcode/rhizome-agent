@@ -3,7 +3,7 @@ title: Why Rhizome
 description: What makes Rhizome different from other agent harnesses, and what will feel familiar.
 ---
 
-Rhizome gives an AI agent a memory you can see. The things worth keeping become notes in a folder you own, and you can check what the agent did to your files after the fact.
+A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own. You can check what the agent did to your files after the fact.
 
 ## The problem it solves
 

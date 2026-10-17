@@ -1,8 +1,8 @@
-# Windows development — Rhizome Agent + Prime
+# Windows development — Rhizome + Prime
 
 > **⚠️ Status, corrected 2026-08-22: the app has never been launched on
 > Windows.** Not "the daemon does not connect yet" — nobody has observed
-> Rhizome Agent start on a Windows machine at all. Everything below is the
+> Rhizome start on a Windows machine at all. Everything below is the
 > intended setup path, not a verified one, and the first person to run it
 > should expect to be debugging the boot, not the features.
 >
@@ -13,7 +13,7 @@
 >
 > **Stamped 16:05:** still no Windows work this window. C42 stays skip.
 
-Rhizome Agent **targets** Windows (Tauri + WebView2). Prime chat/sessions
+Rhizome **targets** Windows (Tauri + WebView2). Prime chat/sessions
 need the **`prime-agent` daemon** running on the same machine; the named-pipe
 client for it landed in `1922a27`/`326930b` and is likewise unverified on a
 real Windows box.

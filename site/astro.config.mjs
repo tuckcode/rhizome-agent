@@ -19,7 +19,7 @@ export default defineConfig({
   integrations: [
     starlight({
       title: 'Rhizome',
-      description: 'Docs for Rhizome, a desktop app for an AI agent whose memory is a folder of Markdown notes you own.',
+      description: "A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own.",
       favicon: '/favicon.png',
       head: [
         {

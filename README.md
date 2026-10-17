@@ -3,12 +3,9 @@
 [![repowise](https://api.repowise.dev/badge/wiki/tuckcode/rhizome-agent.svg)](https://repowise.dev/repo/tuckcode/rhizome-agent)
 [![Code health](https://api.repowise.dev/badge/health/tuckcode/rhizome-agent.svg)](https://repowise.dev/repo/tuckcode/rhizome-agent)
 
-![Rhizome mark. Branching nodes over dark earth.](src/assets/brand/rhizome-organic-hero.png)
+A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own.
 
-**A harness that doesn't forget.**
-Rhizome runs its own agent loop. Chat works without [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent). Notes stay as plain Markdown in a local vault you own. You read and diff those notes in the app. The agent cannot search the vault or old Mycelium sessions yet.
-
-This is a developer preview. There is no signed download. Prime is an optional engine. Hermes is a planned adapter, not a usable engine in the app today.
+This is a developer preview. There is no signed download. Prime is an optional engine and the current Chat default. Hermes is a planned adapter, not a usable engine in the app today. You read and diff notes in the app. The agent cannot search the vault or old Mycelium sessions yet.
 
 | | |
 |---|---|

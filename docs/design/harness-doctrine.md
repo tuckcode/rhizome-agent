@@ -7,7 +7,7 @@ ADR-0180 supersedes the Prime-only execution lock. Rhizome owns its
 loop. Prime and Hermes are optional engines. Borrow-care below still
 holds for foreign runtimes.
 
-This is the Take / Adapt / Reject / Defer rule for Rhizome Agent. It is not an
+This is the Take / Adapt / Reject / Defer rule for Rhizome. It is not an
 implementation plan and not a parity checklist.
 
 Source reviews:
