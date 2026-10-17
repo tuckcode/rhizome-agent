@@ -39,8 +39,8 @@ Type a message and press Enter. You should get an answer, or a clear failure:
 
 | You see | Do this |
 |---|---|
-| Prime is installed, but Chat still says it's missing | Wait a few seconds. The check repeats |
-| No provider key (Rhizome's engine) | Add a key in Settings → AI Agents → API model, or turn on a free provider. See [Set up models and keys](../guides/configure-ai-models.md) |
+| No provider key | Add a key in Settings → AI Agents → API model, or turn on a free provider. See [Set up models and keys](../guides/configure-ai-models.md) |
+| Prime is installed, but Chat still says it's missing | Applies to Prime-locked chats only. Wait a few seconds. The check repeats |
 | The provider login expired (Prime) | Settings → AI Agents → Local agent → **Reconnect** on that provider, or run `prime-agent` and `/login` in a terminal |
 
 More cases: [Chat doesn't answer](../troubleshooting/chat-doesnt-answer.md).
