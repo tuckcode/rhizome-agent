@@ -53,7 +53,7 @@ const apiTarget: AiTarget = {
       tools: true,
       vision: false,
       json_mode: false,
-      reasoning: false,
+      reasoning: { state: 'unknown' as const },
     },
   },
 }

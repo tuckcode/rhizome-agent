@@ -21,7 +21,7 @@ const capabilities = {
   tools: true,
   vision: true,
   json_mode: true,
-  reasoning: false,
+  reasoning: { state: 'unknown' as const },
 }
 
 function keyedOpenAi(): AiModelProvider {
