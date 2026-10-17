@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const invoked = vi.hoisted(() => ({
   calls: [] as string[],
-  sessions: [] as Array<{ id: string; path: string; title?: string | null }>,
+  sessions: [] as Array<Record<string, string | null | undefined>>,
   returnsNull: false,
 }))
 

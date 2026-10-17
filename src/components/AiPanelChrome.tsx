@@ -791,7 +791,7 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
     // nothing however tall the transcript gets.
     <div
       ref={containerRef}
-      className="chat-transcript min-h-0 flex-1 overflow-y-auto"
+      className="chat-transcript flex min-h-0 flex-1 flex-col overflow-y-auto"
       style={{ padding: 12 }}
       onScroll={updateScrollState}
       onMouseDown={onDragRegionMouseDown}
@@ -801,7 +801,7 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
         role="log"
         aria-live="off"
         aria-relevant="additions"
-        className="flex min-h-full flex-col"
+        className="flex min-h-0 flex-1 flex-col"
       >
         <div className="chat-column flex min-h-full flex-col">
           {messages.length === 0 && transcriptPane(transcriptState, isActive) === 'loading' && (
