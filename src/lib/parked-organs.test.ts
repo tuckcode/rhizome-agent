@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { readAppShellSource } from '../test-utils/appShellSource'
 
 describe('parked organs leftover', () => {
   it('does not vendor TokenJuice or tinyhumans', () => {
@@ -304,7 +305,7 @@ describe('parked organs leftover', () => {
   })
 
   it('mounts Graph and Mycelium only on Changes, not Inbox', () => {
-    const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+    const app = readAppShellSource()
     expect(app).toContain('chatCentered ? (')
     expect(app).not.toContain('chatCentered && isChangesSelection ? (')
     expect(app).not.toMatch(/isInboxSelection[\s\S]{0,80}GraphView/)
@@ -387,7 +388,7 @@ describe('parked organs leftover', () => {
       `${process.cwd()}/src/components/askChatExcerpt.ts`,
       'utf8',
     )
-    const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+    const app = readAppShellSource()
     expect(excerpt).toContain(
       'Look at this excerpt from “${noteTitle}”:',
     )
@@ -418,7 +419,7 @@ describe('parked organs leftover', () => {
 
   it('keeps Create Rhizome Vault and Inbox as a Notes folder mode', () => {
     const en = readFileSync(`${process.cwd()}/src/lib/locales/en.json`, 'utf8')
-    const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+    const app = readAppShellSource()
     expect(en).toContain(
       '"status.vault.cloneGettingStarted": "Create Rhizome Vault"',
     )
@@ -426,7 +427,7 @@ describe('parked organs leftover', () => {
   })
 
   it('keeps Notes click-to-close, green latest-reply mark, and chat drag vs select', () => {
-    const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+    const app = readAppShellSource()
     const message = readFileSync(
       `${process.cwd()}/src/components/AiMessage.tsx`,
       'utf8',
@@ -451,7 +452,7 @@ describe('parked organs leftover', () => {
   })
 
   it('toasts Rhizome Vault as created, not cloned', () => {
-    const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+    const app = readAppShellSource()
     expect(app).toContain('Rhizome Vault created and opened at')
     expect(app).not.toContain('vault cloned and opened')
   })
@@ -613,7 +614,7 @@ describe('parked organs leftover', () => {
       `${process.cwd()}/src/components/PrimeProviderStatusSection.tsx`,
       'utf8',
     )
-    const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+    const app = readAppShellSource()
     const about = readFileSync(
       `${process.cwd()}/src/components/AboutSettingsSection.tsx`,
       'utf8',
@@ -861,7 +862,7 @@ describe('parked organs leftover', () => {
   })
 
   it('keeps Chat on screen when Notes is open', () => {
-    const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+    const app = readAppShellSource()
     const rail = readFileSync(
       `${process.cwd()}/src/components/CommandRail.tsx`,
       'utf8',
@@ -991,7 +992,7 @@ describe('parked organs leftover', () => {
   })
 
   it('keeps Browse and the note list as two independent panels', () => {
-    const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+    const app = readAppShellSource()
     expect(app).toContain('const showSidebarTree = classicSidebarVisible')
     expect(app).toContain('const showNoteListPanel = classicNoteListVisible')
     expect(app).toContain('showInbox={explicitOrganizationEnabled}')
