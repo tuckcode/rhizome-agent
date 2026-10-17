@@ -36,7 +36,7 @@ export interface ParsedBashToolResult {
   stderrLinesHidden?: number
 }
 
-export type BashRowVerb = 'Running' | 'Ran' | 'Denied' | 'Failed' | 'Superseded'
+export type BashRowVerb = 'Running' | 'Ran' | 'Denied' | 'Failed' | 'No result for'
 
 export interface BashRowStatus {
   verb: BashRowVerb
@@ -97,7 +97,7 @@ export function bashResultRowStatus(
 ): BashRowStatus {
   if (actionStatus === 'pending') return { verb: 'Running', verbDanger: false }
   if (options?.denied) return { verb: 'Denied', verbDanger: true }
-  if (options?.superseded) return { verb: 'Superseded', verbDanger: false }
+  if (options?.superseded) return { verb: 'No result for', verbDanger: false }
   if (result.structured) {
     if (result.timedOut) {
       return {

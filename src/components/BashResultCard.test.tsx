@@ -95,7 +95,7 @@ describe('BashResultCard', () => {
     expect(screen.getByTestId('bash-result-unknown')).toHaveTextContent('status unknown')
   })
 
-  it('labels a superseded settled row without Failed · status unknown', () => {
+  it('labels a superseded settled row as No result for the command', () => {
     render(
       <BashResultCard
         command="pwd"
@@ -106,9 +106,28 @@ describe('BashResultCard', () => {
         onToggle={vi.fn()}
       />,
     )
-    expect(screen.getByTestId('bash-result-summary')).toHaveTextContent('Superseded')
-    expect(screen.getByTestId('bash-result-summary')).not.toHaveTextContent('Failed')
+    const summary = screen.getByTestId('bash-result-summary')
+    expect(summary).toHaveTextContent('No result for')
+    expect(summary.querySelector('code')).toHaveTextContent('pwd')
+    expect(summary.innerHTML).not.toContain('danger-text')
+    expect(summary).not.toHaveTextContent('Failed')
+    expect(summary).not.toHaveTextContent('Superseded')
     expect(screen.queryByTestId('bash-result-unknown')).not.toBeInTheDocument()
+  })
+
+  it('truncates and badges the command on a superseded row', () => {
+    render(
+      <BashResultCard
+        command={`echo \u202E${'a'.repeat(80)}`}
+        output=""
+        status="error"
+        superseded
+        expanded={false}
+        onToggle={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('command-hidden')).toHaveTextContent('\\u{202E}')
+    expect(screen.getByTestId('bash-result-summary').querySelector('code')?.textContent).toMatch(/…$/u)
   })
 
   it('keeps CR on the collapsed row so ls\\r\\nrm x is not Ran ls rm x', () => {

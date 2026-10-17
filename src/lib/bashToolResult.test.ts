@@ -65,7 +65,7 @@ describe('bashResultRowStatus', () => {
       verbDanger: true,
     })
     expect(bashResultRowStatus('error', empty, { superseded: true })).toEqual({
-      verb: 'Superseded',
+      verb: 'No result for',
       verbDanger: false,
     })
     expect(bashResultRowStatus('error', empty)).toMatchObject({
