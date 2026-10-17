@@ -146,9 +146,9 @@ describe('rich editor block selection extension', () => {
 
     dispatchEditorKey(mounted.editor, 'Escape')
 
-    const selectedBlocks = mounted.mount.querySelectorAll('.tolaria-rich-editor-block-selected')
+    const selectedBlocks = mounted.mount.querySelectorAll('.rhizome-rich-editor-block-selected')
     expect(selectedBlocks).toHaveLength(1)
-    expect(selectedBlocks[0].getAttribute('data-tolaria-block-selection')).toBe('single')
+    expect(selectedBlocks[0].getAttribute('data-rhizome-block-selection')).toBe('single')
   })
 
   it('lets a second Escape fall through to app-level note-list navigation', () => {

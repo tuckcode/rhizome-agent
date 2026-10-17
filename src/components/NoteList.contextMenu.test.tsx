@@ -25,12 +25,12 @@ function renderNoteListWithFullActionMenu() {
   })
 }
 
-function openBuildLaputaActions() {
-  fireEvent.contextMenu(screen.getByText('Build Laputa App'))
+function openBuildVaultActions() {
+  fireEvent.contextMenu(screen.getByText('Build Rhizome App'))
 }
 
-function clickBuildLaputaAction(label: string) {
-  openBuildLaputaActions()
+function clickBuildVaultAction(label: string) {
+  openBuildVaultActions()
   fireEvent.click(screen.getByText(label))
 }
 
@@ -64,7 +64,7 @@ describe('NoteList context menu', () => {
       onCopyGitUrl,
     })
 
-    openBuildLaputaActions()
+    openBuildVaultActions()
 
     expect(screen.getByTestId('note-list-context-menu')).toBeInTheDocument()
     expect(screen.getByTestId('note-list-context-menu')).toHaveClass('z-[12000]')
@@ -76,39 +76,39 @@ describe('NoteList context menu', () => {
     fireEvent.click(screen.getByText('Open in New Window'))
     expect(onOpenInNewWindow).toHaveBeenCalledWith(mockEntries[0])
 
-    clickBuildLaputaAction('Add to Favorites')
+    clickBuildVaultAction('Add to Favorites')
     expect(onToggleFavorite).toHaveBeenCalledWith(mockEntries[0].path)
 
-    clickBuildLaputaAction('Mark as Organized')
+    clickBuildVaultAction('Mark as Organized')
     expect(onToggleOrganized).toHaveBeenCalledWith(mockEntries[0].path)
 
-    clickBuildLaputaAction('Rename filename')
+    clickBuildVaultAction('Rename filename')
     expect(screen.getByTestId('note-list-rename-dialog')).toBeInTheDocument()
-    expect(screen.getByTestId('note-list-rename-input')).toHaveValue('26q1-laputa-app')
+    expect(screen.getByTestId('note-list-rename-input')).toHaveValue('26q1-rhizome-app')
     fireEvent.change(screen.getByTestId('note-list-rename-input'), { target: { value: 'renamed-from-menu.md ' } })
     fireEvent.click(screen.getByText('Rename'))
     expect(onRenameFilename).toHaveBeenCalledWith(mockEntries[0].path, 'renamed-from-menu')
 
-    clickBuildLaputaAction("Open note's neighborhood")
+    clickBuildVaultAction("Open note's neighborhood")
     expect(onEnterNeighborhood).toHaveBeenCalledWith(mockEntries[0])
 
-    clickBuildLaputaAction('Reveal in Finder')
+    clickBuildVaultAction('Reveal in Finder')
     expect(onRevealFile).toHaveBeenCalledWith(mockEntries[0].path)
 
-    clickBuildLaputaAction('Copy file path')
+    clickBuildVaultAction('Copy file path')
     expect(onCopyFilePath).toHaveBeenCalledWith(mockEntries[0].path)
 
-    clickBuildLaputaAction('Copy git URL')
+    clickBuildVaultAction('Copy git URL')
     expect(canCopyGitUrl).toHaveBeenCalledWith(mockEntries[0])
     expect(onCopyGitUrl).toHaveBeenCalledWith(mockEntries[0])
 
-    clickBuildLaputaAction('Export note as PDF')
+    clickBuildVaultAction('Export note as PDF')
     expect(onExportPdf).toHaveBeenCalledWith(mockEntries[0])
 
-    clickBuildLaputaAction('Archive this note')
+    clickBuildVaultAction('Archive this note')
     expect(onBulkArchive).toHaveBeenCalledWith([mockEntries[0].path])
 
-    clickBuildLaputaAction('Delete this note')
+    clickBuildVaultAction('Delete this note')
     expect(onBulkDeletePermanently).toHaveBeenCalledWith([mockEntries[0].path])
   })
 
@@ -172,7 +172,7 @@ describe('NoteList context menu', () => {
       onCopyFilePath: vi.fn(),
     })
 
-    fireEvent.contextMenu(screen.getByText('Build Laputa App'))
+    fireEvent.contextMenu(screen.getByText('Build Rhizome App'))
 
     expect(screen.queryByText('Copy git URL')).not.toBeInTheDocument()
   })
@@ -184,7 +184,7 @@ describe('NoteList context menu', () => {
       onBulkDeletePermanently: vi.fn(),
     })
 
-    fireEvent.contextMenu(screen.getByText('Build Laputa App'), { clientX: 1000, clientY: 740 })
+    fireEvent.contextMenu(screen.getByText('Build Rhizome App'), { clientX: 1000, clientY: 740 })
 
     const menu = screen.getByTestId('note-list-context-menu')
     expect(menu.style.left).toBe('')
@@ -200,7 +200,7 @@ describe('NoteList context menu', () => {
     setViewportSize(420, 320)
     renderNoteListWithFullActionMenu()
 
-    fireEvent.contextMenu(screen.getByText('Build Laputa App'), { clientX: 271, clientY: 157 })
+    fireEvent.contextMenu(screen.getByText('Build Rhizome App'), { clientX: 271, clientY: 157 })
 
     const menu = screen.getByTestId('note-list-context-menu')
     expect(menu).toHaveStyle({
@@ -224,7 +224,7 @@ describe('NoteList context menu — ask the agent', () => {
     const onAskAgent = vi.fn()
     renderNoteList({ onAskAgent })
 
-    fireEvent.contextMenu(screen.getByText('Build Laputa App'))
+    fireEvent.contextMenu(screen.getByText('Build Rhizome App'))
     fireEvent.click(screen.getByText('Ask the agent about this note'))
 
     expect(onAskAgent).toHaveBeenCalledWith(mockEntries[0])
@@ -233,7 +233,7 @@ describe('NoteList context menu — ask the agent', () => {
   /** No handler, no menu item — the same rule every other action here follows. */
   it('hides the action when no handler is supplied', () => {
     renderNoteList({})
-    fireEvent.contextMenu(screen.getByText('Build Laputa App'))
+    fireEvent.contextMenu(screen.getByText('Build Rhizome App'))
     expect(screen.queryByText('Ask the agent about this note')).not.toBeInTheDocument()
   })
 
@@ -241,7 +241,7 @@ describe('NoteList context menu — ask the agent', () => {
     const listener = vi.fn()
     window.addEventListener('rhizome:connections-open', listener)
     renderNoteListWithFullActionMenu()
-    fireEvent.contextMenu(screen.getByText('Build Laputa App'))
+    fireEvent.contextMenu(screen.getByText('Build Rhizome App'))
     expect(screen.queryByText('Mycelium report')).not.toBeInTheDocument()
     fireEvent.click(screen.getByText('Show in Graph'))
     expect((listener.mock.calls[0]?.[0] as CustomEvent<{ view: string, focusPath?: string }>).detail).toEqual({
@@ -253,7 +253,7 @@ describe('NoteList context menu — ask the agent', () => {
 
   it('keeps Copy file path, not a selected-text Copy path leftover', () => {
     renderNoteListWithFullActionMenu()
-    fireEvent.contextMenu(screen.getByText('Build Laputa App'))
+    fireEvent.contextMenu(screen.getByText('Build Rhizome App'))
     expect(screen.getByText('Copy file path')).toBeInTheDocument()
     expect(screen.queryByText('Copy path')).not.toBeInTheDocument()
   })

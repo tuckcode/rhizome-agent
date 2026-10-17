@@ -5,7 +5,7 @@ import { isTauri } from '../mock-tauri'
 import { createCrossWindowPersistedStore, type CrossWindowStoreReadReason } from './crossWindowPersistedStore'
 
 const STORAGE_KEY = 'tolaria:ai-workspace-sessions:v1'
-const BROADCAST_CHANNEL = 'tolaria-ai-workspace-sessions'
+const BROADCAST_CHANNEL = 'rhizome-ai-workspace-sessions'
 const NATIVE_WRITE_DEBOUNCE_MS = 250
 
 export interface AiWorkspaceSessionSnapshot {

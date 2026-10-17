@@ -133,8 +133,8 @@ describe('useVaultSwitcher', () => {
 
   it('loads persisted vaults on mount', async () => {
     mockVaultListStore = {
-      vaults: [{ label: 'My Vault', path: '/Users/luca/Laputa' }],
-      active_vault: '/Users/luca/Laputa',
+      vaults: [{ label: 'My Vault', path: '/Users/mock/Vault' }],
+      active_vault: '/Users/mock/Vault',
     }
 
     const { result } = renderHook(() => useVaultSwitcher({ onSwitch, onToast }))
@@ -145,9 +145,9 @@ describe('useVaultSwitcher', () => {
 
     expect(result.current.allVaults).toHaveLength(2) // default + persisted
     expect(result.current.allVaults[1].label).toBe('My Vault')
-    expect(result.current.allVaults[1].path).toBe('/Users/luca/Laputa')
+    expect(result.current.allVaults[1].path).toBe('/Users/mock/Vault')
     expect(result.current.allVaults[1].available).toBe(true)
-    expect(result.current.vaultPath).toBe('/Users/luca/Laputa')
+    expect(result.current.vaultPath).toBe('/Users/mock/Vault')
     expect(mockInvokeFn).toHaveBeenCalledWith('load_vault_list', {})
   })
 

@@ -7,10 +7,12 @@ import {
 export const MATH_INLINE_TYPE = 'mathInline'
 export const MATH_BLOCK_TYPE = 'mathBlock'
 
-const INLINE_TOKEN_PREFIX = '@@TOLARIA_MATH_INLINE:'
-const BLOCK_TOKEN_PREFIX = '@@TOLARIA_MATH_BLOCK:'
+const INLINE_TOKEN_PREFIX = '@@RHIZOME_MATH_INLINE:'
+const BLOCK_TOKEN_PREFIX = '@@RHIZOME_MATH_BLOCK:'
+const LEGACY_INLINE_TOKEN_PREFIX = '@@TOLARIA_MATH_INLINE:'
+const LEGACY_BLOCK_TOKEN_PREFIX = '@@TOLARIA_MATH_BLOCK:'
 const TOKEN_SUFFIX = '@@'
-const INLINE_TOKEN_RE = /@@TOLARIA_MATH_INLINE:([^@]+)@@/g
+const INLINE_TOKEN_RE = /@@(?:RHIZOME|TOLARIA)_MATH_INLINE:([^@]+)@@/g
 const CODE_FENCE_PREFIXES = ['```', '~~~']
 
 interface InlineItem {
@@ -116,8 +118,16 @@ function mathToken({ prefix, latex }: TokenRequest): string {
 }
 
 function readMathToken({ text, prefix }: TokenReadRequest): string | null {
-  if (!text.startsWith(prefix) || !text.endsWith(TOKEN_SUFFIX)) return null
-  return decodeLatex({ encoded: text.slice(prefix.length, -TOKEN_SUFFIX.length) })
+  const prefixes = prefix === BLOCK_TOKEN_PREFIX
+    ? [BLOCK_TOKEN_PREFIX, LEGACY_BLOCK_TOKEN_PREFIX]
+    : prefix === INLINE_TOKEN_PREFIX
+      ? [INLINE_TOKEN_PREFIX, LEGACY_INLINE_TOKEN_PREFIX]
+      : [prefix]
+  for (const candidate of prefixes) {
+    if (!text.startsWith(candidate) || !text.endsWith(TOKEN_SUFFIX)) continue
+    return decodeLatex({ encoded: text.slice(candidate.length, -TOKEN_SUFFIX.length) })
+  }
+  return null
 }
 
 function isEscaped({ text, index }: TextPosition): boolean {

@@ -213,26 +213,26 @@ Status: Evergreened
   })
 
   it('infers the current workspace for untagged default-vault notes before moving them', () => {
-    const laputaWorkspace = makeWorkspace('/Users/luca/Laputa', 'Laputa')
+    const vaultWorkspace = makeWorkspace('/Users/mock/Vault', 'Vault')
     const refactoringWorkspace = makeWorkspace('/Users/luca/Refactoring', 'Refactoring')
     const entry = {
       ...mockEntry,
-      path: '/Users/luca/Laputa/project/test.md',
+      path: '/Users/mock/Vault/project/test.md',
       workspace: undefined,
     }
     const onChangeWorkspace = vi.fn()
 
     renderSelectedInspector({
       entry,
-      workspaces: [laputaWorkspace, refactoringWorkspace],
+      workspaces: [vaultWorkspace, refactoringWorkspace],
       onChangeWorkspace,
     })
 
-    fireEvent.click(screen.getByRole('combobox', { name: 'Laputa' }))
+    fireEvent.click(screen.getByRole('combobox', { name: 'Vault' }))
     fireEvent.click(screen.getByRole('option', { name: 'Refactoring' }))
 
     expect(onChangeWorkspace).toHaveBeenCalledWith(
-      expect.objectContaining({ path: entry.path, workspace: laputaWorkspace }),
+      expect.objectContaining({ path: entry.path, workspace: vaultWorkspace }),
       refactoringWorkspace,
     )
   })
@@ -400,7 +400,7 @@ This is a test note with some words to count.
 
   describe('Referenced By (bidirectional relationships)', () => {
     const targetEntry: VaultEntry = makeEntry({
-      path: '/Users/luca/Laputa/responsibility/grow-newsletter.md',
+      path: '/Users/mock/Vault/responsibility/grow-newsletter.md',
       filename: 'grow-newsletter.md',
       title: 'Grow Newsletter',
       isA: 'Responsibility',
@@ -410,7 +410,7 @@ This is a test note with some words to count.
     })
 
     const essayEntry: VaultEntry = makeEntry({
-      path: '/Users/luca/Laputa/essay/on-writing.md',
+      path: '/Users/mock/Vault/essay/on-writing.md',
       filename: 'on-writing.md',
       title: 'On Writing Well',
       isA: 'Essay',
@@ -421,7 +421,7 @@ This is a test note with some words to count.
     })
 
     const procedureEntry: VaultEntry = makeEntry({
-      path: '/Users/luca/Laputa/procedure/write-essays.md',
+      path: '/Users/mock/Vault/procedure/write-essays.md',
       filename: 'write-essays.md',
       title: 'Write Weekly Essays',
       isA: 'Procedure',
@@ -432,7 +432,7 @@ This is a test note with some words to count.
     })
 
     const experimentEntry: VaultEntry = makeEntry({
-      path: '/Users/luca/Laputa/experiment/seo.md',
+      path: '/Users/mock/Vault/experiment/seo.md',
       filename: 'seo.md',
       title: 'SEO Experiment',
       isA: 'Experiment',
@@ -505,7 +505,7 @@ Status: Active
     it('skips Type relationships in referenced-by computation', () => {
       const typeEntry: VaultEntry = {
         ...targetEntry,
-        path: '/Users/luca/Laputa/responsibility.md',
+        path: '/Users/mock/Vault/responsibility.md',
         filename: 'responsibility.md',
         title: 'Responsibility',
         isA: 'Type',
@@ -551,7 +551,7 @@ Status: Active
 
     it('excludes entries from backlinks when already shown in referenced-by', async () => {
       const noteA: VaultEntry = makeEntry({
-        path: '/Users/luca/Laputa/essay/on-writing.md',
+        path: '/Users/mock/Vault/essay/on-writing.md',
         filename: 'on-writing.md',
         title: 'On Writing Well',
         isA: 'Essay',

@@ -41,7 +41,7 @@ const eventEntry = makeEntry({ path: '/vault/event/kickoff.md', filename: 'kicko
 const topicEntry = makeEntry({ path: '/vault/topic/dev.md', filename: 'dev.md', title: 'Software Development', isA: 'Topic' })
 const recipeEntry = makeEntry({ path: '/vault/recipe/pasta.md', filename: 'pasta.md', title: 'Pasta Carbonara', isA: 'Recipe' })
 const untypedEntry = makeEntry({ path: '/vault/note/random.md', filename: 'random.md', title: 'Random Thought' })
-const noteEntry = makeEntry({ path: '/vault/note/welcome-to-laputa.md', filename: 'welcome-to-laputa.md', title: 'Welcome to Laputa', isA: 'Note' })
+const noteEntry = makeEntry({ path: '/vault/note/welcome-to-vault.md', filename: 'welcome-to-vault.md', title: 'Welcome to Vault', isA: 'Note' })
 
 const allEntries = [typeProject, typePerson, typeEvent, typeTopic, typeRecipe, typeNote, projectEntry, personEntry, eventEntry, topicEntry, recipeEntry, untypedEntry, noteEntry]
 
@@ -67,11 +67,11 @@ describe('findEntryByTarget', () => {
   })
 
   it('matches by relative path (folder/slug)', () => {
-    expect(findEntryByTarget(allEntries, 'note/welcome-to-laputa')).toBe(noteEntry)
+    expect(findEntryByTarget(allEntries, 'note/welcome-to-vault')).toBe(noteEntry)
   })
 
   it('matches by relative path with pipe syntax', () => {
-    expect(findEntryByTarget(allEntries, 'note/welcome-to-laputa|Welcome!')).toBe(noteEntry)
+    expect(findEntryByTarget(allEntries, 'note/welcome-to-vault|Welcome!')).toBe(noteEntry)
   })
 
   it('matches project by relative path', () => {
@@ -147,7 +147,7 @@ describe('resolveWikilinkColor', () => {
   })
 
   it('resolves relative-path wikilink target to correct type color', () => {
-    const result = resolveWikilinkColor(allEntries, 'note/welcome-to-laputa')
+    const result = resolveWikilinkColor(allEntries, 'note/welcome-to-vault')
     expect(result.isBroken).toBe(false)
     expect(result.color).toBe('var(--accent-blue)')
   })

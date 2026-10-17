@@ -38,7 +38,7 @@ describe('shouldStripAutoLinkedLocalFileMark', () => {
   it('keeps intentional external links', () => {
     expect(shouldStripAutoLinkedLocalFileMark({
       href: { raw: 'https://example.com/docs' },
-      text: { raw: 'Tolaria Docs' },
+      text: { raw: 'Rhizome Docs' },
     })).toBe(false)
     expect(shouldStripAutoLinkedLocalFileMark({
       href: { raw: 'https://example.com/agents' },

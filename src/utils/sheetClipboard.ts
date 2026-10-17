@@ -14,7 +14,7 @@ import { MAX_SHEET_COLUMNS, MAX_SHEET_ROWS, SHEET_INDEX } from './sheetWorkbook'
 
 export const RHIZOME_SHEET_CLIPBOARD_MIME = 'application/x-rhizome-sheet-clipboard'
 
-const TOLARIA_SHEET_CLIPBOARD_VERSION = 1
+const RHIZOME_SHEET_CLIPBOARD_VERSION = 1
 const LOCAL_CELL_REFERENCE_PATTERN = /(^|[^A-Za-z0-9_.\][$])(\$?)([A-Za-z]{1,3})(\$?)([1-9]\d*)(?![A-Za-z0-9_]|\s*\()/g
 
 export interface RhizomeSheetClipboardPayload {
@@ -95,7 +95,7 @@ function isClipboardPayload(value: unknown): value is RhizomeSheetClipboardPaylo
   if (!value || typeof value !== 'object') return false
   const payload = value as Partial<RhizomeSheetClipboardPayload>
   return payload.type === 'rhizome-sheet-clipboard'
-    && payload.version === TOLARIA_SHEET_CLIPBOARD_VERSION
+    && payload.version === RHIZOME_SHEET_CLIPBOARD_VERSION
     && isClipboardAction(payload.action)
     && Array.isArray(payload.cells)
     && isClipboardSource(payload.source)
@@ -251,7 +251,7 @@ export function buildRhizomeSheetClipboardPayload(
       width: area.width,
     },
     type: 'rhizome-sheet-clipboard',
-    version: TOLARIA_SHEET_CLIPBOARD_VERSION,
+    version: RHIZOME_SHEET_CLIPBOARD_VERSION,
   }
 }
 

@@ -300,7 +300,7 @@ function filenameStemFromEntry(entry: VaultEntry): string {
 
 function relativePathStemFromEntry(entry: VaultEntry): string {
   const normalizedPath = stringField(entry.path).replaceAll('\\', '/')
-  return normalizedPath.replace(/^.*\/Laputa\//, '').replace(/\.md$/, '')
+  return normalizedPath.replace(/^.*\/Vault\//, '').replace(/\.md$/, '')
 }
 
 function linkTargetsForEntry(entry: VaultEntry): Set<string> {

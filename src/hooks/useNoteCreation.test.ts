@@ -261,10 +261,10 @@ describe('resolveNewNote', () => {
 
   it('blocks creation when macOS /tmp aliases point at the same note path', () => {
     const plan = planNewNoteCreation({
-      entries: [makeEntry({ path: '/private/tmp/tolaria-vault/briefing.md', filename: 'briefing.md' })],
+      entries: [makeEntry({ path: '/private/tmp/vault/briefing.md', filename: 'briefing.md' })],
       title: 'Briefing',
       type: 'Note',
-      vaultPath: '/tmp/tolaria-vault',
+      vaultPath: '/tmp/vault',
     })
 
     expect(plan.status).toBe('blocked')
@@ -573,8 +573,8 @@ describe('useNoteCreation hook', () => {
     vi.mocked(isTauri).mockReturnValue(true)
     vi.mocked(invoke).mockResolvedValueOnce(undefined)
     vi.spyOn(Date, 'now').mockReturnValue(1700000000000)
-    const windowsVaultPath = String.raw`\\?\C:\Users\alex\Documents\Tolaria`
-    const createdPath = String.raw`\\?\C:\Users\alex\Documents\Tolaria/untitled-project-1700000000.md`
+    const windowsVaultPath = String.raw`\\?\C:\Users\alex\Documents\Rhizome`
+    const createdPath = String.raw`\\?\C:\Users\alex\Documents\Rhizome/untitled-project-1700000000.md`
     const { result } = renderHook(() => useNoteCreation({
       ...makeConfig(),
       vaultPath: windowsVaultPath,
@@ -699,8 +699,8 @@ describe('useNoteCreation hook', () => {
       .mockRejectedValueOnce(new Error('not found'))
       .mockResolvedValueOnce(undefined)
     const onTypeStateChanged = vi.fn()
-    const windowsVaultPath = String.raw`\\?\C:\Users\alex\Documents\Tolaria`
-    const createdPath = String.raw`\\?\C:\Users\alex\Documents\Tolaria/recipe.md`
+    const windowsVaultPath = String.raw`\\?\C:\Users\alex\Documents\Rhizome`
+    const createdPath = String.raw`\\?\C:\Users\alex\Documents\Rhizome/recipe.md`
     const { result } = renderHook(() => useNoteCreation({
       ...makeConfig(),
       vaultPath: windowsVaultPath,
