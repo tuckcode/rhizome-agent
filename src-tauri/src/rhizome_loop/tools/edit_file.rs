@@ -116,7 +116,7 @@ fn plan_with_cap(
     if text::to_lf(old_string) == text::to_lf(new_string) {
         return Err("old_string and new_string are the same; no change to make.".into());
     }
-    let path = sandbox::resolve_file(requested, vault_path, vault_paths)?;
+    let path = sandbox::resolve_file_for_write(requested, vault_path, vault_paths)?;
     atomic::preflight(&path)?;
     let before = text::read_text_limited(&path, max_bytes)?;
     let content_hash = text::hash_bytes(before.as_bytes());
@@ -387,6 +387,96 @@ mod tests {
         );
     }
 
+    #[test]
+    fn writes_stay_blocked_when_the_secret_setting_is_off() {
+        let (_dir, root) = vault();
+        let root_path = Path::new(&root);
+        fs::create_dir_all(root_path.join(".git").join("hooks")).unwrap();
+        fs::write(
+            root_path.join(".git").join("hooks").join("pre-commit"),
+            "keep\n",
+        )
+        .unwrap();
+        fs::write(root_path.join(".git").join("config"), "keep\n").unwrap();
+        fs::write(root_path.join(".env"), "SECRET=keep\n").unwrap();
+        fs::write(root_path.join("id_rsa"), "keep\n").unwrap();
+        let _guard = sandbox::override_secret_block(false);
+        for requested in [".git/hooks/pre-commit", ".git/config", ".env", "id_rsa"] {
+            let error = run(
+                &json!({
+                    "path": requested,
+                    "old_string": "keep",
+                    "new_string": "no"
+                })
+                .to_string(),
+                Some(&root),
+                &[],
+            )
+            .unwrap_err();
+            assert!(
+                error.contains(sandbox::BLOCKED_SECRET),
+                "edit must keep blocking {requested} with the setting off: {error}"
+            );
+            assert_eq!(
+                fs::read_to_string(root_path.join(requested)).unwrap(),
+                if requested == ".env" {
+                    "SECRET=keep\n"
+                } else {
+                    "keep\n"
+                },
+                "{requested} must stay unchanged"
+            );
+        }
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(root_path.join(".git"), root_path.join("gitlink")).unwrap();
+            let error = run(
+                &json!({
+                    "path": "gitlink",
+                    "old_string": "keep",
+                    "new_string": "no"
+                })
+                .to_string(),
+                Some(&root),
+                &[],
+            )
+            .unwrap_err();
+            assert!(
+                error.contains(sandbox::BLOCKED_SECRET),
+                "edit must keep blocking a symlink to .git with the setting off: {error}"
+            );
+            assert_eq!(
+                fs::read_to_string(root_path.join(".git").join("config")).unwrap(),
+                "keep\n"
+            );
+        }
+        let (_worktree, worktree_root) = vault();
+        fs::write(
+            Path::new(&worktree_root).join(".git"),
+            "gitdir: /tmp/worktree.git\n",
+        )
+        .unwrap();
+        let error = run(
+            &json!({
+                "path": ".git",
+                "old_string": "gitdir",
+                "new_string": "nope"
+            })
+            .to_string(),
+            Some(&worktree_root),
+            &[],
+        )
+        .unwrap_err();
+        assert!(
+            error.contains(sandbox::BLOCKED_SECRET),
+            "edit must keep blocking a .git worktree file with the setting off: {error}"
+        );
+        assert_eq!(
+            fs::read_to_string(Path::new(&worktree_root).join(".git")).unwrap(),
+            "gitdir: /tmp/worktree.git\n"
+        );
+    }
+
     #[cfg(unix)]
     #[test]
     fn symlink_to_a_secret_file_is_refused() {
@@ -494,6 +584,27 @@ mod tests {
         .unwrap();
         assert_eq!(plan.display_path, "real.md via link.md");
         assert_eq!(plan.path, dest);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn dangling_symlink_mid_path_is_a_clear_error() {
+        let (_dir, root) = vault();
+        let link = Path::new(&root).join("gone");
+        std::os::unix::fs::symlink(Path::new(&root).join("missing-dir"), &link).unwrap();
+        let error = run(
+            &json!({
+                "path": "gone/note.md",
+                "old_string": "keep",
+                "new_string": "no"
+            })
+            .to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap_err();
+        assert!(error.to_lowercase().contains("dangling"), "{error}");
+        assert!(!error.contains("os error 17"), "{error}");
     }
 
     #[test]

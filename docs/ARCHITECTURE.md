@@ -537,7 +537,8 @@ Secret-path blocking (`.env*` except `.env.example`, `.git/`, `*.pem` /
 backups) is a safety net, not a wall. It covers the native file tools
 only. A future shell tool will not be covered. Settings → AI Agents →
 Safety has a toggle (on by default) that disables the denylist for
-**reads** only; write tools always apply it via `sandbox::resolve_for_write`.
+**reads** only (`sandbox::resolve_for_read`); write tools always apply
+it via `sandbox::resolve_for_write`.
 Root sandboxing still applies. When the toggle is off, `.git/config` is
 readable and can hold tokens in remote URLs.
 `rhizome_routing/` wraps it with free-tier fallback over a pinned OmniRoute

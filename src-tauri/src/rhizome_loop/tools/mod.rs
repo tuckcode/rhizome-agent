@@ -7,8 +7,9 @@
 //! and auto-run in both permission modes. `edit_file` and `write_file`
 //! use the same roots and ask before they write. Secret-path blocking
 //! on those tools is a safety net, not a wall: a future shell tool will
-//! not be covered. Write tools must call `sandbox::resolve_for_write`,
-//! which always applies the denylist.
+//! not be covered. Write tools must call `sandbox::resolve_for_write`
+//! (or `resolve_file_for_write` when the path must already be a file),
+//! which always applies the denylist. Reads use `resolve_for_read`.
 
 mod args;
 mod atomic;
@@ -292,8 +293,8 @@ pub fn mutate_session_matches(
     match (args::json_path(granted_args), args::json_path(call_args)) {
         (Some(granted), Some(call)) => {
             match (
-                sandbox::resolve(&granted, vault_path, vault_paths),
-                sandbox::resolve(&call, vault_path, vault_paths),
+                sandbox::resolve_for_read(&granted, vault_path, vault_paths),
+                sandbox::resolve_for_read(&call, vault_path, vault_paths),
             ) {
                 (Ok(left), Ok(right)) => left == right,
                 _ => granted == call,

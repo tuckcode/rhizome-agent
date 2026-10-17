@@ -102,7 +102,7 @@ fn plan_with_cap(
             content.len()
         ));
     }
-    let path = sandbox::resolve(requested, vault_path, vault_paths)?;
+    let path = sandbox::resolve_for_write(requested, vault_path, vault_paths)?;
     if path.is_dir() {
         return Err(format!("Not a file: {requested}"));
     }
@@ -284,6 +284,81 @@ mod tests {
                 "{requested} must not be created"
             );
         }
+    }
+
+    #[test]
+    fn writes_stay_blocked_when_the_secret_setting_is_off() {
+        let (_dir, root) = vault();
+        let root_path = Path::new(&root);
+        fs::create_dir_all(root_path.join(".git").join("hooks")).unwrap();
+        fs::write(
+            root_path.join(".git").join("hooks").join("pre-commit"),
+            "keep\n",
+        )
+        .unwrap();
+        fs::write(root_path.join(".git").join("config"), "keep\n").unwrap();
+        fs::write(root_path.join(".env"), "SECRET=keep\n").unwrap();
+        fs::write(root_path.join("id_rsa"), "keep\n").unwrap();
+        let _guard = sandbox::override_secret_block(false);
+        for requested in [".git/hooks/pre-commit", ".git/config", ".env", "id_rsa"] {
+            let error = run(
+                &json!({ "path": requested, "content": "no\n" }).to_string(),
+                Some(&root),
+                &[],
+            )
+            .unwrap_err();
+            assert!(
+                error.contains(sandbox::BLOCKED_SECRET),
+                "write must keep blocking {requested} with the setting off: {error}"
+            );
+            assert_eq!(
+                fs::read_to_string(root_path.join(requested)).unwrap(),
+                if requested == ".env" {
+                    "SECRET=keep\n"
+                } else {
+                    "keep\n"
+                },
+                "{requested} must stay unchanged"
+            );
+        }
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(root_path.join(".git"), root_path.join("gitlink")).unwrap();
+            let error = run(
+                &json!({ "path": "gitlink", "content": "no\n" }).to_string(),
+                Some(&root),
+                &[],
+            )
+            .unwrap_err();
+            assert!(
+                error.contains(sandbox::BLOCKED_SECRET),
+                "write must keep blocking a symlink to .git with the setting off: {error}"
+            );
+            assert_eq!(
+                fs::read_to_string(root_path.join(".git").join("config")).unwrap(),
+                "keep\n"
+            );
+        }
+        let (_worktree, worktree_root) = vault();
+        fs::write(
+            Path::new(&worktree_root).join(".git"),
+            "gitdir: /tmp/worktree.git\n",
+        )
+        .unwrap();
+        let error = run(
+            &json!({ "path": ".git", "content": "no\n" }).to_string(),
+            Some(&worktree_root),
+            &[],
+        )
+        .unwrap_err();
+        assert!(
+            error.contains(sandbox::BLOCKED_SECRET),
+            "write must keep blocking a .git worktree file with the setting off: {error}"
+        );
+        assert_eq!(
+            fs::read_to_string(Path::new(&worktree_root).join(".git")).unwrap(),
+            "gitdir: /tmp/worktree.git\n"
+        );
     }
 
     #[cfg(unix)]

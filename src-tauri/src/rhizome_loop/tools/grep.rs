@@ -207,7 +207,11 @@ fn search_starts(
     roots: &Roots,
 ) -> Result<Vec<PathBuf>, String> {
     match search_path {
-        Some(requested) => Ok(vec![sandbox::resolve(requested, vault_path, vault_paths)?]),
+        Some(requested) => Ok(vec![sandbox::resolve_for_read(
+            requested,
+            vault_path,
+            vault_paths,
+        )?]),
         None => Ok(roots.all.clone()),
     }
 }
