@@ -87,7 +87,7 @@ The macOS app asks for:
 
 It does not ask for the microphone, the camera, or accessibility.
 
-Prime tools you run from that engine can use the machine. A vault is not a sandbox for those tools. There is no in-app Packages marketplace. Settings → AI Agents → **Advanced Prime engine** holds Prime install status and Copy MCP config.
+A vault is not a sandbox for shell commands the native engine runs after you approve them. There is no in-app Packages marketplace. **Copy MCP config** (`ai.panel.copyMcpConfig`) is on Settings → AI Agents for wiring external MCP clients.
 
 ## Telemetry
 

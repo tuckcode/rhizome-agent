@@ -21,7 +21,7 @@ pnpm tauri dev
 
 The first launch of `prime-agent` asks you to run `/login` and choose a provider. Skip that if you use Rhizome's engine and add a provider key in Settings. Keys live in the system keychain.
 
-`prime-agent` stops when that terminal closes. To leave it running (only if you use the Prime engine):
+`prime-agent` stops when that terminal closes. To leave it running for CLI use outside Rhizome Chat:
 
 ```bash
 (prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status

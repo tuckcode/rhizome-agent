@@ -36,8 +36,7 @@
     "headings": [
       "Before you start",
       "Build and run",
-      "Pick an engine",
-      "Set up Prime",
+      "Set up Prime (legacy)",
       "If you already have a built copy",
       "Look at the interface without an engine",
       "Next"
@@ -75,15 +74,14 @@
   },
   {
     "title": "Agents, engines and models",
-    "description": "The agent loop, Chat engines (Prime and Rhizome's own), models, tools and permission modes.",
+    "description": "The agent loop, Rhizome's chat engine, models, tools and permission modes.",
     "path": "pages/concepts/ai.md",
     "url": "/concepts/ai",
     "section": "concepts",
     "headings": [
       "Terms on this page",
-      "Engines for Chat",
+      "Engine for Chat",
       "Rhizome's engine",
-      "Prime Agent",
       "Permission modes",
       "Plugins",
       "Let other apps use your vault (MCP)",
@@ -326,7 +324,6 @@
       "From Claude Code",
       "From Hermes Agent",
       "From Cursor",
-      "From Prime Agent",
       "Bring your own model",
       "Plugins"
     ]
@@ -350,7 +347,7 @@
     "url": "/guides/configure-ai-models",
     "section": "guides",
     "headings": [
-      "Choose an engine first",
+      "Engine",
       "Add a provider",
       "Store the key",
       "Test the connection",
@@ -648,13 +645,13 @@
   },
   {
     "title": "Chat doesn't answer",
-    "description": "What to do when a message gets no reply, for Prime and for Rhizome's own engine.",
+    "description": "What to do when a message gets no reply, for Rhizome's own engine and for Prime.",
     "path": "pages/troubleshooting/chat-doesnt-answer.md",
     "url": "/troubleshooting/chat-doesnt-answer",
     "section": "troubleshooting",
     "headings": [
-      "Prime Agent",
       "Rhizome's engine",
+      "Prime Agent",
       "Either engine"
     ]
   },

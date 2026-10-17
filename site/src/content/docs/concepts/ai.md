@@ -35,14 +35,6 @@ New chats use **Rhizome's engine**: the loop built into the app. It does not nee
 
 Secret files (`.env*` except `.env.example`, `.git/`, key material) are blocked on the file tools. That denylist does not cover `bash`. Settings → AI Agents → Safety can turn the denylist off for **reads** only.
 
-### Prime Agent
-
-Prime runs as a background service (a daemon) that Rhizome connects to. Prime owns its sessions (`~/.prime/agent/sessions/`). Prime packages you install from the Prime CLI can use the whole machine; a vault isn't a sandbox for them. There is no in-app Packages marketplace. Settings → AI Agents → **Advanced Prime engine** shows whether Prime is installed and lets you copy MCP config.
-
-Prime handles its own provider login. Sign in from Settings → AI Agents → Local agent, where each provider card (Anthropic, OpenAI Codex, xAI, DeepSeek and others) has a **Sign in** or **Reconnect** button. Or run `prime-agent` in a terminal and use `/login`. Prime's model list includes Anthropic models.
-
-The same tab lists **Recognized local agents**, Prime's default model, and which models Prime may use.
-
 ## Permission modes
 
 A **permission mode** decides what the agent may do without asking. It's set per vault.
@@ -52,17 +44,15 @@ A **permission mode** decides what the agent may do without asking. It's set per
 | **Limited tools** | Read and search auto-run. `create_note` asks. Edits ask. No `bash` |
 | **Power User** | Read, search, and `create_note` auto-run. Edits still ask unless a session grant covers that path. `bash` is offered and asks every time |
 
-Prime has no sandbox, so Prime chats always run as Power User.
-
 ## Plugins
 
-Rhizome will have its own plugin system: add a tool, hook into a turn, or block a tool call. It's planned, not shipped. Today, Prime CLI packages extend Prime, and MCP lets other apps use your vault.
+Rhizome will have its own plugin system: add a tool, hook into a turn, or block a tool call. It's planned, not shipped. Today, MCP lets other apps use your vault.
 
 ## Let other apps use your vault (MCP)
 
 **MCP** (Model Context Protocol) lets other AI apps call Rhizome's tools. With it, an MCP client such as Claude Code or Cursor can read and write your vault.
 
-Run **Set Up External AI Tools…** from the command palette (⌘K). Rhizome shows which config files it will change (for example `~/.claude.json` and `~/.cursor/mcp.json`) and writes nothing until you confirm. It needs Node.js 18 or newer, or Bun, on your `PATH`. To paste the entry yourself, use **Copy MCP config** in Settings → AI Agents → **Advanced Prime engine**.
+Run **Set Up External AI Tools…** from the command palette (⌘K). Rhizome shows which config files it will change (for example `~/.claude.json` and `~/.cursor/mcp.json`) and writes nothing until you confirm. It needs Node.js 18 or newer, or Bun, on your `PATH`. To paste the entry yourself, use **Copy MCP config** on Settings → AI Agents (`ai.panel.copyMcpConfig`).
 
 ## Review what the agent changed
 

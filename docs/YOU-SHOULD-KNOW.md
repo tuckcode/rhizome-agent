@@ -72,7 +72,7 @@ longer open the way the ADR text still sounds.
 | Open note vs Chat | **Shipped 2026-09-12.** Notes header **On top / Beside**. Beside folds Sessions/Notes. Hover must not collapse the note. Highlight → Copy, or **Ask Chat about this** (same thread; `App.layout-edges.test.ts` 14:00). Right-click a list row → **Ask the agent about this note** keeps Chat and opens that note (`App.test.tsx` 13:50). Note lock is ephemeral and per-note — locked notes are read-only (`EditorContentLayout.test.tsx` 13:51). Not vault `editor_mode`. |
 | Latest reply | Green start marker on the newest assistant turn. Moves when a newer reply starts. |
 | Session click | Transcript **clears on the click**, then rehydrates. Leaving the old chat up is the switch beachball. |
-| Settings cost | Model catalog and provider status wait until **Agents** is visible. There is no Packages catalog. Old Packages section ids open **Advanced Prime engine**. |
+| Settings cost | Model catalog and provider status wait until **Agents** is visible. There is no Packages catalog. Old Packages section ids open **AI Agents**. |
 | Hide vs quit | Red X quits unless Keep in taskbar (ADR-0179). Default quit stops ws-bridge, Mindwalk, and a spawned Prime. Keep in taskbar restores C22 hide; **C75** then leaves spawned Prime warm. Keep working leaves that daemon so the grant can live. Never Prime `shutdown` (0163, kept by 0180). A Rhizome-owned turn that is not using Prime is not a Prime helper. |
 
 **Do not** make nav and the note list exclusive. Claude tried; it broke
@@ -171,13 +171,13 @@ are **closed** on GitHub (2026-08-29). Do not redesign the strip again.
 
 There is no Settings → **Packages** marketplace and no **Browse packages**
 button. Old section ids (`packages`, `settings-section-extensions`) open
-**Advanced Prime engine** (install status and Copy MCP config). Do not
-restore `setLoadExtensionCatalog`. Prime CLI install (`prime-agent package
-install`) still exists outside the app.
+**AI Agents**. **Copy MCP config** (`ai.panel.copyMcpConfig`) is on that
+page. Do not restore `setLoadExtensionCatalog`. Prime CLI install
+(`prime-agent package install`) still exists outside the app.
 
 ### Native Chat default and vault tools (2026-10-16)
 
-New chats use Rhizome's engine unless Settings stores `chat_engine: prime`.
+New chats use Rhizome's engine (ADR-0187).
 Native tools: `echo`; read-only `read_file`, `list_dir`, `grep`, `glob`
 (auto-run inside vault and workspace roots); `edit_file` / `write_file`
 (ask in both modes unless a session grant covers that tool and path);

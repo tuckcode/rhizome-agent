@@ -11,16 +11,15 @@ Chat is where you work with the agent: ask, let it use tools, keep what's worth 
 2. Attach a vault if you want the agent to read your notes or save to them.
 3. Type a message and press Enter.
 
-Which engine answers depends on **Chat engine** in Settings → AI Agents: Prime Agent (the default) or Rhizome's own engine. See [Agents, engines and models](../concepts/ai.md).
+New chats use Rhizome's own engine (ADR-0187). See [Agents, engines and models](../concepts/ai.md).
 
 ## While a reply is running
 
 The message box stays open, so you can write your next message while the agent works.
 
-- **With Prime:** press Enter to send it to the running turn. Prime queues it and reads it before its next step.
-- **With Rhizome's engine:** Enter does nothing until the reply finishes. Your text stays in the box; send it when the turn ends.
+Enter does nothing until the reply finishes. Your text stays in the box; send it when the turn ends.
 
-Press Stop to end the run with either engine. With VoiceOver, Rhizome announces when a run starts, when a tool starts or fails, and when the reply is complete or stopped.
+Press Stop to end the run. With VoiceOver, Rhizome announces when a run starts, when a tool starts or fails, and when the reply is complete or stopped.
 
 ## Ask from the editor or about a note
 
@@ -34,8 +33,7 @@ Under a reply worth keeping, click **Save to vault**. Rhizome writes it as a Mar
 
 ## Come back to a chat
 
-- **Rhizome's engine:** chats are saved as they go and listed with automatic titles. Reopen one to continue it. If Rhizome quit in the middle of a turn, that turn is marked cancelled when you reopen the chat. Tool approvals you gave earlier aren't restored, so the agent asks again. Only one window can send to a chat at a time.
-- **Prime:** use the sessions list to switch between, fork and archive Prime sessions.
+Chats are saved as they go and listed with automatic titles. Reopen one to continue it. If Rhizome quit in the middle of a turn, that turn is marked cancelled when you reopen the chat. Tool approvals you gave earlier aren't restored, so the agent asks again. Only one window can send to a chat at a time.
 
 See [Sessions](sessions.md).
 
@@ -43,24 +41,21 @@ See [Sessions](sessions.md).
 
 The vault's permission mode decides what the agent may do without asking:
 
-- **Limited tools:** Rhizome's engine can echo and create notes, and asks before each note.
-- **Power User:** creates notes without asking, and also offers `bash`, with approval each time. `bash` doesn't run a shell yet.
+- **Limited tools:** Rhizome's engine can read and search the vault without asking. It asks before each new note and before each file edit. It does not offer a shell command.
+- **Power User:** read, search, and new notes run without asking. File edits still ask unless you already allowed that tool and path for the session. **Run command** (`bash`) asks every time, then runs in the vault folder.
 
-Prime always runs as Power User, with its local tools and no sandbox. See [Agents, engines and models](../concepts/ai.md#permission-modes).
+See [Agents, engines and models](../concepts/ai.md#permission-modes).
 
 ## See what the agent did
 
 - **Changes:** next to All Notes in the sidebar. The files that changed, with diffs. Commit or revert.
-- **Mycelium:** for Prime sessions, a map of which files the run searched, read or edited. See [Mycelium](../concepts/mycelium.md).
+- **Mycelium:** for Prime sessions, a map of which files the run searched, read or edited. See [Mycelium](../concepts/mycelium.md). Native chats are not drawn in Mycelium.
 
 ## Requests that work well
 
-With Prime, which can read and search the vault:
+Rhizome's engine can read and search the open vault:
 
 - "Find notes related to this project and summarize what's open."
 - "Draft a weekly review from the notes linked here."
 - "What did we decide about X? Check the vault."
-
-With Rhizome's engine, which can create notes but not read them yet:
-
 - "Write up these meeting notes as a note called *Weekly sync*."

@@ -92,7 +92,7 @@ Board cards: [`BOARD.md`](BOARD.md) W11.
 | #5 Prime surface skeleton | Structured talk | [`design/prime-agent-surface.md`](design/prime-agent-surface.md) |
 | Sessions-only rail + Research on status bar | Local `4f9b4c4`, **unpushed** | [0438](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md) |
 | Public preview install claims | Draft, not dogfooded | [`PUBLIC-PREVIEW.md`](PUBLIC-PREVIEW.md) · [inventory](plans/2026-09-20-public-readiness-inventory.md) |
-| Packages shortcut on rail | Parked; marketplace removed | No Settings → Packages. Advanced Prime engine is install status only |
+| Packages shortcut on rail | Parked; marketplace removed | No Settings → Packages. Legacy deep links open AI Agents |
 | Rail automations / kanban icons | Later | Empty icons no. ADR-0188 lifted the Kanban park; board is not built |
 
 Chat ↔ native engine first. Do not replace Chat. Do not add `kanban.db`
@@ -347,7 +347,7 @@ column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 **Models and providers**
 | | |
 |---|---|
-| #45 | Model settings: Rhizome catalog (`ai_models.rs`) is the main list. Prime `models.json` only when the Prime engine is picked. [Harness plan](plans/2026-10-09-rhizome-harness-plan.md) Phase 4. |
+| #45 | Model settings: Rhizome catalog (`ai_models.rs`) is the main list for new chats. Prime `models.json` only for legacy Prime-locked chats still open. [Harness plan](plans/2026-10-09-rhizome-harness-plan.md) Phase 4. |
 | #48 | OmniRoute goal kept, not the program: free catalog + fallback in Rhizome Rust. No outward gateway. Phase 4b. |
 | #46 | **Security — still open.** Local **`4416411`** refuses HOME aliases (`~/`, `$HOME/`, symlink-to-HOME). Seed / MCP / `save_vault_list` already drop HOME roots. Connect scrubs only a Rhizome-authored global `rhizome-vault`. **Leftover:** live Chat-without-vault (no global skill returns). Source lock: ChatHome still mounts with empty vault ([1456](plans/handoffs/2026-09-14-1456-cursor-grok-4-6-chat-no-vault.md)). Host status still polls with empty path ([1466](plans/handoffs/2026-09-14-1466-cursor-grok-4-6-host-no-vault.md)). Do not close from units. Do not invent a Prime sandbox. Do not change `normalize_cwd("")` — empty vault → Prime cwd `$HOME` is Chat-without-vault, not MCP scope. |
 

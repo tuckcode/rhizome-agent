@@ -45,6 +45,6 @@ Vault-level information should travel with the vault. Machine-specific preferenc
 | Saved views | Window size |
 | Pinned properties | Recent vault list |
 | Relationship conventions | Local cache |
-| Vault AI guidance files (`AGENTS.md`, `CLAUDE.md`) | AI target and Chat engine |
+| Vault AI guidance files (`AGENTS.md`, `CLAUDE.md`) | AI model target |
 | Permission mode | Provider keys (in the system keychain) |
 | Auto-save chat knowledge setting | Chat logs from Rhizome's engine (`native-sessions/`) |

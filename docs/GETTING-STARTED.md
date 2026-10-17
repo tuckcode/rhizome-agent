@@ -551,10 +551,11 @@ Verified against source 2026-09-14. Longer landmine list:
 - **Settings catalog is lazy.** Do not fetch `get_available_prime_models` or
   `get_prime_provider_status` until Agents is visible. There is no Packages
   marketplace. Old section ids `packages` and `settings-section-extensions`
-  open **Advanced Prime engine** (install status and Copy MCP config). Do
+  open **AI Agents** (`settings-section-ai`). **Copy MCP config**
+  (`ai.panel.copyMcpConfig`) is on that page. Do
   not restore `setLoadExtensionCatalog` or **Browse packages**. Do not
   cache a failed “host is not running” catalog.
-- **Chat engine is native only (ADR-0187).** `readChatEngine` in
+- **Native-only chat (ADR-0187).** `readChatEngine` in
   `src/lib/chatEngine.ts` always returns `native`. `ChatEngineSettings` is
   gone (#218). Open Prime-locked chats keep that lock until closed.
   ChatHome still must not strip Prime chrome when the default AI *agent* is
