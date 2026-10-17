@@ -609,6 +609,8 @@ function useInboxPropertyPickerState(
   isInboxView: boolean,
   typeEntryMap: Record<string, VaultEntry>,
 ): ScopedPropertyPickerState {
+  // The picker must use the same period as the Inbox list. App passes 'all'.
+  // A narrower period would drop older notes from the picker only.
   const inboxEntries = useMemo(
     () => isInboxView ? filterInboxEntries(entries, inboxPeriod) : [],
     [entries, inboxPeriod, isInboxView],

@@ -1481,7 +1481,7 @@ describe('SettingsPanel', () => {
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
     const shortcut = getAppCommandShortcutDisplay(APP_COMMAND_IDS.appSettings)
-    expect(screen.getByText(`${shortcut} to open settings`)).toBeInTheDocument()
+    expect(screen.getByText(`Open settings ${shortcut}`)).toBeInTheDocument()
   })
 
   it('shows the Windows settings shortcut when the platform is Windows', () => {
@@ -1494,7 +1494,7 @@ describe('SettingsPanel', () => {
       render(
         <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
       )
-      expect(screen.getByText('Ctrl+, to open settings')).toBeInTheDocument()
+      expect(screen.getByText('Open settings Ctrl+,')).toBeInTheDocument()
     } finally {
       Object.defineProperty(window.navigator, 'userAgent', {
         configurable: true,
@@ -1513,7 +1513,7 @@ describe('SettingsPanel', () => {
       render(
         <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
       )
-      expect(screen.getByText('⌘, to open settings')).toBeInTheDocument()
+      expect(screen.getByText('Open settings ⌘,')).toBeInTheDocument()
     } finally {
       Object.defineProperty(window.navigator, 'userAgent', {
         configurable: true,

@@ -40,12 +40,13 @@ import { VaultMenu, type VaultAction, type VaultPillSummary } from './VaultMenu'
 import { formatShortcutDisplay } from '../../hooks/appCommandCatalog'
 import type { GitRepositoryOption } from '../../utils/gitRepositories'
 
-const SETTINGS_SHORTCUT = {
-  shortcut: formatShortcutDisplay({ display: '⌘,' }),
-} as const
-const ZOOM_RESET_SHORTCUT = {
-  shortcut: formatShortcutDisplay({ display: '⌘0' }),
-} as const
+function settingsShortcut() {
+  return { shortcut: formatShortcutDisplay({ display: '⌘,' }) }
+}
+
+function zoomResetShortcut() {
+  return { shortcut: formatShortcutDisplay({ display: '⌘0' }) }
+}
 
 interface StatusBarPrimarySectionProps {
   modifiedCount: number
@@ -640,7 +641,7 @@ export function StatusBarSecondarySection({
       }}
     >
       {zoomLevel === 100 ? null : (
-        <ActionTooltip copy={{ label: translate(locale, 'status.zoom.reset'), ...ZOOM_RESET_SHORTCUT }} side="top">
+        <ActionTooltip copy={{ label: translate(locale, 'status.zoom.reset'), ...zoomResetShortcut() }} side="top">
           <Button
             type="button"
             variant="ghost"
@@ -678,7 +679,7 @@ export function StatusBarSecondarySection({
         </Button>
       </ActionTooltip>
       {!commandRailActive && (
-        <ActionTooltip copy={{ label: translate(locale, 'status.settings.open'), ...SETTINGS_SHORTCUT }} side="top" align="end">
+        <ActionTooltip copy={{ label: translate(locale, 'status.settings.open'), ...settingsShortcut() }} side="top" align="end">
           <Button
             type="button"
             variant="ghost"

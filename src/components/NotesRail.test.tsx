@@ -4,10 +4,16 @@ import { describe, expect, it, vi } from 'vitest'
 import { FileText } from '@phosphor-icons/react'
 import { NotesRail } from './NotesRail'
 import { notesRailRecentItems, notesRailSectionItems } from '../lib/notesRailItems'
+import { MACOS_TITLEBAR_HEIGHT } from './MacOSTitlebar'
+import { hasNativeMacosTrafficLights } from '../utils/trafficLights'
 import type { VaultEntry } from '../types'
 
 vi.mock('./ui/action-tooltip', () => ({
   ActionTooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}))
+
+vi.mock('../utils/trafficLights', () => ({
+  hasNativeMacosTrafficLights: vi.fn(() => false),
 }))
 
 function renderRail(overrides: Partial<React.ComponentProps<typeof NotesRail>> = {}) {
@@ -79,16 +85,31 @@ describe('NotesRail', () => {
     expect(screen.getByTestId('notes-panel-rail-slot')).toHaveStyle({ width: '46px' })
     const sheet = screen.getByTestId('notes-panel-rail-expanded')
     expect(sheet).toHaveStyle({
-      top: 'var(--overlay-titlebar-height, 38px)',
+      top: 'var(--notes-sheet-offset, 0px)',
       right: '46px',
       width: '194px',
       pointerEvents: 'auto',
     })
-    expect(sheet).toHaveClass('bg-background')
+    expect(sheet).toHaveClass('bg-background', 'flex', 'flex-col')
     const changes = screen.getByTestId('notes-rail-changes')
     expect(changes).toBeInTheDocument()
     changes.click()
     expect(onSelect).toHaveBeenCalledTimes(1)
+  })
+
+  it('offsets the native mac sheet by the macOS title bar height', () => {
+    vi.mocked(hasNativeMacosTrafficLights).mockReturnValue(true)
+    renderRail({
+      expanded: true,
+      overlaying: true,
+      width: 240,
+      items: [{ id: 'changes', label: 'Changes', icon: FileText, onSelect: vi.fn() }],
+    })
+    expect(screen.getByTestId('notes-panel-rail-expanded')).toHaveStyle({
+      top: `var(--notes-sheet-offset, ${MACOS_TITLEBAR_HEIGHT}px)`,
+    })
+    expect(MACOS_TITLEBAR_HEIGHT).toBe(32)
+    vi.mocked(hasNativeMacosTrafficLights).mockReturnValue(false)
   })
 
   it('marks unsaved recent notes with a neutral dot', () => {

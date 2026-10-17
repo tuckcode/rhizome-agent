@@ -1,4 +1,5 @@
 import { disambiguateTitles } from './disambiguateTitles'
+import { relativeDate } from '../utils/noteListHelpers'
 
 const HISTORY_OPEN = ['<', 'conversation_history', '>'].join('')
 const HISTORY_CLOSE = ['</', 'conversation_history', '>'].join('')
@@ -8,6 +9,7 @@ export const MYCELIUM_UNTITLED_SESSION = 'Untitled session'
 export interface MyceliumTitleSource {
   id: string
   title?: string | null
+  mtimeMs?: number | null
 }
 
 /**
@@ -29,15 +31,32 @@ export function myceliumSessionTitles(sessions: readonly MyceliumTitleSource[]):
   const rows = sessions.map((session) => ({
     id: session.id,
     title: myceliumSessionTitle(session.title),
+    mtimeMs: session.mtimeMs,
   }))
-  return disambiguateTitles(rows, (row) => row.id.slice(-6)).map((row) => row.title)
+  return disambiguateTitles(rows, (row) => myceliumAgeSuffix(row.mtimeMs)).map((row) => row.title)
+}
+
+/** Relative time for a duplicate row, from the session file's mtime. */
+export function myceliumAgeSuffix(mtimeMs: number | null | undefined): string {
+  if (typeof mtimeMs !== 'number' || !Number.isFinite(mtimeMs)) return 'undated'
+  return relativeDate(Math.floor(mtimeMs / 1000)) || 'undated'
+}
+
+function graphemes(value: string): string[] {
+  if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
+    return [...new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(value)].map(
+      (part) => part.segment,
+    )
+  }
+  return [...value]
 }
 
 function clip(raw: string, fallback: string): string {
   const collapsed = raw.replace(/\s+/g, ' ').trim()
   if (!collapsed) return fallback
-  if (collapsed.length <= MAX_LABEL_CHARS) return collapsed
-  return `${collapsed.slice(0, MAX_LABEL_CHARS).trimEnd()}…`
+  const parts = graphemes(collapsed)
+  if (parts.length <= MAX_LABEL_CHARS) return collapsed
+  return `${parts.slice(0, MAX_LABEL_CHARS).join('').trimEnd()}…`
 }
 
 function firstUserTurn(raw: string): string {

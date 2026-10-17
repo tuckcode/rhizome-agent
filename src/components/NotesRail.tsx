@@ -14,6 +14,9 @@ import {
   RAIL_WIDTH_TRANSITION_MS,
 } from '../lib/railChrome'
 import { cn } from '@/lib/utils'
+import { MACOS_TITLEBAR_HEIGHT } from './MacOSTitlebar'
+import { NOTES_SHEET_OFFSET_VAR, useNotesSheetOffset } from '../hooks/useNotesSheetOffset'
+import { hasNativeMacosTrafficLights } from '../utils/trafficLights'
 
 export type { NotesRailItem }
 
@@ -66,6 +69,10 @@ export function NotesRail({
   windowTooNarrow = false,
   openForNow = false,
 }: NotesRailProps) {
+  useNotesSheetOffset()
+  const sheetTop = hasNativeMacosTrafficLights()
+    ? `var(${NOTES_SHEET_OFFSET_VAR}, ${MACOS_TITLEBAR_HEIGHT}px)`
+    : `var(${NOTES_SHEET_OFFSET_VAR}, 0px)`
   const triggerMode = controlMode ?? mode
   const railItems = items ?? [
     ...(selection && onSelectSection
@@ -180,11 +187,11 @@ export function NotesRail({
         </div>
         {expanded ? (
           <div
-            className="min-h-0 overflow-hidden bg-background shadow-md"
+            className="flex min-h-0 flex-col overflow-hidden bg-background shadow-md"
             data-testid="notes-panel-rail-expanded"
             style={overlaying ? {
               position: 'absolute',
-              top: 'var(--overlay-titlebar-height, 38px)',
+              top: sheetTop,
               right: RAIL_COLLAPSED_WIDTH_PX,
               bottom: 0,
               width: sheetWidth,

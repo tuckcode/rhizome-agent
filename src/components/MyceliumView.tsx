@@ -39,6 +39,11 @@ interface SidecarStatus {
   mode: string
 }
 
+function sessionFileName(path: string): string {
+  const name = path.split(/[/\\]/).pop()
+  return name && name.length > 0 ? name : path
+}
+
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (isTauri()) return invoke<T>(cmd, args)
   return mockInvoke<T>(cmd, args)
@@ -64,7 +69,11 @@ export default function MyceliumView({
   const refreshSessions = useCallback(async () => {
     try {
       const listed = await call<SessionSummary[]>('list_prime_session_summaries')
-      const titles = myceliumSessionTitles(listed)
+      const titles = myceliumSessionTitles(listed.map((session) => ({
+        id: session.id,
+        title: session.title,
+        mtimeMs: session.mtimeMs,
+      })))
       const picks = listed.map((session, index) => ({
         name: titles[index] ?? myceliumSessionTitle(session.title),
         path: session.path,
@@ -74,7 +83,7 @@ export default function MyceliumView({
       setSelected((prev) => {
         if (focusSessionPath) {
           return picks.find((s) => s.path === focusSessionPath)
-            ?? { name: myceliumSessionTitle(null), path: focusSessionPath }
+            ?? { name: sessionFileName(focusSessionPath), path: focusSessionPath }
         }
         if (prev && picks.some((s) => s.path === prev.path)) return prev
         return picks[0] ?? null
