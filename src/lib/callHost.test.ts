@@ -52,8 +52,8 @@ describe('callHost', () => {
 
   it('passes arguments through when there are some', async () => {
     state.tauri = true
-    await callHost('set_prime_thinking_level', { level: 'high' })
-    expect(state.args).toEqual([{ level: 'high' }])
+    await callHost('set_prime_model', { provider: 'xai', modelId: 'grok-4.5' })
+    expect(state.args).toEqual([{ provider: 'xai', modelId: 'grok-4.5' }])
   })
 
   it('propagates failures — a mutation must not fail silently', async () => {

@@ -773,11 +773,6 @@ struct PrimeHost {
     /// exchange names the session once and never fights a later rename.
     name_is_placeholder: bool,
     thinking_level: Option<String>,
-    /// Levels the attached model can actually run, from `get_state`'s model
-    /// `thinkingLevelMap`. `None` until a model is reported — read it through
-    /// `supported_thinking_levels_for_session`, which falls back to the full
-    /// scale rather than treating `None` as "no levels".
-    supported_thinking_levels: Option<Vec<String>>,
     socket_path: PathBuf,
     cwd: PathBuf,
     is_streaming: bool,
@@ -1535,107 +1530,6 @@ pub fn set_model(provider: &str, model_id: &str) -> Result<(), String> {
         host.refresh_session_id()?;
         Ok(())
     })
-}
-
-/// The reasoning levels Prime accepts, in increasing order of effort.
-///
-/// Mirrors `ThinkingLevel` in `@earendil-works/pi-agent-core`, confirmed twice:
-/// the type in `pi-agent-core/dist/types.d.ts` and `prime-agent --help`'s
-/// `--thinking` line agree exactly. Ordered because the UI renders them as a
-/// scale, not an unordered set.
-pub const PRIME_THINKING_LEVELS: [&str; 7] =
-    ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
-
-/// The reasoning levels a model can actually run, in Prime's own order.
-///
-/// Mirrors `getSupportedThinkingLevels` in pi-ai: an explicit `null` in the
-/// model's `thinkingLevelMap` means the model does not have that level, and
-/// `xhigh`/`max` count only when the map names them. Prime clamps every
-/// request to this set before it applies it, so a control built from the full
-/// scale offers levels whose click does nothing and then reads as broken —
-/// which is what the composer pill did on `deepseek-v4-flash`, whose map is
-/// `{minimal: null, low: null, medium: null, high: "high", xhigh: "max",
-/// max: null}`. Picking Medium there snapped back to High with no message.
-///
-/// `None` means Prime did not say (no model, no `reasoning` flag). That is not
-/// the same as "no levels", and callers must fall back to the full scale
-/// rather than to a narrower menu.
-pub fn supported_thinking_levels(
-    reasoning: Option<bool>,
-    map: Option<&serde_json::Map<String, serde_json::Value>>,
-) -> Option<Vec<String>> {
-    let reasoning = reasoning?;
-    if !reasoning {
-        // Prime reports one level for a model that does not reason at all.
-        return Some(vec!["off".to_string()]);
-    }
-    Some(
-        PRIME_THINKING_LEVELS
-            .iter()
-            .copied()
-            .filter(|level| match map.and_then(|map| map.get(*level)) {
-                Some(serde_json::Value::Null) => false,
-                Some(_) => true,
-                // Absent is Prime saying nothing about this level. For the
-                // other five that means "ordinary"; for these two it means
-                // the model never opted in.
-                None => !matches!(*level, "xhigh" | "max"),
-            })
-            .map(|level| level.to_string())
-            .collect(),
-    )
-}
-
-/// Set the attached session's reasoning level.
-///
-/// Validated against `PRIME_THINKING_LEVELS` before it goes out rather than
-/// forwarded blind: the daemon takes a typed `ThinkingLevel`, so an unknown
-/// string is a command that fails at the far end with a less useful message —
-/// and a level silently not applied reads to the user as the control being
-/// broken, since the strip would keep showing the old value.
-pub fn set_thinking_level(level: &str) -> Result<(), String> {
-    let level = level.trim();
-    if !PRIME_THINKING_LEVELS.contains(&level) {
-        return Err(format!(
-            "Unknown thinking level {level:?}. Expected one of: {}",
-            PRIME_THINKING_LEVELS.join(", "),
-        ));
-    }
-    with_host_mut(|host| {
-        host.call(serde_json::json!({
-            "type": "set_thinking_level",
-            "level": level,
-        }))?;
-        // Refresh the cached state, exactly as `set_model` does. `get_status`
-        // -- what the strip polls every 4s -- reads that cache and does not
-        // re-issue `get_state` itself, so without this the strip keeps showing
-        // the level the user just changed away from until something unrelated
-        // happens to refresh it. #9 requires the strip to reflect the change
-        // immediately, and a control whose label does not move reads as one
-        // that did not work.
-        host.refresh_session_id()?;
-        Ok(())
-    })
-}
-
-/// The levels the attached session's model can actually run, in Prime's order.
-///
-/// Falls back to the full scale when Prime has not reported a model. Before a
-/// session exists that is the honest answer, and the fallback is deliberately
-/// the wider list: a menu narrower than the truth hides a level the user has,
-/// which is a worse failure than showing one they do not. Same reasoning as
-/// `get_status` falling back to Prime's configured defaults for the model
-/// chip.
-pub fn supported_thinking_levels_for_session() -> Vec<String> {
-    with_host_mut(|host| Ok(host.supported_thinking_levels.clone()))
-        .ok()
-        .flatten()
-        .unwrap_or_else(|| {
-            PRIME_THINKING_LEVELS
-                .iter()
-                .map(|level| (*level).to_string())
-                .collect()
-        })
 }
 
 /// Pause, resume, or stop one heartbeat.
@@ -3439,7 +3333,6 @@ impl PrimeHost {
         let mut host = Self {
             model_accepts_images: None,
             model_catalog: None,
-            supported_thinking_levels: None,
             name_is_placeholder: false,
             stream,
             pending,
@@ -4017,14 +3910,6 @@ impl PrimeHost {
         if model.is_null() {
             return;
         }
-        // Read with the model, and only when there is one: a payload with a
-        // null model is a payload that knows nothing about the level list
-        // either, and overwriting a good set with `None` would swap a correct
-        // menu for the full scale mid-session.
-        self.supported_thinking_levels = supported_thinking_levels(
-            model["reasoning"].as_bool(),
-            model["thinkingLevelMap"].as_object(),
-        );
         self.model_provider = model["provider"].as_str().map(str::to_string).or_else(|| {
             model
                 .get("provider")
@@ -8135,11 +8020,6 @@ mod tests {
             Some("max"),
             "a null model must not swallow the level",
         );
-        assert_eq!(
-            supported_thinking_levels_for_session(),
-            ["off", "high", "xhigh"],
-            "a null model must not widen the menu back to the full scale",
-        );
 
         let _ = shutdown_host();
     }
@@ -8658,223 +8538,6 @@ mod tests {
 
         let error = set_auto_compaction(true).unwrap_err();
         assert!(error.contains("unsupported"), "got: {error}");
-
-        let _ = shutdown_host();
-    }
-
-    fn thinking_level_map(value: serde_json::Value) -> serde_json::Map<String, serde_json::Value> {
-        value.as_object().expect("a level map is an object").clone()
-    }
-
-    #[test]
-    fn supported_levels_follow_the_models_own_map() {
-        // deepseek-v4-flash, as the installed catalog reports it. Prime clamps
-        // Medium to High here, so a pill offering Medium was offering a click
-        // that could not apply.
-        let model = thinking_level_map(serde_json::json!({
-            "minimal": null,
-            "low": null,
-            "medium": null,
-            "high": "high",
-            "xhigh": "max",
-            "max": null
-        }));
-        assert_eq!(
-            supported_thinking_levels(Some(true), Some(&model)).unwrap(),
-            ["off", "high", "xhigh"],
-        );
-    }
-
-    #[test]
-    fn supported_levels_without_a_map_are_the_ordinary_scale() {
-        // A missing map is not a map of nulls. Prime reads an absent level as
-        // available, except xhigh and max, which only exist when named.
-        assert_eq!(
-            supported_thinking_levels(Some(true), None).unwrap(),
-            ["off", "minimal", "low", "medium", "high"],
-        );
-    }
-
-    #[test]
-    fn supported_levels_are_off_alone_for_a_model_that_cannot_reason() {
-        assert_eq!(
-            supported_thinking_levels(Some(false), None).unwrap(),
-            ["off"],
-        );
-    }
-
-    #[test]
-    fn supported_levels_stay_unknown_when_prime_does_not_say() {
-        // Unknown must stay unknown. The caller falls back to the full scale;
-        // reading this as "no levels" would hide levels the user has.
-        assert!(supported_thinking_levels(None, None).is_none());
-    }
-
-    #[test]
-    fn supported_levels_come_from_the_live_state_payload() {
-        let _guard = host_guard();
-        let vault = tempfile::tempdir().unwrap();
-        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
-            Some("get_state") => Some(vec![ok(
-                id,
-                "get_state",
-                serde_json::json!({
-                    "sessionId": "sess-a",
-                    "isStreaming": false,
-                    "thinkingLevel": "high",
-                    "model": {
-                        "provider": "deepseek",
-                        "id": "deepseek-v4-flash",
-                        "name": "DeepSeek V4 Flash",
-                        "reasoning": true,
-                        "thinkingLevelMap": {
-                            "minimal": null,
-                            "low": null,
-                            "medium": null,
-                            "high": "high",
-                            "xhigh": "max",
-                            "max": null
-                        }
-                    }
-                }),
-            )]),
-            _ => None,
-        });
-        daemon.install();
-        connect_host(vault.path()).unwrap();
-
-        assert_eq!(
-            supported_thinking_levels_for_session(),
-            ["off", "high", "xhigh"],
-        );
-
-        let _ = shutdown_host();
-    }
-
-    #[test]
-    fn supported_levels_fall_back_to_the_scale_before_a_model_is_known() {
-        // No session yet: the honest answer is the whole scale. A menu
-        // narrower than the truth is the failure this feature exists to avoid.
-        let _guard = host_guard();
-        assert_eq!(
-            supported_thinking_levels_for_session(),
-            PRIME_THINKING_LEVELS
-                .iter()
-                .map(|level| (*level).to_string())
-                .collect::<Vec<_>>(),
-        );
-    }
-
-    #[test]
-    fn set_thinking_level_refuses_a_level_prime_does_not_have() {
-        // Fails here rather than at the daemon: an unapplied level leaves the
-        // strip showing the old value, which reads as a broken control.
-        assert!(set_thinking_level("turbo").is_err());
-        assert!(set_thinking_level("").is_err());
-        assert!(set_thinking_level("HIGH").is_err(), "levels are lower-case");
-    }
-
-    #[test]
-    fn set_thinking_level_accepts_every_level_prime_documents() {
-        // Guards the list against drift: `prime-agent --help` and
-        // pi-agent-core's ThinkingLevel both name exactly these seven.
-        assert_eq!(
-            PRIME_THINKING_LEVELS,
-            ["off", "minimal", "low", "medium", "high", "xhigh", "max"],
-        );
-    }
-
-    #[test]
-    fn set_thinking_level_sends_the_level_to_the_daemon() {
-        let _guard = host_guard();
-        let vault = tempfile::tempdir().unwrap();
-        let sent: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
-        let daemon = {
-            let sent = Arc::clone(&sent);
-            FakeDaemon::start(move |command, id| match command["type"].as_str() {
-                Some("set_thinking_level") => {
-                    *sent.lock().unwrap() =
-                        Some(command["level"].as_str().unwrap_or_default().to_string());
-                    Some(vec![ok(id, "set_thinking_level", serde_json::Value::Null)])
-                }
-                _ => None,
-            })
-        };
-        daemon.install();
-        connect_host(vault.path()).unwrap();
-
-        set_thinking_level("high").unwrap();
-        assert_eq!(sent.lock().unwrap().clone().as_deref(), Some("high"));
-
-        let _ = shutdown_host();
-    }
-
-    #[test]
-    fn setting_a_level_updates_what_the_strip_will_read() {
-        // The strip polls `get_status`, which reads a cache rather than asking
-        // the daemon. Setting a level must refresh that cache or the label
-        // never moves -- which reads as a broken control, not a slow one.
-        let _guard = host_guard();
-        let vault = tempfile::tempdir().unwrap();
-        let level: Arc<Mutex<String>> = Arc::new(Mutex::new("off".to_string()));
-        let daemon = {
-            let level = Arc::clone(&level);
-            FakeDaemon::start(move |command, id| match command["type"].as_str() {
-                Some("set_thinking_level") => {
-                    *level.lock().unwrap() =
-                        command["level"].as_str().unwrap_or_default().to_string();
-                    Some(vec![ok(id, "set_thinking_level", serde_json::Value::Null)])
-                }
-                Some("get_state") => {
-                    let current = level.lock().unwrap().clone();
-                    Some(vec![ok(
-                        id,
-                        "get_state",
-                        serde_json::json!({
-                            "sessionId": "sess-a",
-                            "isStreaming": false,
-                            "thinkingLevel": current,
-                            "model": { "provider": "xai", "id": "grok-4.5", "name": "Grok 4.5" }
-                        }),
-                    )])
-                }
-                _ => None,
-            })
-        };
-        daemon.install();
-        connect_host(vault.path()).unwrap();
-        assert_eq!(get_status().thinking_level.as_deref(), Some("off"));
-
-        set_thinking_level("high").unwrap();
-
-        assert_eq!(
-            get_status().thinking_level.as_deref(),
-            Some("high"),
-            "the strip polls this cache; without a refresh it shows the old level",
-        );
-
-        let _ = shutdown_host();
-    }
-
-    #[test]
-    fn set_thinking_level_surfaces_a_daemon_refusal() {
-        let _guard = host_guard();
-        let vault = tempfile::tempdir().unwrap();
-        let daemon = FakeDaemon::start(|command, id| match command["type"].as_str() {
-            Some("set_thinking_level") => Some(vec![failed(
-                id,
-                "set_thinking_level",
-                "model has no reasoning",
-            )]),
-            _ => None,
-        });
-        daemon.install();
-        connect_host(vault.path()).unwrap();
-
-        // A model without reasoning support is a real refusal the user needs
-        // to see, not something to swallow into a silently unchanged strip.
-        let error = set_thinking_level("high").unwrap_err();
-        assert!(error.contains("model has no reasoning"), "got: {error}");
 
         let _ = shutdown_host();
     }

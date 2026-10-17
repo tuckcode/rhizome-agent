@@ -424,7 +424,6 @@ rhizome-agent/
 | `src/components/aiWorkspaceConversations.ts` | Conversation metadata state, settings persistence, default title generation, and target resolution. |
 | `src/components/aiWorkspaceSizing.ts` | AI workspace sizing, localStorage persistence, class names, and layout style helpers. |
 | `src/components/AiPanel.tsx` | Reusable AI transcript/composer surface — selected target with tool execution, reasoning, actions, and per-vault permission mode. |
-| `src/components/PrimeThinkingToggle.tsx` | Composer thinking-level menu. Levels come from the host and are filtered to the model's own set; no hardcoded list. |
 | `src/components/usePrimeSessionSwitcher.ts` | Session list switch / fork / branch. Skips `ensure_prime_session_host` when the host is already running. Clears the transcript on the same click as the row highlight. |
 | `src/lib/replySuggestions.ts` | Rules-first reply pills and Tab ghost-text (#51 Case 1). Options win over completion. Model-backed suggestions are not built. |
 | `src/components/chatNoteSplit.ts` | On top / Beside for an open note over Chat. Beside forces compact Sessions/Notes. |
@@ -535,10 +534,11 @@ Verified against source 2026-09-14. Longer landmine list:
   itself. `ConnectionsPanel` is the **Show in Graph** overlay, not the
   rail Graph. ADR-0171's "mount only on Changes" does not match `App.tsx`.
   Inbox stays a Notes filter. Do not remount Graph under Inbox.
-- **Thinking levels come from the host.** Call `get_prime_thinking_levels`
-  for the scale and `get_prime_supported_thinking_levels` for the attached
-  model's subset of it. Do not hardcode Off → Max in the frontend, and do not
-  offer a level the model refuses — Prime clamps it and the click looks dead.
+- **Prime `thinkingLevelMap` in `models.json` is live.** The external Prime
+  daemon reads it to clamp thinking per model. Settings → Add to Chat list still
+  writes maps via `prime_custom_models` / `merge_nous_portal`; do not drop those
+  fields on merge. Rhizome no longer ships a composer pill or Tauri commands to
+  change thinking levels from the UI.
 - **Session switch skip-ensure.** `usePrimeSessionSwitcher` skips
   `ensure_prime_session_host` when `hostRunning` is true. Status-poll retry
   of ensure is still required when the host is down. The click must clear the
