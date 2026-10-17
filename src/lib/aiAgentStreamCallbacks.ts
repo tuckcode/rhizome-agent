@@ -2,7 +2,7 @@ import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
 import { appendLocalMarker, type AgentStatus, type AiAgentMessage } from './aiAgentConversation'
 import { detectFileOperation, type AgentFileCallbacks } from './aiAgentFileOperations'
 import type { NativeApprovalPrompt } from './nativeToolApproval'
-import { pathFromToolArgs } from './nativeToolApproval'
+import { matchPendingApprovalAction, pathFromToolArgs } from './nativeToolApproval'
 import {
   markReasoningDone,
   updateMessage,
@@ -353,14 +353,11 @@ export function createStreamCallbacks(context: StreamMutationContext) {
       setStatus('tool-executing')
       updateMessage(setMessages, activeMessageId, (message) => {
         const path = prompt.path || pathFromToolArgs(prompt.args)
-        const match = [...message.actions].reverse().find((action) => (
-          action.status === 'pending'
-          && action.tool === prompt.tool
-          && !action.approval
-        ))
+        const match = matchPendingApprovalAction(message.actions, prompt)
         const approval = {
           promptId: prompt.promptId,
           options: prompt.options,
+          args: prompt.args,
           preview: prompt.preview,
           notes: prompt.notes,
           capped: prompt.capped,

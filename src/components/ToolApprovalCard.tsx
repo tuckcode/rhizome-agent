@@ -4,12 +4,15 @@ import { Button } from '@/components/ui/button'
 import { DiffView } from './DiffView'
 import { APPROVAL_COLLAPSE_AFTER, compactDiffLines } from './approvalDiff'
 import { writeClipboardText } from '../utils/clipboardText'
+import { bashTimeoutLabel } from '../lib/bashToolResult'
 import {
   approvalTitle,
+  isBashTool,
   previewLooksCreated,
   type NativeApprovalChoice,
   type NativeApprovalOption,
 } from '../lib/nativeToolApproval'
+import { commandHasHiddenChars, visibleCommandParts } from '../lib/visibleCommand'
 
 export interface ToolApprovalCardProps {
   tool: string
@@ -24,10 +27,6 @@ export interface ToolApprovalCardProps {
   options: NativeApprovalOption[]
   busy?: boolean
   onReply: (choice: NativeApprovalChoice) => void
-}
-
-function isBashTool(tool: string): boolean {
-  return tool === 'bash' || tool === 'Bash'
 }
 
 function ToolGlyph({ created, tool }: { created: boolean; tool: string }) {
@@ -100,6 +99,9 @@ export function ToolApprovalCard({
 
   const showTopFade = overflows && scrollTop > 0
   const showBottomFade = overflows && moreBelow
+  const visibleOptions = bash
+    ? options.filter((option) => option.id !== 'allow_session')
+    : options
 
   return (
     <section
@@ -196,7 +198,7 @@ export function ToolApprovalCard({
         </ul>
       ) : null}
       <footer className="flex flex-wrap items-center justify-end gap-1.5 px-3 py-2">
-        {options.map((option) => (
+        {visibleOptions.map((option) => (
           <Button
             key={option.id}
             disabled={busy}
@@ -229,14 +231,16 @@ function BashApprovalBody({
     void writeClipboardText(command).catch(() => {})
   }
 
+  const hidden = commandHasHiddenChars(command)
+
   return (
     <div className="border-y border-border bg-muted/40 px-3 py-2">
       <div className="relative">
         <pre
-          className="max-h-64 overflow-auto whitespace-pre-wrap break-all pr-9 font-mono text-[12px] leading-5 text-foreground"
+          className="max-h-64 overflow-auto whitespace-pre-wrap break-all pr-11 font-mono text-[12px] leading-5 text-foreground"
           data-testid="approval-command"
         >
-          {command}
+          <VisibleCommand command={command} />
         </pre>
         {command ? (
           <Button
@@ -252,14 +256,50 @@ function BashApprovalBody({
           </Button>
         ) : null}
       </div>
+      {hidden ? (
+        <p className="mt-2 text-[12px] text-[var(--danger-text)]" data-testid="approval-hidden-warning">
+          This command contains hidden or control characters.
+        </p>
+      ) : null}
       <p className="mt-2 text-[12px] text-muted-foreground" data-testid="approval-vault-note">
         Runs in your vault folder. Output is shown when it finishes.
       </p>
-      {timeoutSecs == null ? null : (
-        <p className="mt-0.5 text-[12px] text-muted-foreground" data-testid="approval-timeout">
-          Timeout: {timeoutSecs}s
-        </p>
-      )}
+      <p className="mt-0.5 text-[12px] text-muted-foreground" data-testid="approval-timeout">
+        {bashTimeoutLabel(timeoutSecs)}
+      </p>
     </div>
+  )
+}
+
+function VisibleCommand({ command }: { command: string }) {
+  return (
+    <>
+      {visibleCommandParts(command).map((part, index) => {
+        if (part.kind === 'text') return <span key={index}>{part.text}</span>
+        if (part.kind === 'newline') {
+          return (
+            <span key={index}>
+              <span
+                aria-label="newline"
+                className="ml-0.5 text-[11px] text-muted-foreground"
+                data-testid="command-newline"
+              >
+                ⏎
+              </span>
+              {'\n'}
+            </span>
+          )
+        }
+        return (
+          <span
+            key={index}
+            className="mx-0.5 inline-block rounded-sm bg-muted px-1 py-px text-[11px] text-[var(--danger-text)]"
+            data-testid="command-hidden"
+          >
+            {`\\u{${part.hex}}`}
+          </span>
+        )
+      })}
+    </>
   )
 }

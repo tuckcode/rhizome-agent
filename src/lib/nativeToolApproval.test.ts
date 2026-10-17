@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   approvalTitle,
   commandFromToolArgs,
+  isBashTool,
+  matchPendingApprovalAction,
   pathFromToolArgs,
   previewLooksCreated,
   timeoutSecsFromToolArgs,
@@ -18,6 +20,22 @@ describe('native tool approval helpers', () => {
     expect(approvalTitle('write_file', false)).toBe('Write file')
     expect(approvalTitle('edit_file', false)).toBe('Edit file')
     expect(approvalTitle('bash', false)).toBe('Run command')
+    expect(approvalTitle('Bash', false)).toBe('Bash')
+  })
+
+  it('matches only the native lowercase bash tool', () => {
+    expect(isBashTool('bash')).toBe(true)
+    expect(isBashTool('Bash')).toBe(false)
+    expect(isBashTool('bash_like')).toBe(false)
+  })
+
+  it('matches an approval by call id when the prompt has one', () => {
+    const actions = [
+      { tool: 'bash', toolId: 'call_old', status: 'pending' },
+      { tool: 'bash', toolId: 'call_2', status: 'pending' },
+    ]
+    expect(matchPendingApprovalAction(actions, { tool: 'bash', callId: 'call_2' })?.toolId).toBe('call_2')
+    expect(matchPendingApprovalAction(actions, { tool: 'bash' })?.toolId).toBe('call_2')
   })
 
   it('reads the command and timeout from bash args', () => {

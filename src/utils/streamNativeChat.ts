@@ -51,6 +51,7 @@ export interface NativeEngineEvent {
   output?: string
   fatal?: boolean
   prompt_id?: string
+  call_id?: string
   tool?: string
   options?: Array<{ id: string; label: string }>
   path?: string
@@ -81,6 +82,7 @@ export function applyNativeEvent(event: NativeEngineEvent, callbacks: AgentStrea
         promptId: event.prompt_id ?? '',
         tool: event.tool ?? event.name ?? 'tool',
         args: event.args ?? '',
+        callId: event.call_id ?? event.id,
         options: event.options ?? [],
         path: event.path,
         preview: event.preview,

@@ -518,9 +518,10 @@ describe('AiMessage', () => {
           toolId: 't1',
           label: 'ls',
           status: 'pending',
-          input: '{"command":"ls"}',
+          input: '{"command":"wrong"}',
           approval: {
             promptId: 'p1',
+            args: '{"command":"ls"}',
             options: [
               { id: 'allow_once', label: 'Allow once' },
               { id: 'allow_session', label: 'Allow for session' },
@@ -543,13 +544,70 @@ describe('AiMessage', () => {
           label: 'ls',
           status: 'done',
           input: '{"command":"ls"}',
-          output: JSON.stringify({ stdout: 'notes\n', stderr: '', exit_code: 0 }),
+          output: JSON.stringify({
+            kind: 'bash_result',
+            exit_code: 0,
+            timed_out: false,
+            stopped: false,
+            stdout: 'notes\n',
+            stderr: '',
+            stdout_truncated: false,
+            stderr_truncated: false,
+          }),
         }]}
       />,
     )
     expect(screen.getByTestId('bash-result-card')).toBeTruthy()
     expect(screen.getByTestId('bash-result-exit')).toHaveTextContent('exit 0')
     expect(screen.queryByTestId('tool-approval-card')).toBeNull()
+  })
+
+  it('keeps two consecutive bash calls as separate cards', () => {
+    render(
+      <AiMessage
+        userMessage="run two"
+        actions={[
+          {
+            tool: 'bash',
+            toolId: 't1',
+            label: 'ls',
+            status: 'done',
+            input: '{"command":"ls"}',
+            output: JSON.stringify({
+              kind: 'bash_result',
+              exit_code: 0,
+              timed_out: false,
+              stopped: false,
+              stdout: 'a\n',
+              stderr: '',
+              stdout_truncated: false,
+              stderr_truncated: false,
+            }),
+          },
+          {
+            tool: 'bash',
+            toolId: 't2',
+            label: 'pwd',
+            status: 'done',
+            input: '{"command":"pwd"}',
+            output: JSON.stringify({
+              kind: 'bash_result',
+              exit_code: 0,
+              timed_out: false,
+              stopped: false,
+              stdout: '/vault\n',
+              stderr: '',
+              stdout_truncated: false,
+              stderr_truncated: false,
+            }),
+          },
+        ]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getAllByTestId('bash-result-card')).toHaveLength(2)
+    expect(screen.getByText('ls', { selector: 'code' })).toBeTruthy()
+    expect(screen.getByText('pwd', { selector: 'code' })).toBeTruthy()
   })
 
   it('passes onOpenNote to action cards', () => {

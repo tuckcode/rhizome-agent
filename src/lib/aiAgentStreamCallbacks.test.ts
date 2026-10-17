@@ -893,8 +893,45 @@ describe('aiAgentStreamCallbacks', () => {
     const action = messages.getMessages()[0]?.actions[0]
     expect(action?.approval?.promptId).toBe('prompt_1')
     expect(action?.approval?.path).toBe('notes/a.md')
+    expect(action?.approval?.args).toBe('{"path":"notes/a.md","old_string":"x","new_string":"y"}')
     action?.approval?.onReply?.('allow_once')
     expect(reply).toHaveBeenCalledWith('allow_once')
     expect(messages.getMessages()[0]?.actions[0]?.approval?.busy).toBe(true)
+  })
+
+  it('attaches an approval to the pending bash call with the same call id', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'run',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const callbacks = createStreamCallbacks({
+      agent: 'prime',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: createStatusStore().setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef: { current: '' },
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+    callbacks.onToolStart('bash', 'call_old', '{"command":"pwd"}')
+    callbacks.onToolStart('bash', 'call_2', '{"command":"ls"}')
+    callbacks.onApprovalRequested?.({
+      promptId: 'prompt_2',
+      tool: 'bash',
+      callId: 'call_2',
+      args: '{"command":"ls"}',
+      options: [{ id: 'allow_once', label: 'Allow once' }],
+      reply: vi.fn(),
+    })
+    const actions = messages.getMessages()[0]?.actions ?? []
+    expect(actions[0]?.approval).toBeUndefined()
+    expect(actions[1]?.approval?.promptId).toBe('prompt_2')
+    expect(actions[1]?.approval?.args).toBe('{"command":"ls"}')
   })
 })

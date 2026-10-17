@@ -2,6 +2,12 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { ToolApprovalCard } from './ToolApprovalCard'
 
+const writeClipboardText = vi.fn()
+
+vi.mock('../utils/clipboardText', () => ({
+  writeClipboardText: (text: string) => writeClipboardText(text),
+}))
+
 const OPTIONS = [
   { id: 'allow_once', label: 'Allow once' },
   { id: 'allow_session', label: 'Allow for session' },
@@ -225,14 +231,15 @@ describe('ToolApprovalCard', () => {
     expect(screen.getByTestId('approval-vault-note')).toHaveTextContent(
       'Runs in your vault folder. Output is shown when it finishes.',
     )
-    expect(screen.getByTestId('approval-timeout')).toHaveTextContent('30')
+    expect(screen.getByTestId('approval-timeout')).toHaveTextContent('Stops after 30 seconds.')
     expect(screen.queryByTestId('approval-diff')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Allow once' })).toHaveClass('bg-primary')
-    expect(screen.getByRole('button', { name: 'Allow for session' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Allow for session' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Deny' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copy command' })).toBeInTheDocument()
   })
 
-  it('hides the timeout line when timeout_secs is unset', () => {
+  it('shows the default timeout when timeout_secs is unset', () => {
     render(
       <ToolApprovalCard
         tool="bash"
@@ -243,7 +250,44 @@ describe('ToolApprovalCard', () => {
     )
     expect(screen.getByText('Run command')).toBeInTheDocument()
     expect(screen.getByTestId('approval-command')).toHaveTextContent('ls')
-    expect(screen.queryByTestId('approval-timeout')).not.toBeInTheDocument()
+    expect(screen.getByTestId('approval-timeout')).toHaveTextContent('Stops after 60 seconds.')
+  })
+
+  it('marks newlines and hidden characters, and copies the exact raw string', () => {
+    writeClipboardText.mockResolvedValue(undefined)
+    const command = "echo hi\nworld\u001b[31m\u200B\u202E"
+    render(
+      <ToolApprovalCard
+        tool="bash"
+        command={command}
+        options={OPTIONS}
+        onReply={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('command-newline')).toHaveTextContent('⏎')
+    expect(screen.getByTestId('approval-command')).toHaveTextContent('\\u{001B}')
+    expect(screen.getByTestId('approval-command')).toHaveTextContent('\\u{200B}')
+    expect(screen.getByTestId('approval-command')).toHaveTextContent('\\u{202E}')
+    expect(screen.getByTestId('approval-hidden-warning')).toHaveTextContent(
+      'This command contains hidden or control characters.',
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Copy command' }))
+    expect(writeClipboardText).toHaveBeenCalledWith(command)
+  })
+
+  it('does not treat Claude Code Bash as the native bash card', () => {
+    render(
+      <ToolApprovalCard
+        tool="Bash"
+        command="ls"
+        options={OPTIONS}
+        onReply={vi.fn()}
+      />,
+    )
+    expect(screen.queryByText('Run command')).not.toBeInTheDocument()
+    expect(screen.getByText('Bash')).toBeInTheDocument()
+    expect(screen.queryByTestId('approval-vault-note')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Allow for session' })).toBeInTheDocument()
   })
 
   it('sends allow once, allow for session, and deny', () => {

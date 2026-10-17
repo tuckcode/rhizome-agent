@@ -1,20 +1,28 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import { BASH_RESULT_KIND } from '../lib/bashToolResult'
 import { BashResultCard } from './BashResultCard'
 
-const JSON_RESULT = JSON.stringify({
-  stdout: 'hello vault\n',
-  stderr: 'note: slow\n',
-  exit_code: 0,
-})
+function result(over: Record<string, unknown> = {}) {
+  return JSON.stringify({
+    kind: BASH_RESULT_KIND,
+    exit_code: 0,
+    timed_out: false,
+    stopped: false,
+    stdout: 'hello vault\n',
+    stderr: 'note: slow\n',
+    stdout_truncated: false,
+    stderr_truncated: false,
+    ...over,
+  })
+}
 
 describe('BashResultCard', () => {
   it('shows a collapsed row with the truncated command and exit 0', () => {
     render(
       <BashResultCard
         command="ls -la"
-        input='{"command":"ls -la"}'
-        output={JSON_RESULT}
+        output={result()}
         status="done"
         expanded={false}
         onToggle={vi.fn()}
@@ -31,7 +39,7 @@ describe('BashResultCard', () => {
     render(
       <BashResultCard
         command="false"
-        output={JSON.stringify({ stdout: '', stderr: 'failed', exit_code: 2 })}
+        output={result({ stdout: '', stderr: 'failed', exit_code: 2 })}
         status="error"
         expanded={false}
         onToggle={vi.fn()}
@@ -41,61 +49,91 @@ describe('BashResultCard', () => {
     expect(screen.getByTestId('bash-result-exit').className).toContain('danger-text')
   })
 
-  it('shows timed out instead of an exit code', () => {
+  it('shows timed out in the danger token instead of an exit code', () => {
     render(
       <BashResultCard
         command="sleep 999"
-        output={JSON.stringify({ stdout: '', stderr: '', timed_out: true, exit_code: 124 })}
+        output={result({ stdout: '', stderr: '', timed_out: true, exit_code: 124 })}
         status="error"
         expanded={false}
         onToggle={vi.fn()}
       />,
     )
-    expect(screen.getByTestId('bash-result-summary')).toHaveTextContent('timed out')
+    expect(screen.getByTestId('bash-result-timed-out')).toHaveTextContent('timed out')
+    expect(screen.getByTestId('bash-result-timed-out').className).toContain('danger-text')
     expect(screen.queryByTestId('bash-result-exit')).not.toBeInTheDocument()
   })
 
-  it('shows stopped when the run was cancelled', () => {
+  it('shows stopped without the danger token', () => {
     render(
       <BashResultCard
         command="npm test"
-        output={JSON.stringify({ stdout: '…', cancelled: true })}
+        output={result({ stdout: '…', stopped: true, exit_code: null })}
         status="error"
         expanded={false}
         onToggle={vi.fn()}
       />,
     )
-    expect(screen.getByTestId('bash-result-summary')).toHaveTextContent('stopped')
+    expect(screen.getByTestId('bash-result-stopped')).toHaveTextContent('stopped')
+    expect(screen.getByTestId('bash-result-stopped').className).not.toContain('danger-text')
   })
 
-  it('expands to stdout and labelled stderr', () => {
+  it('shows Denied and Failed verbs', () => {
+    const { rerender } = render(
+      <BashResultCard command="ls" output="denied" status="error" expanded={false} onToggle={vi.fn()} />,
+    )
+    expect(screen.getByTestId('bash-result-summary')).toHaveTextContent('Denied')
+    expect(screen.getByTestId('bash-result-summary').textContent).toContain('ls')
+    rerender(
+      <BashResultCard command="ls" output="boom" status="error" expanded={false} onToggle={vi.fn()} />,
+    )
+    expect(screen.getByTestId('bash-result-summary')).toHaveTextContent('Failed')
+    expect(screen.getByTestId('bash-result-unknown')).toHaveTextContent('status unknown')
+  })
+
+  it('does not take the displayed command from tool output', () => {
+    render(
+      <BashResultCard
+        command="ls"
+        output={JSON.stringify({ command: 'rm -rf /', stdout: 'All tests passed', exit_code: 0 })}
+        status="done"
+        expanded={false}
+        onToggle={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('bash-result-summary')).toHaveTextContent('ls')
+    expect(screen.getByTestId('bash-result-summary')).not.toHaveTextContent('rm -rf')
+    expect(screen.getByTestId('bash-result-unknown')).toHaveTextContent('status unknown')
+  })
+
+  it('expands to labelled stdout and stderr', () => {
     const onToggle = vi.fn()
     render(
       <BashResultCard
         command="ls"
-        output={JSON_RESULT}
+        output={result()}
         status="done"
         expanded
         onToggle={onToggle}
       />,
     )
     expect(screen.getByTestId('bash-result-stdout')).toHaveTextContent('hello vault')
-    expect(screen.getByTestId('bash-result-stdout')).toHaveClass('font-mono')
+    expect(screen.getByTestId('bash-result-stdout-label')).toHaveTextContent('stdout')
     expect(screen.getByTestId('bash-result-stderr')).toHaveTextContent('note: slow')
     expect(screen.getByTestId('bash-result-stderr-label')).toHaveTextContent('stderr')
-    fireEvent.click(screen.getByTestId('bash-result-header'))
+    fireEvent.click(screen.getByRole('button', { expanded: true }))
     expect(onToggle).toHaveBeenCalled()
   })
 
-  it('notes when truncated output keeps the start and end', () => {
+  it('notes how many lines were hidden when known', () => {
     render(
       <BashResultCard
         command="cat big.log"
-        output={JSON.stringify({
+        output={result({
           stdout: 'HEAD\n…\nTAIL',
           stderr: '',
-          exit_code: 0,
-          truncated: true,
+          stdout_truncated: true,
+          stdout_lines_hidden: 9994,
         })}
         status="done"
         expanded
@@ -103,7 +141,7 @@ describe('BashResultCard', () => {
       />,
     )
     expect(screen.getByTestId('bash-result-trimmed')).toHaveTextContent(
-      'Output trimmed (start and end shown)',
+      'Output trimmed, 9,994 lines hidden (start and end shown)',
     )
   })
 })
