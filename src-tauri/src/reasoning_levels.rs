@@ -15,13 +15,13 @@
 //! models.dev plug in through the cache files written by
 //! [`refresh_cached_catalogs`]. That is the seam for fetched catalogs.
 
+use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::fs;
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
-
-use sha2::{Digest, Sha256};
 
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -197,7 +197,7 @@ pub struct ReasoningCacheKey {
 #[derive(Debug, Default)]
 pub struct ReasoningLookupCache {
     entries: HashMap<ReasoningCacheKey, ReasoningSupport>,
-    key_fingerprints: HashMap<(String, String), String>,
+    key_fingerprints: HashMap<(String, String), u64>,
     base_urls: HashMap<(String, String), String>,
 }
 
@@ -461,11 +461,12 @@ fn file_mtime(path: &Path) -> Option<SystemTime> {
     fs::metadata(path).and_then(|meta| meta.modified()).ok()
 }
 
-fn key_fingerprint(api_key: &str) -> String {
-    Sha256::digest(api_key.as_bytes())
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+/// Process-local cache discriminator. Not a password hash: the value never
+/// leaves this process, and it only tells a new key from the previous one.
+fn key_fingerprint(api_key: &str) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    api_key.hash(&mut hasher);
+    hasher.finish()
 }
 
 impl ReasoningSources for DiskSources {
@@ -1719,7 +1720,7 @@ mod tests {
         assert!(cache
             .key_fingerprints
             .values()
-            .all(|fingerprint| fingerprint != "key-1" && fingerprint != "key-2"));
+            .all(|fingerprint| fingerprint.to_string() != "key-1"));
     }
 
     #[test]
