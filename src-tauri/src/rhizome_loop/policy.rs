@@ -1,13 +1,14 @@
 //! Tool allow / deny for the Rhizome loop.
 //!
-//! Limited tools (`Safe`) may run `echo` and `create_note`. `echo`
-//! auto-runs. `create_note` asks every call (Allow once and Deny).
+//! Limited tools (`Safe`) may run `echo`, the read-only file tools,
+//! and `create_note`. `echo` and read-only tools auto-run.
+//! `create_note` asks every call (Allow once and Deny).
 //! Power User `echo` still auto-runs once from the shared table.
-//! Power User `create_note` runs with no prompt. Power User `bash`
-//! asks a human for each call unless a session grant already matches.
-//! A name outside `offered_tools` is denied by the driver before this
-//! function runs. No waiter, or a cancelled wait, denies.
-//! An unknown name always asks and never matches a session grant.
+//! Power User `create_note` and read-only tools run with no prompt.
+//! Power User `bash` asks a human for each call unless a session grant
+//! already matches. A name outside `offered_tools` is denied by the
+//! driver before this function runs. No waiter, or a cancelled wait,
+//! denies. An unknown name always asks and never matches a session grant.
 
 use crate::ai_agents::AiAgentPermissionMode;
 use crate::ai_model_tools::CREATE_NOTE_TOOL_NAME;
@@ -47,6 +48,7 @@ pub fn rule_tool(mode: AiAgentPermissionMode, name: &str, grant_spent: bool) -> 
         Some(ToolPolicy::Echo) if mode == AiAgentPermissionMode::Safe => {
             Ruling::Run { spend_grant: false }
         }
+        Some(ToolPolicy::ReadOnly) => Ruling::Run { spend_grant: false },
         Some(ToolPolicy::CreateNote) => match mode {
             AiAgentPermissionMode::Safe => Ruling::Ask,
             AiAgentPermissionMode::PowerUser => Ruling::Run { spend_grant: false },
@@ -88,7 +90,7 @@ pub fn session_matches(name: &str, granted_args: &str, call_args: &str) -> bool 
     match tools::lookup(name).map(|tool| tool.policy) {
         Some(ToolPolicy::CreateNote) => false,
         Some(ToolPolicy::Bash) => granted_args == call_args,
-        Some(ToolPolicy::Echo) => true,
+        Some(ToolPolicy::Echo) | Some(ToolPolicy::ReadOnly) => true,
         None => false,
     }
 }
@@ -195,15 +197,49 @@ mod tests {
 
         assert_eq!(
             offered_tools(AiAgentPermissionMode::Safe),
-            vec!["echo".to_string(), "create_note".to_string()]
+            vec![
+                "echo".to_string(),
+                "read_file".to_string(),
+                "list_dir".to_string(),
+                "grep".to_string(),
+                "glob".to_string(),
+                "create_note".to_string()
+            ]
         );
         assert_eq!(
             offered_tools(AiAgentPermissionMode::PowerUser),
             vec![
                 "echo".to_string(),
+                "read_file".to_string(),
+                "list_dir".to_string(),
+                "grep".to_string(),
+                "glob".to_string(),
                 "bash".to_string(),
                 "create_note".to_string()
             ]
         );
+    }
+
+    #[test]
+    fn read_only_tools_auto_run_in_both_modes() {
+        use super::{rule_tool, Ruling};
+        use crate::ai_agents::AiAgentPermissionMode;
+
+        for name in ["read_file", "list_dir", "grep", "glob"] {
+            assert!(
+                matches!(
+                    rule_tool(AiAgentPermissionMode::Safe, name, false),
+                    Ruling::Run { spend_grant: false }
+                ),
+                "{name} must auto-run in Limited tools"
+            );
+            assert!(
+                matches!(
+                    rule_tool(AiAgentPermissionMode::PowerUser, name, false),
+                    Ruling::Run { spend_grant: false }
+                ),
+                "{name} must auto-run in Power User"
+            );
+        }
     }
 }
