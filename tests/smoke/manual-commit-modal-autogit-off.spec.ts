@@ -194,7 +194,7 @@ test('@smoke commit entry opens the manual modal when AutoGit is off and switche
   await expect(page.getByRole('heading', { name: 'Commit & Push' })).toBeVisible()
   const messageInput = page.locator('textarea[placeholder="Commit message..."]')
   await expect(messageInput).toBeFocused()
-  await page.keyboard.press('Meta+A')
+  await page.keyboard.press('ControlOrMeta+A')
   await page.keyboard.type('Manual commit from keyboard')
   await page.keyboard.press('Meta+Enter')
 
