@@ -532,10 +532,29 @@ files over 2 MiB rather than loading them whole. The Chat approval card
 shows the path and a unified-style preview computed once with `similar`
 (250ms deadline, 40/40 cap, leftover notes). A symlink target is labelled
 `real.md via link.md`.
+Power User `bash` runs one command with the vault root as its working
+directory (`sh -c` on Unix, `cmd /S /C` on Windows). The model cannot
+choose that directory. The child environment starts empty and keeps an
+allowlist (`PATH`, `HOME`, `USER`, `LANG`, `TERM`, `TMPDIR`, plus Windows
+system variables such as `SystemRoot`, `COMSPEC`, and `PATHEXT`). stdin
+is closed. stdout and stderr each keep the first 15360 bytes and a
+rolling last 15360 bytes (30720 bytes per stream). A trimmed stream
+inserts one marker, `\n… [N lines hidden] …\n`, between those parts.
+`N` is the number of newline bytes that fell out of the tail. The
+result is JSON: `{"kind":"bash_result","exit_code":number|null,"timed_out":boolean,"stopped":boolean,"stdout":string,"stderr":string,"stdout_truncated":boolean,"stderr_truncated":boolean}`
+plus `stdout_lines_hidden` and `stderr_lines_hidden` only when that
+stream was trimmed. `stopped` is true when the user cancelled the
+command. The default timeout is 60s and the hard cap is
+300s. Every call asks; there is no session grant. The approval card
+receives the full command string, and the run is bound to the tool-call
+id plus a hash of that command, checked again before spawn. Cancel kills
+the process group. On Unix the command is its own process group
+(`process-wrap`). On Windows it is a Job Object created suspended,
+assigned, then resumed, with `KILL_ON_JOB_CLOSE`.
 Secret-path blocking (`.env*` except `.env.example`, `.git/`, `*.pem` /
 `*.key` / `*.p12` / `*.pfx`, known private-key basenames and their
 backups) is a safety net, not a wall. It covers the native file tools
-only. A future shell tool will not be covered. Settings → AI Agents →
+only. `bash` is not covered. Settings → AI Agents →
 Safety has a toggle (on by default) that disables the denylist for
 **reads** only (`sandbox::resolve_for_read`); write tools always apply
 it via `sandbox::resolve_for_write`.

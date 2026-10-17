@@ -10,8 +10,8 @@
 //! `write_file` ask in both modes unless a session grant covers that
 //! tool and path. `create_note` is offered in both modes: Limited
 //! tools asks every call (Allow once and Deny); Power User runs it
-//! with no prompt. Power User bash asks each call unless a session
-//! grant matches the exact command. Unknown tools always ask and
+//! with no prompt. Power User bash asks every call. There is no
+//! session grant. Unknown tools always ask and
 //! never match a session grant. Quit is `stop_and_drain`.
 //! The turn / inbox vocabulary is the DeepSeek Harness idea. No DeepSeek
 //! code is copied.
@@ -1144,51 +1144,67 @@ mod tests {
             .any(|event| matches!(event, DurableEvent::TurnEnd)));
     }
 
+    #[cfg(unix)]
     #[test]
     fn power_user_bash_asks_for_a_new_command() {
+        let vault = tempfile::tempdir().unwrap();
+        let root = vault.path().canonicalize().unwrap();
         let agent = AgentLoop::new();
         agent.set_permission_mode(AiAgentPermissionMode::PowerUser);
+        agent.set_vault(Some(root.to_string_lossy().into_owned()), Vec::new());
         let asks = Arc::new(AtomicUsize::new(0));
         let count = Arc::clone(&asks);
-        agent.set_approval_waiter(move |_, _| {
+        let seen = Arc::new(Mutex::new(String::new()));
+        let seen_args = Arc::clone(&seen);
+        agent.set_approval_waiter(move |_, args| {
             count.fetch_add(1, Ordering::SeqCst);
+            *seen_args.lock().expect("seen command") = args.to_string();
             ApprovalReply::AllowOnce
         });
         let mut model = FakeModel::script(vec![vec![ScriptPart::Tool {
             name: "bash".into(),
-            args: "ls".into(),
+            args: serde_json::json!({ "command": "echo hi" }).to_string(),
         }]]);
         agent.submit("go");
         agent.run_until_idle(&mut model);
 
         assert_eq!(asks.load(Ordering::SeqCst), 1);
+        assert_eq!(seen.lock().expect("seen command").as_str(), "echo hi");
         assert!(agent.events().iter().any(|event| {
             matches!(
                 event,
                 DurableEvent::ToolResult { name, output, .. }
-                    if name == "bash" && output == "ls"
+                    if name == "bash"
+                        && output.contains("hi")
+                        && output.contains("\"exit_code\":0")
+                        && output.contains("\"stopped\":false")
             )
         }));
     }
 
+    #[cfg(unix)]
     #[test]
     fn power_user_bash_asks_again_for_a_repeat() {
+        let vault = tempfile::tempdir().unwrap();
+        let root = vault.path().canonicalize().unwrap();
         let agent = AgentLoop::new();
         agent.set_permission_mode(AiAgentPermissionMode::PowerUser);
+        agent.set_vault(Some(root.to_string_lossy().into_owned()), Vec::new());
         let asks = Arc::new(AtomicUsize::new(0));
         let count = Arc::clone(&asks);
         agent.set_approval_waiter(move |_, _| {
             count.fetch_add(1, Ordering::SeqCst);
             ApprovalReply::AllowOnce
         });
+        let command = serde_json::json!({ "command": "echo hi" }).to_string();
         let mut model = FakeModel::script(vec![vec![
             ScriptPart::Tool {
                 name: "bash".into(),
-                args: "ls".into(),
+                args: command.clone(),
             },
             ScriptPart::Tool {
                 name: "bash".into(),
-                args: "ls".into(),
+                args: command,
             },
         ]]);
         agent.submit("go");
@@ -1202,13 +1218,106 @@ mod tests {
                 matches!(
                     event,
                     DurableEvent::ToolResult { name, output, .. }
-                        if name == "bash" && output == "ls"
+                        if name == "bash"
+                            && output.contains("hi")
+                            && output.contains("\"exit_code\":0")
+                            && output.contains("\"stopped\":false")
                 )
             })
             .count();
         assert_eq!(runs, 2);
         assert!(!agent.events().iter().any(|event| {
             matches!(event, DurableEvent::ToolDenied { name, .. } if name == "bash")
+        }));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn cancel_during_bash_records_cancelled() {
+        let vault = tempfile::tempdir().unwrap();
+        let root = vault.path().canonicalize().unwrap();
+        let started = root.join("started");
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::PowerUser);
+        agent.set_vault(Some(root.to_string_lossy().into_owned()), Vec::new());
+        agent.set_approval_waiter(|_, _| ApprovalReply::AllowOnce);
+        let command = format!("echo go > '{}'; sleep 30", started.display());
+        let watcher = agent.clone();
+        let flag = started.clone();
+        thread::spawn(move || {
+            for _ in 0..200 {
+                if flag.exists() {
+                    watcher.cancel("quit");
+                    return;
+                }
+                thread::sleep(Duration::from_millis(10));
+            }
+        });
+        let mut model = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "bash".into(),
+            args: serde_json::json!({ "command": command, "timeout_secs": 5 }).to_string(),
+        }]]);
+        agent.submit("go");
+        agent.run_until_idle(&mut model);
+
+        assert!(agent.events().iter().any(|event| {
+            matches!(event, DurableEvent::Cancelled { cause } if cause == "quit")
+        }));
+        assert!(agent.events().iter().any(|event| {
+            matches!(
+                event,
+                DurableEvent::ToolResult { name, output, .. }
+                    if name == "bash" && output.contains("\"stopped\":true") && output.contains("\"kind\":\"bash_result\"")
+            )
+        }));
+    }
+
+    #[test]
+    fn bash_approval_shows_the_command_with_escapes_intact() {
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::PowerUser);
+        let command = "printf '%s' \"a\\b\\\"c\"";
+        let seen = Arc::new(Mutex::new(String::new()));
+        let seen_args = Arc::clone(&seen);
+        agent.set_approval_waiter(move |_, args| {
+            *seen_args.lock().expect("seen command") = args.to_string();
+            ApprovalReply::Deny
+        });
+        let mut model = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "bash".into(),
+            args: serde_json::json!({ "command": command }).to_string(),
+        }]]);
+        agent.submit("go");
+        agent.run_until_idle(&mut model);
+
+        assert_eq!(seen.lock().expect("seen command").as_str(), command);
+        assert!(agent.events().iter().any(|event| {
+            matches!(event, DurableEvent::ToolDenied { name, .. } if name == "bash")
+        }));
+    }
+
+    #[test]
+    fn a_session_grant_does_not_skip_bash_approval() {
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::PowerUser);
+        let args = serde_json::json!({ "command": "echo hi" }).to_string();
+        agent.grant_for_session("bash", &args);
+        let asks = Arc::new(AtomicUsize::new(0));
+        let count = Arc::clone(&asks);
+        agent.set_approval_waiter(move |_, _| {
+            count.fetch_add(1, Ordering::SeqCst);
+            ApprovalReply::Deny
+        });
+        let mut model = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "bash".into(),
+            args,
+        }]]);
+        agent.submit("go");
+        agent.run_until_idle(&mut model);
+
+        assert_eq!(asks.load(Ordering::SeqCst), 1);
+        assert!(!agent.events().iter().any(|event| {
+            matches!(event, DurableEvent::ToolResult { name, .. } if name == "bash")
         }));
     }
 
@@ -1377,111 +1486,94 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
     #[test]
-    fn allow_session_stops_asking_for_that_exact_bash_command_only() {
+    fn allow_session_does_not_cover_a_later_bash_call() {
+        let vault = tempfile::tempdir().unwrap();
+        let root = vault.path().canonicalize().unwrap();
         let agent = AgentLoop::new();
         agent.set_permission_mode(AiAgentPermissionMode::PowerUser);
-        let asks = Arc::new(AtomicUsize::new(0));
-        let count = Arc::clone(&asks);
-        agent.set_approval_waiter(move |_, _| {
-            let n = count.fetch_add(1, Ordering::SeqCst);
-            if n == 0 {
-                ApprovalReply::AllowSession
-            } else {
-                ApprovalReply::AllowOnce
-            }
-        });
-        let mut model = FakeModel::script(vec![vec![
-            ScriptPart::Tool {
-                name: "bash".into(),
-                args: "ls".into(),
-            },
-            ScriptPart::Tool {
-                name: "bash".into(),
-                args: "ls".into(),
-            },
-            ScriptPart::Tool {
-                name: "bash".into(),
-                args: "pwd".into(),
-            },
-        ]]);
-        agent.submit("go");
-        agent.run_until_idle(&mut model);
-
-        assert_eq!(asks.load(Ordering::SeqCst), 2);
-        let ls_runs = agent
-            .events()
-            .iter()
-            .filter(|event| {
-                matches!(
-                    event,
-                    DurableEvent::ToolResult { name, output, .. }
-                        if name == "bash" && output == "ls"
-                )
-            })
-            .count();
-        let pwd_runs = agent
-            .events()
-            .iter()
-            .filter(|event| {
-                matches!(
-                    event,
-                    DurableEvent::ToolResult { name, output, .. }
-                        if name == "bash" && output == "pwd"
-                )
-            })
-            .count();
-        assert_eq!(ls_runs, 2);
-        assert_eq!(pwd_runs, 1);
-    }
-
-    #[test]
-    fn session_grants_clear_when_the_session_ends() {
-        let agent = AgentLoop::new();
-        agent.set_permission_mode(AiAgentPermissionMode::PowerUser);
+        agent.set_vault(Some(root.to_string_lossy().into_owned()), Vec::new());
         let asks = Arc::new(AtomicUsize::new(0));
         let count = Arc::clone(&asks);
         agent.set_approval_waiter(move |_, _| {
             count.fetch_add(1, Ordering::SeqCst);
             ApprovalReply::AllowSession
         });
+        let command = serde_json::json!({ "command": "echo hi" }).to_string();
+        let mut model = FakeModel::script(vec![vec![
+            ScriptPart::Tool {
+                name: "bash".into(),
+                args: command.clone(),
+            },
+            ScriptPart::Tool {
+                name: "bash".into(),
+                args: command,
+            },
+        ]]);
+        agent.submit("go");
+        agent.run_until_idle(&mut model);
+
+        assert_eq!(asks.load(Ordering::SeqCst), 2);
+        let runs = agent
+            .events()
+            .iter()
+            .filter(|event| {
+                matches!(
+                    event,
+                    DurableEvent::ToolResult { name, output, .. }
+                        if name == "bash" && output.contains("\"exit_code\":0") && output.contains("\"kind\":\"bash_result\"")
+                )
+            })
+            .count();
+        assert_eq!(runs, 2);
+    }
+
+    #[test]
+    fn session_grants_clear_when_the_session_ends() {
+        let vault = tempfile::tempdir().unwrap();
+        let root = vault.path().canonicalize().unwrap();
+        std::fs::write(root.join("note.md"), "one\n").unwrap();
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::PowerUser);
+        agent.set_vault(Some(root.to_string_lossy().into_owned()), Vec::new());
+        let asks = Arc::new(AtomicUsize::new(0));
+        let count = Arc::clone(&asks);
+        agent.set_approval_waiter(move |_, _| {
+            count.fetch_add(1, Ordering::SeqCst);
+            ApprovalReply::AllowSession
+        });
+        let args = serde_json::json!({ "path": "note.md", "content": "TWO\n" }).to_string();
         let mut first = FakeModel::script(vec![vec![ScriptPart::Tool {
-            name: "bash".into(),
-            args: "ls".into(),
+            name: "write_file".into(),
+            args: args.clone(),
         }]]);
         agent.submit("a");
         agent.run_until_idle(&mut first);
         assert_eq!(asks.load(Ordering::SeqCst), 1);
 
         let mut replay = FakeModel::script(vec![vec![ScriptPart::Tool {
-            name: "bash".into(),
-            args: "ls".into(),
+            name: "write_file".into(),
+            args: args.clone(),
         }]]);
         agent.submit("again");
         agent.run_until_idle(&mut replay);
         assert_eq!(
             asks.load(Ordering::SeqCst),
             1,
-            "the same tool should stay granted until the session ends"
+            "the same path should stay granted until the session ends"
         );
 
         agent.end_session();
+        agent.set_vault(Some(root.to_string_lossy().into_owned()), Vec::new());
 
         let mut after = FakeModel::script(vec![vec![ScriptPart::Tool {
-            name: "bash".into(),
-            args: "ls".into(),
+            name: "write_file".into(),
+            args,
         }]]);
         agent.submit("b");
         agent.run_until_idle(&mut after);
         assert_eq!(asks.load(Ordering::SeqCst), 2);
-        let runs = agent
-            .events()
-            .iter()
-            .filter(
-                |event| matches!(event, DurableEvent::ToolResult { name, .. } if name == "bash"),
-            )
-            .count();
-        assert_eq!(runs, 3);
     }
 
     #[test]

@@ -59,6 +59,7 @@ export interface NativeEngineEvent {
   capped?: boolean
   created?: boolean
   overwrite?: boolean
+  call_id?: string
   reason?: string
 }
 
@@ -88,6 +89,7 @@ export function applyNativeEvent(event: NativeEngineEvent, callbacks: AgentStrea
         capped: event.capped,
         created: event.created,
         overwrite: event.overwrite,
+        callId: event.call_id,
         reply: () => {},
       })
       return false

@@ -1,13 +1,13 @@
 //! Allowed tool bodies. A denied call never reaches this function.
 //! Each registered tool has a name, a run function, a policy, and a
 //! schema. An unknown name returns an error; it does not echo its args.
-//! `bash` is not a process. Limited tools never call it.
-//! `create_note` writes through `ai_model_tools::run_create_note_tool`.
+//! `bash` runs one command in the vault root. Limited tools never
+//! offer it. `create_note` writes through `ai_model_tools::run_create_note_tool`.
 //! Read-only file tools stay inside canonical vault and workspace roots
 //! and auto-run in both permission modes. `edit_file` and `write_file`
 //! use the same roots and ask before they write. Secret-path blocking
-//! on those tools is a safety net, not a wall: a future shell tool will
-//! not be covered. Write tools must call `sandbox::resolve_for_write`
+//! on those tools is a safety net, not a wall: `bash` is not covered.
+//! Write tools must call `sandbox::resolve_for_write`
 //! (or `resolve_file_for_write` when the path must already be a file),
 //! which always applies the denylist. Reads use `resolve_for_read`.
 
@@ -21,11 +21,13 @@ mod preview;
 mod read_file;
 mod sandbox;
 mod scan;
+mod shell;
 mod text;
 mod walk;
 mod write_file;
 
 pub use sandbox::resolve_for_write;
+pub(crate) use shell::{approval_stamp as bash_stamp, command_from_args as bash_command};
 #[cfg(test)]
 pub use text::CHANGED_SINCE_APPROVAL;
 
@@ -39,8 +41,8 @@ pub enum ToolPolicy {
     Echo,
     /// Safe asks every call. Power User auto-runs.
     CreateNote,
-    /// Safe does not offer it. Power User asks unless a session grant
-    /// matches the exact command.
+    /// Safe does not offer it. Power User asks on every call.
+    /// There is no session grant.
     Bash,
     /// Offered in both modes. Auto-runs. No approval card.
     ReadOnly,
@@ -75,15 +77,6 @@ const ECHO_SCHEMA: &str = r#"{
   "function": {
     "name": "echo",
     "description": "Return the provided arguments unchanged.",
-    "parameters": { "type": "object" }
-  }
-}"#;
-
-const BASH_SCHEMA: &str = r#"{
-  "type": "function",
-  "function": {
-    "name": "bash",
-    "description": "Reserved shell tool. Not a process in this build; arguments are returned unchanged. Offered in Power User only.",
     "parameters": { "type": "object" }
   }
 }"#;
@@ -134,8 +127,8 @@ const TOOLS: &[Tool] = &[
     Tool {
         name: "bash",
         policy: ToolPolicy::Bash,
-        run: echo_args,
-        schema: BASH_SCHEMA,
+        run: bash_needs_approval,
+        schema: shell::SCHEMA,
     },
     Tool {
         name: CREATE_NOTE_TOOL_NAME,
@@ -162,7 +155,7 @@ pub fn execute_allowed(
     vault_path: Option<&str>,
     vault_paths: &[String],
 ) -> Result<String, String> {
-    execute_stamped(name, args, vault_path, vault_paths, None)
+    execute_stamped(name, args, vault_path, vault_paths, None, "", &|| false)
 }
 
 pub fn execute_stamped(
@@ -171,10 +164,21 @@ pub fn execute_stamped(
     vault_path: Option<&str>,
     vault_paths: &[String],
     expected_hash: Option<&str>,
+    call_id: &str,
+    is_cancelled: &dyn Fn() -> bool,
 ) -> Result<String, String> {
     match name {
         "edit_file" => edit_file::run_stamped(args, vault_path, vault_paths, expected_hash),
         "write_file" => write_file::run_stamped(args, vault_path, vault_paths, expected_hash),
+        "bash" => shell::run(&shell::ShellInput {
+            args,
+            vault_path,
+            vault_paths,
+            call_id,
+            stamp: expected_hash,
+            is_cancelled,
+            timeout: None,
+        }),
         _ => match lookup(name) {
             Some(tool) => (tool.run)(args, vault_path, vault_paths),
             None => Err(format!("unknown tool: {name}")),
@@ -304,6 +308,14 @@ pub fn mutate_session_matches(
     }
 }
 
+fn bash_needs_approval(
+    _args: &str,
+    _vault_path: Option<&str>,
+    _vault_paths: &[String],
+) -> Result<String, String> {
+    Err("bash was not approved for this call.".into())
+}
+
 fn echo_args(
     args: &str,
     _vault_path: Option<&str>,
@@ -317,9 +329,10 @@ mod tests {
     use super::{execute_allowed, lookup, registered, ToolPolicy};
 
     #[test]
-    fn echo_and_bash_return_their_args() {
+    fn echo_returns_its_args_and_bash_without_approval_does_not_run() {
         assert_eq!(execute_allowed("echo", "ping", None, &[]).unwrap(), "ping");
-        assert_eq!(execute_allowed("bash", "ls", None, &[]).unwrap(), "ls");
+        let error = execute_allowed("bash", r#"{"command":"echo hi"}"#, None, &[]).unwrap_err();
+        assert!(error.contains("not approved"), "{error}");
     }
 
     #[test]

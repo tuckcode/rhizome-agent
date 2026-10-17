@@ -16,6 +16,7 @@ export interface NativeApprovalPrompt {
   capped?: boolean
   created?: boolean
   overwrite?: boolean
+  callId?: string
   reply: (choice: NativeApprovalChoice) => void
 }
 

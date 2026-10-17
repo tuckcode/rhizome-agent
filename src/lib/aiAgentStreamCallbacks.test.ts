@@ -888,11 +888,13 @@ describe('aiAgentStreamCallbacks', () => {
       options: [{ id: 'allow_once', label: 'Allow once' }],
       path: 'notes/a.md',
       preview: '-x\n+y\n',
+      callId: 'call_1',
       reply,
     })
     const action = messages.getMessages()[0]?.actions[0]
     expect(action?.approval?.promptId).toBe('prompt_1')
     expect(action?.approval?.path).toBe('notes/a.md')
+    expect(action?.approval?.callId).toBe('call_1')
     action?.approval?.onReply?.('allow_once')
     expect(reply).toHaveBeenCalledWith('allow_once')
     expect(messages.getMessages()[0]?.actions[0]?.approval?.busy).toBe(true)

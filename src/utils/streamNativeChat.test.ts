@@ -120,6 +120,7 @@ describe('native stream events', () => {
       preview: '--- /dev/null\n+++ fresh.md\n+hello\n',
       created: true,
       overwrite: false,
+      call_id: 'call_1',
       options: [
         { id: 'allow_once', label: 'Allow once' },
         { id: 'allow_session', label: 'Allow for session' },
@@ -132,6 +133,7 @@ describe('native stream events', () => {
       path: 'fresh.md',
       created: true,
       overwrite: false,
+      callId: 'call_1',
     }))
   })
 })

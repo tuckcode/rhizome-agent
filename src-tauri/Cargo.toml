@@ -43,6 +43,10 @@ base64 = "0.22"
 regex = "1"
 # Timed Myers diffs for mutate-tool approval previews (Apache-2.0 OR MIT).
 similar = "2.7"
+# Unix process groups and the command-wrapper types for native bash.
+# Apache-2.0 OR MIT. 8.2.1 keeps the 1.77 MSRV; its std JobObject leaves
+# KILL_ON_JOB_CLOSE off, so the Windows job lives in tools/shell.rs.
+process-wrap = { version = "=8.2.1", default-features = false, features = ["std", "process-group"] }
 # gitignore-aware walks and glob matching for native read tools.
 # MIT/Unlicense; already common in the Rust search stack (ripgrep).
 ignore = "0.4"
@@ -70,6 +74,13 @@ fastembed = { version = "5.17.2", default-features = false, features = [
 
 [target.'cfg(windows)'.dependencies]
 keyring = { version = "3.6.3", features = ["windows-native"] }
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_JobObjects",
+    "Win32_System_Threading",
+] }
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_Security",

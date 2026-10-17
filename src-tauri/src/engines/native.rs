@@ -287,7 +287,7 @@ impl<M: Model> Engine for NativeEngine<M> {
         let emit_for_wait = emit.clone();
         let wait_prompt = Arc::clone(&live_prompt);
         self.agent
-            .set_approval_waiter_preview(move |name, args, prepared| {
+            .set_approval_waiter_preview(move |name, args, prepared, call_id| {
                 let id = format!("prompt_{}", prompt_seq.fetch_add(1, Ordering::SeqCst) + 1);
                 *wait_prompt.lock().expect("live prompt") = Some(id.clone());
                 if matches!(name, "edit_file" | "write_file") {
@@ -308,6 +308,7 @@ impl<M: Model> Engine for NativeEngine<M> {
                                     Some(card.notes)
                                 },
                                 capped: if card.capped { Some(true) } else { None },
+                                call_id: call_id.to_string(),
                             });
                         }
                         Err(_) => {
@@ -327,6 +328,7 @@ impl<M: Model> Engine for NativeEngine<M> {
                         overwrite: None,
                         notes: None,
                         capped: None,
+                        call_id: call_id.to_string(),
                     });
                 }
                 let deadline = Instant::now() + timeout;
