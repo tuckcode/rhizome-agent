@@ -783,14 +783,27 @@ impl StreamCapture {
                 lines_hidden: None,
             };
         }
+        let hidden = fully_hidden_lines(&head, dropped_newlines);
         let mut text = String::from_utf8(head).expect("head is utf-8");
-        text.push_str(&format!("\n… [{dropped_newlines} lines hidden] …\n"));
+        text.push_str(&format!("\n… [{hidden} lines hidden] …\n"));
         text.push_str(&String::from_utf8(Vec::from(tail)).expect("tail is utf-8"));
         CapturedText {
             text,
             truncated: true,
-            lines_hidden: Some(dropped_newlines),
+            lines_hidden: Some(hidden),
         }
+    }
+}
+
+/// Newlines popped from the tail, minus the one that closes a line the
+/// head still shows. A cut in the middle of a line must not count that
+/// line as hidden.
+fn fully_hidden_lines(head: &[u8], dropped_newlines: u64) -> u64 {
+    let head_shows_a_partial_line = !head.is_empty() && !head.ends_with(b"\n");
+    if head_shows_a_partial_line {
+        dropped_newlines.saturating_sub(1)
+    } else {
+        dropped_newlines
     }
 }
 
@@ -1644,6 +1657,67 @@ mod tests {
         let marker_at = text.text.find(&marker).unwrap();
         assert_eq!(text.text[..marker_at].len(), HEAD_BYTES);
         assert_eq!(text.text[marker_at + marker.len()..].len(), TAIL_BYTES);
+    }
+
+    #[test]
+    fn uneven_lines_count_only_lines_fully_dropped() {
+        let mut body = Vec::new();
+        while body.len() + 4 <= HEAD_BYTES.saturating_sub(10) {
+            body.extend_from_slice(b"hi\n");
+        }
+        let cross = (HEAD_BYTES - body.len()) + 8;
+        body.extend(std::iter::repeat(b'H').take(cross));
+        body.push(b'\n');
+        let mut n = 0usize;
+        while body.len() < HEAD_BYTES + TAIL_BYTES + 8_000 {
+            let len = (n % 11) + 1;
+            body.extend(std::iter::repeat(b'M').take(len));
+            body.push(b'\n');
+            n += 1;
+        }
+        let tail_at = body.len() - TAIL_BYTES;
+        if body[tail_at - 1] == b'\n' {
+            body.splice(tail_at..tail_at, b"xyz".iter().copied());
+        }
+        let tail_at = body.len() - TAIL_BYTES;
+        assert_ne!(body[HEAD_BYTES - 1], b'\n', "head cut must land mid-line");
+        assert_ne!(body[tail_at - 1], b'\n', "tail cut must land mid-line");
+
+        let mut fully = 0u64;
+        let mut line_start = 0usize;
+        for (index, byte) in body.iter().enumerate() {
+            if *byte != b'\n' {
+                continue;
+            }
+            let line_end = index + 1;
+            if line_start >= HEAD_BYTES && line_end <= tail_at {
+                fully += 1;
+            }
+            line_start = line_end;
+        }
+        let raw_newlines = body[HEAD_BYTES..tail_at]
+            .iter()
+            .filter(|byte| **byte == b'\n')
+            .count() as u64;
+        assert_eq!(
+            raw_newlines,
+            fully + 1,
+            "the partial head line must be the extra newline"
+        );
+        assert!(fully > 0);
+
+        let mut capture = StreamCapture::default();
+        capture.push_bytes(&body);
+        let text = capture.finish();
+        assert!(text.truncated);
+        assert_eq!(text.lines_hidden, Some(fully));
+        let marker = format!("\n… [{fully} lines hidden] …\n");
+        assert_eq!(
+            text.text.matches(marker.as_str()).count(),
+            1,
+            "{}",
+            text.text
+        );
     }
 
     #[test]

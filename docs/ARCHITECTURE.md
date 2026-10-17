@@ -551,7 +551,9 @@ including `"7"`, or any other non-whole-number) uses the 60s default.
 stdout and stderr each keep the first 15360 bytes and a
 rolling last 15360 bytes (30720 bytes per stream). A trimmed stream
 inserts one marker, `\n… [N lines hidden] …\n`, between those parts.
-`N` is the number of newline bytes that fell out of the tail. The
+`N` is the number of lines fully dropped from the middle. A line
+the head or the tail still shows is not counted, even when the cut
+lands in the middle of it. The
 result is JSON: `{"kind":"bash_result","exit_code":number|null,"timed_out":boolean,"stopped":boolean,"stdout":string,"stderr":string,"stdout_truncated":boolean,"stderr_truncated":boolean}`
 plus `stdout_lines_hidden` and `stderr_lines_hidden` only when that
 stream was trimmed. `stopped` is true when the user cancelled the
