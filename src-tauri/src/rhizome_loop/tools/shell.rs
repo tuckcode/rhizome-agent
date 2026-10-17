@@ -1864,169 +1864,87 @@ mod tests {
         assert_eq!(value["stopped"], false);
     }
 
-    /// `ping -n 30` waits about 29 seconds. A short shell timeout must
-    /// kill that process and report a timeout. The `rem` token is only
-    /// there so the test can find this cmd in the process list.
+    /// `ping -n 30` waits about 29 seconds. A short timeout must stop it
+    /// before the summary line.
     #[cfg(windows)]
     #[test]
     fn ping_past_the_timeout_is_killed() {
         let (_dir, root) = root_dir();
-        let token = dir_token(&root);
-        let command = format!("ping -n 30 127.0.0.1 & rem {token}");
-        let seen = Arc::new(Mutex::new(Vec::new()));
-        let slot = Arc::clone(&seen);
-        let watch = token.clone();
-        thread::spawn(move || {
-            for _ in 0..80 {
-                let pids = pids_for_token(&watch);
-                if pids.len() >= 2 {
-                    *slot.lock().unwrap() = pids;
-                    return;
-                }
-                thread::sleep(Duration::from_millis(100));
-            }
-        });
         let started = Instant::now();
-        let output = run_approved(&command, &root, Some(Duration::from_secs(8))).unwrap();
-        assert!(started.elapsed() < Duration::from_secs(18), "{output}");
+        let output =
+            run_approved("ping -n 30 127.0.0.1", &root, Some(Duration::from_secs(5))).unwrap();
+        assert!(started.elapsed() < Duration::from_secs(12), "{output}");
         let value = bash_json(&output);
         assert_eq!(value["timed_out"], true, "{output}");
         assert_eq!(value["stopped"], false, "{output}");
         assert!(value["exit_code"].is_null(), "{output}");
-        let pids = seen.lock().unwrap().clone();
+        let stdout = value["stdout"].as_str().unwrap();
+        assert!(stdout.contains("Reply from 127.0.0.1"), "{output}");
         assert!(
-            pids.len() >= 2,
-            "never saw cmd and ping for {token}: {output}"
+            !stdout.contains("Ping statistics"),
+            "ping finished instead of being killed: {output}"
         );
-        for pid in pids {
-            assert_dead(pid);
-        }
     }
 
-    /// cmd → cmd → ping. Cancel must remove every one of them.
+    /// A batch starts a child cmd that appends one line a second, then
+    /// pings. Cancel must stop both. A living child would keep appending.
     #[cfg(windows)]
     #[test]
     fn cancel_mid_run_kills_the_process_tree() {
         let (_dir, root) = root_dir();
-        let token = dir_token(&root);
-        let command = format!("cmd /d /c \"ping -n 30 127.0.0.1\" & rem {token}");
+        let root_path = std::path::Path::new(&root);
+        let started_path = root_path.join("started.txt");
+        let child_path = root_path.join("child-ping.txt");
+        // `%%i` is the batch form. Each echo opens the file, so a killed
+        // child stops adding lines instead of sitting in a full buffer.
+        let batch = "@echo off\r\necho started> started.txt\r\nstart /b cmd /c \"for /L %%i in (1,1,40) do @(echo reply %%i>> child-ping.txt & ping -n 2 127.0.0.1 >nul)\"\r\nping -n 40 127.0.0.1\r\n";
+        std::fs::write(root_path.join("tree.bat"), batch).unwrap();
+        let command = "tree.bat";
         let cancel = Arc::new(AtomicBool::new(false));
-        let seen = Arc::new(Mutex::new(Vec::new()));
         let flag = Arc::clone(&cancel);
-        let slot = Arc::clone(&seen);
-        let watch = token.clone();
+        let watch_started = started_path.clone();
+        let watch_child = child_path.clone();
         thread::spawn(move || {
             for _ in 0..200 {
-                let pids = pids_for_token(&watch);
-                if pids.len() >= 3 {
-                    *slot.lock().unwrap() = pids;
+                let child = std::fs::read_to_string(&watch_child).unwrap_or_default();
+                if watch_started.is_file() && child.contains("reply") {
                     flag.store(true, Ordering::SeqCst);
                     return;
                 }
-                thread::sleep(Duration::from_millis(100));
+                thread::sleep(Duration::from_millis(50));
             }
         });
-        let stamp = approval_stamp("call-1", &command);
+        let stamp = approval_stamp("call-1", command);
         let started = Instant::now();
         let output = run_command(
-            &command,
+            command,
             Some(&root),
             "call-1",
             Some(&stamp),
             &|| cancel.load(Ordering::SeqCst),
-            Some(Duration::from_secs(30)),
+            Some(Duration::from_secs(20)),
         )
         .unwrap();
-        assert!(started.elapsed() < Duration::from_secs(25), "{output}");
+        assert!(started.elapsed() < Duration::from_secs(15), "{output}");
         let value = bash_json(&output);
         assert_eq!(value["stopped"], true, "{output}");
         assert_eq!(value["timed_out"], false, "{output}");
         assert!(value["exit_code"].is_null(), "{output}");
-        let pids = seen.lock().unwrap().clone();
+        let leader = value["stdout"].as_str().unwrap();
         assert!(
-            pids.len() >= 3,
-            "never saw the cmd/cmd/ping tree for {token}: {output}"
+            !leader.contains("Ping statistics"),
+            "leader ping finished: {output}"
         );
-        for pid in pids {
-            assert_dead(pid);
-        }
-    }
-
-    #[cfg(windows)]
-    fn dir_token(root: &str) -> String {
-        std::path::Path::new(root)
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("rhizome-bash")
-            .to_string()
-    }
-
-    /// cmd.exe whose command line contains `token`, plus every cmd.exe
-    /// and ping.exe descended from it. The query runs in the test
-    /// process, outside the job.
-    #[cfg(windows)]
-    fn pids_for_token(token: &str) -> Vec<u32> {
-        let script = format!(
-            "$token = '{token}'\n\
-$procs = @(Get-CimInstance Win32_Process | Where-Object {{ $_.Name -eq 'cmd.exe' -or $_.Name -eq 'ping.exe' }})\n\
-$ids = New-Object System.Collections.Generic.List[int]\n\
-foreach ($proc in $procs) {{\n\
-  if ($proc.Name -eq 'cmd.exe' -and $proc.CommandLine -like \"*$token*\") {{ [void]$ids.Add([int]$proc.ProcessId) }}\n\
-}}\n\
-$changed = $true\n\
-while ($changed) {{\n\
-  $changed = $false\n\
-  foreach ($proc in $procs) {{\n\
-    $procId = [int]$proc.ProcessId\n\
-    $parentId = [int]$proc.ParentProcessId\n\
-    if ($ids.Contains($parentId) -and -not $ids.Contains($procId)) {{\n\
-      [void]$ids.Add($procId)\n\
-      $changed = $true\n\
-    }}\n\
-  }}\n\
-}}\n\
-$ids -join ' '\n"
+        let child = std::fs::read_to_string(&child_path)
+            .unwrap_or_else(|error| panic!("missing child ping output: {error}"));
+        let replies = child.matches("reply").count();
+        assert!(replies >= 1, "{child}");
+        thread::sleep(Duration::from_secs(3));
+        let later = std::fs::read_to_string(&child_path).unwrap_or_default();
+        assert_eq!(
+            later.matches("reply").count(),
+            replies,
+            "child ping kept running:\n{later}"
         );
-        let output = std::process::Command::new("powershell.exe")
-            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
-            .output()
-            .unwrap_or_else(|error| panic!("powershell: {error}"));
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(output.status.success(), "powershell failed: {stderr}");
-        String::from_utf8_lossy(&output.stdout)
-            .split_whitespace()
-            .filter_map(|part| part.parse().ok())
-            .filter(|pid| *pid > 0)
-            .collect()
-    }
-
-    #[cfg(windows)]
-    fn assert_dead(pid: u32) {
-        let deadline = Instant::now() + Duration::from_secs(2);
-        loop {
-            if !process_alive(pid) {
-                return;
-            }
-            if Instant::now() >= deadline {
-                panic!("pid {pid} is still alive");
-            }
-            thread::sleep(Duration::from_millis(50));
-        }
-    }
-
-    #[cfg(windows)]
-    fn process_alive(pid: u32) -> bool {
-        let output = std::process::Command::new("tasklist")
-            .args(["/FI", &format!("PID eq {pid}"), "/FO", "CSV", "/NH"])
-            .output()
-            .unwrap_or_else(|error| panic!("tasklist: {error}"));
-        let text = String::from_utf8_lossy(&output.stdout);
-        text.lines().any(|line| {
-            let mut fields = line.split(',');
-            let _image = fields.next();
-            fields
-                .next()
-                .is_some_and(|field| field.trim().trim_matches('"') == pid.to_string())
-        })
     }
 }
