@@ -69,7 +69,13 @@ Linux release CI currently uses Tauri's stock linuxdeploy AppImage output plugin
 pnpm tauri build --target x86_64-unknown-linux-gnu --bundles deb,rpm,appimage
 ```
 
-Release validation verifies that the Linux job produced an AppImage and at least one installer bundle. There is no in-app update feed: `createUpdaterArtifacts` is false and the updater endpoint list is empty, so updater signature files are not required.
+Release validation verifies that the Linux job produced an AppImage and at least one installer bundle. A signed release also produces updater signature files (`.sig`).
+
+The app checks for updates on startup, and from the existing Check for updates control. Alpha reads `https://github.com/tuckcode/rhizome-agent/releases/download/alpha-latest/alpha-latest.json`. Stable reads the same kind of URL on the `stable-latest` tag. Those tags are prereleases on purpose: GitHub's `releases/latest/download` URL does not serve alpha releases. Update now downloads and installs through the Tauri updater. Restart uses the existing Restart control.
+
+In-app install works only after two things are true. The release was signed with the `TAURI_SIGNING_PRIVATE_KEY` secret (and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` when the key has a password). And `plugins.updater.pubkey` in `src-tauri/tauri.conf.json` is the matching minisign public key. Today that field is the placeholder `PLACEHOLDER_KNISPO_TAURI_UPDATER_PUBKEY`. Replace it with the output of `pnpm tauri signer generate`. Do not invent a key. Until that follow-up is in a build you installed, install a new disk image or rebuild.
+
+A local `pnpm tauri build` with `createUpdaterArtifacts` on needs `TAURI_SIGNING_PRIVATE_KEY` in the environment. An unsigned local build can pass `--config '{"bundle":{"createUpdaterArtifacts":false}}'`. Release builds do that themselves when the secret is missing.
 
 ## Quick Start
 
@@ -385,7 +391,7 @@ rhizome-agent/
 | `src-tauri/src/ai_agents.rs` | CLI-agent request normalization, availability aggregation, adapter dispatch, and Claude event mapping. |
 | `src-tauri/src/cli_agent_runtime.rs` | Shared CLI-agent request shape, prompt wrapping, JSON subprocess lifecycle, version probing, and MCP path helpers. |
 | `src-tauri/src/claude_cli.rs`, `src-tauri/src/codex_cli.rs`, `src-tauri/src/opencode_cli.rs`, `src-tauri/src/antigravity_cli.rs`, `src-tauri/src/kiro_cli.rs` | Per-agent command, config, discovery, and event adapters. |
-| `src-tauri/src/app_updater.rs` | App-update stub. It reports that no release feed is configured. |
+| `src-tauri/src/app_updater.rs` | In-app updater. Checks the alpha or stable feed, then downloads and installs through the Tauri updater plugin. |
 
 ### Editor
 
@@ -445,7 +451,7 @@ rhizome-agent/
 | `src/hooks/useMainWindowSizeConstraints.ts` | Derives the main-window minimum width from the visible panes and asks Tauri to grow back to fit wider layouts. |
 | `src/hooks/useVaultConfig.ts` | Per-vault local UI preferences (zoom, view mode, colors, Inbox columns, explicit organization workflow, Git setup prompt preference, AI permission mode). |
 | `src/components/SettingsPanel.tsx` | Settings UI for telemetry, release channel, Git visibility, sync interval, UI language, content display preferences, default AI agent, and the vault-level explicit organization toggle. |
-| `src/hooks/useUpdater.ts` | App-update UI. The host currently reports that no feed is configured. |
+| `src/hooks/useUpdater.ts` | App-update UI. Startup check after 3 seconds, plus the manual check. Install and relaunch stay on the existing banner actions. |
 
 ## Architecture Patterns
 
