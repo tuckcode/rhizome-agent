@@ -468,7 +468,7 @@ fn provider_request(
                     "tools": true,
                     "vision": false,
                     "json_mode": false,
-                    "reasoning": false
+                    "reasoning": crate::reasoning_levels::support_for_free_tier(&provider.id, &base_url, model)
                 }
             }]
         },
@@ -491,6 +491,35 @@ mod tests {
     use std::sync::Arc;
 
     const T0: Millis = 1_760_000_000_000;
+
+    #[test]
+    fn provider_request_uses_resolved_reasoning_instead_of_false() {
+        let dir = tempfile::tempdir().expect("temp");
+        crate::reasoning_levels::reset_reasoning_state_for_test(Some(dir.path().to_path_buf()));
+        let nvidia: CatalogProvider = serde_json::from_value(json!({
+            "id": "nvidia",
+            "name": "NVIDIA NIM",
+            "base_url": "https://integrate.api.nvidia.com/v1",
+            "models": []
+        }))
+        .expect("provider");
+        let nemotron = provider_request(
+            &nvidia,
+            "nvidia/nemotron-3-super-120b-a12b",
+            nvidia.base_url.clone(),
+            None,
+        );
+        assert!(matches!(
+            nemotron.provider.models[0].capabilities.reasoning,
+            crate::reasoning_levels::ReasoningSupport::Levels(_)
+        ));
+        let unknown = provider_request(&nvidia, "not-a-real-model", nvidia.base_url.clone(), None);
+        assert_eq!(
+            unknown.provider.models[0].capabilities.reasoning,
+            crate::reasoning_levels::ReasoningSupport::Unknown
+        );
+        crate::reasoning_levels::reset_reasoning_state_for_test(None);
+    }
 
     struct FakeKeys(HashMap<String, Credential>);
 

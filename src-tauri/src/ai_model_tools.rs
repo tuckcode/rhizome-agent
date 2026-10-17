@@ -567,7 +567,7 @@ mod tests {
                     tools: false,
                     vision: false,
                     json_mode: false,
-                    reasoning: false,
+                    reasoning: crate::reasoning_levels::ReasoningSupport::Unknown,
                 },
             }],
         }

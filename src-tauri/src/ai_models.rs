@@ -41,7 +41,9 @@ pub struct AiModelCapabilities {
     pub tools: bool,
     pub vision: bool,
     pub json_mode: bool,
-    pub reasoning: bool,
+    /// Unknown, no, or a level list. A legacy bool loads as unknown.
+    #[serde(default)]
+    pub reasoning: crate::reasoning_levels::ReasoningSupport,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -848,7 +850,7 @@ mod tests {
             tools: false,
             vision: false,
             json_mode: true,
-            reasoning: false,
+            reasoning: crate::reasoning_levels::ReasoningSupport::Unknown,
         }
     }
 
