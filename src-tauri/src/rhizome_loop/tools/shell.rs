@@ -527,7 +527,6 @@ fn poll_pipe_windows<R>(pipe: &mut R, buf: &mut [u8]) -> ReadPoll
 where
     R: Read + std::os::windows::io::AsRawHandle,
 {
-    use std::os::windows::io::AsRawHandle;
     use windows::Win32::Foundation::HANDLE;
 
     let handle = HANDLE(pipe.as_raw_handle() as _);
@@ -954,7 +953,7 @@ mod win_ffi {
 
 #[cfg(windows)]
 mod windows_job {
-    use std::io::{Error, Result};
+    use std::io::Result;
     use std::os::windows::io::{AsRawHandle, OwnedHandle};
     use std::os::windows::process::CommandExt;
     use std::process::{Child, Command, ExitStatus};
@@ -1051,13 +1050,11 @@ mod windows_job {
     }
 
     fn make_job(process: HANDLE) -> Result<OwnedHandle> {
-        let job = win_ffi::create_job()?;
-        win_ffi::set_kill_on_close(job)?;
-        if let Err(error) = win_ffi::assign_process(job, process) {
-            win_ffi::close_handle(job).ok();
-            return Err(error);
-        }
-        Ok(win_ffi::own_handle(job))
+        // Own the handle first. A failed `set_kill_on_close` must still close it.
+        let job = win_ffi::own_handle(win_ffi::create_job()?);
+        win_ffi::set_kill_on_close(sys_handle(&job))?;
+        win_ffi::assign_process(sys_handle(&job), process)?;
+        Ok(job)
     }
 
     fn resume_threads(child_process: HANDLE) -> Result<()> {
@@ -1851,5 +1848,114 @@ mod tests {
                 nix::sys::signal::Signal::SIGKILL,
             );
         }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn echo_hi_returns_hi_and_exit_code_0() {
+        let (_dir, root) = root_dir();
+        let output = run_approved("echo hi", &root, Some(Duration::from_secs(5))).unwrap();
+        let value = bash_json(&output);
+        assert_eq!(value["kind"], "bash_result");
+        let stdout = value["stdout"].as_str().unwrap().replace("\r\n", "\n");
+        assert_eq!(stdout, "hi\n", "{output}");
+        assert_eq!(value["exit_code"], 0);
+        assert_eq!(value["timed_out"], false);
+        assert_eq!(value["stopped"], false);
+    }
+
+    /// `ping -n 30` waits about 29 seconds. A short timeout must stop it
+    /// before the summary line.
+    #[cfg(windows)]
+    #[test]
+    fn ping_past_the_timeout_is_killed() {
+        let (_dir, root) = root_dir();
+        let started = Instant::now();
+        let output =
+            run_approved("ping -n 30 127.0.0.1", &root, Some(Duration::from_secs(5))).unwrap();
+        assert!(started.elapsed() < Duration::from_secs(12), "{output}");
+        let value = bash_json(&output);
+        assert_eq!(value["timed_out"], true, "{output}");
+        assert_eq!(value["stopped"], false, "{output}");
+        assert!(value["exit_code"].is_null(), "{output}");
+        let stdout = value["stdout"].as_str().unwrap();
+        assert!(stdout.contains("127.0.0.1"), "{output}");
+        // "Ping statistics" is the English summary. The address is in
+        // that line too, so it cannot mark a finished ping.
+        assert!(
+            !stdout.contains("Ping statistics"),
+            "ping finished instead of being killed: {output}"
+        );
+        // A child that outlived cmd would still hold the pipe.
+        assert!(
+            !value["stderr"].as_str().unwrap().contains(DETACHED_NOTE),
+            "{output}"
+        );
+    }
+
+    /// A batch starts a child cmd that appends one line a second, then
+    /// pings. Cancel must stop both. A living child would keep appending.
+    #[cfg(windows)]
+    #[test]
+    fn cancel_mid_run_kills_the_process_tree() {
+        let (_dir, root) = root_dir();
+        let root_path = std::path::Path::new(&root);
+        let started_path = root_path.join("started.txt");
+        let child_path = root_path.join("child-ping.txt");
+        // `%%i` is the batch form. Each echo opens the file, so a killed
+        // child stops adding lines instead of sitting in a full buffer.
+        let batch = "@echo off\r\necho started> started.txt\r\nstart /b cmd /c \"for /L %%i in (1,1,40) do @(echo reply %%i>> child-ping.txt & ping -n 2 127.0.0.1 >nul)\"\r\nping -n 40 127.0.0.1\r\n";
+        std::fs::write(root_path.join("tree.bat"), batch).unwrap();
+        let command = "tree.bat";
+        let cancel = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&cancel);
+        let watch_started = started_path.clone();
+        let watch_child = child_path.clone();
+        thread::spawn(move || {
+            for _ in 0..200 {
+                let child = std::fs::read_to_string(&watch_child).unwrap_or_default();
+                if watch_started.is_file() && child.contains("reply") {
+                    flag.store(true, Ordering::SeqCst);
+                    return;
+                }
+                thread::sleep(Duration::from_millis(50));
+            }
+        });
+        let stamp = approval_stamp("call-1", command);
+        let started = Instant::now();
+        let output = run_command(
+            command,
+            Some(&root),
+            "call-1",
+            Some(&stamp),
+            &|| cancel.load(Ordering::SeqCst),
+            Some(Duration::from_secs(20)),
+        )
+        .unwrap();
+        assert!(started.elapsed() < Duration::from_secs(15), "{output}");
+        let value = bash_json(&output);
+        assert_eq!(value["stopped"], true, "{output}");
+        assert_eq!(value["timed_out"], false, "{output}");
+        assert!(value["exit_code"].is_null(), "{output}");
+        let leader = value["stdout"].as_str().unwrap();
+        // "Ping statistics" is the English summary. The address is in
+        // that line too, so it cannot mark a finished ping.
+        assert!(
+            !leader.contains("Ping statistics"),
+            "leader ping finished: {output}"
+        );
+        // TerminateJobObject returns before every child has exited.
+        thread::sleep(Duration::from_millis(250));
+        let child = std::fs::read_to_string(&child_path)
+            .unwrap_or_else(|error| panic!("missing child ping output: {error}"));
+        let replies = child.matches("reply").count();
+        assert!(replies >= 1, "{child}");
+        thread::sleep(Duration::from_secs(3));
+        let later = std::fs::read_to_string(&child_path).unwrap_or_default();
+        assert_eq!(
+            later.matches("reply").count(),
+            replies,
+            "child ping kept running:\n{later}"
+        );
     }
 }

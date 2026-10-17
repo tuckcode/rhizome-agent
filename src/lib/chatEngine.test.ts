@@ -13,24 +13,33 @@ import {
 } from './nativeChatTargets'
 
 describe('chat engine setting', () => {
-  it('reads prime when the value is absent', () => {
-    expect(readChatEngine(undefined)).toBe('prime')
-    expect(readChatEngine(null)).toBe('prime')
-    expect(readChatEngine('prime')).toBe('prime')
-    expect(chatEngineFromSettings({})).toBe('prime')
-    expect(chatEngineForSave('prime')).toBeNull()
+  it('reads native when the value is absent', () => {
+    expect(readChatEngine(undefined)).toBe('native')
+    expect(readChatEngine(null)).toBe('native')
+    expect(readChatEngine('')).toBe('native')
+    expect(readChatEngine('native')).toBe('native')
+    expect(readChatEngine('hermes')).toBe('native')
+    expect(readChatEngine('bogus')).toBe('native')
+    expect(chatEngineFromSettings({})).toBe('native')
+    expect(chatEngineFromSettings(null)).toBe('native')
+    expect(chatEngineForSave('native')).toBeNull()
   })
 
-  it('lets native send without a Prime install and keeps Prime-targeted chats gated', () => {
+  it('lets only a resolved native engine send without a Prime install', () => {
     expect(chatEngineAllowsSendWithoutPrime('native')).toBe(true)
-    expect(chatEngineAllowsSendWithoutPrime('prime')).toBe(false)
     expect(chatEngineAllowsSendWithoutPrime(undefined)).toBe(false)
+    expect(chatEngineAllowsSendWithoutPrime('prime')).toBe(false)
   })
 
-  it('persists native and reads it back', () => {
-    expect(chatEngineForSave('native')).toBe('native')
+  it('persists prime and stores the native default as null', () => {
+    expect(readChatEngine('prime')).toBe('prime')
+    expect(chatEngineForSave('prime')).toBe('prime')
+    expect(chatEngineFromSettings({ chat_engine: 'prime' })).toBe('prime')
+    expect(chatEngineFromSettings({ chat_engine: chatEngineForSave('prime') })).toBe('prime')
     expect(chatEngineFromSettings({ chat_engine: 'native' })).toBe('native')
     expect(chatEngineFromSettings({ chat_engine: chatEngineForSave('native') })).toBe('native')
+    expect(chatEngineFromSettings({ chat_engine: 'hermes' })).toBe('native')
+    expect(chatEngineFromSettings({ chat_engine: 'bogus' })).toBe('native')
   })
 })
 

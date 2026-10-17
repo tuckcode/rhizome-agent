@@ -10,6 +10,7 @@ import { usePanelWidth } from '../hooks/usePanelWidth'
 import { ResizeHandle } from './ResizeHandle'
 import { PeerToolExitButton } from './PeerToolExitButton'
 import { PEER_TOOL_EXIT_CHAT } from '../lib/peerToolExit'
+import { myceliumSessionTitle, myceliumSessionTitles } from '../lib/myceliumSessionTitle'
 
 interface MyceliumViewProps {
   locale?: AppLocale
@@ -26,9 +27,21 @@ interface SessionPick {
   mtimeMs?: number | null
 }
 
+interface SessionSummary {
+  id: string
+  path: string
+  title?: string | null
+  mtimeMs?: number | null
+}
+
 interface SidecarStatus {
   url: string
   mode: string
+}
+
+function sessionFileName(path: string): string {
+  const name = path.split(/[/\\]/).pop()
+  return name && name.length > 0 ? name : path
 }
 
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -55,14 +68,25 @@ export default function MyceliumView({
 
   const refreshSessions = useCallback(async () => {
     try {
-      const listed = await call<SessionPick[]>('list_prime_sessions')
-      setSessions(listed)
+      const listed = await call<SessionSummary[]>('list_prime_session_summaries')
+      const titles = myceliumSessionTitles(listed.map((session) => ({
+        id: session.id,
+        title: session.title,
+        mtimeMs: session.mtimeMs,
+      })))
+      const picks = listed.map((session, index) => ({
+        name: titles[index] ?? myceliumSessionTitle(session.title),
+        path: session.path,
+        mtimeMs: session.mtimeMs,
+      }))
+      setSessions(picks)
       setSelected((prev) => {
         if (focusSessionPath) {
-          return listed.find((s) => s.path === focusSessionPath) ?? { name: focusSessionPath.split('/').pop() ?? 'session', path: focusSessionPath }
+          return picks.find((s) => s.path === focusSessionPath)
+            ?? { name: sessionFileName(focusSessionPath), path: focusSessionPath }
         }
-        if (prev && listed.some((s) => s.path === prev.path)) return prev
-        return listed[0] ?? null
+        if (prev && picks.some((s) => s.path === prev.path)) return prev
+        return picks[0] ?? null
       })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))

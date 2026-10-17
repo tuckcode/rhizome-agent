@@ -1,16 +1,23 @@
 import type { AiAction } from '../components/AiMessage'
+import { isBashTool } from './nativeToolApproval'
 
 /**
  * Collapse a run of the same tool name into one card with a count.
  *
- * Five `ipython` (or five `bash`) rows are the same fact repeated. The
- * Tool use header still carries the true call count.
+ * Five `ipython` rows are the same fact repeated. Native `bash` stays
+ * one card per call so each command keeps its own exit status.
  */
 export function groupConsecutiveToolActions(actions: AiAction[]): AiAction[] {
   const grouped: Array<{ action: AiAction; count: number; sameLabel: boolean }> = []
   for (const action of actions) {
     const last = grouped[grouped.length - 1]
-    if (!last || last.action.tool !== action.tool || action.approval || last.action.approval) {
+    if (
+      !last
+      || last.action.tool !== action.tool
+      || action.approval
+      || last.action.approval
+      || isBashTool(action.tool)
+    ) {
       grouped.push({ action: { ...action }, count: 1, sameLabel: true })
       continue
     }

@@ -299,6 +299,12 @@ jobs:
     runs-on: windows-latest
 
     steps:
+      # Test fixtures are LF; stop the Windows checkout from converting them to CRLF.
+      - name: Keep LF line endings on checkout
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0  # Full history for the rust-changes diff below

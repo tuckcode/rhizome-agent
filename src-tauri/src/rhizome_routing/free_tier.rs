@@ -209,7 +209,8 @@ pub struct FreeTierOverview {
     /// Ids of the providers that route now, in the order the router tries
     /// them. Read-only (ADR-0182 decision 5).
     pub route_order: Vec<String>,
-    /// The router can try at least one provider (D11).
+    /// Free tier (auto) stays available (D11). Also true when the keychain
+    /// could not be read, so the picker does not pretend the key is missing.
     pub usable: bool,
     /// The chosen saved provider. `None` when it was deleted.
     pub own_endpoint: Option<String>,
@@ -777,5 +778,9 @@ mod tests {
         let groq = row(&view, "groq");
         assert!(!groq.has_key);
         assert_eq!(groq.key_error.as_deref(), Some("The keychain is locked."));
+        assert!(
+            view.usable,
+            "a locked keychain must keep Free tier (auto) available"
+        );
     }
 }

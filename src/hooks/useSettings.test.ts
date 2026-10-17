@@ -6,6 +6,7 @@ import {
   GITIGNORED_VISIBILITY_CHANGED_EVENT,
   TOGGLE_GITIGNORED_VISIBILITY_EVENT,
 } from '../lib/gitignoredVisibilityEvents'
+import { readChatEngine } from '../lib/chatEngine'
 import { useSettings } from './useSettings'
 
 const { trackEventMock } = vi.hoisted(() => ({
@@ -170,6 +171,20 @@ describe('useSettings', () => {
     expect(result.current.settings).toEqual(defaultSettings)
     expect(result.current.loaded).toBe(false)
     unmount()
+  })
+
+  it('reads the chat engine as native when settings fail to load', async () => {
+    mockInvokeFn.mockImplementationOnce((cmd: string) => {
+      if (cmd === 'get_settings') return Promise.reject(new Error('disk'))
+      return Promise.resolve(null)
+    })
+
+    const { result } = renderHook(() => useSettings())
+    await waitFor(() => {
+      expect(result.current.loaded).toBe(true)
+    })
+
+    expect(readChatEngine(result.current.settings.chat_engine)).toBe('native')
   })
 
   it('loads settings from backend on mount', async () => {

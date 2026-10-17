@@ -532,6 +532,7 @@ import { resetPrimeHostStatus } from './hooks/usePrimeHostStatus'
 import { streamAiAgent } from './utils/streamAiAgent'
 import { panePresetStorageKey } from './lib/panePresetStorage'
 import { notesPanelModeStorageKey } from './lib/notesPanelMode'
+import { viewShortcutEventModifiers } from './lib/railViewShortcuts'
 
 const AI_AGENTS_ONBOARDING_DISMISSED_STORAGE_NAME = 'rhizome:ai-agents-onboarding-dismissed'
 const CLAUDE_CODE_ONBOARDING_DISMISSED_STORAGE_NAME = 'tolaria:claude-code-onboarding-dismissed'
@@ -777,6 +778,7 @@ describe('App', () => {
     }
     mockCommandResults.list_prime_sessions = [{ path: '/prime/sessions/session-1.jsonl', name: 'session-1' }]
     mockCommandResults.read_prime_session_transcript = []
+    mockCommandResults.get_settings = createSettings({ chat_engine: 'prime' })
     render(<App />)
     fireEvent.click(await screen.findByTestId('prime-session-footprint'))
     expect(await screen.findByTestId('connections-panel')).toBeInTheDocument()
@@ -847,6 +849,7 @@ describe('App', () => {
     }
     mockCommandResults.list_prime_sessions = [{ path: '/prime/sessions/session-1.jsonl', name: 'session-1' }]
     mockCommandResults.read_prime_session_transcript = []
+    mockCommandResults.get_settings = createSettings({ chat_engine: 'prime' })
     render(<App />)
     expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
@@ -868,6 +871,26 @@ describe('App', () => {
     expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
     expect(screen.getByTestId('notes-panel-rail')).toBeVisible()
     expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Open')
+  })
+
+  it('opens History from the view button and its shortcut when Notes is closed', async () => {
+    localStorage.setItem(notesPanelModeStorageKey('main'), 'rail')
+    render(<App />)
+    expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('command-rail-history'))
+    expect(await screen.findByTestId('pulse-header')).toBeInTheDocument()
+    expect(screen.getByTestId('vault-panel')).toBeInTheDocument()
+  })
+
+  it('opens History from its shortcut when Notes is closed', async () => {
+    localStorage.setItem(notesPanelModeStorageKey('main'), 'rail')
+    render(<App />)
+    expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
+    const mods = viewShortcutEventModifiers()
+    fireEvent.keyDown(window, { key: '4', code: 'Digit4', ...mods })
+    expect(await screen.findByTestId('pulse-header')).toBeInTheDocument()
   })
 
   it('keeps a saved Auto or Rail mode when a view switch opens the panel', async () => {
@@ -1123,6 +1146,7 @@ describe('App', () => {
     mockCommandResults.get_settings = createSettings({
       auto_advance_inbox_after_organize: null,
       default_ai_agent: 'prime',
+      chat_engine: 'prime',
     })
     mockCommandResults.get_ai_agents_status = {
       prime: { installed: true, version: 'mock' },
@@ -1171,6 +1195,7 @@ describe('App', () => {
     mockCommandResults.get_settings = createSettings({
       auto_advance_inbox_after_organize: null,
       default_ai_agent: 'prime',
+      chat_engine: 'prime',
     })
     mockCommandResults.get_ai_agents_status = {
       prime: { installed: true, version: 'mock' },
@@ -1241,6 +1266,7 @@ describe('App', () => {
       resolveSettings?.(createSettings({
         auto_advance_inbox_after_organize: null,
         default_ai_agent: 'prime',
+        chat_engine: 'prime',
       }))
     })
 

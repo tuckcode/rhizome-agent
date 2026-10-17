@@ -116,7 +116,8 @@ mod tests {
     use crate::model_events::{FinishReason, ModelErrorKind, ModelEvent};
     use crate::prime_session_host::QuitDisposition;
     use crate::rhizome_loop::{
-        AgentLoop, ApprovalReply, DurableEvent, FakeModel, Model, ModelView, ScriptPart,
+        command_from_args, AgentLoop, ApprovalReply, DurableEvent, FakeModel, Model, ModelView,
+        ScriptPart,
     };
     use crate::rhizome_routing::ProviderAttempt;
     use std::sync::mpsc;
@@ -502,6 +503,66 @@ mod tests {
             .recv_timeout(Duration::from_secs(2))
             .expect("turn finishes");
         assert!(!vault.path().join("fresh.md").exists());
+    }
+
+    #[test]
+    fn native_engine_bash_approval_shows_the_literal_command() {
+        let vault = tempfile::tempdir().unwrap();
+        let command = "printf '%s' \"a\\b\\\"c\"";
+        let raw = serde_json::json!({ "command": command }).to_string();
+        let expected = command_from_args(&raw).expect("command");
+        assert_ne!(expected, raw);
+        let (tx, rx) = mpsc::channel();
+        let mut engine = NativeEngine::from_parts(
+            AgentLoop::new(),
+            FakeModel::script(vec![vec![ScriptPart::Tool {
+                name: "bash".into(),
+                args: raw,
+            }]]),
+        );
+        engine.set_permission_mode(AiAgentPermissionMode::PowerUser);
+        engine.set_vault(
+            Some(vault.path().to_string_lossy().into_owned()),
+            Vec::new(),
+        );
+        let control = engine.control();
+        let (done_tx, done_rx) = mpsc::channel();
+        thread::spawn(move || {
+            engine
+                .start(
+                    "run",
+                    Box::new(move |event| {
+                        let _ = tx.send(event);
+                    }),
+                )
+                .ok();
+            let _ = done_tx.send(());
+        });
+        let started = std::time::Instant::now();
+        let mut shown = None;
+        let mut prompt_id = String::new();
+        while started.elapsed() < Duration::from_secs(2) {
+            match rx.recv_timeout(Duration::from_millis(50)) {
+                Ok(EngineEvent::ApprovalRequested {
+                    prompt_id: id,
+                    tool,
+                    args,
+                    ..
+                }) => {
+                    assert_eq!(tool, "bash");
+                    prompt_id = id;
+                    shown = Some(args);
+                    break;
+                }
+                Ok(_) => {}
+                Err(_) => {}
+            }
+        }
+        assert_eq!(shown.as_deref(), Some(expected.as_str()));
+        control.reply_approval(&prompt_id, ApprovalReply::Deny);
+        done_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("turn finishes");
     }
 
     #[test]

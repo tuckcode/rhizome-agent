@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react'
 import { arrayMove } from '@dnd-kit/sortable'
-import { type AiAgentId } from '../lib/aiAgents'
+import { AI_AGENT_DEFINITIONS, type AiAgentId } from '../lib/aiAgents'
 import { agentTargets, type AiTarget } from '../lib/aiTargets'
 import { translate, type AppLocale } from '../lib/i18n'
 import type { AiWorkspaceConversationSetting } from '../types'
@@ -82,8 +82,23 @@ export function firstTarget(
   return selectedAgent ?? targets[0] ?? defaultTarget ?? agentTargets()[0]
 }
 
+function storedAgentTarget(id: string): AiTarget | undefined {
+  const definition = AI_AGENT_DEFINITIONS.find((agent) => `agent:${agent.id}` === id)
+  if (!definition) return undefined
+  return {
+    kind: 'agent',
+    agent: definition.id,
+    id,
+    label: definition.label,
+    shortLabel: definition.shortLabel,
+  }
+}
+
 export function resolveTarget(conversation: AiConversation, groups: AiWorkspaceTargetGroups, fallback: AiTarget): AiTarget {
-  return flatTargets(groups).find((target) => target.id === conversation.targetId) ?? fallback
+  const id = conversation.targetId
+  return flatTargets(groups).find((target) => target.id === id)
+    ?? storedAgentTarget(id)
+    ?? fallback
 }
 
 function createConversation(locale: AppLocale, target: AiTarget, index: number): AiConversation {

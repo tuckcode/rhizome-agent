@@ -57,6 +57,11 @@ describe('native chat user errors', () => {
       `No free-tier provider key is set. ${NATIVE_NO_KEY_GUIDANCE}`,
     )
   })
+
+  it('leaves a locked or denied keychain error unchanged', () => {
+    const message = 'The keychain could not be read for groq. It may be locked, or access was denied.'
+    expect(nativeChatUserError(message)).toBe(message)
+  })
 })
 
 describe('native stream events', () => {
@@ -134,6 +139,37 @@ describe('native stream events', () => {
       created: true,
       overwrite: false,
       callId: 'call_1',
+    }))
+  })
+
+  it('maps ApprovalRequested.call_id to prompt.callId and ignores event.id', () => {
+    const next = callbacks()
+    next.onApprovalRequested = vi.fn()
+    expect(applyNativeEvent({
+      kind: 'approval_requested',
+      prompt_id: 'prompt_2',
+      tool: 'bash',
+      args: '{"command":"ls"}',
+      id: 'not-the-call-id',
+      call_id: 'call_2',
+    }, next)).toBe(false)
+    expect(next.onApprovalRequested).toHaveBeenCalledWith(expect.objectContaining({
+      callId: 'call_2',
+    }))
+  })
+
+  it('leaves callId unset when ApprovalRequested has no call_id', () => {
+    const next = callbacks()
+    next.onApprovalRequested = vi.fn()
+    expect(applyNativeEvent({
+      kind: 'approval_requested',
+      prompt_id: 'prompt_3',
+      tool: 'bash',
+      args: '{"command":"ls"}',
+      id: 'not-the-call-id',
+    }, next)).toBe(false)
+    expect(next.onApprovalRequested).toHaveBeenCalledWith(expect.objectContaining({
+      callId: undefined,
     }))
   })
 })

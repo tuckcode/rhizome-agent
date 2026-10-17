@@ -5,7 +5,7 @@ describe('leftover native fork and archive', () => {
   it('forks Prime entries only on the Prime engine', () => {
     const home = readFileSync(`${process.cwd()}/src/components/ChatHome.tsx`, 'utf8')
     const panel = readFileSync(`${process.cwd()}/src/components/AiPanel.tsx`, 'utf8')
-    expect(home).toContain("forkTargetsPrimeEntry={effectiveEngine === 'prime'}")
+    expect(home).toContain("forkTargetsPrimeEntry={panelEngine === 'prime'}")
     expect(panel).toContain('const forkPrime = forksPrimeEntry(isPrimeTarget, forkTargetsPrimeEntry)')
     expect(panel).toContain('persistNativeFork({')
   })
