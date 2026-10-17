@@ -1,11 +1,13 @@
-# Rhizome
+# Rhizome docs
 
 Source: index.md
 URL: /
 
-Rhizome is a desktop app for working with an AI agent. What's worth keeping ends up as plain Markdown notes in a folder on your disk, called your **vault**. You can open, edit, diff and revert those notes like any other file.
+A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own. You can open, edit, diff and revert those notes like any other file.
 
-> **Developer preview.** Rhizome runs on macOS, built from source. There is no signed download yet. See [Install](start/install.md).
+:::note
+**Developer preview.** Rhizome runs on macOS, built from source. There is no signed download yet. See [Install](start/install.md).
+:::
 
 ## What you get
 
@@ -28,7 +30,7 @@ It also has what you'd expect from a harness and a notes app: sessions you can r
 
 ## Origins
 
-Rhizome is a modified version of [Tolaria](https://github.com/refactoringhq/tolaria) by Luca Rossi (AGPL-3.0). Rhizome is AGPL-3.0-or-later. Mycelium uses [Mindwalk](https://github.com/cosmtrek/mindwalk) (MIT) © 2026 Ricko Yu. Free tier (auto) builds on [OmniRoute](https://github.com/diegosouzapw/OmniRoute) and [freellmapi](https://github.com/tashfeenahmed/freellmapi) (both MIT). See [Credits and licences](reference/credits.md).
+Rhizome is AGPL-3.0-or-later. Mycelium uses [Mindwalk](https://github.com/cosmtrek/mindwalk) (MIT) © 2026 Ricko Yu. Free tier (auto) builds on [OmniRoute](https://github.com/diegosouzapw/OmniRoute) and [freellmapi](https://github.com/tashfeenahmed/freellmapi) (both MIT). See [Credits and licences](reference/credits.md).
 
 ---
 
@@ -112,17 +114,19 @@ URL: /start/install
 
 You build Rhizome from source on a Mac and run it from there. This takes a few minutes, mostly for the first build.
 
-> **Developer preview.** macOS only. There is no signed download, no Homebrew package and no in-app updater yet. See [Platforms and updates](../reference/platforms-and-updates.md).
+:::note
+**Developer preview.** macOS only. There is no signed download, no Homebrew package and no in-app updater yet. See [Platforms and updates](../reference/platforms-and-updates.md).
+:::
 
 ## Before you start
 
 You need:
 
-1. macOS with the Xcode Command Line Tools (`xcode-select --install`).
-2. Node.js `^20.19.0` or `>=22.12.0`.
-3. pnpm.
-4. Rust `1.77.2` or newer.
-5. git.
+1. macOS with the Xcode Command Line Tools (`xcode-select --install`)
+2. Node.js `^20.19.0` or `>=22.12.0`
+3. pnpm
+4. Rust `1.77.2` or newer
+5. git
 
 Prime Agent is optional. You need it only if you keep Prime as the Chat engine, which is the default.
 
@@ -223,7 +227,7 @@ Git is recommended when you want local history, diff views, recovery, pull, push
 Source: start/why-rhizome.md
 URL: /start/why-rhizome
 
-Rhizome gives an AI agent a memory you can see. The things worth keeping become notes in a folder you own, and you can check what the agent did to your files after the fact.
+A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own. You can check what the agent did to your files after the fact.
 
 ## The problem it solves
 
@@ -1877,7 +1881,7 @@ Small, focused pull requests are welcome. Read [CONTRIBUTING.md](https://github.
 
 ## Origins
 
-Rhizome is a modified version of [Tolaria](https://github.com/refactoringhq/tolaria) by Luca Rossi. See [Credits and licences](credits.md).
+See [Credits and licences](credits.md).
 
 ---
 
