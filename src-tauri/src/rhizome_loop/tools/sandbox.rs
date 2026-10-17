@@ -305,16 +305,17 @@ fn component_is_git(component: std::path::Component<'_>) -> bool {
         return false;
     };
     let name = name.to_string_lossy();
-    if name.eq_ignore_ascii_case(".git") {
+    let trimmed = name.trim_end_matches(['.', ' ']);
+    if trimmed.eq_ignore_ascii_case(".git")
+        || name.eq_ignore_ascii_case(".git::$INDEX_ALLOCATION")
+        || trimmed.eq_ignore_ascii_case(".git::$INDEX_ALLOCATION")
+    {
         return true;
     }
-    // Windows keeps the short 8.3 name and a trailing-dot alias for `.git`.
+    // Windows keeps the short 8.3 name for `.git`.
     #[cfg(windows)]
     {
-        name.eq_ignore_ascii_case(".git.")
-            || name.eq_ignore_ascii_case(".git..")
-            || name.eq_ignore_ascii_case(".git ")
-            || name.eq_ignore_ascii_case("GIT~1")
+        name.eq_ignore_ascii_case("GIT~1")
     }
     #[cfg(not(windows))]
     false
@@ -565,6 +566,13 @@ mod tests {
         plant(Path::new(&root), ".env");
         assert_blocked(&root, ".env");
         assert!(is_secret(&PathBuf::from(&root).join(".env")));
+    }
+
+    #[test]
+    fn git_dot_and_space_aliases_are_secret() {
+        for path in [".git.../x", ".git. /x", ".git::$INDEX_ALLOCATION/x"] {
+            assert!(is_secret(Path::new(path)), "{path}");
+        }
     }
 
     #[test]

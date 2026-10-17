@@ -811,6 +811,10 @@ mod tests {
         fs::create_dir(&git).unwrap();
         fs::write(git.join("config"), "keep\n").unwrap();
         std::os::unix::fs::symlink(git.join("config"), cwd.path().join("note")).unwrap();
+        static CWD_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let _cwd = CWD_LOCK
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         struct RestoreCwd(std::path::PathBuf);
         impl Drop for RestoreCwd {
             fn drop(&mut self) {
@@ -843,6 +847,9 @@ mod tests {
             "GIT~1/config",
             ".git /config",
             ".git../config",
+            ".git.../config",
+            ".git. /config",
+            ".git::$INDEX_ALLOCATION/config",
         ] {
             let error = create_note(
                 &json!({ "path": requested, "content": "no\n" }),
