@@ -49,7 +49,7 @@ const capabilities = {
   tools: false,
   vision: false,
   json_mode: false,
-  reasoning: false,
+  reasoning: { state: 'unknown' as const },
 }
 
 const workOpenAi: AiModelProvider = {
