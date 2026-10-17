@@ -14,7 +14,7 @@ Choose which models Chat can use, store their API keys safely, and check that th
 
 ## Add a provider
 
-Settings → AI Agents has three tabs. **Local model** is for models on your computer. **API model** is for hosted models and holds **Free tier (auto)**.
+Settings → AI Agents has three tabs. **Local model** is for models on your computer. **API model** is for hosted models and holds **Taproot**.
 
 | Kind | Examples | Needs |
 |---|---|---|
@@ -40,11 +40,11 @@ Click **Test model** on the provider. It sends one short request with no tools. 
 
 ## Use free models
 
-**Free tier (auto)**, on the **API model** tab, lets Rhizome pick free hosted models for you and move on when one runs out. Each free provider needs its own key. See [Free models and routing](../concepts/free-models-and-routing.md).
+**Taproot**, the free automatic router on the **API model** tab, lets Rhizome pick free hosted models for you and move on when one runs out. Each free provider needs its own key. See [Free models and routing](../concepts/free-models-and-routing.md).
 
 ## Pick the model for Chat
 
-Choose a model, or **Free tier (auto)**, in the picker. The choice is saved with your settings.
+Choose a model, or **Taproot**, in the picker. The choice is saved with your settings.
 
 ## If it doesn't connect
 

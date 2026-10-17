@@ -1,17 +1,19 @@
-# Rhizome
+# Rhizome docs
 
 Source: index.md
 URL: /
 
-Rhizome is a desktop app for working with an AI agent. What's worth keeping ends up as plain Markdown notes in a folder on your disk, called your **vault**. You can open, edit, diff and revert those notes like any other file.
+A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own. You can open, edit, diff and revert those notes like any other file.
 
-> **Developer preview.** Rhizome runs on macOS, built from source. There is no signed download yet. See [Install](start/install.md).
+:::note
+**Developer preview.** Rhizome runs on macOS, built from source. There is no signed download yet. See [Install](start/install.md).
+:::
 
 ## What you get
 
 - **Memory you can read.** Save an answer to the vault with one click. It becomes a Markdown file. In a Git repository, every change is a commit you can undo. [Your vault is the agent's memory](concepts/vault-as-memory.md)
 - **A replay of where the agent went.** Mycelium draws the folder a Prime run worked in as a map, and lights up each file the agent searched, read or edited. [Mycelium](concepts/mycelium.md)
-- **Free models that switch for you.** With **Free tier (auto)**, Rhizome routes a chat across free hosted models. When a provider fails or runs out, it moves to the next one. [Free models and routing](concepts/free-models-and-routing.md)
+- **Free models that switch for you.** With **Taproot**, Rhizome routes a chat across free hosted models. When a provider fails or runs out, it moves to the next one. [Free models and routing](concepts/free-models-and-routing.md)
 - **Its own agent loop, or Prime.** Rhizome has its own agent loop: it sends your message to a model, runs the tools the model asks for, and repeats until the answer is done. Prime Agent is still the default engine for Chat. [Agents, engines and models](concepts/ai.md)
 
 It also has what you'd expect from a harness and a notes app: sessions you can resume, permission modes for tools, your choice of model, a rich Markdown editor, PDF and image previews, a wiki graph, and Git built in.
@@ -28,7 +30,7 @@ It also has what you'd expect from a harness and a notes app: sessions you can r
 
 ## Origins
 
-Rhizome is a modified version of [Tolaria](https://github.com/refactoringhq/tolaria) by Luca Rossi (AGPL-3.0). Rhizome is AGPL-3.0-or-later. Mycelium uses [Mindwalk](https://github.com/cosmtrek/mindwalk) (MIT) © 2026 Ricko Yu. Free tier (auto) builds on [OmniRoute](https://github.com/diegosouzapw/OmniRoute) and [freellmapi](https://github.com/tashfeenahmed/freellmapi) (both MIT). See [Credits and licences](reference/credits.md).
+Rhizome is a modified version of [Tolaria](https://github.com/refactoringhq/tolaria) by Luca Rossi (AGPL-3.0). Rhizome is AGPL-3.0-or-later. Mycelium uses [Mindwalk](https://github.com/cosmtrek/mindwalk) (MIT) © 2026 Ricko Yu. Taproot builds on [OmniRoute](https://github.com/diegosouzapw/OmniRoute) and [freellmapi](https://github.com/tashfeenahmed/freellmapi) (both MIT). See [Credits and licences](reference/credits.md).
 
 ---
 
@@ -112,17 +114,19 @@ URL: /start/install
 
 You build Rhizome from source on a Mac and run it from there. This takes a few minutes, mostly for the first build.
 
-> **Developer preview.** macOS only. There is no signed download, no Homebrew package and no in-app updater yet. See [Platforms and updates](../reference/platforms-and-updates.md).
+:::note
+**Developer preview.** macOS only. There is no signed download, no Homebrew package and no in-app updater yet. See [Platforms and updates](../reference/platforms-and-updates.md).
+:::
 
 ## Before you start
 
 You need:
 
-1. macOS with the Xcode Command Line Tools (`xcode-select --install`).
-2. Node.js `^20.19.0` or `>=22.12.0`.
-3. pnpm.
-4. Rust `1.77.2` or newer.
-5. git.
+1. macOS with the Xcode Command Line Tools (`xcode-select --install`)
+2. Node.js `^20.19.0` or `>=22.12.0`
+3. pnpm
+4. Rust `1.77.2` or newer
+5. git
 
 Prime Agent is optional. You need it only if you keep Prime as the Chat engine, which is the default.
 
@@ -144,7 +148,7 @@ pnpm tauri dev
 Chat runs on one of two engines. You can switch at any time with **Chat engine** in Settings → AI Agents.
 
 - **Prime Agent (default).** Prime runs Chat. Set it up below.
-- **Rhizome's own engine.** Turn **Chat engine** on. It doesn't need Prime. Add a provider key, or use **Free tier (auto)**. See [Set up models and keys](../guides/configure-ai-models.md).
+- **Rhizome's own engine.** Turn **Chat engine** on. It doesn't need Prime. Add a provider key, or use **Taproot**. See [Set up models and keys](../guides/configure-ai-models.md).
 
 ## Set up Prime
 
@@ -223,7 +227,7 @@ Git is recommended when you want local history, diff views, recovery, pull, push
 Source: start/why-rhizome.md
 URL: /start/why-rhizome
 
-Rhizome gives an AI agent a memory you can see. The things worth keeping become notes in a folder you own, and you can check what the agent did to your files after the fact.
+A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own. You can check what the agent did to your files after the fact.
 
 ## The problem it solves
 
@@ -245,7 +249,7 @@ If the vault is a Git repository, every change to it can be committed, including
 
 ## Free models, routed for you
 
-**Free tier (auto)** sends a chat to free hosted models (Groq, Mistral, LLM7, OpenRouter's free models, NVIDIA NIM) in a fixed order. When one fails or runs out of free use, Rhizome moves to the next. Models whose free tier trains on your prompts are left out. You can add your own endpoint as the last stop. It builds on two open-source projects, OmniRoute and freellmapi. [Free models and routing](../concepts/free-models-and-routing.md)
+**Taproot**, Rhizome's free automatic router, sends a chat to free hosted models (Groq, Mistral, LLM7, OpenRouter's free models, NVIDIA NIM) in a fixed order. When one fails or runs out of free use, Rhizome moves to the next. Models whose free tier trains on your prompts are left out. You can add your own endpoint as the last stop. It builds on two open-source projects, OmniRoute and freellmapi. [Free models and routing](../concepts/free-models-and-routing.md)
 
 ## Rhizome runs its own loop
 
@@ -302,7 +306,7 @@ Switch with **Chat engine** in Settings → AI Agents. When it's on, new chats u
 
 ### Rhizome's engine
 
-- **Models:** pick a catalog model, or **Free tier (auto)**. See [Free models and routing](free-models-and-routing.md). Anthropic models aren't offered here yet.
+- **Models:** pick a catalog model, or **Taproot**. See [Free models and routing](free-models-and-routing.md). Anthropic models aren't offered here yet.
 - **Tools:** `echo` and `create_note`. Power User adds `bash`. Rhizome asks you to approve each `bash` call, but `bash` doesn't run a shell yet. There are no tools to read, search or edit files, and the agent can't search the vault or old sessions.
 - **Saved chats:** each chat is saved as it goes and can be reopened after you quit. Chats get a title automatically from the first exchange.
 - **Errors:** a problem that doesn't stop the turn shows as a notice in the chat. A problem that does stop it, such as a missing key, ends the turn with a message that says what to fix.
@@ -420,9 +424,9 @@ If generated or local-only files are ignored by Git, Rhizome can hide them from 
 Source: concepts/free-models-and-routing.md
 URL: /concepts/free-models-and-routing
 
-**Free tier (auto)** runs Chat on free hosted models without you picking one. It tries free providers in a fixed order. When a provider fails, rate-limits you or runs out of free use, Rhizome moves to the next one. You can add your own endpoint as the last stop.
+**Taproot** is Rhizome's free automatic router. It runs Chat on free hosted models without you picking one. It tries free providers in a fixed order. When a provider fails, rate-limits you or runs out of free use, Rhizome moves to the next one. You can add your own endpoint as the last stop.
 
-This works with Rhizome's own engine. Choose **Free tier (auto)** in the model picker.
+This works with Rhizome's own engine. Choose **Taproot** in the model picker.
 
 ## What you get
 
@@ -449,11 +453,11 @@ The order is fixed. Settings shows it read-only under **Fallback order**.
 
 ## Set it up
 
-1. In Settings → AI Agents, open the **API model** tab and find **Free tier (auto)**.
+1. In Settings → AI Agents, open the **API model** tab and find **Taproot**.
 2. For each provider you want, turn it on and paste its API key. The row shows **Key saved**, **No key**, or **Keychain error** if the keychain is locked or access was denied.
 3. Optional: choose an **Own endpoint** and **Own endpoint model**: any OpenAI-compatible server you've set up as a provider, local or hosted.
 4. Optional: turn on **Strict mode**. It uses only providers that document a hard stop at the free limit (Groq today), plus your own endpoint.
-5. In the model picker, choose **Free tier (auto)**. Until at least one provider has a key, Settings says "Add a key to at least one provider to use Free tier (auto)."
+5. In the model picker, choose **Taproot**. Until at least one provider has a key, Settings says "Add a key to at least one provider to use Taproot."
 
 ## How a provider gets skipped
 
@@ -1174,7 +1178,7 @@ Rhizome doesn't run Claude Code inside Chat. Keep using Claude Code in the termi
 | Memory writes you approve | **Save to vault** is an explicit click. It writes straight away, so review the note after, or undo with Git |
 | Observable, interruptible runs | Stop any run; with Prime, send a follow-up while it works; see a Prime run's file footprint in [Mycelium](../concepts/mycelium.md) |
 | Skills | Prime packages (Settings → Packages) when Prime is the engine. Rhizome's own plugin system is planned |
-| Your choice of provider | Your own providers, local models or **Free tier (auto)**. Keys live in the system keychain |
+| Your choice of provider | Your own providers, local models or **Taproot**. Keys live in the system keychain |
 
 ## From Cursor
 
@@ -1183,7 +1187,7 @@ Rhizome doesn't run Claude Code inside Chat. Keep using Claude Code in the termi
 | Agent chat beside your files | Chat with notes beside it (⌘2 shows Notes) |
 | Cursor's MCP settings | **Set Up External AI Tools…** (⌘K) writes Rhizome's MCP entry into `~/.cursor/mcp.json`, so Cursor's agent can use your vault |
 | Rules files | The vault's `AGENTS.md` |
-| Model picker | Prime's models, your own providers, or **Free tier (auto)** |
+| Model picker | Prime's models, your own providers, or **Taproot** |
 
 Rhizome isn't a code editor. Keep Cursor for code, and use Rhizome as the place where what you and your agents learn is kept, reviewed and found again.
 
@@ -1200,7 +1204,7 @@ What Rhizome adds is the vault: Save to vault, recall with its source, Git histo
 
 ## Bring your own model
 
-To skip Prime, turn on **Chat engine** in Settings → AI Agents and add a provider, or use **Free tier (auto)**. Rhizome's engine works without Prime installed. It's early: it can create notes, but can't read, search or edit files, or search the vault, yet. See [Set up models and keys](configure-ai-models.md).
+To skip Prime, turn on **Chat engine** in Settings → AI Agents and add a provider, or use **Taproot**. Rhizome's engine works without Prime installed. It's early: it can create notes, but can't read, search or edit files, or search the vault, yet. See [Set up models and keys](configure-ai-models.md).
 
 ## Plugins
 
@@ -1255,7 +1259,7 @@ Choose which models Chat can use, store their API keys safely, and check that th
 
 ## Add a provider
 
-Settings → AI Agents has three tabs. **Local model** is for models on your computer. **API model** is for hosted models and holds **Free tier (auto)**.
+Settings → AI Agents has three tabs. **Local model** is for models on your computer. **API model** is for hosted models and holds **Taproot**.
 
 | Kind | Examples | Needs |
 |---|---|---|
@@ -1281,11 +1285,11 @@ Click **Test model** on the provider. It sends one short request with no tools. 
 
 ## Use free models
 
-**Free tier (auto)**, on the **API model** tab, lets Rhizome pick free hosted models for you and move on when one runs out. Each free provider needs its own key. See [Free models and routing](../concepts/free-models-and-routing.md).
+**Taproot**, the free automatic router on the **API model** tab, lets Rhizome pick free hosted models for you and move on when one runs out. Each free provider needs its own key. See [Free models and routing](../concepts/free-models-and-routing.md).
 
 ## Pick the model for Chat
 
-Choose a model, or **Free tier (auto)**, in the picker. The choice is saved with your settings.
+Choose a model, or **Taproot**, in the picker. The choice is saved with your settings.
 
 ## If it doesn't connect
 
@@ -1892,8 +1896,8 @@ Rhizome is free software under AGPL-3.0-or-later. It builds on the projects belo
 |---|---|---|
 | [Tolaria](https://github.com/refactoringhq/tolaria) by Luca Rossi | AGPL-3.0 | Rhizome is a modified version of Tolaria: the vault, editor and note model |
 | [Mindwalk](https://github.com/cosmtrek/mindwalk) © 2026 Ricko Yu | MIT | The map engine behind [Mycelium](../concepts/mycelium.md). You install it separately; Rhizome calls it |
-| [OmniRoute](https://github.com/diegosouzapw/OmniRoute) © 2026 diegosouzapw | MIT | [Free tier (auto)](../concepts/free-models-and-routing.md): the provider catalog data and cooldown rules are ported from it |
-| [freellmapi](https://github.com/tashfeenahmed/freellmapi) | MIT | Free tier (auto): used as an edge-case checklist for retries and failover. No code or hosted catalog is copied |
+| [OmniRoute](https://github.com/diegosouzapw/OmniRoute) © 2026 diegosouzapw | MIT | [Taproot](../concepts/free-models-and-routing.md): the provider catalog data and cooldown rules are ported from it |
+| [freellmapi](https://github.com/tashfeenahmed/freellmapi) | MIT | Taproot: used as an edge-case checklist for retries and failover. No code or hosted catalog is copied |
 | [Portent](https://portent.md) ([portent-vault-template](https://github.com/refactoringhq/portent-vault-template) at commit `87c4adc`) © 2026 Refactoring | MIT | The default work types for new vaults, copied into `src-tauri/src/vault/config_seed.rs`. See [Structure a vault with Portent](../guides/structure-with-portent.md) |
 | [IronCalc](https://github.com/ironcalc/IronCalc) | MIT or Apache-2.0 | Spreadsheet engine for sheet notes |
 
@@ -2555,7 +2559,7 @@ First check **Chat engine** in Settings → AI Agents.
 | You see | Do this |
 |---|---|
 | No key for the model | Add the key in Settings → AI Agents → API model (or Local model). Settings points you there |
-| "No free-tier provider key is set." | Turn on at least one provider under **Free tier (auto)** and paste its key |
+| "No free-tier provider key is set." | Turn on at least one provider under **Taproot** and paste its key |
 | A provider row says **Keychain error** | Unlock the keychain, or allow Rhizome to use it, then reopen Settings |
 | A notice appears, but the reply goes on | Something went wrong that didn't stop the turn, such as part of the chat not being saved. Read the notice; the chat still works |
 | The model can't be reached | Click **Test model** on the provider. See [Model provider connection](model-provider-connection.md) |
@@ -2631,9 +2635,9 @@ Never store keys in the vault. Vault notes are committed and can be pushed.
 
 If a Free tier provider row says **Keychain error**, the system keychain is locked or Rhizome isn't allowed to use it. Unlock it or allow access, then reopen Settings. Keys from older versions move to the keychain the first time they're read; don't edit a key file by hand.
 
-## Free tier (auto) can't route
+## Taproot can't route
 
-If no free provider has a key, Settings says "Add a key to at least one provider to use Free tier (auto)." Turn on a provider and paste its key. With **Strict mode** on, only Groq and your own endpoint are used. See [Free models and routing](../concepts/free-models-and-routing.md).
+If no free provider has a key, Settings says "Add a key to at least one provider to use Taproot." Turn on a provider and paste its key. With **Strict mode** on, only Groq and your own endpoint are used. See [Free models and routing](../concepts/free-models-and-routing.md).
 
 ## No file tools
 

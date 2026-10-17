@@ -19,7 +19,7 @@ First check **Chat engine** in Settings → AI Agents.
 | You see | Do this |
 |---|---|
 | No key for the model | Add the key in Settings → AI Agents → API model (or Local model). Settings points you there |
-| "No free-tier provider key is set." | Turn on at least one provider under **Free tier (auto)** and paste its key |
+| "No free-tier provider key is set." | Turn on at least one provider under **Taproot** and paste its key |
 | A provider row says **Keychain error** | Unlock the keychain, or allow Rhizome to use it, then reopen Settings |
 | A notice appears, but the reply goes on | Something went wrong that didn't stop the turn, such as part of the chat not being saved. Read the notice; the chat still works |
 | The model can't be reached | Click **Test model** on the provider. See [Model provider connection](model-provider-connection.md) |
