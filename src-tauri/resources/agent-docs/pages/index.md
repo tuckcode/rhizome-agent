@@ -1,11 +1,13 @@
-# Rhizome
+# Rhizome docs
 
 Source: index.md
 URL: /
 
-Rhizome is a desktop app for working with an AI agent. What's worth keeping ends up as plain Markdown notes in a folder on your disk, called your **vault**. You can open, edit, diff and revert those notes like any other file.
+A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own. You can open, edit, diff and revert those notes like any other file.
 
-> **Developer preview.** Rhizome runs on macOS, built from source. There is no signed download yet. See [Install](start/install.md).
+:::note
+**Developer preview.** Rhizome runs on macOS, built from source. There is no signed download yet. See [Install](start/install.md).
+:::
 
 ## What you get
 
@@ -28,4 +30,4 @@ It also has what you'd expect from a harness and a notes app: sessions you can r
 
 ## Origins
 
-Rhizome is a modified version of [Tolaria](https://github.com/refactoringhq/tolaria) by Luca Rossi (AGPL-3.0). Rhizome is AGPL-3.0-or-later. Mycelium uses [Mindwalk](https://github.com/cosmtrek/mindwalk) (MIT) © 2026 Ricko Yu. Free tier (auto) builds on [OmniRoute](https://github.com/diegosouzapw/OmniRoute) and [freellmapi](https://github.com/tashfeenahmed/freellmapi) (both MIT). See [Credits and licences](reference/credits.md).
+Rhizome is AGPL-3.0-or-later. Mycelium uses [Mindwalk](https://github.com/cosmtrek/mindwalk) (MIT) © 2026 Ricko Yu. Free tier (auto) builds on [OmniRoute](https://github.com/diegosouzapw/OmniRoute) and [freellmapi](https://github.com/tashfeenahmed/freellmapi) (both MIT). See [Credits and licences](reference/credits.md).

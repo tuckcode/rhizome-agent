@@ -78,6 +78,5 @@ Security reports: [SECURITY.md](SECURITY.md). Do not file a vulnerability as a p
 
 AGPL-3.0-or-later. See [LICENSE](LICENSE).
 
-Rhizome is a modified version of
-[Tolaria](https://github.com/refactoringhq/tolaria) by Luca Rossi (AGPL-3.0).
+Thanks to [Tolaria](https://github.com/refactoringhq/tolaria) (AGPL-3.0), whose editor code Rhizome adapted.
 The Mycelium view embeds Mindwalk (MIT) © 2026 Ricko Yu.
