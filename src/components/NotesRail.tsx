@@ -75,6 +75,7 @@ export function NotesRail({
   ]
   const slotWidth = expanded && !overlaying ? width : RAIL_COLLAPSED_WIDTH_PX
   const panelWidth = expanded ? width : RAIL_COLLAPSED_WIDTH_PX
+  const sheetWidth = Math.max(0, panelWidth - RAIL_COLLAPSED_WIDTH_PX)
 
   return (
     <div
@@ -90,7 +91,7 @@ export function NotesRail({
         ref={panelRef}
         className={cn(
           'flex h-full flex-col items-center py-2',
-          overlaying ? 'bg-background shadow-md' : 'relative bg-[var(--surface-sidebar)]',
+          overlaying ? '' : 'relative bg-[var(--surface-sidebar)]',
           'motion-reduce:transition-none',
         )}
         data-testid="notes-panel-rail"
@@ -100,73 +101,100 @@ export function NotesRail({
         onMouseEnter={onMouseEnter}
         onMouseLeave={onMouseLeave}
         onFocusCapture={onFocusCapture}
-        style={{
-          position: overlaying ? 'absolute' : undefined,
-          top: overlaying ? 0 : undefined,
-          right: overlaying ? 0 : undefined,
-          bottom: overlaying ? 0 : undefined,
+        style={overlaying ? {
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          bottom: 0,
           width: panelWidth,
-          zIndex: overlaying ? NOTES_PANEL_OVERLAY_Z : undefined,
+          zIndex: NOTES_PANEL_OVERLAY_Z,
+          pointerEvents: 'none',
+        } : {
+          width: panelWidth,
           borderLeft: '1px solid var(--border-subtle)',
           transition: `width ${RAIL_WIDTH_TRANSITION_MS}ms ease-out`,
         }}
       >
         <div
-          className="flex w-full flex-col items-center"
-          style={{ gap: NOTES_RAIL_GAP_PX, paddingTop: 0 }}
+          className={cn(
+            'flex w-full flex-col items-center',
+            overlaying && 'bg-[var(--surface-sidebar)]',
+          )}
+          style={overlaying ? {
+            gap: NOTES_RAIL_GAP_PX,
+            pointerEvents: 'auto',
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            width: RAIL_COLLAPSED_WIDTH_PX,
+            zIndex: 1,
+            borderLeft: '1px solid var(--border-subtle)',
+          } : { gap: NOTES_RAIL_GAP_PX, paddingTop: 0 }}
           data-testid="notes-panel-rail-icons"
         >
-          {expanded ? null : (
-            <NotesPanelModeControl
-              mode={triggerMode}
-              onModeChange={onModeChange}
-              onMenuOpenChange={onMenuOpenChange}
-              triggerRef={modeButtonRef}
-              windowTooNarrow={windowTooNarrow}
-              openForNow={openForNow}
-            />
-          )}
-          {!expanded
-            ? railItems.map((item) => {
-                const Icon = item.icon
-                return (
-                  <ActionTooltip key={item.id} copy={{ label: item.label }} side="left">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="relative shrink-0 p-0 hover:bg-[var(--state-hover)] hover:text-[var(--text-primary)] dark:hover:bg-[var(--state-hover)]"
+          <NotesPanelModeControl
+            mode={triggerMode}
+            onModeChange={onModeChange}
+            onMenuOpenChange={onMenuOpenChange}
+            triggerRef={modeButtonRef}
+            windowTooNarrow={windowTooNarrow}
+            openForNow={openForNow}
+          />
+          {railItems.map((item) => {
+            const Icon = item.icon
+            return (
+              <ActionTooltip key={item.id} copy={{ label: item.label }} side="left">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="relative shrink-0 p-0 hover:bg-[var(--state-hover)] hover:text-[var(--text-primary)] dark:hover:bg-[var(--state-hover)]"
+                  style={{
+                    width: NOTES_RAIL_HIT_PX,
+                    height: NOTES_RAIL_HIT_PX,
+                    color: item.active ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    backgroundColor: item.active ? 'var(--state-hover)' : undefined,
+                  }}
+                  aria-label={item.label}
+                  aria-current={item.active ? 'page' : undefined}
+                  data-testid={`notes-rail-${item.id}`}
+                  onClick={item.onSelect}
+                >
+                  <Icon size={NOTES_RAIL_ICON_PX} weight={item.active ? 'fill' : 'regular'} />
+                  {item.unsaved ? (
+                    <span
+                      aria-hidden="true"
+                      data-testid="notes-rail-unsaved"
+                      className="absolute right-1 top-1 rounded-full"
                       style={{
-                        width: NOTES_RAIL_HIT_PX,
-                        height: NOTES_RAIL_HIT_PX,
-                        color: item.active ? 'var(--text-primary)' : 'var(--text-secondary)',
-                        backgroundColor: item.active ? 'var(--state-hover)' : undefined,
+                        width: 6,
+                        height: 6,
+                        background: 'var(--text-muted)',
                       }}
-                      aria-label={item.label}
-                      aria-current={item.active ? 'page' : undefined}
-                      data-testid={`notes-rail-${item.id}`}
-                      onClick={item.onSelect}
-                    >
-                      <Icon size={NOTES_RAIL_ICON_PX} weight={item.active ? 'fill' : 'regular'} />
-                      {item.unsaved ? (
-                        <span
-                          aria-hidden="true"
-                          data-testid="notes-rail-unsaved"
-                          className="absolute right-1 top-1 rounded-full"
-                          style={{
-                            width: 6,
-                            height: 6,
-                            background: 'var(--text-muted)',
-                          }}
-                        />
-                      ) : null}
-                    </Button>
-                  </ActionTooltip>
-                )
-              })
-            : null}
+                    />
+                  ) : null}
+                </Button>
+              </ActionTooltip>
+            )
+          })}
         </div>
         {expanded ? (
-          <div className="min-h-0 w-full flex-1 overflow-hidden" data-testid="notes-panel-rail-expanded">
+          <div
+            className="min-h-0 overflow-hidden bg-background shadow-md"
+            data-testid="notes-panel-rail-expanded"
+            style={overlaying ? {
+              position: 'absolute',
+              top: 'var(--overlay-titlebar-height, 38px)',
+              right: RAIL_COLLAPSED_WIDTH_PX,
+              bottom: 0,
+              width: sheetWidth,
+              pointerEvents: 'auto',
+              borderLeft: '1px solid var(--border-subtle)',
+            } : {
+              width: '100%',
+              flex: 1,
+            }}
+          >
             {children}
           </div>
         ) : null}

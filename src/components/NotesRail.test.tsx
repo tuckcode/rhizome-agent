@@ -57,12 +57,16 @@ describe('NotesRail', () => {
     expect(selected).not.toHaveStyle({ backgroundColor: 'var(--state-selected)' })
   })
 
-  it('overlays Chat without a backdrop when Auto expands', () => {
-    renderRail({ expanded: true, overlaying: true, width: 240 })
+  it('keeps the rail clickable and sits the sheet below the top bar', () => {
+    const onSelect = vi.fn()
+    renderRail({
+      expanded: true,
+      overlaying: true,
+      width: 240,
+      items: [{ id: 'changes', label: 'Changes', icon: FileText, onSelect }],
+    })
     const rail = screen.getByTestId('notes-panel-rail')
     expect(rail).toHaveAttribute('data-overlay', 'true')
-    expect(rail).toHaveClass('bg-background')
-    expect(rail).toHaveClass('shadow-md')
     expect(rail).toHaveStyle({
       position: 'absolute',
       right: '0px',
@@ -70,10 +74,21 @@ describe('NotesRail', () => {
       bottom: '0px',
       width: '240px',
       zIndex: '40',
+      pointerEvents: 'none',
     })
     expect(screen.getByTestId('notes-panel-rail-slot')).toHaveStyle({ width: '46px' })
-    expect(screen.getByTestId('notes-panel-rail-expanded')).toBeInTheDocument()
-    expect(screen.queryByTestId('notes-rail-all')).not.toBeInTheDocument()
+    const sheet = screen.getByTestId('notes-panel-rail-expanded')
+    expect(sheet).toHaveStyle({
+      top: 'var(--overlay-titlebar-height, 38px)',
+      right: '46px',
+      width: '194px',
+      pointerEvents: 'auto',
+    })
+    expect(sheet).toHaveClass('bg-background')
+    const changes = screen.getByTestId('notes-rail-changes')
+    expect(changes).toBeInTheDocument()
+    changes.click()
+    expect(onSelect).toHaveBeenCalledTimes(1)
   })
 
   it('marks unsaved recent notes with a neutral dot', () => {

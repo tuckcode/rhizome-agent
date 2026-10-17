@@ -1194,7 +1194,7 @@
   "rail.mycelium": "Mycelium",
   "mycelium.title": "Mycelium",
   "mycelium.subtitle": "Agent run footprint",
-  "mycelium.overviewSubtitle": "Footprints across all Prime sessions",
+  "mycelium.overviewSubtitle": "Footprints across all sessions",
   "mycelium.thisSessionSubtitle": "This session's footprint",
   "mycelium.thisSessionHint": "Showing {name} only — not the session list.",
   "mycelium.sessionsHeading": "Sessions",

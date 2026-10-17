@@ -2,7 +2,7 @@ import { CirclesThree, MagnifyingGlass, Plus } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../hooks/appCommandCatalog'
-import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
+import { useLayoutEffect, useRef, type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react'
 import { cn } from '@/lib/utils'
 import { useDragRegion } from '../hooks/useDragRegion'
 import { createTranslator, type AppLocale } from '../lib/i18n'
@@ -117,6 +117,22 @@ export function PrimeSessionSubhead({
   // Native macOS docks Command Palette on MacOSTitlebar; keep the Chat
   // affordance for browser preview and Linux/Windows.
   const showCommandPalette = Boolean(onOpenCommandPalette) && !hasNativeMacosTrafficLights()
+  const bandRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const node = bandRef.current
+    if (!node) return
+    const publish = () => {
+      const height = Math.ceil(node.getBoundingClientRect().height)
+      if (height > 0) {
+        document.documentElement.style.setProperty('--overlay-titlebar-height', `${height}px`)
+      }
+    }
+    publish()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(publish)
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
   // On Chat this strip can still drag the window when it is the top band.
   const { onMouseDown: onDragRegionMouseDown } = useDragRegion<HTMLDivElement>()
   const shortId = shortPrimeSessionId(sessionId)
@@ -142,6 +158,7 @@ export function PrimeSessionSubhead({
         'select-none',
         'pl-[var(--subhead-traffic-light-inset,0.75rem)]',
       )}
+      ref={bandRef}
       style={titleBarBand}
       data-testid="prime-session-subhead"
       onMouseDown={onDragRegionMouseDown}

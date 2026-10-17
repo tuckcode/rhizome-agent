@@ -6,6 +6,7 @@ import {
   viewShortcutEventModifiers,
 } from '../lib/railViewShortcuts'
 import type { SidebarFilter } from '../types'
+import { platformShortcutLabel } from '../lib/platformShortcutLabel'
 import { isMac } from '../utils/platform'
 import type { ViewMode } from './useViewMode'
 
@@ -543,9 +544,7 @@ export function findShortcutCommandIdForEvent(event: ShortcutEventLike): AppComm
 export function formatShortcutDisplay(
   shortcut: Pick<AppCommandShortcutDefinition, 'display'>,
 ): string {
-  if (isMac()) return shortcut.display
-
-  return shortcut.display
+  return platformShortcutLabel(shortcut.display, shortcut.display
     .replaceAll('⌥⌘', 'Ctrl+Alt+')
     .replaceAll('⌘⇧', 'Ctrl+Shift+')
     .replaceAll('⌘', 'Ctrl+')
@@ -554,7 +553,7 @@ export function formatShortcutDisplay(
     .replaceAll('⌦', 'Delete')
     .replaceAll('←', 'Left')
     .replaceAll('→', 'Right')
-    .replaceAll('↵', 'Enter')
+    .replaceAll('↵', 'Enter'))
 }
 
 export function getAppCommandShortcutDisplay(id: AppCommandId): string | undefined {
