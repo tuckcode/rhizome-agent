@@ -1275,12 +1275,43 @@ describe('AiPanel predicted completion wiring', () => {
     chatEngine = 'native',
     permissionMode = 'safe',
     withTarget = true,
+    apiModel = false,
   }: {
-    agent?: 'prime' | 'codex' | 'hermes'
+    agent?: 'prime' | 'codex' | 'hermes' | 'claude_code'
     chatEngine?: 'native' | 'prime'
     permissionMode?: 'safe' | 'power_user'
     withTarget?: boolean
+    apiModel?: boolean
   } = {}) {
+    const agentTarget = {
+      kind: 'agent' as const,
+      agent,
+      id: `agent:${agent}`,
+      label: agent,
+      shortLabel: agent,
+    }
+    const modelTarget = {
+      kind: 'api_model' as const,
+      provider: {
+        id: 'openai',
+        name: 'OpenAI',
+        kind: 'open_ai' as const,
+        models: [],
+      },
+      model: {
+        id: 'gpt-test',
+        capabilities: {
+          streaming: true,
+          tools: false,
+          vision: false,
+          json_mode: false,
+          reasoning: false,
+        },
+      },
+      id: 'model:openai/gpt-test',
+      label: 'OpenAI · gpt-test',
+      shortLabel: 'gpt-test',
+    }
     return render(
       <AiPanelView
         controller={primeController({
@@ -1294,13 +1325,7 @@ describe('AiPanel predicted completion wiring', () => {
         showHeader={false}
         chatEngine={chatEngine}
         defaultAiAgent={agent}
-        defaultAiTarget={withTarget ? {
-          kind: 'agent',
-          agent,
-          id: `agent:${agent}`,
-          label: agent,
-          shortLabel: agent,
-        } : undefined}
+        defaultAiTarget={withTarget ? (apiModel ? modelTarget : agentTarget) : undefined}
       />,
     )
   }
@@ -1324,6 +1349,15 @@ describe('AiPanel predicted completion wiring', () => {
     power.unmount()
 
     renderGhost({ agent: 'prime', chatEngine: 'native', withTarget: false })
+    expect(screen.queryByTestId('composer-reply-completion')).toBeNull()
+  })
+
+  it('shows the ghost for an API model in Safe mode and hides Claude Code', () => {
+    const model = renderGhost({ apiModel: true, permissionMode: 'safe' })
+    expect(screen.getByTestId('composer-reply-completion')).toHaveTextContent('Yes — draft the note')
+    model.unmount()
+
+    renderGhost({ agent: 'claude_code', chatEngine: 'native', permissionMode: 'safe' })
     expect(screen.queryByTestId('composer-reply-completion')).toBeNull()
   })
 })

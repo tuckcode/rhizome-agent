@@ -298,9 +298,10 @@ describe('suggestReply', () => {
         kind: 'completion',
         text: 'Yes — sketch the diagram',
       })
-      expect(suggestReply('Shall I start the rebuild?')).toEqual({
+      expect(suggestReply('Shall I start the rebuild?')).toBeNull()
+      expect(suggestReply('Shall I start the outline?')).toEqual({
         kind: 'completion',
-        text: 'Yes — start the rebuild',
+        text: 'Yes — start the outline',
       })
       expect(suggestReply('I can run the tests if you would like.')).toBeNull()
       expect(suggestReply('Shall I proceed?')).toBeNull()

@@ -54,11 +54,16 @@ const FILLER_CLAUSE = /^(?:proceed|continue|go ahead|go|do it|do that|yes|ok|oka
 
 const PROCEED_WITH = /^(?:proceed|continue|go ahead)\s+with\b/i
 
-/** Base verbs that may lead a Tab ghost. Inflections are not in this set. */
+/**
+ * Base verbs that may lead a Tab ghost. Inflections are not in this set.
+ * `start` is not here: it is allowed only with an outline, draft, summary, or note.
+ * `check out` and `check in` are denied even though `check` is allowed.
+ */
 const SAFE_LEADING_VERBS = new Set([
   'draft',
   'write',
   'summarize',
+  'summarise',
   'outline',
   'explain',
   'add',
@@ -69,8 +74,49 @@ const SAFE_LEADING_VERBS = new Set([
   'review',
   'check',
   'sketch',
-  'start',
+  'fix',
+  'rephrase',
+  'tag',
+  'link',
+  'organize',
+  'find',
+  'compare',
+  'brainstorm',
+  'suggest',
+  'analyze',
+  'translate',
 ])
+
+/** Read-only leads skip the verb deny list ("explain git push", "review the deploy script"). */
+const READ_ONLY_VERBS = new Set([
+  'explain',
+  'read',
+  'review',
+  'summarize',
+  'summarise',
+  'list',
+  'show',
+  'search',
+  'check',
+])
+
+const VERB_PHRASES: ReadonlyArray<{ words: readonly string[]; name: string; readOnly: boolean }> = [
+  { words: ['check', 'out'], name: 'check out', readOnly: false },
+  { words: ['check', 'in'], name: 'check in', readOnly: false },
+  { words: ['look', 'into'], name: 'look into', readOnly: true },
+  { words: ['dig', 'into'], name: 'dig into', readOnly: true },
+  { words: ['write', 'up'], name: 'write up', readOnly: true },
+  { words: ['expand', 'on'], name: 'expand on', readOnly: true },
+  { words: ['make', 'a', 'note'], name: 'make a note', readOnly: true },
+  { words: ['create', 'a', 'note'], name: 'create a note', readOnly: false },
+  { words: ['jot', 'down'], name: 'jot down', readOnly: true },
+  { words: ['note', 'down'], name: 'note down', readOnly: true },
+]
+
+const NOTE_ISH = /\b(?:notes?|comments?|tags?|links?|summary|sections?|todos?|drafts?|outlines?|repl(?:y|ies))\b/i
+
+/** Places and payloads `add` / `write` must not touch. */
+const ADD_WRITE_DANGER = /\b(?:remote|upstream|collaborator|keys?|secrets?|github|webhooks?|slack|payments?|sudo|force|env|configs?|disk|databases?|keychains?|passwords?|cron|hooks?|servers?|tokens?|drives?|branch|files?|scripts?|commands?|flags?)\b/i
 
 /** Writing or sending. A shared target next to one of these stays silent. */
 const WRITE_OR_TRANSFER = new Set<string>([
@@ -110,6 +156,7 @@ const UNNAMED_OBJECTS = new Set([
   'the job',
   'the steps',
   'the fix',
+  'some',
 ])
 
 const OBJECT_SKIP = new Set([
@@ -138,6 +185,7 @@ const OBJECT_SKIP = new Set([
   'off',
   'then',
   'too',
+  'through',
 ])
 
 const LEADING_VERB_PHRASES = [
@@ -213,38 +261,74 @@ function hasNonAsciiLeadingVerb(words: string[]): boolean {
   return Boolean(verb && !isAsciiWord(verb))
 }
 
+function sharedTargetsAreNoteTitles(joined: string): boolean {
+  const hits = joined.match(/\b(?:origin|remote|prod|production|main|master|vault)\b/g) ?? []
+  if (hits.length === 0) return false
+  return hits.every((hit) => {
+    if (hit === 'main') return /\bmain\s+notes?\b/.test(joined)
+    if (hit === 'master') return /\bmaster\s+notes?\b/.test(joined)
+    return false
+  })
+}
+
 function hasWriteVerbBesideSharedTarget(words: string[]): boolean {
   const joined = words.join(' ')
   if (!SHARED_TARGET.test(joined)) return false
+  if (sharedTargetsAreNoteTitles(joined)) return false
   if (/\bclean\s+up\b/.test(joined)) return true
   return words.some((word) => WRITE_OR_TRANSFER.has(word))
 }
 
-/**
- * you / me / I, or the agent's own "my". "my vault" with a read verb is the
- * listener's vault and stays. "my" produced by swapping "your" is not this.
- */
-function hasAgentPronoun(original: string): boolean {
-  const text = prepareText(original)
-  if (/\byou\b(?!')/i.test(text)) return true
-  if (/\bme\b/i.test(text)) return true
-  if (/\bi\b/i.test(text)) return true
-  if (/\bmy\b/i.test(text) && !/\bmy\s+(?:origin|remote|prod|production|main|master|vault)\b/i.test(text)) {
-    return true
+/** A comma, "and", or a relative starts a second clause. "between X and Y" does not. */
+function hasSecondClause(clause: string): boolean {
+  const text = prepareText(clause).toLowerCase()
+  if (/[,;&+]/.test(text)) return true
+  if (/\b(?:and then|then)\b/.test(text)) return true
+  if (/\b(?:that|which|who)\s+(?!down\b|up\b|out\b|over\b)[\p{L}\p{N}]/u.test(text)) return true
+  const withoutBetween = text.replace(/\bbetween\s+\S+\s+and\s+\S+/g, ' ')
+  return /\band\b/.test(withoutBetween)
+}
+
+function phraseAt(words: string[]): { name: string; readOnly: boolean; rest: string[] } | null {
+  for (const phrase of VERB_PHRASES) {
+    if (phrase.words.every((word, index) => words[index] === word)) {
+      return {
+        name: phrase.name,
+        readOnly: phrase.readOnly,
+        rest: words.slice(phrase.words.length),
+      }
+    }
   }
-  return false
+  return null
 }
 
-function isCreateANote(words: string[]): boolean {
-  return words[0] === 'create' && words[1] === 'a' && words[2] === 'note'
+function isJotThatDown(words: string[]): boolean {
+  return (words[0] === 'jot' || words[0] === 'note')
+    && (words[1] === 'that' || words[1] === 'this')
+    && words[2] === 'down'
+    && words.length === 3
 }
 
-/** Leading verb is a safe base form, or the clause is "create a note". */
-function hasSafeLeadingVerb(words: string[]): boolean {
-  const verb = words[0]
-  if (!verb || !isAsciiWord(verb)) return false
-  if (isCreateANote(words)) return true
-  return SAFE_LEADING_VERBS.has(verb)
+function startObjectIsSafe(rest: string): boolean {
+  return /\b(?:outlines?|drafts?|summar(?:y|ies)|notes?)\b/.test(rest)
+}
+
+function addOrWriteObjectIsSafe(rest: string): boolean {
+  if (!NOTE_ISH.test(rest)) return false
+  if (ADD_WRITE_DANGER.test(rest)) return false
+  if (/\b(?:origin|remote|prod|production|vault)\b/.test(rest)) return false
+  if (/\b(?:main|master)\b(?!\s+notes?\b)/.test(rest)) return false
+  return true
+}
+
+function hasBlockingPronoun(original: string, verb: string, readOnly: boolean): boolean {
+  const text = prepareText(original).toLowerCase()
+  if (/\bme\b/.test(text) || /\bi\b/.test(text)) return true
+  if (/\byou\b(?!')/.test(text) && !(/\bwhat you\b/.test(text) && readOnly)) return true
+  if (!/\bmy\b/.test(text)) return false
+  if (/\bmy\s+notes?\b/.test(text) && (verb === 'read' || verb === 'search')) return false
+  if (/\bmy\s+vault\b/.test(text) && (verb === 'read' || verb === 'search')) return false
+  return true
 }
 
 function clauseIsOfferSafe(clause: string, original = clause): boolean {
@@ -254,10 +338,33 @@ function clauseIsOfferSafe(clause: string, original = clause): boolean {
   if (PROCEED_WITH.test(joined)) return false
   if (FILLER_CLAUSE.test(joined)) return false
   if (hasNonAsciiLeadingVerb(words)) return false
-  if (isUnnamedObject(words)) return false
-  if (hasAgentPronoun(original)) return false
-  if (!hasSafeLeadingVerb(words)) return false
-  if (isConsequentialAsk(joined)) return false
+  if (hasSecondClause(clause)) return false
+  if (isJotThatDown(words)) return !hasBlockingPronoun(original, words[0] ?? '', true)
+
+  const phrase = phraseAt(words)
+  if (phrase?.name === 'check out' || phrase?.name === 'check in') return false
+
+  const verb = phrase?.name ?? words[0] ?? ''
+  const rest = phrase ? phrase.rest : words.slice(1)
+  const restText = rest.join(' ')
+  const readOnly = phrase?.readOnly ?? READ_ONLY_VERBS.has(verb)
+
+  const allowedPhrase = phrase !== null && phrase.name !== 'check out' && phrase.name !== 'check in'
+  const allowedStart = verb === 'start' && startObjectIsSafe(restText)
+  const allowedVerb = allowedPhrase || allowedStart || SAFE_LEADING_VERBS.has(verb)
+  if (!allowedVerb || !isAsciiWord(words[0] ?? '')) return false
+
+  if (verb === 'add' || verb === 'write') {
+    if (!addOrWriteObjectIsSafe(restText)) return false
+  }
+  if (verb === 'start' && !startObjectIsSafe(restText)) return false
+
+  const lookIntoIt = phrase?.name === 'look into' && restText === 'it'
+  const noteAboutThis = (phrase?.name === 'make a note' || phrase?.name === 'create a note')
+    && /^(?:of|for)\s+(?:this|that)$/.test(restText)
+  if (!lookIntoIt && !noteAboutThis && isUnnamedObject(words)) return false
+  if (hasBlockingPronoun(original, verb, readOnly)) return false
+  if (!readOnly && isConsequentialAsk(joined)) return false
   return true
 }
 
@@ -281,7 +388,13 @@ export function isConsequentialAsk(action: string): boolean {
   const joined = words.join(' ')
   if (!joined) return false
   if (/\bclean\s+up\b/.test(joined)) return true
-  if (words.some((word) => isAsciiWord(word) && (CONSEQUENTIAL_VERBS as readonly string[]).includes(word))) {
+  if (words.some((word, index) => {
+    if (!isAsciiWord(word) || !(CONSEQUENTIAL_VERBS as readonly string[]).includes(word)) return false
+    // "the post" / "a post" is a noun. "merge sort" is a noun.
+    if (word === 'post' && (words[index - 1] === 'the' || words[index - 1] === 'a')) return false
+    if (word === 'merge' && words[index + 1] === 'sort') return false
+    return true
+  })) {
     return true
   }
   return hasWriteVerbBesideSharedTarget(words)
@@ -359,8 +472,10 @@ function approvalCompletionText(sentence: string): string | null | undefined {
   const found = rawApprovalClause(text)
   if (!found) return null
   const clause = cleanClause(found.clause)
-  if (!clause || !clauseIsOfferSafe(clause)) return null
-  return `Yes — ${clause}`
+  if (!clause) return null
+  const swapped = swapListenerPossessives(clause)
+  if (!clauseIsOfferSafe(swapped, clause)) return null
+  return `Yes — ${swapped}`
 }
 
 /** Harmless next-step echo, or null when the step is absent, unclean, or not allowlisted. */
