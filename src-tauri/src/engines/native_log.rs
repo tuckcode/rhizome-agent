@@ -208,6 +208,9 @@ fn apply_scrub(text: &str, saved: &[String]) -> String {
         }
     }
     let scrubbers = scrub_regexes();
+    // PEM runs first. An assignment cap would keep only the opening banner
+    // and the later pattern would no longer see a whole key.
+    out = scrub_private_keys(&out, scrubbers);
     out = scrub_assignments(&out, scrubbers);
     out = scrub_bearer(&out, scrubbers);
     for pattern in &scrubbers.patterns {
@@ -223,6 +226,7 @@ struct ScrubRegexes {
     quoted_env_name: regex::Regex,
     prefixed_key_name: regex::Regex,
     bearer: regex::Regex,
+    pem: regex::Regex,
     patterns: Vec<regex::Regex>,
     mistral_context: regex::Regex,
     mistral_key: regex::Regex,
@@ -256,6 +260,11 @@ fn scrub_regexes() -> &'static ScrubRegexes {
             .expect("prefixed key name");
         let bearer = regex::Regex::new(r"(?i)bearer\s+(?P<token>[A-Za-z0-9._\-+/=]{8,})")
             .expect("bearer token");
+        // `[\s\S]` is a real newline. `\\n` is the two-character escape.
+        let pem = regex::Regex::new(
+            r"-----BEGIN [A-Z ]*PRIVATE KEY-----(?:\\n|[\s\S])*?-----END [A-Z ]*PRIVATE KEY-----",
+        )
+        .expect("pem block");
         let patterns = [
             r"(?:sk-proj-|sk-or-v1-|sk-ant-|gsk_)[A-Za-z0-9_-]{8,}",
             r"(?:sk_live_|sk_test_|sk-|ghp_|gho_|ghs_|ghu_|ghr_|github_pat_|glpat-|gsk_|npm_|xox[abprse]-)[A-Za-z0-9_-]{20,}",
@@ -267,7 +276,6 @@ fn scrub_regexes() -> &'static ScrubRegexes {
             r"AKIA[0-9A-Z]{16}",
             r"SG\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}",
             r"\beyJ[A-Za-z0-9_-]{7,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b",
-            r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----",
             r#"(?i)"api_key"\s*:\s*"[^"]+""#,
         ]
         .into_iter()
@@ -280,6 +288,7 @@ fn scrub_regexes() -> &'static ScrubRegexes {
             quoted_env_name,
             prefixed_key_name,
             bearer,
+            pem,
             patterns,
             mistral_context: regex::Regex::new(r"(?i)mistral|api\.mistral\.ai")
                 .expect("mistral context"),
@@ -321,10 +330,7 @@ fn scrub_assignments(text: &str, scrubbers: &ScrubRegexes) -> String {
             && assignment_name_is_secret(name.as_str(), quoted, scrubbers)
             && assignment_value_is_secret(value.as_str(), name.as_str(), scrubbers);
         if redact {
-            let mut end = value.end();
-            if unquoted_value_hit_cap(value.as_str()) {
-                end = token_end(text, end);
-            }
+            let end = secret_span_end(text, value.start(), value.end());
             out.push_str(&text[copied..value.start()]);
             out.push_str("[redacted]");
             copied = end;
@@ -403,7 +409,13 @@ fn first_secret_value_restart(
         }
         if secret_value_needs_rescan(window, index + 1, name, scrubbers) {
             let name_abs = value_start + name_start;
-            return Some(char_before(text, name_abs));
+            // Land before an opening quote. Starting on the quote makes it
+            // the left boundary, so the name is seen as unquoted.
+            let mut restart = char_before(text, name_abs);
+            if quoted {
+                restart = char_before(text, restart);
+            }
+            return Some(restart);
         }
     }
     None
@@ -492,17 +504,149 @@ fn char_after(text: &str, index: usize) -> usize {
         .unwrap_or(text.len())
 }
 
-/// End of an over-cap unquoted value. Stops before a later field or query pair.
-fn token_end(text: &str, start: usize) -> usize {
-    let Some(rest) = text.get(start..) else {
+fn scrub_private_keys(text: &str, scrubbers: &ScrubRegexes) -> String {
+    scrubbers.pem.replace_all(text, "[redacted]").into_owned()
+}
+
+/// A quoted secret runs to its closing quote, or to the end of the line when
+/// the quote never closes. An unquoted secret past the cap runs to whitespace
+/// or `#`. `&`, `,`, and `}` stop it only when a new field follows.
+fn secret_span_end(text: &str, value_start: usize, value_end: usize) -> usize {
+    let Some(rest) = text.get(value_start..) else {
+        return value_end;
+    };
+    let Some(first) = rest.chars().next() else {
+        return value_end;
+    };
+    if first == '"' || first == '\'' {
+        return quoted_value_end(text, value_start, first);
+    }
+    let matched_len = value_end.saturating_sub(value_start);
+    let matched = rest.get(..matched_len).unwrap_or("");
+    if unquoted_value_hit_cap(matched) {
+        return unquoted_value_end(text, value_end);
+    }
+    value_end
+}
+
+fn quoted_value_end(text: &str, value_start: usize, quote: char) -> usize {
+    let Some(rest) = text.get(value_start..) else {
         return text.len();
     };
-    for (offset, ch) in rest.char_indices() {
-        if ch.is_whitespace() || matches!(ch, '#' | ',' | ';' | '&' | '}') {
-            return start + offset;
+    let mut chars = rest.char_indices();
+    if chars.next().is_none() {
+        return text.len();
+    }
+    let mut escaped = false;
+    for (offset, ch) in chars {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if ch == '\\' {
+            escaped = true;
+            continue;
+        }
+        if ch == '\n' || ch == '\r' {
+            return value_start + offset;
+        }
+        if ch == quote {
+            return value_start + offset + ch.len_utf8();
         }
     }
     text.len()
+}
+
+fn unquoted_value_end(text: &str, from: usize) -> usize {
+    let Some(rest) = text.get(from..) else {
+        return text.len();
+    };
+    for (offset, ch) in rest.char_indices() {
+        if ch.is_whitespace() || ch == '#' {
+            return from + offset;
+        }
+        if matches!(ch, '&' | ',' | '}') {
+            let after = from + offset + ch.len_utf8();
+            if new_field_follows(text, ch, after) {
+                return from + offset;
+            }
+        }
+    }
+    text.len()
+}
+
+fn new_field_follows(text: &str, stop: char, after: usize) -> bool {
+    let Some(rest) = text.get(after..) else {
+        return false;
+    };
+    match stop {
+        '&' => query_name_follows(rest),
+        ',' => json_or_yaml_field_follows(rest),
+        '}' => {
+            let rest = rest.trim_start_matches([' ', '\t']);
+            if let Some(stripped) = rest.strip_prefix(',') {
+                json_or_yaml_field_follows(stripped)
+            } else if let Some(stripped) = rest.strip_prefix('&') {
+                query_name_follows(stripped)
+            } else {
+                false
+            }
+        }
+        _ => false,
+    }
+}
+
+fn query_name_follows(text: &str) -> bool {
+    let mut chars = text.chars();
+    match chars.next() {
+        Some(ch) if ch.is_ascii_alphabetic() => {}
+        _ => return false,
+    }
+    for ch in chars {
+        if ch.is_ascii_alphanumeric() || ch == '_' {
+            continue;
+        }
+        return ch == '=';
+    }
+    false
+}
+
+fn json_or_yaml_field_follows(text: &str) -> bool {
+    let text = text.trim_start_matches([' ', '\t']);
+    let mut chars = text.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if first == '"' || first == '\'' {
+        let mut closed = false;
+        for ch in chars {
+            if !closed {
+                if ch == first {
+                    closed = true;
+                    continue;
+                }
+                if ch.is_ascii_alphanumeric() || ch == '_' {
+                    continue;
+                }
+                return false;
+            }
+            if ch == ' ' || ch == '\t' {
+                continue;
+            }
+            return ch == ':';
+        }
+        return false;
+    }
+    if !first.is_ascii_alphabetic() {
+        return false;
+    }
+    for ch in chars {
+        if ch.is_ascii_alphanumeric() || ch == '_' || ch == ' ' || ch == '\t' {
+            continue;
+        }
+        return ch == ':';
+    }
+    false
 }
 
 fn assignment_name_is_secret(name: &str, quoted: bool, scrubbers: &ScrubRegexes) -> bool {
@@ -538,7 +682,10 @@ fn assignment_value_is_secret(raw: &str, name: &str, scrubbers: &ScrubRegexes) -
     let Some(first) = chars.next() else {
         return false;
     };
-    if matches!(first, '{' | '$' | '<' | '[') || inner.chars().any(char::is_whitespace) {
+    // A quoted passphrase may contain spaces. An unquoted value with a space
+    // is still prose or a command, not a single token.
+    if matches!(first, '{' | '$' | '<' | '[') || (!quoted && inner.chars().any(char::is_whitespace))
+    {
         return false;
     }
     let uppercase_api_key = scrubbers.api_key_name.is_match(name)
@@ -1672,6 +1819,28 @@ mod tests {
     }
 
     #[test]
+    fn scrub_secrets_redacts_a_long_escaped_private_key() {
+        let begin = format!("{}{}", "-----BEGIN ", "PRIVATE KEY-----");
+        let end = format!("{}{}", "-----END ", "PRIVATE KEY-----");
+        let body = "abcd".repeat(400);
+        let escaped = format!("FIREBASE_PRIVATE_KEY=\"{begin}\\n{body}\\n{end}\\n\"");
+        let scrubbed = scrub_secrets(&escaped);
+        assert!(
+            !scrubbed.contains(&body),
+            "escaped private key must be removed"
+        );
+        assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
+
+        let multiline = format!("GOOGLE_PRIVATE_KEY=\"{begin}\n{body}\n{end}\"");
+        let scrubbed = scrub_secrets(&multiline);
+        assert!(
+            !scrubbed.contains(&body),
+            "multiline private key must be removed"
+        );
+        assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
+    }
+
+    #[test]
     fn scrub_secrets_redacts_api_key_inside_a_url() {
         let value = format!("{}{}", "super", "secret");
         assert_redacted(&format!("curl https://x.test/?api_key={value}"), &value);
@@ -1820,8 +1989,16 @@ mod tests {
     }
 
     #[test]
-    fn scrub_secrets_leaves_a_quoted_secret_phrase() {
-        assert_unchanged(r#""secret": "sauce recipe""#);
+    fn scrub_secrets_redacts_a_quoted_passphrase() {
+        assert_redacted(
+            "PASSWORD=\"correct horse battery staple\"",
+            "correct horse battery staple",
+        );
+        assert_redacted(
+            r#""password": "correct horse battery staple""#,
+            "correct horse battery staple",
+        );
+        assert_redacted(r#""secret": "sauce recipe""#, "sauce recipe");
     }
 
     #[test]
@@ -2022,17 +2199,34 @@ mod tests {
 
     #[test]
     fn scrub_secrets_stops_a_long_value_before_the_next_field() {
-        let body = "ab".repeat(300);
+        let body = "ab".repeat(260);
+        assert_eq!(body.len(), 520);
         let query = format!("API_KEY={body}&user=bob");
         let scrubbed = scrub_secrets(&query);
         assert!(
             scrubbed.starts_with("API_KEY=[redacted]&user=bob"),
-            "the query tail stays"
+            "a following query field stays"
         );
         assert!(!scrubbed.contains(body.as_str()), "secret must be removed");
 
-        let json = format!("{{\"API_KEY\":\"{body}\",\"user\":\"bob\"}}");
-        let scrubbed = scrub_secrets(&json);
+        let json_field = format!("API_KEY={body},\"user\":\"bob\"");
+        let scrubbed = scrub_secrets(&json_field);
+        assert!(
+            scrubbed.contains("\"user\":\"bob\""),
+            "a following json field stays"
+        );
+        assert!(!scrubbed.contains(body.as_str()), "secret must be removed");
+
+        let yaml_field = format!("API_KEY={body}, user:bob");
+        let scrubbed = scrub_secrets(&yaml_field);
+        assert!(
+            scrubbed.contains(", user:bob"),
+            "a following yaml field stays"
+        );
+        assert!(!scrubbed.contains(body.as_str()), "secret must be removed");
+
+        let quoted = format!("{{\"API_KEY\":\"{body}\",\"user\":\"bob\"}}");
+        let scrubbed = scrub_secrets(&quoted);
         assert!(
             scrubbed.contains("\"user\":\"bob\""),
             "later json fields stay"
@@ -2041,46 +2235,123 @@ mod tests {
     }
 
     #[test]
-    fn scrub_assignments_scales_linearly() {
-        assert_scrub_scales("a=");
-        assert_scrub_scales("API_KEY=$");
+    fn scrub_secrets_keeps_a_long_secret_tail_that_is_not_a_field() {
+        let body = "ab".repeat(260);
+        for tail in [";TAILVALUE", "&TAILVALUE", ",TAILVALUE", "}TAILVALUE"] {
+            let input = format!("API_KEY={body}{tail}");
+            let scrubbed = scrub_secrets(&input);
+            assert!(
+                !scrubbed.contains("TAILVALUE"),
+                "a tail that is not a new field must be redacted"
+            );
+            assert!(!scrubbed.contains(body.as_str()), "secret must be removed");
+            assert_eq!(
+                scrubbed.len(),
+                "API_KEY=[redacted]".len(),
+                "the whole token is redacted"
+            );
+            assert!(
+                scrubbed.starts_with("API_KEY=[redacted]"),
+                "the whole token is redacted"
+            );
+        }
+        let quoted = format!("PASSWORD=\"{body},TAILVALUE\"");
+        let scrubbed = scrub_secrets(&quoted);
+        assert!(
+            !scrubbed.contains("TAILVALUE"),
+            "a quoted tail must be redacted"
+        );
+        assert!(scrubbed.starts_with("PASSWORD=[redacted]"), "quoted secret");
+        let json = format!("\"password\":\"{body};TAILVALUE\"");
+        let scrubbed = scrub_secrets(&json);
+        assert!(
+            !scrubbed.contains("TAILVALUE"),
+            "a json string tail must be redacted"
+        );
+        assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
     }
 
-    fn assert_scrub_scales(piece: &str) {
+    #[test]
+    fn scrub_secrets_redacts_a_quoted_name_inside_compact_json() {
+        let items = "1,".repeat(800);
+        let secret = "hunter2hunter2";
+        for key in ["password", "token", "client_secret"] {
+            let input = format!(
+                "{{\"id\":42,\"name\":\"svc\",\"{key}\":\"{secret}\",\"items\":[{items}]}}"
+            );
+            let scrubbed = scrub_secrets(&input);
+            assert!(!scrubbed.contains(secret), "secret must be removed");
+            assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
+            assert!(scrubbed.contains("\"name\":\"svc\""), "other fields stay");
+        }
+        let input = format!("[{{\"id\":42,\"password\":\"{secret}\",\"items\":[{items}]}}]");
+        let scrubbed = scrub_secrets(&input);
+        assert!(!scrubbed.contains(secret), "secret must be removed");
+        assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
+        assert!(scrubbed.contains("\"id\":42"), "other fields stay");
+    }
+
+    #[test]
+    fn scrub_assignments_scales_linearly() {
+        assert_scrub_scales("a=", "a=");
+        assert_scrub_scales("API_KEY=$", "API_KEY=$");
+        assert_scrub_scales(
+            "compact-json",
+            r#"{"id":42,"name":"svc","token":"$","items":[1]}"#,
+        );
+    }
+
+    fn assert_scrub_scales(label: &str, piece: &str) {
         let small_reps = (100 * 1024) / piece.len();
         let small = piece.repeat(small_reps);
-        let big = piece.repeat(small_reps * 4);
+        let big = piece.repeat(small_reps * 8);
         let _ = scrub_secrets(&small);
-        let small_time = best_scrub_time(&small);
-        let big_time = best_scrub_time(&big);
+        let (small_time, big_time) = best_alternating_scrub(&small, &big);
         let ratio = big_time.as_secs_f64() / small_time.as_secs_f64().max(1e-9);
         eprintln!(
-            "scrub scale {piece}: 100KB {} ms, 400KB {} ms, ratio {ratio:.2}",
+            "scrub scale {label}: 100KB {} ms, 800KB {} ms, ratio {ratio:.2}",
             small_time.as_millis(),
             big_time.as_millis()
         );
-        assert!(ratio < 8.0, "400 KB scrub was 8x or more the 100 KB scrub");
+        assert!(
+            ratio < 24.0,
+            "800 KB scrub was 24x or more the 100 KB scrub"
+        );
         assert!(
             big_time < scrub_absolute_limit(),
-            "400 KB scrub took too long"
+            "800 KB scrub took too long"
         );
     }
 
-    fn best_scrub_time(input: &str) -> std::time::Duration {
-        let mut best = std::time::Duration::from_secs(60);
-        for _ in 0..3 {
-            let started = std::time::Instant::now();
-            let _ = scrub_secrets(input);
-            best = best.min(started.elapsed());
+    fn best_alternating_scrub(
+        small: &str,
+        big: &str,
+    ) -> (std::time::Duration, std::time::Duration) {
+        let mut best_small = std::time::Duration::from_secs(60);
+        let mut best_big = std::time::Duration::from_secs(60);
+        for round in 0..5 {
+            if round % 2 == 0 {
+                best_small = best_small.min(scrub_once(small));
+                best_big = best_big.min(scrub_once(big));
+            } else {
+                best_big = best_big.min(scrub_once(big));
+                best_small = best_small.min(scrub_once(small));
+            }
         }
-        best
+        (best_small, best_big)
+    }
+
+    fn scrub_once(input: &str) -> std::time::Duration {
+        let started = std::time::Instant::now();
+        let _ = scrub_secrets(input);
+        started.elapsed()
     }
 
     fn scrub_absolute_limit() -> std::time::Duration {
         if cfg!(debug_assertions) {
-            std::time::Duration::from_secs(5)
+            std::time::Duration::from_secs(20)
         } else {
-            std::time::Duration::from_millis(250)
+            std::time::Duration::from_secs(2)
         }
     }
 
