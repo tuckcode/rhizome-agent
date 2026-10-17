@@ -529,6 +529,19 @@ function handleMoveNoteToWorkspace(args: {
   return { new_path: newPath, updated_files: updatedFiles, failed_updates: 0 }
 }
 
+// Sample Research library for the browser mock (rhizome_scan_library).
+const MOCK_LIBRARY = [
+  {
+    id: 'mock-repo.md',
+    path: 'sources/repos/mock-repo.md',
+    title: 'mock repo',
+    description: 'A sample wiki from the browser mock.',
+    type: 'wiki',
+    tag: 'Repo Wiki',
+    date: 1700000000,
+  },
+]
+
 // Fixture for the wiki graph view (rhizome_wiki_graph tool): three notes
 // and one ghost so browser dev / tests exercise both node variants.
 const MOCK_WIKI_GRAPH = {
@@ -1090,6 +1103,15 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   call_rhizome_tool: (args: { name: string }) => {
     if (args.name === 'rhizome_wiki_graph') {
       return JSON.stringify(MOCK_WIKI_GRAPH)
+    }
+    if (args.name === 'rhizome_scan_library') {
+      return JSON.stringify(MOCK_LIBRARY)
+    }
+    if (args.name === 'rhizome_read_events') {
+      return JSON.stringify([])
+    }
+    if (args.name === 'rhizome_search') {
+      return JSON.stringify([])
     }
     throw new Error(`Mock call_rhizome_tool: unsupported tool ${args.name}`)
   },
