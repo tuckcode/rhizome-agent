@@ -1,12 +1,12 @@
 ---
 title: Rhizome docs
-description: Rhizome is a desktop app for an AI agent whose memory is a folder of Markdown notes you own.
+description: A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own.
 head:
   - tag: title
     content: Docs | Rhizome
 ---
 
-Rhizome is a desktop app for working with an AI agent. What's worth keeping ends up as plain Markdown notes in a folder on your disk, called your **vault**. You can open, edit, diff and revert those notes like any other file.
+A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own. You can open, edit, diff and revert those notes like any other file.
 
 :::note
 **Developer preview.** Rhizome runs on macOS, built from source. There is no signed download yet. See [Install](start/install.md).

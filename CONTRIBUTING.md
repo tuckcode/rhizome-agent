@@ -1,6 +1,6 @@
 # Contributing
 
-If you like Rhizome Agent, contributions are welcome.
+If you like Rhizome, contributions are welcome.
 
 A small pull request is the useful kind. Open an issue first if you are not sure the change is wanted. Issues live on [tuckcode/rhizome-agent](https://github.com/tuckcode/rhizome-agent).
 

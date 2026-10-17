@@ -1,6 +1,6 @@
 # Public preview
 
-Rhizome is a macOS chat app with its own agent loop. You can switch Chat to [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent). You can open a note beside the chat and save the result as plain Markdown in a vault on your disk.
+A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own. You can switch Chat to [Prime Agent](https://github.com/PrimeIntellect-ai/prime-agent). Prime is the current Chat default.
 
 This page is the install and recovery guide. Developer commands live in [`GETTING-STARTED.md`](GETTING-STARTED.md).
 

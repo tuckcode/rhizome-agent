@@ -1,4 +1,4 @@
-# GitHub Actions — Rhizome Agent
+# GitHub Actions — Rhizome
 
 **Origin:** Rewritten 2026-09-01 (Cursor) — replaces Italian bootstrap copy from
 Rhizome Desktop (`11e1315`, 2026-08-09). Align with the workflow YAML files

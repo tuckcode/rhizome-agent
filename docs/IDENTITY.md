@@ -52,8 +52,8 @@ say so explicitly and record why before diverging.
 ## Near-term direction
 
 - UI: chat-like experience (existing AI panel as starting point).
-- Brain: long-lived **Prime Agent** session (`--mode rpc` / harness), not “spawn CLI once per message.”
-- Vault: Rhizome MCP tools when a vault is attached — Agent is not a second full wiki product on day one.
+- Harness: Rhizome owns the agent loop (ADR-0180). Prime and Hermes are optional engines. Settings still starts Chat on Prime until you switch.
+- Vault: Rhizome MCP tools when a vault is attached — not a second full wiki product on day one.
 
 Session-host spike (slice 1): `docs/plans/2026-08-09-prime-harness-chat-spike.md`.
 v0 brief + roadmap: `docs/plans/2026-08-09-rhizome-agent-v0-brief-and-roadmap.md` (glossary: root `CONTEXT.md`).
