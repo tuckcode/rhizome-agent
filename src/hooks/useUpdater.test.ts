@@ -307,6 +307,22 @@ describe('useUpdater', () => {
     )
   })
 
+  it('maps an unknown invoke error to the shared check fallback', async () => {
+    const { outcome } = await performManualCheck(
+      'stable',
+      new Error('internal invoke detail users should not see'),
+    )
+
+    expect(outcome).toEqual({
+      kind: 'error',
+      message: UPDATER_CHECK_FAILED_MESSAGE,
+    })
+    expect(console.warn).toHaveBeenCalledWith(
+      '[updater] Failed to check for updates',
+      'internal invoke detail users should not see',
+    )
+  })
+
   it('dismiss resets the banner state', async () => {
     vi.mocked(isTauri).mockReturnValue(true)
     installInvokeHandlers({ checkResult: makeUpdate() })

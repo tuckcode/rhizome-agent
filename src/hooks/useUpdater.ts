@@ -6,7 +6,10 @@ import {
   type AppUpdateDownloadEvent,
   type AppUpdateMetadata,
 } from '../lib/appUpdater'
-import { UPDATER_CHECK_FAILED_MESSAGE } from '../lib/updaterUserMessages'
+import {
+  UPDATER_CHECK_FAILED_MESSAGE,
+  isAllowlistedUpdaterCheckError,
+} from '../lib/updaterUserMessages'
 import { formatCalendarVersionForDisplay } from '../utils/calendarVersion'
 import { openExternalUrl } from '../utils/url'
 
@@ -58,10 +61,6 @@ function updateCheckDetail(error: unknown): string {
   return ''
 }
 
-function looksLikeTransportOrPluginFailure(detail: string): boolean {
-  return /release json|network|reqwest|timed out|os error|status code|econn|dns/i.test(detail)
-}
-
 function buildUpdateCheckErrorMessage(error: unknown): string {
   const detail = updateCheckDetail(error)
   if (detail) {
@@ -69,9 +68,9 @@ function buildUpdateCheckErrorMessage(error: unknown): string {
   } else {
     console.warn('[updater] Failed to check for updates')
   }
-  // User-facing copy lives in src/shared/updaterUserMessages.json. Show Rust
-  // messages as-is. Hide transport and plugin wording.
-  if (detail && !looksLikeTransportOrPluginFailure(detail)) return detail
+  // Only show copy Rust allowlists in updaterUserMessages.json. Everything else
+  // is logged and replaced with the shared check-failed sentence.
+  if (detail && isAllowlistedUpdaterCheckError(detail)) return detail
   return UPDATER_CHECK_FAILED_MESSAGE
 }
 
