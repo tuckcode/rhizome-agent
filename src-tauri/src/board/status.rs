@@ -113,50 +113,52 @@ fn prepend_block(body: &str, status: &str) -> StatusEdit {
 fn edit_frontmatter(lines: &[Line<'_>], close: usize, status: &str) -> StatusEdit {
     // `status_spans` sees only the lines between the fences.
     let spans = status_spans(&lines[1..close]);
-    let mut out = String::new();
     if spans.is_empty() {
-        for line in &lines[..close] {
-            push_line(&mut out, line);
-        }
-        let eol = lines[0].eol;
-        out.push_str(&format!("Status: {}{eol}", format_value(status, None)));
-        for line in &lines[close..] {
-            push_line(&mut out, line);
-        }
-        return StatusEdit {
-            content: out,
-            from: None,
-        };
+        return insert_status(lines, close, status);
     }
-
+    let mut out = String::new();
     let mut from = None;
     let mut index = 0;
     for span in spans {
         let (start, end) = (span.start + 1, span.end + 1);
-        for line in &lines[index..start] {
-            push_line(&mut out, line);
-        }
-        match parse_key_line(lines[start].text) {
-            Some(key) => {
-                if from.is_none() {
-                    from = read_value(&lines[start..=end], &key);
-                }
-                out.push_str(&rewrite_key_line(&key, status));
-                // Every line before the close fence has an ending.
-                out.push_str(lines[end].eol);
-            }
-            None => {
-                for line in &lines[start..=end] {
-                    push_line(&mut out, line);
-                }
-            }
-        }
+        push_lines(&mut out, &lines[index..start]);
+        let old = rewrite_span(&mut out, &lines[start..=end], status);
+        from = from.or(old);
         index = end + 1;
     }
-    for line in &lines[index..] {
-        push_line(&mut out, line);
-    }
+    push_lines(&mut out, &lines[index..]);
     StatusEdit { content: out, from }
+}
+
+/// Adds a `Status` line just before the closing fence.
+fn insert_status(lines: &[Line<'_>], close: usize, status: &str) -> StatusEdit {
+    let mut out = String::new();
+    push_lines(&mut out, &lines[..close]);
+    let eol = lines[0].eol;
+    out.push_str(&format!("Status: {}{eol}", format_value(status, None)));
+    push_lines(&mut out, &lines[close..]);
+    StatusEdit {
+        content: out,
+        from: None,
+    }
+}
+
+/// Writes one `Status` entry as a single line. Returns the old value.
+fn rewrite_span(out: &mut String, span: &[Line<'_>], status: &str) -> Option<String> {
+    let Some(key) = parse_key_line(span[0].text) else {
+        push_lines(out, span);
+        return None;
+    };
+    out.push_str(&rewrite_key_line(&key, status));
+    // Every line before the close fence has an ending.
+    out.push_str(span[span.len() - 1].eol);
+    read_value(span, &key)
+}
+
+fn push_lines(out: &mut String, lines: &[Line<'_>]) {
+    for line in lines {
+        push_line(out, line);
+    }
 }
 
 fn push_line(out: &mut String, line: &Line<'_>) {
@@ -341,12 +343,9 @@ fn quoted_end(text: &str, quote: char) -> Option<usize> {
 }
 
 fn strip_quotes(text: &str) -> Option<&str> {
-    let first = text.chars().next()?;
-    if (first == '"' || first == '\'') && text.len() >= 2 && text.ends_with(first) {
-        Some(&text[1..text.len() - 1])
-    } else {
-        None
-    }
+    ['"', '\'']
+        .into_iter()
+        .find_map(|quote| text.strip_prefix(quote)?.strip_suffix(quote))
 }
 
 /// Old value as text. Lists and maps read as `None`.
