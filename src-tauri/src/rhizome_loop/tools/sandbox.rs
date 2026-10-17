@@ -11,6 +11,7 @@
 
 use std::cell::Cell;
 use std::ffi::OsString;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 pub const OUTSIDE_ROOTS: &str = "Path is outside the allowed vault and workspace roots.";
@@ -319,6 +320,14 @@ fn canonicalize_missing(path: &Path) -> Result<PathBuf, String> {
     let mut current = path.to_path_buf();
     let mut tail: Vec<OsString> = Vec::new();
     loop {
+        if let Ok(meta) = fs::symlink_metadata(&current) {
+            if meta.file_type().is_symlink() && current.canonicalize().is_err() {
+                return Err(format!(
+                    "Dangling symlink in path: {}",
+                    path.to_string_lossy()
+                ));
+            }
+        }
         if current.exists() {
             let mut resolved = current
                 .canonicalize()
@@ -771,5 +780,16 @@ mod tests {
                 "write must keep blocking {requested} with the setting off: {error}"
             );
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn dangling_symlink_mid_path_is_a_clear_error() {
+        let (_dir, root) = vault();
+        let link = PathBuf::from(&root).join("gone");
+        std::os::unix::fs::symlink(PathBuf::from(&root).join("missing-dir"), &link).unwrap();
+        let error = resolve("gone/note.md", Some(&root), &[]).unwrap_err();
+        assert!(error.to_lowercase().contains("dangling"), "{error}");
+        assert!(!error.contains("os error 17"), "{error}");
     }
 }

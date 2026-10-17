@@ -90,11 +90,24 @@ pub fn offered_tools(mode: AiAgentPermissionMode) -> Vec<String> {
 /// become "run any shell". `create_note` never matches: Limited
 /// tools ask every call (Allow once and Deny only). An unknown
 /// name never matches.
+#[cfg(test)]
 pub fn session_matches(name: &str, granted_args: &str, call_args: &str) -> bool {
+    session_matches_in(name, granted_args, call_args, None, &[])
+}
+
+pub fn session_matches_in(
+    name: &str,
+    granted_args: &str,
+    call_args: &str,
+    vault_path: Option<&str>,
+    vault_paths: &[String],
+) -> bool {
     match tools::lookup(name).map(|tool| tool.policy) {
         Some(ToolPolicy::CreateNote) => false,
         Some(ToolPolicy::Bash) => granted_args == call_args,
-        Some(ToolPolicy::Mutate) => tools::mutate_session_matches(granted_args, call_args),
+        Some(ToolPolicy::Mutate) => {
+            tools::mutate_session_matches(granted_args, call_args, vault_path, vault_paths)
+        }
         Some(ToolPolicy::Echo) | Some(ToolPolicy::ReadOnly) => true,
         None => false,
     }

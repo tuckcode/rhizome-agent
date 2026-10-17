@@ -1,18 +1,19 @@
 //! Create or overwrite a text file inside the allowed roots.
 
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use super::args;
 use super::atomic;
-use super::preview;
 use super::sandbox;
+use super::text;
+
+pub const MAX_BYTES: usize = text::MAX_BYTES;
 
 pub(crate) const SCHEMA: &str = r#"{
   "type": "function",
   "function": {
     "name": "write_file",
-    "description": "Create or overwrite a text file inside the user's vault roots or current workspace. Paths are canonicalized; anything outside those roots is refused. Secret files (.env*, .git/, *.pem, id_*) are refused. Parent directories are created only inside those roots. Writes are atomic (temp file then rename). This tool asks for approval on every call unless the session already granted this path.",
+    "description": "Create or overwrite a text file inside the user's vault roots or current workspace. Paths are canonicalized; anything outside those roots is refused. Secret files (.env*, .git/, *.pem, id_*) are refused. Content and existing files larger than 2097152 bytes are refused. Read-only files and hard links are refused. Parent directories are created only inside those roots. Writes are atomic (temp file then rename). This tool asks for approval on every call unless the session already granted this path.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -36,7 +37,16 @@ pub fn run(
     vault_path: Option<&str>,
     vault_paths: &[String],
 ) -> Result<String, String> {
-    let plan = plan(raw_args, vault_path, vault_paths)?;
+    run_with_cap(raw_args, vault_path, vault_paths, MAX_BYTES)
+}
+
+fn run_with_cap(
+    raw_args: &str,
+    vault_path: Option<&str>,
+    vault_paths: &[String],
+    max_bytes: usize,
+) -> Result<String, String> {
+    let plan = plan_with_cap(raw_args, vault_path, vault_paths, max_bytes)?;
     atomic::write_atomic(&plan.path, plan.after.as_bytes())?;
     Ok(if plan.created {
         format!("Created {}", plan.display_path)
@@ -51,6 +61,7 @@ pub struct WritePlan {
     pub before: String,
     pub after: String,
     pub created: bool,
+    pub content_hash: String,
 }
 
 pub fn plan(
@@ -58,18 +69,36 @@ pub fn plan(
     vault_path: Option<&str>,
     vault_paths: &[String],
 ) -> Result<WritePlan, String> {
+    plan_with_cap(raw_args, vault_path, vault_paths, MAX_BYTES)
+}
+
+fn plan_with_cap(
+    raw_args: &str,
+    vault_path: Option<&str>,
+    vault_paths: &[String],
+    max_bytes: usize,
+) -> Result<WritePlan, String> {
     let args = args::parse_object(raw_args, "write_file")?;
     let requested = args::required_str(&args, "path", "write_file")?;
     let content = args::required_string(&args, "content", "write_file")?;
+    if content.len() > max_bytes {
+        return Err(format!(
+            "Content is too large to write ({} bytes; limit is {max_bytes}).",
+            content.len()
+        ));
+    }
     let path = sandbox::resolve(requested, vault_path, vault_paths)?;
     if path.is_dir() {
         return Err(format!("Not a file: {requested}"));
     }
+    atomic::preflight(&path)?;
     let created = !path.is_file();
-    let before = if created {
-        String::new()
+    let (before, content_hash) = if created {
+        (String::new(), text::ABSENT_HASH.to_string())
     } else {
-        read_existing(&path)?
+        let text_body = text::read_text_limited(&path, max_bytes)?;
+        let content_hash = text::hash_bytes(text_body.as_bytes());
+        (text_body, content_hash)
     };
     let roots = sandbox::allowed_roots(vault_path, vault_paths)?;
     Ok(WritePlan {
@@ -78,30 +107,22 @@ pub fn plan(
         before,
         after: content.to_string(),
         created,
+        content_hash,
     })
 }
 
+#[cfg(test)]
 pub fn preview_diff(
     raw_args: &str,
     vault_path: Option<&str>,
     vault_paths: &[String],
 ) -> Result<String, String> {
     let plan = plan(raw_args, vault_path, vault_paths)?;
-    Ok(preview::unified(
+    Ok(super::preview::unified(
         &plan.display_path,
         &plan.before,
         &plan.after,
     ))
-}
-
-fn read_existing(path: &Path) -> Result<String, String> {
-    let bytes = fs::read(path).map_err(|error| format!("Failed to read file: {error}"))?;
-    String::from_utf8(bytes).map_err(|_| {
-        format!(
-            "File is binary and cannot be overwritten as text: {}",
-            path.display()
-        )
-    })
 }
 
 #[cfg(test)]
@@ -265,5 +286,146 @@ mod tests {
         .unwrap_err();
         assert!(error.contains(sandbox::BLOCKED_SECRET), "{error}");
         assert_eq!(fs::read_to_string(&env).unwrap(), "SECRET=keep\n");
+    }
+
+    #[test]
+    fn existing_file_over_the_byte_cap_is_refused_without_writing() {
+        let (_dir, root) = vault();
+        let dest = Path::new(&root).join("note.md");
+        fs::write(&dest, "abcdefghij").unwrap();
+        let error = run_with_cap(
+            &json!({ "path": "note.md", "content": "x" }).to_string(),
+            Some(&root),
+            &[],
+            8,
+        )
+        .unwrap_err();
+        assert!(error.contains("too large"), "{error}");
+        assert!(error.contains("limit is 8"), "{error}");
+        assert_eq!(fs::read_to_string(&dest).unwrap(), "abcdefghij");
+    }
+
+    #[test]
+    fn content_over_the_byte_cap_is_refused_without_writing() {
+        let (_dir, root) = vault();
+        let dest = Path::new(&root).join("note.md");
+        fs::write(&dest, "keep\n").unwrap();
+        let error = run_with_cap(
+            &json!({ "path": "note.md", "content": "abcdefghij" }).to_string(),
+            Some(&root),
+            &[],
+            8,
+        )
+        .unwrap_err();
+        assert!(error.contains("Content is too large"), "{error}");
+        assert!(error.contains("limit is 8"), "{error}");
+        assert_eq!(fs::read_to_string(&dest).unwrap(), "keep\n");
+        assert!(!Path::new(&root).join("fresh.md").exists());
+    }
+
+    #[test]
+    fn new_content_at_the_byte_cap_can_be_written() {
+        let (_dir, root) = vault();
+        let out = run_with_cap(
+            &json!({ "path": "fresh.md", "content": "abcdefgh" }).to_string(),
+            Some(&root),
+            &[],
+            8,
+        )
+        .unwrap();
+        assert!(out.contains("Created"), "{out}");
+        assert_eq!(
+            fs::read_to_string(Path::new(&root).join("fresh.md")).unwrap(),
+            "abcdefgh"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn preview_path_is_the_symlink_target() {
+        let (_dir, root) = vault();
+        let dest = Path::new(&root).join("real.md");
+        fs::write(&dest, "old\n").unwrap();
+        std::os::unix::fs::symlink(&dest, Path::new(&root).join("link.md")).unwrap();
+        let plan = plan(
+            &json!({ "path": "link.md", "content": "new\n" }).to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap();
+        assert_eq!(plan.display_path, "real.md");
+        assert_eq!(plan.path, dest);
+        assert!(!plan.created);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn dangling_symlink_mid_path_is_a_clear_error() {
+        let (_dir, root) = vault();
+        let link = Path::new(&root).join("gone");
+        std::os::unix::fs::symlink(Path::new(&root).join("missing-dir"), &link).unwrap();
+        let error = run(
+            &json!({ "path": "gone/note.md", "content": "no\n" }).to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap_err();
+        assert!(error.to_lowercase().contains("dangling"), "{error}");
+        assert!(!error.contains("os error 17"), "{error}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn read_only_file_is_refused() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let (_dir, root) = vault();
+        let dest = Path::new(&root).join("locked.md");
+        fs::write(&dest, "keep\n").unwrap();
+        fs::set_permissions(&dest, fs::Permissions::from_mode(0o444)).unwrap();
+        let error = run(
+            &json!({ "path": "locked.md", "content": "no\n" }).to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap_err();
+        let _ = fs::set_permissions(&dest, fs::Permissions::from_mode(0o644));
+        assert!(error.contains("read-only"), "{error}");
+        assert_eq!(fs::read_to_string(&dest).unwrap(), "keep\n");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn hard_link_is_refused() {
+        let (_dir, root) = vault();
+        let dest = Path::new(&root).join("note.md");
+        let alias = Path::new(&root).join("alias.md");
+        fs::write(&dest, "keep\n").unwrap();
+        fs::hard_link(&dest, &alias).unwrap();
+        let error = run(
+            &json!({ "path": "note.md", "content": "no\n" }).to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap_err();
+        assert!(error.contains("hard link"), "{error}");
+        assert_eq!(fs::read_to_string(&dest).unwrap(), "keep\n");
+        assert_eq!(fs::read_to_string(&alias).unwrap(), "keep\n");
+    }
+
+    #[test]
+    fn long_filename_can_be_overwritten() {
+        let (_dir, root) = vault();
+        let long = "n".repeat(240) + ".md";
+        let dest = Path::new(&root).join(&long);
+        fs::write(&dest, "old\n").unwrap();
+        let out = run(
+            &json!({ "path": long, "content": "new\n" }).to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap();
+        assert!(out.contains("Wrote"), "{out}");
+        assert_eq!(fs::read_to_string(&dest).unwrap(), "new\n");
     }
 }

@@ -51,6 +51,10 @@ pub enum EngineEvent {
         path: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         preview: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        created: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        overwrite: Option<bool>,
     },
     ApprovalDismissed {
         prompt_id: String,
@@ -465,12 +469,16 @@ mod tests {
                     options,
                     preview: card,
                     path,
+                    created,
+                    overwrite,
                     ..
                 }) => {
                     prompt_id = id;
                     preview = card;
                     option_ids = options.iter().map(|option| option.id.clone()).collect();
                     assert_eq!(path.as_deref(), Some("fresh.md"));
+                    assert_eq!(created, Some(true));
+                    assert_eq!(overwrite, Some(false));
                     break;
                 }
                 Ok(_) => {}

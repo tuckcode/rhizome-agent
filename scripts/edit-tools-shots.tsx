@@ -4,9 +4,13 @@ import '../src/index.css'
 import '../src/themes.css'
 import '../src/App.css'
 import './edit-tools-shots.css'
+import editPreview from './edit-tools-previews/edit.diff?raw'
+import newPreview from './edit-tools-previews/new.diff?raw'
+import overwritePreview from './edit-tools-previews/overwrite.diff?raw'
+import longPreview from './edit-tools-previews/long.diff?raw'
 
 type ShotTheme = 'graphite' | 'earth'
-type ShotState = 'edit' | 'new' | 'long'
+type ShotState = 'edit' | 'new' | 'overwrite' | 'long'
 
 const OPTIONS = [
   { id: 'allow_once', label: 'Allow once' },
@@ -16,7 +20,7 @@ const OPTIONS = [
 
 const params = new URLSearchParams(window.location.search)
 const theme = (params.get('theme') === 'earth' ? 'earth' : 'graphite') as ShotTheme
-const state = (['edit', 'new', 'long'].includes(params.get('state') ?? '')
+const state = (['edit', 'new', 'overwrite', 'long'].includes(params.get('state') ?? '')
   ? params.get('state')
   : 'edit') as ShotState
 
@@ -28,53 +32,35 @@ document.body.style.background = 'var(--surface-app)'
 document.body.style.color = 'var(--text-primary)'
 document.body.style.fontFamily = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
 
-const PREVIEW: Record<ShotState, { tool: string; path: string; preview: string }> = {
+const PREVIEW: Record<
+  ShotState,
+  { tool: string; path: string; preview: string; created?: boolean; overwrite?: boolean; label: string }
+> = {
   edit: {
     tool: 'edit_file',
     path: 'notes/plan.md',
-    preview: [
-      '--- notes/plan.md',
-      '+++ notes/plan.md',
-      '@@ -3,3 +3,3 @@',
-      '-Ship the read tools first.',
-      '+Ship the edit tools after the read tools.',
-    ].join('\n'),
+    preview: editPreview,
+    label: 'edit with a diff',
   },
   new: {
     tool: 'write_file',
     path: 'notes/fresh.md',
-    preview: [
-      '--- /dev/null',
-      '+++ notes/fresh.md',
-      '@@ -0,0 +1,4 @@',
-      '+# Fresh note',
-      '+',
-      '+The agent wants to create this file in the vault.',
-      '+Keep the parent folders inside the workspace root.',
-    ].join('\n'),
+    preview: newPreview,
+    created: true,
+    label: 'new file',
+  },
+  overwrite: {
+    tool: 'write_file',
+    path: 'notes/weekly-review.md',
+    preview: overwritePreview,
+    overwrite: true,
+    label: 'replaces the whole file',
   },
   long: {
     tool: 'edit_file',
     path: 'notes/weekly-review.md',
-    preview: [
-      '--- notes/weekly-review.md',
-      '+++ notes/weekly-review.md',
-      '@@ -12,20 +12,20 @@',
-      '-keep line 12 of the weekly review',
-      '+rewrite line 12 with the shipping note',
-      '-keep line 13 of the weekly review',
-      '+rewrite line 13 after the first pass',
-      '-keep line 14 of the weekly review',
-      '+rewrite line 14 with the vault path',
-      '-keep line 15 of the weekly review',
-      '+rewrite line 15 so the card scrolls',
-      '-keep line 24 of the weekly review',
-      '+rewrite line 24 after the critique pass',
-      '-keep line 25 of the weekly review',
-      '+rewrite line 25 with the approval copy',
-      ' keep line 26 of the weekly review',
-      '… 40 more lines',
-    ].join('\n'),
+    preview: longPreview,
+    label: 'long diff',
   },
 }
 
@@ -92,7 +78,7 @@ export function Shot() {
         <p className="mb-3 text-[11px] font-medium uppercase tracking-[0.04em] text-muted-foreground">
           {theme === 'graphite' ? 'Graphite' : 'Earth light'}
           {' · '}
-          {state === 'edit' ? 'edit with a diff' : state === 'new' ? 'new file' : 'long diff'}
+          {card.label}
         </p>
         <div className="mb-3 rounded-lg px-3 py-2 text-sm" style={{ background: 'var(--state-selected)' }}>
           Please update the note.
@@ -101,6 +87,8 @@ export function Shot() {
           tool={card.tool}
           path={card.path}
           preview={card.preview}
+          created={card.created}
+          overwrite={card.overwrite}
           options={OPTIONS}
           onReply={() => {}}
         />

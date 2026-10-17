@@ -9,14 +9,16 @@ mkdirSync(outDir, { recursive: true })
 const shots = [
   ['graphite', 'edit'],
   ['graphite', 'new'],
+  ['graphite', 'overwrite'],
   ['graphite', 'long'],
   ['earth', 'edit'],
   ['earth', 'new'],
+  ['earth', 'overwrite'],
   ['earth', 'long'],
 ]
 
 const browser = await chromium.launch()
-const page = await browser.newPage({ viewport: { width: 720, height: 900 } })
+const page = await browser.newPage({ viewport: { width: 720, height: 1100 } })
 for (const [theme, state] of shots) {
   await page.goto(`${base}?theme=${theme}&state=${state}`, { waitUntil: 'networkidle' })
   await page.evaluate(() => document.fonts.ready)

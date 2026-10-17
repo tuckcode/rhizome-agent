@@ -9,7 +9,7 @@ const OPTIONS = [
 ]
 
 describe('ToolApprovalCard', () => {
-  it('shows the path and a readable edit diff', () => {
+  it('shows the path and a readable edit diff without file headers', () => {
     render(
       <ToolApprovalCard
         tool="edit_file"
@@ -21,22 +21,76 @@ describe('ToolApprovalCard', () => {
     )
     expect(screen.getByTestId('approval-path')).toHaveTextContent('notes/plan.md')
     expect(screen.getByText('Edit file')).toBeInTheDocument()
+    expect(screen.getByTestId('approval-status')).toHaveTextContent('Needs approval')
+    expect(screen.getByTestId('approval-diff')).toHaveTextContent('@@ -1,1 +1,1 @@')
     expect(screen.getByTestId('approval-diff')).toHaveTextContent('-draft')
     expect(screen.getByTestId('approval-diff')).toHaveTextContent('+ready')
+    expect(screen.getByTestId('approval-diff')).not.toHaveTextContent('--- notes/plan.md')
+    expect(screen.queryByText('ASK')).not.toBeInTheDocument()
   })
 
-  it('titles a new file as create and shows the full content', () => {
+  it('titles a new file as create and labels it under the path', () => {
     render(
       <ToolApprovalCard
         tool="write_file"
         path="notes/fresh.md"
+        created
         preview={'--- /dev/null\n+++ notes/fresh.md\n@@ -0,0 +1,1 @@\n+hello vault\n'}
         options={OPTIONS}
         onReply={vi.fn()}
       />,
     )
     expect(screen.getByText('Create file')).toBeInTheDocument()
+    expect(screen.getByTestId('approval-new-file')).toHaveTextContent('New file')
     expect(screen.getByTestId('approval-diff')).toHaveTextContent('+hello vault')
+    expect(screen.queryByTestId('approval-overwrite')).not.toBeInTheDocument()
+  })
+
+  it('warns when write_file replaces the whole file', () => {
+    render(
+      <ToolApprovalCard
+        tool="write_file"
+        path="notes/weekly-review.md"
+        overwrite
+        preview={'@@ -1,2 +1,1 @@\n-old\n+new\n'}
+        options={OPTIONS}
+        onReply={vi.fn()}
+      />,
+    )
+    expect(screen.getByText('Write file')).toBeInTheDocument()
+    expect(screen.getByTestId('approval-overwrite')).toHaveTextContent('Replaces the whole file')
+  })
+
+  it('makes Allow once the filled primary action', () => {
+    render(
+      <ToolApprovalCard
+        tool="write_file"
+        path="a.md"
+        created
+        preview={'@@ -0,0 +1,1 @@\n+x\n'}
+        options={OPTIONS}
+        onReply={vi.fn()}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'Allow once' })).toHaveClass('bg-primary')
+    expect(screen.getByRole('button', { name: 'Allow for session' })).toHaveClass('border')
+    expect(screen.getByRole('button', { name: 'Deny' })).not.toHaveClass('bg-primary')
+  })
+
+  it('offers Show all when the diff body overflows', () => {
+    const long = ['@@ -1,20 +1,20 @@', ...Array.from({ length: 20 }, (_, i) => `+line${i}`)].join('\n')
+    render(
+      <ToolApprovalCard
+        tool="edit_file"
+        path="notes/weekly-review.md"
+        preview={long}
+        options={OPTIONS}
+        onReply={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('approval-show-all')).toHaveTextContent('Show all')
+    fireEvent.click(screen.getByTestId('approval-show-all'))
+    expect(screen.queryByTestId('approval-show-all')).not.toBeInTheDocument()
   })
 
   it('sends allow once, allow for session, and deny', () => {

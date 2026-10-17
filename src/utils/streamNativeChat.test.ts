@@ -118,6 +118,8 @@ describe('native stream events', () => {
       args: '{"path":"fresh.md","content":"hello\\n"}',
       path: 'fresh.md',
       preview: '--- /dev/null\n+++ fresh.md\n+hello\n',
+      created: true,
+      overwrite: false,
       options: [
         { id: 'allow_once', label: 'Allow once' },
         { id: 'allow_session', label: 'Allow for session' },
@@ -128,6 +130,8 @@ describe('native stream events', () => {
       promptId: 'prompt_1',
       tool: 'write_file',
       path: 'fresh.md',
+      created: true,
+      overwrite: false,
     }))
   })
 })

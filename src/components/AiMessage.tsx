@@ -42,6 +42,8 @@ export interface AiActionApproval {
   options: NativeApprovalOption[]
   preview?: string
   path?: string
+  created?: boolean
+  overwrite?: boolean
   busy?: boolean
   onReply?: (choice: NativeApprovalChoice) => void
 }
@@ -312,6 +314,8 @@ function ActionCardsList({ actions, onOpenNote, expandedIds, onToggleExpand }: {
             tool={action.tool}
             path={action.approval.path ?? action.path}
             preview={action.approval.preview}
+            created={action.approval.created}
+            overwrite={action.approval.overwrite}
             options={action.approval.options}
             busy={action.approval.busy}
             onReply={(choice) => action.approval?.onReply?.(choice)}

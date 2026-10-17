@@ -12,6 +12,8 @@ export interface NativeApprovalPrompt {
   options: NativeApprovalOption[]
   path?: string
   preview?: string
+  created?: boolean
+  overwrite?: boolean
   reply: (choice: NativeApprovalChoice) => void
 }
 

@@ -140,10 +140,10 @@
   --syntax-highlight-type: #90511E;
   --syntax-highlight-deletion: #A8322E;
   --syntax-highlight-deletion-bg: #F5E2DE;
-  --diff-added-text: #296E46;
-  --diff-added-bg: rgba(41, 110, 70, 0.12);
-  --diff-removed-text: #AD3B31;
-  --diff-removed-bg: rgba(173, 59, 49, 0.12);
+  --diff-added-text: #1E5536;
+  --diff-added-bg: rgba(30, 85, 54, 0.12);
+  --diff-removed-text: #8F2C24;
+  --diff-removed-bg: rgba(143, 44, 36, 0.12);
   --diff-hunk-bg: rgba(44, 106, 77, 0.08);
   --editor-code-block-background: var(--surface-sidebar);
   --editor-code-block-border: var(--border-subtle);

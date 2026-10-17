@@ -1,0 +1,7 @@
+--- /dev/null
++++ notes/fresh.md
+@@ -0,0 +1,4 @@
++# Fresh note
++
++The agent wants to create this file in the vault.
++Keep the parent folders inside the workspace root.

@@ -40,6 +40,16 @@ describe('DiffView', () => {
     expect(hunkLine).toBeInTheDocument()
   })
 
+  it('uses the raised surface for compact hunk rows and hides file headers', () => {
+    const diff = '--- a.md\n+++ a.md\n@@ -1,1 +1,1 @@\n-old\n+new\n'
+    render(<DiffView compact diff={diff} />)
+    expect(screen.queryByText('--- a.md')).not.toBeInTheDocument()
+    expect(screen.queryByText('+++ a.md')).not.toBeInTheDocument()
+    const hunkLine = screen.getByText('@@ -1,1 +1,1 @@').closest('div')
+    expect(hunkLine).toHaveClass('bg-[var(--surface-button)]')
+    expect(hunkLine).not.toHaveClass('italic')
+  })
+
   it('applies header styling to diff/index/---/+++ lines', () => {
     const diff = 'diff --git a/test.md b/test.md\nindex abc123..def456\n--- a/test.md\n+++ b/test.md'
     const { container } = render(<DiffView diff={diff} />)

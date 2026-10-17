@@ -41,8 +41,11 @@ struct Shared {
     /// Name and args already consumed by an allow-once grant.
     grants: Vec<(String, String)>,
     /// Session grants. Echo and other tools match by name; bash
-    /// matches the exact command. Cleared by `end_session`.
+    /// matches the exact command. Cleared by `end_session` and
+    /// `set_vault`.
     session_grants: Vec<(String, String)>,
+    /// Hash of the file as it was when the approval card opened.
+    pending_stamp: Option<(String, String)>,
     /// Names a test adds on top of `policy::offered_tools`. Production
     /// modes do not use this list.
     extra_offered: Vec<String>,
@@ -241,6 +244,7 @@ impl AgentLoop {
                 grants: Vec::new(),
                 session_grants: Vec::new(),
                 extra_offered: Vec::new(),
+                pending_stamp: None,
                 vault_path: None,
                 vault_paths: Vec::new(),
                 waiter: None,
@@ -278,10 +282,14 @@ impl AgentLoop {
     }
 
     /// Vault for this run. `create_note` uses it; it is not on `ModelView`.
+    /// Changing vaults drops session grants so a path in the old vault
+    /// cannot cover a file in the new one.
     pub fn set_vault(&self, vault_path: Option<String>, vault_paths: Vec<String>) {
         let mut shared = self.lock();
         shared.vault_path = vault_path;
         shared.vault_paths = vault_paths;
+        shared.session_grants.clear();
+        shared.pending_stamp = None;
     }
 
     pub fn set_approval_waiter(
@@ -582,11 +590,19 @@ impl AgentLoop {
     }
 
     fn session_allows(&self, name: &str, args: &str) -> bool {
-        self.lock()
+        let shared = self.lock();
+        shared
             .session_grants
             .iter()
             .any(|(granted_name, granted_args)| {
-                granted_name == name && policy::session_matches(name, granted_args, args)
+                granted_name == name
+                    && policy::session_matches_in(
+                        name,
+                        granted_args,
+                        args,
+                        shared.vault_path.as_deref(),
+                        &shared.vault_paths,
+                    )
             })
     }
 
@@ -602,6 +618,24 @@ impl AgentLoop {
         if self.is_cancelled() {
             self.record_denial(id, name, "cancelled".into());
             return;
+        }
+        if matches!(
+            tools::lookup(name).map(|tool| tool.policy),
+            Some(tools::ToolPolicy::Mutate)
+        ) {
+            let (vault_path, vault_paths) = {
+                let shared = self.lock();
+                (shared.vault_path.clone(), shared.vault_paths.clone())
+            };
+            match tools::mutate_prepare(name, args, vault_path.as_deref(), &vault_paths) {
+                Ok(preview) => {
+                    self.lock().pending_stamp = Some((name.to_string(), preview.content_hash));
+                }
+                Err(error) => {
+                    self.record_tool_output(id, name, error);
+                    return;
+                }
+            }
         }
         let reply = self.wait_for_approval(name, args);
         // Cancel or quit can land while the waiter is blocked, or just
@@ -682,11 +716,47 @@ impl AgentLoop {
         }
     }
 
+    fn record_tool_output(&self, id: &str, name: &str, output: String) {
+        {
+            let mut shared = self.lock();
+            shared.history.push(HistoryItem::ToolResult {
+                id: id.to_string(),
+                name: name.to_string(),
+                output: output.clone(),
+            });
+        }
+        self.push_log(DurableEvent::ToolResult {
+            id: id.to_string(),
+            name: name.to_string(),
+            output,
+        });
+    }
+
     fn record_run(&self, id: &str, name: &str, args: &str, spend_grant: bool) {
-        let (vault_path, vault_paths) = {
-            let shared = self.lock();
-            (shared.vault_path.clone(), shared.vault_paths.clone())
+        let (vault_path, vault_paths, stamp) = {
+            let mut shared = self.lock();
+            let stamp = shared.pending_stamp.take();
+            (shared.vault_path.clone(), shared.vault_paths.clone(), stamp)
         };
+        if let Some((stamp_name, expected)) = stamp {
+            if stamp_name == name {
+                match tools::current_content_hash(name, args, vault_path.as_deref(), &vault_paths) {
+                    Ok(actual) if actual == expected => {}
+                    Ok(_) => {
+                        self.record_tool_output(
+                            id,
+                            name,
+                            tools::CHANGED_SINCE_APPROVAL.to_string(),
+                        );
+                        return;
+                    }
+                    Err(error) => {
+                        self.record_tool_output(id, name, error);
+                        return;
+                    }
+                }
+            }
+        }
         let output = match tools::execute_allowed(name, args, vault_path.as_deref(), &vault_paths) {
             Ok(output) => output,
             Err(error) => error,

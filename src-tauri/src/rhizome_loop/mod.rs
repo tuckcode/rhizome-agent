@@ -529,6 +529,125 @@ mod tests {
     }
 
     #[test]
+    fn file_changed_since_approval_does_not_write() {
+        let vault = tempfile::tempdir().unwrap();
+        let root = vault.path().canonicalize().unwrap();
+        let dest = root.join("note.md");
+        std::fs::write(&dest, "keep\n").unwrap();
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::Safe);
+        agent.set_vault(Some(root.to_string_lossy().into_owned()), Vec::new());
+        let note_path = dest.clone();
+        agent.set_approval_waiter(move |_, _| {
+            std::fs::write(&note_path, "changed\n").unwrap();
+            ApprovalReply::AllowOnce
+        });
+        let mut model = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "write_file".into(),
+            args: serde_json::json!({ "path": "note.md", "content": "no\n" }).to_string(),
+        }]]);
+        agent.submit("overwrite");
+        agent.run_until_idle(&mut model);
+        assert_eq!(std::fs::read_to_string(&dest).unwrap(), "changed\n");
+        assert!(agent.events().iter().any(|event| {
+            matches!(
+                event,
+                DurableEvent::ToolResult { name, output, .. }
+                    if name == "write_file" && output == super::tools::CHANGED_SINCE_APPROVAL
+            )
+        }));
+    }
+
+    #[test]
+    fn preview_error_does_not_open_an_approval_card() {
+        let vault = tempfile::tempdir().unwrap();
+        let root = vault.path().canonicalize().unwrap();
+        std::fs::write(root.join("note.md"), "only this\n").unwrap();
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::Safe);
+        agent.set_vault(Some(root.to_string_lossy().into_owned()), Vec::new());
+        let asked = Arc::new(AtomicBool::new(false));
+        let flag = Arc::clone(&asked);
+        agent.set_approval_waiter(move |_, _| {
+            flag.store(true, Ordering::SeqCst);
+            ApprovalReply::AllowOnce
+        });
+        let mut model = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "edit_file".into(),
+            args: serde_json::json!({
+                "path": "note.md",
+                "old_string": "missing",
+                "new_string": "x"
+            })
+            .to_string(),
+        }]]);
+        agent.submit("edit");
+        agent.run_until_idle(&mut model);
+        assert!(
+            !asked.load(Ordering::SeqCst),
+            "a call that will error must not show Allow buttons: {:?}",
+            agent.events()
+        );
+        assert!(agent.events().iter().any(|event| {
+            matches!(
+                event,
+                DurableEvent::ToolResult { name, output, .. }
+                    if name == "edit_file" && output.contains("not found")
+            )
+        }));
+        assert!(!agent.events().iter().any(|event| {
+            matches!(event, DurableEvent::ToolDenied { name, .. } if name == "edit_file")
+        }));
+    }
+
+    #[test]
+    fn session_grants_clear_when_the_vault_changes() {
+        let first = tempfile::tempdir().unwrap();
+        let second = tempfile::tempdir().unwrap();
+        let root_a = first.path().canonicalize().unwrap();
+        let root_b = second.path().canonicalize().unwrap();
+        std::fs::write(root_a.join("note.md"), "one\n").unwrap();
+        std::fs::write(root_b.join("note.md"), "two\n").unwrap();
+        let agent = AgentLoop::new();
+        agent.set_permission_mode(AiAgentPermissionMode::PowerUser);
+        agent.set_vault(Some(root_a.to_string_lossy().into_owned()), Vec::new());
+        let asks = Arc::new(AtomicUsize::new(0));
+        let count = Arc::clone(&asks);
+        agent.set_approval_waiter(move |_, _| {
+            count.fetch_add(1, Ordering::SeqCst);
+            ApprovalReply::AllowSession
+        });
+        let mut model_a = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "write_file".into(),
+            args: serde_json::json!({ "path": "note.md", "content": "ONE\n" }).to_string(),
+        }]]);
+        agent.submit("a");
+        agent.run_until_idle(&mut model_a);
+        assert_eq!(asks.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            std::fs::read_to_string(root_a.join("note.md")).unwrap(),
+            "ONE\n"
+        );
+
+        agent.set_vault(Some(root_b.to_string_lossy().into_owned()), Vec::new());
+        let mut model_b = FakeModel::script(vec![vec![ScriptPart::Tool {
+            name: "write_file".into(),
+            args: serde_json::json!({ "path": "note.md", "content": "TWO\n" }).to_string(),
+        }]]);
+        agent.submit("b");
+        agent.run_until_idle(&mut model_b);
+        assert_eq!(
+            asks.load(Ordering::SeqCst),
+            2,
+            "a grant from the old vault must not cover the new one"
+        );
+        assert_eq!(
+            std::fs::read_to_string(root_b.join("note.md")).unwrap(),
+            "TWO\n"
+        );
+    }
+
+    #[test]
     fn limited_tools_asks_before_create_note_writes() {
         let vault = tempfile::tempdir().unwrap();
         let note = vault.path().join("asked.md");

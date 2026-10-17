@@ -291,14 +291,26 @@ impl<M: Model> Engine for NativeEngine<M> {
         self.agent.set_approval_waiter(move |name, args| {
             let id = format!("prompt_{}", prompt_seq.fetch_add(1, Ordering::SeqCst) + 1);
             *wait_prompt.lock().expect("live prompt") = Some(id.clone());
-            let preview = approval_preview(name, args, vault_for_wait.as_deref(), &vaults_for_wait);
+            let prepared =
+                approval_preview(name, args, vault_for_wait.as_deref(), &vaults_for_wait);
+            let (path, preview, created, overwrite) = match prepared {
+                Some(Ok(card)) => (
+                    Some(card.path),
+                    Some(card.diff),
+                    Some(card.created),
+                    Some(card.overwrite),
+                ),
+                Some(Err(_)) | None => (None, None, None, None),
+            };
             emit_for_wait(EngineEvent::ApprovalRequested {
                 prompt_id: id.clone(),
                 tool: name.to_string(),
                 args: args.to_string(),
                 options: approval_options(mode, name),
-                path: preview.as_ref().map(|preview| preview.path.clone()),
-                preview: preview.as_ref().map(|preview| preview.diff.clone()),
+                path,
+                preview,
+                created,
+                overwrite,
             });
             let deadline = Instant::now() + timeout;
             let reply = loop {

@@ -1,10 +1,40 @@
 //! Temp-file + rename writes. A failed write leaves the destination
-//! unchanged. Existing files keep their permissions.
+//! unchanged. Existing files keep their permissions. Read-only files
+//! and hard links are refused. The temp name is short so a long
+//! destination name still fits.
 
-use std::fs;
+use std::fs::{self, File};
 use std::io::Write;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+pub fn preflight(path: &Path) -> Result<(), String> {
+    dest_permissions(path).map(|_| ())
+}
+
+fn dest_permissions(path: &Path) -> Result<Option<std::fs::Permissions>, String> {
+    match fs::metadata(path) {
+        Ok(meta) if meta.is_dir() => Err(format!("Not a file: {}", path.display())),
+        Ok(meta) => {
+            if meta.permissions().readonly() {
+                return Err(format!("File is read-only: {}", path.display()));
+            }
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::MetadataExt;
+                if meta.nlink() > 1 {
+                    return Err(format!(
+                        "Refusing to write through a hard link (nlink={}): {}",
+                        meta.nlink(),
+                        path.display()
+                    ));
+                }
+            }
+            Ok(Some(meta.permissions()))
+        }
+        Err(_) => Ok(None),
+    }
+}
 
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let parent = path
@@ -22,24 +52,18 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
         }
     }
 
-    let dest_permissions = match fs::metadata(path) {
-        Ok(meta) if meta.is_dir() => {
-            return Err(format!("Not a file: {}", path.display()));
-        }
-        Ok(meta) => Some(meta.permissions()),
-        Err(_) => None,
-    };
+    let kept_permissions = dest_permissions(path)?;
 
     let parent = path.parent().unwrap_or_else(|| Path::new("."));
-    let name = path
-        .file_name()
-        .and_then(|value| value.to_str())
-        .unwrap_or("file");
     let stamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|duration| duration.as_nanos())
         .unwrap_or(0);
-    let tmp = parent.join(format!(".{name}.tmp-{}-{stamp}", std::process::id()));
+    let tmp = parent.join(format!(
+        ".rhz{:x}{:x}.tmp",
+        std::process::id() & 0xffff,
+        (stamp as u32) & 0xffff
+    ));
 
     let write_tmp = || -> Result<(), String> {
         let mut file = fs::OpenOptions::new()
@@ -52,11 +76,18 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
         file.sync_all()
             .map_err(|error| format!("Failed to sync temporary file: {error}"))?;
         drop(file);
-        if let Some(permissions) = dest_permissions {
+        if let Some(permissions) = kept_permissions {
             fs::set_permissions(&tmp, permissions)
                 .map_err(|error| format!("Failed to keep file permissions: {error}"))?;
         }
         fs::rename(&tmp, path).map_err(|error| format!("Failed to replace file: {error}"))?;
+        #[cfg(unix)]
+        {
+            let dir = File::open(parent)
+                .map_err(|error| format!("Failed to open parent directory: {error}"))?;
+            dir.sync_all()
+                .map_err(|error| format!("Failed to sync parent directory: {error}"))?;
+        }
         Ok(())
     };
 
@@ -80,7 +111,7 @@ mod tests {
         let leftovers: Vec<_> = fs::read_dir(dir.path())
             .unwrap()
             .filter_map(|entry| entry.ok())
-            .filter(|entry| entry.file_name().to_string_lossy().contains(".tmp-"))
+            .filter(|entry| entry.file_name().to_string_lossy().contains(".tmp"))
             .collect();
         assert!(leftovers.is_empty(), "tmp leftovers: {leftovers:?}");
     }
@@ -113,5 +144,44 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let error = write_atomic(dir.path(), b"no\n").unwrap_err();
         assert!(error.contains("Not a file"), "{error}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn refuses_a_read_only_file() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("locked.md");
+        fs::write(&dest, "keep\n").unwrap();
+        fs::set_permissions(&dest, fs::Permissions::from_mode(0o444)).unwrap();
+        let error = write_atomic(&dest, b"no\n").unwrap_err();
+        let _ = fs::set_permissions(&dest, fs::Permissions::from_mode(0o644));
+        assert!(error.contains("read-only"), "{error}");
+        assert_eq!(fs::read_to_string(&dest).unwrap(), "keep\n");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn refuses_a_hard_link() {
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("note.md");
+        let alias = dir.path().join("alias.md");
+        fs::write(&dest, "keep\n").unwrap();
+        fs::hard_link(&dest, &alias).unwrap();
+        let error = write_atomic(&dest, b"no\n").unwrap_err();
+        assert!(error.contains("hard link"), "{error}");
+        assert_eq!(fs::read_to_string(&dest).unwrap(), "keep\n");
+        assert_eq!(fs::read_to_string(&alias).unwrap(), "keep\n");
+    }
+
+    #[test]
+    fn short_temp_name_fits_beside_a_long_filename() {
+        let dir = tempfile::tempdir().unwrap();
+        let long = "n".repeat(240) + ".md";
+        let dest = dir.path().join(&long);
+        fs::write(&dest, "old\n").unwrap();
+        write_atomic(&dest, b"new\n").unwrap();
+        assert_eq!(fs::read_to_string(&dest).unwrap(), "new\n");
     }
 }

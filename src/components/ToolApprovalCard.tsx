@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react'
 import { FilePlus, NotePencil, PencilSimple } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { DiffView } from './DiffView'
@@ -12,6 +13,8 @@ export interface ToolApprovalCardProps {
   tool: string
   path?: string
   preview?: string
+  created?: boolean
+  overwrite?: boolean
   options: NativeApprovalOption[]
   busy?: boolean
   onReply: (choice: NativeApprovalChoice) => void
@@ -24,21 +27,47 @@ function ToolGlyph({ created, tool }: { created: boolean; tool: string }) {
 }
 
 function optionVariant(id: string): 'default' | 'outline' | 'ghost' {
-  if (id === 'allow_session') return 'default'
+  if (id === 'allow_once') return 'default'
   if (id === 'deny') return 'ghost'
   return 'outline'
 }
 
+function compactLineCount(diff: string): number {
+  return diff
+    .split('\n')
+    .filter((line) => line.length > 0 && !line.startsWith('---') && !line.startsWith('+++'))
+    .length
+}
+
+const COLLAPSE_AFTER = 12
+
 export function ToolApprovalCard({
   busy = false,
+  created: createdProp,
   onReply,
   options,
+  overwrite: overwriteProp,
   path,
   preview,
   tool,
 }: ToolApprovalCardProps) {
-  const created = previewLooksCreated(preview)
+  const created = createdProp ?? previewLooksCreated(preview)
+  const overwrite = overwriteProp ?? (tool === 'write_file' && !created)
   const title = approvalTitle(tool, created)
+  const [expanded, setExpanded] = useState(false)
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const lineCount = compactLineCount(preview ?? '')
+  const overflows = !expanded && lineCount > COLLAPSE_AFTER
+
+  useLayoutEffect(() => {
+    const el = bodyRef.current
+    if (!el || !overflows) return
+    const added = el.querySelector('[data-diff-kind="added"]')
+    if (!(added instanceof HTMLElement)) return
+    const parentBox = el.getBoundingClientRect()
+    const addedBox = added.getBoundingClientRect()
+    el.scrollTop += addedBox.top - parentBox.top - 52
+  }, [preview, overflows])
 
   return (
     <section
@@ -54,11 +83,10 @@ export function ToolApprovalCard({
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-medium text-foreground">{title}</h2>
             <span
-              className="inline-flex items-center gap-1 font-mono text-[11px] tracking-[0.02em] text-muted-foreground"
+              className="font-sans text-[11px] text-muted-foreground"
               data-testid="approval-status"
             >
-              <span aria-hidden="true" className="size-1.5 rounded-full bg-primary" />
-              ASK
+              Needs approval
             </span>
           </div>
           {path ? (
@@ -70,18 +98,53 @@ export function ToolApprovalCard({
               {path}
             </p>
           ) : null}
+          {created ? (
+            <p className="mt-0.5 text-[12px] text-muted-foreground" data-testid="approval-new-file">
+              New file
+            </p>
+          ) : null}
+          {overwrite && tool === 'write_file' ? (
+            <p
+              className="mt-0.5 text-[12px] text-[var(--warn-text)]"
+              data-testid="approval-overwrite"
+            >
+              Replaces the whole file
+            </p>
+          ) : null}
         </div>
       </header>
-      <div
-        className="max-h-64 overflow-auto border-y border-border bg-muted/40"
-        data-testid="approval-diff"
-      >
-        <DiffView compact diff={preview ?? ''} />
+      <div className="relative border-y border-border bg-muted/40">
+        <div
+          ref={bodyRef}
+          className={expanded ? 'overflow-auto' : 'max-h-64 overflow-auto'}
+          data-testid="approval-diff"
+        >
+          <div className={expanded || !overflows ? undefined : 'pb-14'}>
+            <DiffView compact diff={preview ?? ''} />
+          </div>
+        </div>
+        {overflows && !expanded ? (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col justify-end">
+            <div className="h-10 bg-gradient-to-t from-card to-transparent" data-testid="approval-diff-fade" />
+            <div className="pointer-events-auto bg-card px-3 pb-2">
+              <Button
+                size="sm"
+                type="button"
+                variant="ghost"
+                data-testid="approval-show-all"
+                onClick={() => setExpanded(true)}
+              >
+                Show all {lineCount} lines
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </div>
       <footer className="flex flex-wrap items-center justify-end gap-1.5 px-3 py-2">
         {options.map((option) => (
           <Button
             key={option.id}
+            autoFocus={option.id === 'allow_once'}
             disabled={busy}
             size="sm"
             type="button"

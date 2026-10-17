@@ -1,23 +1,19 @@
 //! Exact string replace inside a text file in the allowed roots.
 
-use std::fs::{self, File};
-use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use super::args;
 use super::atomic;
-use super::preview;
 use super::sandbox;
+use super::text;
 
-/// Largest file `edit_file` will load. Bigger files are refused
-/// before the whole body is read.
-pub const MAX_BYTES: usize = 2_097_152;
+pub const MAX_BYTES: usize = text::MAX_BYTES;
 
 pub(crate) const SCHEMA: &str = r#"{
   "type": "function",
   "function": {
     "name": "edit_file",
-    "description": "Replace an exact string in a text file inside the user's vault roots or current workspace. Paths are canonicalized; anything outside those roots is refused. Secret files (.env*, .git/, *.pem, id_*) are refused. Files larger than 2097152 bytes are refused. Fails if old_string is missing or not unique unless replace_all is true. Line endings and file permissions are kept. Writes are atomic. This tool asks for approval on every call unless the session already granted this path.",
+    "description": "Replace an exact string in a text file inside the user's vault roots or current workspace. Paths are canonicalized; anything outside those roots is refused. Secret files (.env*, .git/, *.pem, id_*) are refused. Files larger than 2097152 bytes are refused. Fails if old_string is missing or not unique unless replace_all is true. Line endings and file permissions are kept. Read-only files and hard links are refused. Writes are atomic. This tool asks for approval on every call unless the session already granted this path.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -77,6 +73,7 @@ pub struct EditPlan {
     pub before: String,
     pub after: String,
     pub replacements: usize,
+    pub content_hash: String,
 }
 
 pub fn plan(
@@ -101,12 +98,18 @@ fn plan_with_cap(
     if old_string.is_empty() {
         return Err("edit_file old_string must not be empty.".into());
     }
-    if old_string == new_string {
+    let old_lf = text::to_lf(old_string);
+    let new_lf = text::to_lf(new_string);
+    if old_lf == new_lf {
         return Err("old_string and new_string are the same; no change to make.".into());
     }
     let path = sandbox::resolve_file(requested, vault_path, vault_paths)?;
-    let before = read_text_limited(&path, max_bytes)?;
-    let matches = count_matches(&before, old_string);
+    atomic::preflight(&path)?;
+    let before = text::read_text_limited(&path, max_bytes)?;
+    let content_hash = text::hash_bytes(before.as_bytes());
+    let crlf = text::uses_crlf(&before);
+    let before_lf = text::to_lf(&before);
+    let matches = count_matches(&before_lf, &old_lf);
     if matches == 0 {
         return Err(format!("old_string was not found in {requested}."));
     }
@@ -115,65 +118,35 @@ fn plan_with_cap(
             "old_string matched {matches} times in {requested}. Set replace_all to true to change every match."
         ));
     }
-    let (after, replacements) = if replace_all {
-        (before.replace(old_string, new_string), matches)
+    let after_lf = if replace_all {
+        before_lf.replace(&old_lf, &new_lf)
     } else {
-        (before.replacen(old_string, new_string, 1), 1)
+        before_lf.replacen(&old_lf, &new_lf, 1)
     };
+    let after = text::apply_eol(&after_lf, crlf);
     let roots = sandbox::allowed_roots(vault_path, vault_paths)?;
     Ok(EditPlan {
         display_path: sandbox::relative_to_root(&path, &roots),
         path,
         before,
         after,
-        replacements,
+        replacements: if replace_all { matches } else { 1 },
+        content_hash,
     })
 }
 
+#[cfg(test)]
 pub fn preview_diff(
     raw_args: &str,
     vault_path: Option<&str>,
     vault_paths: &[String],
 ) -> Result<String, String> {
     let plan = plan(raw_args, vault_path, vault_paths)?;
-    Ok(preview::unified(
+    Ok(super::preview::unified(
         &plan.display_path,
         &plan.before,
         &plan.after,
     ))
-}
-
-fn read_text_limited(path: &Path, max_bytes: usize) -> Result<String, String> {
-    let meta = fs::metadata(path).map_err(|error| format!("Failed to read file: {error}"))?;
-    if meta.len() > max_bytes as u64 {
-        return Err(format!(
-            "File is too large to edit ({} bytes; limit is {max_bytes}).",
-            meta.len()
-        ));
-    }
-    let file = File::open(path).map_err(|error| format!("Failed to read file: {error}"))?;
-    let mut bytes = Vec::new();
-    let n = file
-        .take((max_bytes as u64).saturating_add(1))
-        .read_to_end(&mut bytes)
-        .map_err(|error| format!("Failed to read file: {error}"))?;
-    if n > max_bytes {
-        return Err(format!(
-            "File is too large to edit ({n} bytes; limit is {max_bytes})."
-        ));
-    }
-    if bytes.contains(&0) {
-        return Err(format!(
-            "File is binary and cannot be edited as text: {}",
-            path.display()
-        ));
-    }
-    String::from_utf8(bytes).map_err(|_| {
-        format!(
-            "File is binary and cannot be edited as text: {}",
-            path.display()
-        )
-    })
 }
 
 fn count_matches(haystack: &str, needle: &str) -> usize {
@@ -479,5 +452,46 @@ mod tests {
         .unwrap();
         assert!(out.contains("1 replacement"), "{out}");
         assert_eq!(fs::read_to_string(&dest).unwrap(), "ABCDEFGH");
+    }
+
+    #[test]
+    fn multiline_lf_old_string_matches_a_crlf_file() {
+        let (_dir, root) = vault();
+        let dest = Path::new(&root).join("note.md");
+        fs::write(&dest, "one\r\ntwo\r\nthree\r\n").unwrap();
+        run(
+            &json!({
+                "path": "note.md",
+                "old_string": "one\ntwo",
+                "new_string": "ONE\nTWO"
+            })
+            .to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap();
+        assert_eq!(fs::read(&dest).unwrap(), b"ONE\r\nTWO\r\nthree\r\n");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn preview_path_is_the_symlink_target() {
+        let (_dir, root) = vault();
+        let dest = Path::new(&root).join("real.md");
+        fs::write(&dest, "old\n").unwrap();
+        std::os::unix::fs::symlink(&dest, Path::new(&root).join("link.md")).unwrap();
+        let plan = plan(
+            &json!({
+                "path": "link.md",
+                "old_string": "old",
+                "new_string": "new"
+            })
+            .to_string(),
+            Some(&root),
+            &[],
+        )
+        .unwrap();
+        assert_eq!(plan.display_path, "real.md");
+        assert_eq!(plan.path, dest);
     }
 }
