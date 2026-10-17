@@ -1178,7 +1178,7 @@ Managed by `useSettings` hook and `SettingsPanel` component. `theme_mode` is ins
 - **`src/lib/appUpdater.ts`** — Thin wrapper around the Tauri updater commands. Keeps the React hook free of endpoint-selection details.
 
 ### Rust
-- **`src-tauri/src/app_updater.rs`** — Chooses the correct update endpoint and adapts Tauri updater results into frontend-friendly payloads. Stable uses the public `stable/latest.json` feed. Alpha first resolves the newest non-draft `alpha-vYYYY.M.D-alpha.NNNN` GitHub Release asset named `alpha-latest.json`, then falls back to the public `alpha/latest.json` feed if the release lookup is unavailable.
+- **`src-tauri/src/app_updater.rs`** — Checks the Tauri updater plugin and adapts the result for `useUpdater`. Alpha uses the moving `alpha-latest` tag asset `alpha-latest.json`. Stable uses the moving `stable-latest` tag asset `stable-latest.json`. Neither URL is `releases/latest/download`, because alpha releases are prereleases. Install stays on the existing banner. A placeholder, empty, or whitespace-only pubkey returns before any network call. HTTP 404 and 204 mean there is no update. The moving feed is republished only when every platform entry has a signature.
 - **`src-tauri/src/commands/version.rs`** — Formats app build/version labels for the status bar, including calendar alpha labels and legacy release compatibility.
 
 ### Tauri Commands

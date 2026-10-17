@@ -69,7 +69,21 @@ Linux release CI currently uses Tauri's stock linuxdeploy AppImage output plugin
 pnpm tauri build --target x86_64-unknown-linux-gnu --bundles deb,rpm,appimage
 ```
 
-Release validation verifies that the Linux job produced an AppImage and at least one installer bundle. There is no in-app update feed: `createUpdaterArtifacts` is false and the updater endpoint list is empty, so updater signature files are not required.
+Release validation verifies that the Linux job produced an AppImage and at least one installer bundle. A signed release also produces updater signature files (`.sig`).
+
+The app checks for updates on startup, and from the existing Check for updates control. Alpha reads `https://github.com/tuckcode/rhizome-agent/releases/download/alpha-latest/alpha-latest.json`. Stable reads the same kind of URL on the `stable-latest` tag. Those tags are prereleases on purpose: GitHub's `releases/latest/download` URL does not serve alpha releases. Update now downloads and installs through the Tauri updater. Restart uses the existing Restart control. While `plugins.updater.pubkey` is still `PLACEHOLDER_KNISPO_TAURI_UPDATER_PUBKEY`, check and install stop before any network call and say that in-app updates are not available yet.
+
+Rust always passes the channel URL. The `plugins.updater.endpoints` entry in `src-tauri/tauri.conf.json` stays as an unused fallback. In tauri-plugin-updater 2.10.0, `UpdaterBuilder::endpoints` replaces that list. `build()` uses the config list only when no runtime list was given, and it errors only when both are empty. The checked-in URL is the alpha feed. Rust passes the stable feed unless the release channel is alpha.
+
+Generate the minisign key outside this repo:
+
+```bash
+pnpm tauri signer generate -w ~/.tauri/rhizome-updater.key
+```
+
+Paste the single line from `~/.tauri/rhizome-updater.key.pub` into `plugins.updater.pubkey`. Put the contents of `~/.tauri/rhizome-updater.key` in the GitHub secret `TAURI_SIGNING_PRIVATE_KEY`, and the password you chose in `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Do not commit the private key. `.gitignore` already ignores `*.key` and `*.key.pub`. Back the key up. Losing it strands every installed copy, because those copies will only accept updates signed by this key. Commit the public key in the same release that first sets those secrets, or in a release before that one.
+
+Release builds export the key only when the secret is non-empty. An unsigned build still ships the versioned downloads, and it turns `createUpdaterArtifacts` off for that build. The moving `alpha-latest` and `stable-latest` feeds are republished only when every platform object in the feed JSON has a `signature`. An unsigned feed must not replace the last signed feed. A local `pnpm tauri build` with `createUpdaterArtifacts` on needs `TAURI_SIGNING_PRIVATE_KEY` in the environment. An unsigned local build can pass `--config '{"bundle":{"createUpdaterArtifacts":false}}'`.
 
 ## Quick Start
 
@@ -385,7 +399,7 @@ rhizome-agent/
 | `src-tauri/src/ai_agents.rs` | CLI-agent request normalization, availability aggregation, adapter dispatch, and Claude event mapping. |
 | `src-tauri/src/cli_agent_runtime.rs` | Shared CLI-agent request shape, prompt wrapping, JSON subprocess lifecycle, version probing, and MCP path helpers. |
 | `src-tauri/src/claude_cli.rs`, `src-tauri/src/codex_cli.rs`, `src-tauri/src/opencode_cli.rs`, `src-tauri/src/antigravity_cli.rs`, `src-tauri/src/kiro_cli.rs` | Per-agent command, config, discovery, and event adapters. |
-| `src-tauri/src/app_updater.rs` | App-update stub. It reports that no release feed is configured. |
+| `src-tauri/src/app_updater.rs` | In-app updater. Checks the alpha or stable feed, then downloads and installs through the Tauri updater plugin. |
 
 ### Editor
 
@@ -445,7 +459,7 @@ rhizome-agent/
 | `src/hooks/useMainWindowSizeConstraints.ts` | Derives the main-window minimum width from the visible panes and asks Tauri to grow back to fit wider layouts. |
 | `src/hooks/useVaultConfig.ts` | Per-vault local UI preferences (zoom, view mode, colors, Inbox columns, explicit organization workflow, Git setup prompt preference, AI permission mode). |
 | `src/components/SettingsPanel.tsx` | Settings UI for telemetry, release channel, Git visibility, sync interval, UI language, content display preferences, default AI agent, and the vault-level explicit organization toggle. |
-| `src/hooks/useUpdater.ts` | App-update UI. The host currently reports that no feed is configured. |
+| `src/hooks/useUpdater.ts` | App-update UI. Startup check after 3 seconds, plus the manual check. Install and relaunch stay on the existing banner actions. |
 
 ## Architecture Patterns
 

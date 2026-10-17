@@ -35,6 +35,7 @@ pub(crate) use tools::command_from_args;
 pub(crate) use tools::override_secret_block;
 pub use tools::resolve_for_write;
 pub(crate) use tools::write_atomic;
+pub(crate) use tools::{allowed_roots, preflight, relative_to_root, resolve_file_for_write};
 pub(crate) use tools::{openai_tool_definition, require_mutate_card};
 pub(crate) use tools::{write_target_is_secret, BLOCKED_SECRET};
 pub use types::{DurableEvent, HistoryItem, ModelView, ToolCall, UNANSWERED_TOOL_OUTPUT};

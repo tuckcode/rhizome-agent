@@ -219,17 +219,18 @@ jobs:
           print("Telemetry env validation passed.")
           PY
 
-      # Deliberately unsigned (2026-07-24): no APPLE_* or TAURI_SIGNING_*
-      # secrets are forwarded here. Tauri's macOS bundler treats an env var
-      # as "sign with this" the moment it's *present*, even set to "" — and
-      # GitHub Actions injects a referenced-but-missing secret as an empty
-      # string, not an absent variable. That mismatch is what made
-      # `security import` fail on an empty certificate in earlier runs, even
-      # though no APPLE_CERTIFICATE secret was ever configured. Re-add these
-      # only once a real paid Apple Developer ID cert is in secrets, and
-      # confirm the Tauri build step actually receives it (this comment is
-      # the guard against reintroducing the empty-string trap).
-      - name: Build Tauri app (unsigned)
+      # Apple code signing stays out of this job (see the certificate step
+      # above). Updater signing is separate: the key is written to a file
+      # only when the secret is non-empty, so an unset secret is not an
+      # empty TAURI_SIGNING_PRIVATE_KEY in the build environment.
+      - name: Resolve Tauri updater signing
+        id: updater-signing
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: bash .github/scripts/resolve-tauri-updater-signing.sh
+
+      - name: Build Tauri app
         env:
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
           VITE_SENTRY_RELEASE: ${{ inputs.version }}
@@ -237,22 +238,32 @@ jobs:
           VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY }}
           VITE_POSTHOG_HOST: ${{ secrets.VITE_POSTHOG_HOST }}
         run: |
+          args=(pnpm tauri build --target "${{ matrix.target }}")
           MACOS_BUNDLES="${{ inputs.macos_bundles }}"
           if [ -n "$MACOS_BUNDLES" ]; then
-            pnpm tauri build --target ${{ matrix.target }} --bundles "$MACOS_BUNDLES"
-          else
-            pnpm tauri build --target ${{ matrix.target }}
+            args+=(--bundles "$MACOS_BUNDLES")
           fi
+          bash .github/scripts/with-tauri-updater-signing.sh "${args[@]}"
 
-      # createUpdaterArtifacts is false and we intentionally omit TAURI_SIGNING_*,
-      # so Tauri does not emit .app.tar.gz / .sig. Package a downloadable archive
-      # from the .app so the publish job still has a macOS artifact to ship.
-      - name: Package macOS .app.tar.gz for download (no updater .sig)
+      # When the signing secret is missing, createUpdaterArtifacts is turned
+      # off for this build and Tauri does not emit .app.tar.gz / .sig.
+      # Package a downloadable archive from the .app so publish still has one.
+      - name: Package macOS .app.tar.gz when Tauri did not
         run: |
           BUNDLE_DIR="src-tauri/target/${{ matrix.target }}/release/bundle/macos"
           shopt -s nullglob
           apps=("$BUNDLE_DIR"/*.app)
           tars=("$BUNDLE_DIR"/*.app.tar.gz)
+          if [ "${{ steps.updater-signing.outputs.updater_signing }}" = "true" ]; then
+            sigs=("$BUNDLE_DIR"/*.app.tar.gz.sig)
+            if [ ${#tars[@]} -eq 0 ] || [ ${#sigs[@]} -eq 0 ]; then
+              echo "::error::Updater signing was configured but macOS .app.tar.gz or .sig is missing."
+              exit 1
+            fi
+            echo "Tauri produced signed updater archive(s):"
+            printf '  %s\n' "${tars[@]}" "${sigs[@]}"
+            exit 0
+          fi
           if [ ${#tars[@]} -gt 0 ]; then
             echo "Tauri already produced updater archive(s):"
             printf '  %s\n' "${tars[@]}"
@@ -357,11 +368,14 @@ jobs:
           jq --arg v "$VERSION" '.version = $v' src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json
           sed -i "s/^version = \".*\"/version = \"$VERSION\"/" src-tauri/Cargo.toml
 
-      # Deliberately unsigned (2026-07-25): mirror macOS/Windows — do not
-      # forward TAURI_SIGNING_* even if the secret exists. updater.endpoints
-      # is [] so nothing consumes .sig today; forwarding a key that does not
-      # produce a working signature (or empty injection) only fails the job.
-      - name: Build Tauri app (Linux bundles, unsigned updater)
+      - name: Resolve Tauri updater signing
+        id: updater-signing
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: bash .github/scripts/resolve-tauri-updater-signing.sh
+
+      - name: Build Tauri app (Linux bundles)
         env:
           APPIMAGE_EXTRACT_AND_RUN: 1
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
@@ -370,7 +384,8 @@ jobs:
           VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY }}
           VITE_POSTHOG_HOST: ${{ secrets.VITE_POSTHOG_HOST }}
         run: |
-          pnpm tauri build --target x86_64-unknown-linux-gnu --bundles deb,rpm,appimage
+          bash .github/scripts/with-tauri-updater-signing.sh \
+            pnpm tauri build --target x86_64-unknown-linux-gnu --bundles deb,rpm,appimage
 
       - name: Validate Linux bundles
         run: |
@@ -397,7 +412,11 @@ jobs:
             exit 1
           fi
           if [ ${#signatures[@]} -eq 0 ]; then
-            echo "::warning::Linux build produced no updater signature (.sig) — publishing download artifacts only (unsigned updater path)."
+            if [ "${{ steps.updater-signing.outputs.updater_signing }}" = "true" ]; then
+              echo "::error::Linux build produced no updater signature (.sig)."
+              exit 1
+            fi
+            echo "::warning::TAURI_SIGNING_PRIVATE_KEY not set — skipping .sig validation for unsigned Linux build."
           fi
 
           validate_desktop_categories() {
@@ -540,28 +559,13 @@ jobs:
         id: windows-signing
         shell: bash
         env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
           WINDOWS_CODE_SIGNING_CERTIFICATE: ${{ secrets.WINDOWS_CODE_SIGNING_CERTIFICATE }}
           WINDOWS_CODE_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CODE_SIGNING_CERTIFICATE_PASSWORD }}
           WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: |
-          # Deliberately unsigned (2026-07-24): Tauri updater signing is not
-          # required right now — `updater.endpoints` in tauri.conf.json is
-          # empty, so no in-app auto-update path consumes a .sig today.
-          # TAURI_SIGNING_PRIVATE_KEY is intentionally NOT forwarded to the
-          # Windows build step below and this always resolves to false, even
-          # if that secret exists in the repo, so the "no .sig produced"
-          # failure this fixes can't reappear the next time that secret is
-          # rotated. Flip this back to a real has_tauri_key check only once
-          # the updater endpoint is live and the key has been verified to
-          # actually produce a .sig on a real run.
-          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
-            echo "::warning::TAURI_SIGNING_PRIVATE_KEY is set but Windows updater signing is disabled — building unsigned regardless (see workflow comment)."
-          fi
-          echo "tauri_signing_available=false" >> "$GITHUB_OUTPUT"
-
+          # Authenticode is separate from the Tauri updater key. The updater
+          # key is resolved in its own step and is not forwarded when empty.
           has_certificate=false
           has_password=false
           if [ -n "$WINDOWS_CODE_SIGNING_CERTIFICATE" ] || [ -n "$WINDOWS_CERTIFICATE" ]; then
@@ -579,7 +583,7 @@ jobs:
           if [ "$has_certificate" = "true" ]; then
             echo "authenticode_available=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::warning::Windows Authenticode certificate secrets are not configured. Building Windows artifacts without Authenticode signatures; Tauri updater signatures are still required."
+            echo "::warning::Windows Authenticode certificate secrets are not configured. Building Windows artifacts without Authenticode signatures."
             echo "authenticode_available=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -597,11 +601,16 @@ jobs:
           WINDOWS_TIMESTAMP_URL: ${{ secrets.WINDOWS_TIMESTAMP_URL }}
         run: ./.github/scripts/configure-windows-authenticode.ps1
 
-      # Deliberately unsigned (2026-07-24) — see the comment on the
-      # "Validate Windows release env" step above for why
-      # TAURI_SIGNING_PRIVATE_KEY is not forwarded here.
-      - name: Build Tauri app (Windows bundles, unsigned updater)
-        shell: pwsh
+      - name: Resolve Tauri updater signing
+        id: updater-signing
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: bash .github/scripts/resolve-tauri-updater-signing.sh
+
+      - name: Build Tauri app (Windows bundles)
+        shell: bash
         env:
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
           VITE_SENTRY_RELEASE: ${{ inputs.version }}
@@ -609,11 +618,11 @@ jobs:
           VITE_POSTHOG_KEY: ${{ secrets.VITE_POSTHOG_KEY }}
           VITE_POSTHOG_HOST: ${{ secrets.VITE_POSTHOG_HOST }}
         run: |
-          if ("${{ steps.windows-signing.outputs.authenticode_available }}" -eq "true") {
-            pnpm tauri build --target x86_64-pc-windows-msvc --bundles nsis --config src-tauri/tauri.windows-signing.conf.json
-          } else {
-            pnpm tauri build --target x86_64-pc-windows-msvc --bundles nsis
-          }
+          args=(pnpm tauri build --target x86_64-pc-windows-msvc --bundles nsis)
+          if [ "${{ steps.windows-signing.outputs.authenticode_available }}" = "true" ]; then
+            args+=(--config src-tauri/tauri.windows-signing.conf.json)
+          fi
+          bash .github/scripts/with-tauri-updater-signing.sh "${args[@]}"
 
       - name: Validate Windows Authenticode signatures
         if: ${{ steps.windows-signing.outputs.authenticode_available == 'true' }}
@@ -672,7 +681,7 @@ jobs:
             fi
           done
           if [ ${#signatures[@]} -eq 0 ]; then
-            if [ "${{ steps.windows-signing.outputs.tauri_signing_available }}" = "true" ]; then
+            if [ "${{ steps.updater-signing.outputs.updater_signing }}" = "true" ]; then
               echo "::error::Windows build produced no updater signature (.sig) artifact."
               exit 1
             else

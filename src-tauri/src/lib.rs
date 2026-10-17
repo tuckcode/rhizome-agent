@@ -11,6 +11,7 @@ mod antigravity_discovery;
 mod app_config;
 mod app_icon;
 pub mod app_updater;
+mod board;
 pub mod claude_cli;
 mod claude_invocation;
 mod cli_agent_runtime;

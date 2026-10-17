@@ -16,7 +16,7 @@ This page is the install and recovery guide. Developer commands live in [`GETTIN
 | Theme | Earth dark (default), Earth light, Loam, and Match system | |
 | Models | **Taproot** (free automatic router), plus catalog providers you add a key for | |
 | Keys | System keychain (macOS Keychain, Windows Credential Manager, or Secret Service) | A JSON key file you edit by hand |
-| Updates | Replace the `.app`, or rebuild from source | An in-app updater |
+| Updates | Check for updates in the app. Install applies from a signed release on the alpha or stable feed. | An update while the updater public key is still the placeholder, or from an unsigned build |
 
 The app reports version `0.1.0`. That number is the bundle version, not a promise about every macOS release.
 

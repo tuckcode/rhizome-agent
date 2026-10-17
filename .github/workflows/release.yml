@@ -161,9 +161,8 @@ jobs:
 
       - name: Normalize macOS release artifact names
         run: |
-          # .sig is optional: unsigned builds (no TAURI_SIGNING_*) ship the
-          # download archive only. updater.endpoints is [] so the app cannot
-          # install from this release. The disk image is the Mac download.
+          # .sig is optional: a build without TAURI_SIGNING_PRIVATE_KEY ships
+          # the download archive only. The in-app updater needs the signature.
           # Intel Mac (x86_64) is no longer in the matrix.
           normalize_macos_artifacts() {
             local arch="$1"
@@ -261,8 +260,13 @@ jobs:
           PAGES_URL="https://${OWNER}.github.io/${REPO_NAME}/"
 
           # find_first: optional glob match (no failure). find_required: hard-fail.
-          # .sig is optional — unsigned builds publish download URLs only.
-          # updater.endpoints is [] so nothing in-app consumes signatures.
+          # .sig is optional. When it exists, the signature field is the
+          # contents of the .sig file, JSON-escaped. The updater plugin
+          # requires that field. Unsigned builds keep download_url only.
+          json_quote_file() {
+            python3 .github/scripts/json-quote-file.py "$1"
+          }
+
           find_first() {
             for pattern in "$@"; do
               # shellcheck disable=SC2086
@@ -308,8 +312,8 @@ jobs:
               updater_base=$(basename "$updater_file")
               local updater_url="https://github.com/${REPO}/releases/download/${TAG}/${updater_base}"
               local sig
-              sig=$(cat "$sig_file")
-              printf '      "%s": {\n        "signature": "%s",\n        "url": "%s",\n        "download_url": "%s"\n      }' \
+              sig=$(json_quote_file "$sig_file")
+              printf '      "%s": {\n        "signature": %s,\n        "url": "%s",\n        "download_url": "%s"\n      }' \
                 "$key" "$sig" "$updater_url" "$download_url"
             else
               echo "::warning::No .sig for ${key} — publishing download_url only." >&2
@@ -411,6 +415,18 @@ jobs:
             windows-x86_64-bundles/*/*.zip
             windows-x86_64-bundles/*/*.zip.sig
             alpha-latest.json
+
+      # GitHub's releases/latest/download ignores prereleases. Alpha releases
+      # are prereleases, so the app reads this fixed tag instead.
+      - name: Publish moving alpha update feed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if jq -e '[.platforms[] | has("signature")] | all' alpha-latest.json >/dev/null; then
+            bash .github/scripts/publish-update-feed.sh alpha-latest alpha-latest.json
+          else
+            echo "::warning::alpha-latest.json has no updater signatures on every platform — leaving the alpha-latest feed unchanged."
+          fi
 
   # ─────────────────────────────────────────────────────────────
   # Phase 4: Update GitHub Pages with docs, release history, and download assets
