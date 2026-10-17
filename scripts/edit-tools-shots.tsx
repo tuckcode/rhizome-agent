@@ -28,10 +28,6 @@ document.body.style.background = 'var(--surface-app)'
 document.body.style.color = 'var(--text-primary)'
 document.body.style.fontFamily = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
 
-const LONG_OLD = Array.from({ length: 36 }, (_, index) => `keep line ${index + 1} of the weekly review`).join('\n')
-const LONG_NEW = LONG_OLD.replace('keep line 12 of the weekly review', 'rewrite line 12 with the shipping note')
-  .replace('keep line 24 of the weekly review', 'rewrite line 24 after the critique pass')
-
 const PREVIEW: Record<ShotState, { tool: string; path: string; preview: string }> = {
   edit: {
     tool: 'edit_file',
@@ -82,7 +78,7 @@ const PREVIEW: Record<ShotState, { tool: string; path: string; preview: string }
   },
 }
 
-function Shot() {
+export function Shot() {
   const card = PREVIEW[state]
   return (
     <div
