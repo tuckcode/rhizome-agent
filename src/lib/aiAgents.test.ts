@@ -13,7 +13,8 @@ describe('aiAgents helpers', () => {
     expect(normalizeStoredAiAgent('prime')).toBe('prime')
     expect(normalizeStoredAiAgent('claude_code')).toBe('claude_code')
     expect(normalizeStoredAiAgent('hermes')).toBe('hermes')
-    expect(normalizeStoredAiAgent('gemini')).toBe('antigravity')
+    expect(normalizeStoredAiAgent('pi')).toBe('prime')
+    expect(normalizeStoredAiAgent('gemini')).toBe('prime')
     expect(normalizeStoredAiAgent('cursor')).toBeNull()
   })
 

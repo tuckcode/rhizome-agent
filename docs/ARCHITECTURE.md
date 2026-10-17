@@ -716,24 +716,11 @@ itself: an empty allow-list means *never curated* (normalized to `None` in
 Rust), and a list matching no live model shows everything. `activeModelKey`
 keeps whatever is running listed, since the picker only ever receives a label.
 
-#### Prime packages
+#### Advanced Prime engine
 
-Settings → AI Agents → **Advanced Prime engine** holds Prime install status,
-Copy MCP config, and the package catalog. The catalog is npm's `pi-package`
-keyword — the same index as [pi.dev/packages](https://pi.dev/packages).
-Installed entries come from `~/.prime/agent/settings.json` via
-`list_prime_packages`. Install runs `prime-agent package install` in the
-background (`install_prime_package`), then reloads the attached Prime session
-(`reload`). Settings shows the full-system-access warning on its own line.
-If the CLI is missing, Settings copies the command or asks Chat to run it
-(`primePackageAskAgentPrompt`). Kind tabs (extension / skill / prompt / theme)
-add a second keyword. Search hits the public npm registry from the renderer
-(`catalogSearchUrl`). Prime's **daemon has no install command**. Install is a
-180s background process (`prime_packages.rs`). Bare names become `npm:{name}`.
-Sources that start with `-` or contain whitespace are refused. Expanding
-Advanced Prime engine does **not** search the catalog until **Browse packages**
-is opened. An old Packages section id (`packages`, `settings-section-extensions`)
-opens that disclosure.
+Settings → AI Agents → **Advanced Prime engine** holds Prime install status
+and Copy MCP config. An old Packages section id (`packages`,
+`settings-section-extensions`) still opens that disclosure.
 
 The allow-list is Rhizome's view of Prime's catalog, in the same sense as
 archiving below: Prime's CLI and every other client still see all 501.
@@ -978,8 +965,6 @@ flowchart LR
 |----------|---------|
 | `spawn_ws_bridge(vault_path)` | Spawns `ws-bridge.js` as child process with `VAULT_PATH`/`VAULT_PATHS` env |
 | `sync_mcp_bridge_vault(vault_path?)` | Starts, restarts, or stops the desktop WebSocket bridge as the selected vault changes |
-| `list_prime_packages` | Installed Prime packages from `~/.prime/agent/settings.json` |
-| `install_prime_package` | Run `prime-agent package install`, then reload the attached session |
 | `get_prime_provider_status` | Read-only connection status per provider (no keys). Settings waits until Agents is visible |
 | `sign_in_prime_provider` | OAuth sign-in in the system browser via `mcp-server/prime-login.mjs` and Prime's `AuthStorage`, then reload the session (ADR-0176) |
 | `save_prime_provider_key` | Store a pasted API key through Prime's `AuthStorage` (key on stdin), then reload the session (ADR-0176) |
@@ -1779,8 +1764,7 @@ The vault backend (`src-tauri/src/vault/`) is split into focused submodules:
 | `ai_agents.rs` | CLI-agent request normalization and adapter dispatch |
 | `cli_agent_runtime.rs` | Shared CLI-agent request, prompt, subprocess, version, and MCP path helpers |
 | `acp_client/` | Generic Agent Client Protocol stdio JSON-RPC client (ADR-0178). Not Hermes-specific. |
-| `claude_cli.rs`, `codex_cli.rs`, `opencode_cli.rs`, `pi_cli.rs`, `antigravity_cli.rs`, `hermes_cli.rs` | CLI-agent command/config/event adapters. Hermes prefers ACP (`hermes acp`) and falls back to one-shot `hermes chat`. |
-| `pi_cli.rs`, `pi_config.rs`, `pi_discovery.rs`, `pi_events.rs` | Pi subprocess launch, user-config-seeded transient MCP adapter config, discovery, and JSON stream parsing |
+| `claude_cli.rs`, `codex_cli.rs`, `opencode_cli.rs`, `antigravity_cli.rs`, `hermes_cli.rs` | CLI-agent command/config/event adapters. Hermes prefers ACP (`hermes acp`) and falls back to one-shot `hermes chat`. |
 | `mcp.rs` | MCP server spawning + explicit config registration/removal |
 | `commands/` | Tauri command handlers (split into submodules) |
 | `settings.rs` | App settings persistence |

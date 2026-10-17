@@ -599,26 +599,6 @@ export function trackComposerReplyCompletionDismissed(): void {
 }
 
 /**
- * Settings → Extensions opened the Pi package catalog.
- * No query text — that can name a private package path.
- */
-export function trackPrimePackageCatalogOpened(): void {
-  trackEvent('prime_package_catalog_opened')
-}
-
-export function trackPrimePackageInstallCopied(origin: 'catalog' | 'installed'): void {
-  trackEvent('prime_package_install_copied', { origin })
-}
-
-export function trackPrimePackageInstalled(origin: 'catalog' | 'installed'): void {
-  trackEvent('prime_package_installed', { origin })
-}
-
-export function trackPrimePackageInstallFailed(reason: 'cli_missing' | 'error'): void {
-  trackEvent('prime_package_install_failed', { reason })
-}
-
-/**
  * Settings added Nous Portal into Prime's catalog so Chat can list it with
  * the other providers. Count only — never model ids.
  */

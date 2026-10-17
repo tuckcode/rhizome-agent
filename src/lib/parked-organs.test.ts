@@ -309,7 +309,8 @@ describe('parked organs leftover', () => {
     expect(settings).toContain(
       "if (id === SETTINGS_SECTION_IDS.ai) setLoadModelCatalog(true)",
     )
-    expect(settings).toContain('setLoadExtensionCatalog(true)')
+    expect(settings).not.toContain('setLoadExtensionCatalog')
+    expect(settings).not.toContain('Browse packages')
     const toggle = readFileSync(
       `${process.cwd()}/src/components/ChatEngineSettings.tsx`,
       'utf8',
@@ -495,19 +496,6 @@ describe('parked organs leftover', () => {
     expect(input).toContain('if (event.key === \'Tab\' && !event.shiftKey && onAcceptCompletion?.())')
     expect(suggestions).toContain('That is case 2 in #51')
     expect(suggestions).toContain('Deliberately not built here')
-  })
-
-  it('installs Prime packages via CLI, with Chat as fallback', () => {
-    const packages = readFileSync(
-      `${process.cwd()}/src/components/PrimeExtensionsSection.tsx`,
-      'utf8',
-    )
-    expect(packages).toContain(
-      'Install runs `prime-agent package install` in the background, then reloads',
-    )
-    expect(packages).toContain('They run with full system access.')
-    expect(packages).toContain('askChatToInstall')
-    expect(packages).toContain('queueAiPrompt(primePackageAskAgentPrompt(source), [])')
   })
 
   it('keeps Chat per-message clocks in the C70 local style', () => {

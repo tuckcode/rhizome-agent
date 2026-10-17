@@ -186,9 +186,9 @@ pub fn resolve_default_agent_id() -> crate::ai_agents::AiAgentId {
     match crate::settings::normalize_default_ai_agent(settings.default_ai_agent.as_deref())
         .as_deref()
     {
+        Some("prime") => AiAgentId::Prime,
         Some("codex") => AiAgentId::Codex,
         Some("opencode") => AiAgentId::Opencode,
-        Some("pi") => AiAgentId::Pi,
         Some("antigravity") => AiAgentId::Antigravity,
         Some("kiro") => AiAgentId::Kiro,
         Some("hermes") => AiAgentId::Hermes,

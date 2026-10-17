@@ -7,10 +7,10 @@ describe('buildAiAgentCommands', () => {
 
     const commands = buildAiAgentCommands({
       aiAgentsStatus: {
+        prime: { status: 'missing', version: null },
         claude_code: { status: 'installed', version: '1.0.20' },
         codex: { status: 'missing', version: null },
         opencode: { status: 'missing', version: null },
-        pi: { status: 'missing', version: null },
         antigravity: { status: 'missing', version: null },
         kiro: { status: 'missing', version: null },
         hermes: { status: 'installed', version: 'Hermes Agent 0.16.0' },

@@ -405,8 +405,6 @@
   "ai.panel.stop": "Hentikan respons",
   "ai.panel.stoppedResponse": "Dihentikan.",
   "ai.error.claude.tooManyRedirects": "Claude Code tidak dapat terhubung ke penyedia karena permintaan API terlalu sering dialihkan. Di Terminal, jalankan 'claude auth status', lalu 'claude auth login' jika perlu. Jika Anda menggunakan penyedia atau proxy khusus, periksa ANTHROPIC_BASE_URL, HTTPS_PROXY, HTTP_PROXY, dan pengaturan SSO/proxy perusahaan, lalu mulai ulang Rhizome.",
-  "ai.error.pi.emptyOutput": "Pi CLI keluar tanpa output agen. Rhizome mengharapkan peristiwa aliran JSON dari 'pi --mode json'; jalankan Pi di terminal untuk memeriksa pengaturannya.",
-  "ai.error.pi.emptyOutputWithDiagnostic": "Pi CLI keluar tanpa output agen. Rhizome mengharapkan peristiwa aliran JSON dari 'pi --mode json', tetapi Pi hanya menulis:\n{diagnostic_output}",
   "ai.message.regenerate": "Buat ulang respons",
   "ai.message.copy": "Salin respons",
   "ai.message.fork": "Cabangkan obrolan dari sini",
@@ -964,5 +962,4 @@
   "ai.composer.modelsFilter": "Filter models…",
   "ai.composer.modelsNotConnected": "Not connected · {count}",
   "ai.composer.modelsHidden": "Hidden by your list · {count}"
-
 }

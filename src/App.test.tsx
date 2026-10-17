@@ -1083,7 +1083,6 @@ describe('App', () => {
       claude_code: { installed: true, version: '2.1.90' },
       codex: { installed: true, version: '0.122.0-alpha.1' },
       opencode: { installed: false, version: null },
-      pi: { installed: false, version: null },
       antigravity: { installed: false, version: null },
     }
     mockCommandResults.check_mcp_status = 'installed'
@@ -1130,7 +1129,6 @@ describe('App', () => {
       claude_code: { installed: true, version: '2.1.90' },
       codex: { installed: true, version: '0.122.0-alpha.1' },
       opencode: { installed: false, version: null },
-      pi: { installed: false, version: null },
       antigravity: { installed: false, version: null },
     }
 
@@ -1179,7 +1177,6 @@ describe('App', () => {
       claude_code: { installed: true, version: '2.1.90' },
       codex: { installed: true, version: '0.122.0-alpha.1' },
       opencode: { installed: false, version: null },
-      pi: { installed: false, version: null },
       antigravity: { installed: false, version: null },
     }
 
@@ -1224,7 +1221,6 @@ describe('App', () => {
       claude_code: { installed: true, version: '2.1.90' },
       codex: { installed: true, version: '0.122.0-alpha.1' },
       opencode: { installed: false, version: null },
-      pi: { installed: false, version: null },
       antigravity: { installed: false, version: null },
     }
 

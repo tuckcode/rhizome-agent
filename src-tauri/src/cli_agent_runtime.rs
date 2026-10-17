@@ -30,23 +30,8 @@ pub struct AgentStreamRequest {
 
 pub(crate) struct JsonLineRun {
     pub session_id: String,
-    pub parsed_json_lines: usize,
-    pub ignored_stdout_output: String,
     pub stderr_output: String,
     pub status: ExitStatus,
-}
-
-impl JsonLineRun {
-    pub(crate) fn diagnostic_output(&self) -> String {
-        self.ignored_stdout_output
-            .lines()
-            .chain(self.stderr_output.lines())
-            .map(str::trim)
-            .filter(|line| !line.is_empty())
-            .take(3)
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
 }
 
 pub(crate) struct AgentCommandTarget {
@@ -458,12 +443,10 @@ where
     let reader = std::io::BufReader::new(stdout);
     let mut session_id = String::new();
     let mut ignored_stdout_lines = Vec::new();
-    let mut parsed_json_lines = 0;
 
     for line in reader.lines() {
         match parse_process_stdout_line(line, &mut ignored_stdout_lines) {
             Ok(Some(json)) => {
-                parsed_json_lines += 1;
                 handle_json(&json, emit, &mut session_id);
             }
             Ok(None) => {}
@@ -482,8 +465,6 @@ where
 
     Ok(JsonLineRun {
         session_id,
-        parsed_json_lines,
-        ignored_stdout_output: ignored_stdout_lines.join("\n"),
         stderr_output,
         status,
     })

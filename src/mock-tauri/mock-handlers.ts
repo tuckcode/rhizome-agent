@@ -207,7 +207,6 @@ const mockArchivedSessions = new Set<string>()
 const mockArchivedNativeSessions = new Set<string>()
 let mockForkedNative: { sessionId: string; events: unknown[] } | null = null
 let mockPrimeModelAllowList: string[] = ['mock/mock-model']
-const mockPrimePackages: string[] = []
 
 const mockSessionNames = new Map<string, string>()
 
@@ -632,7 +631,6 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     claude_code: { installed: false, version: null },
     codex: { installed: false, version: null },
     opencode: { installed: false, version: null },
-    pi: { installed: false, version: null },
     antigravity: { installed: false, version: null },
     kiro: { installed: false, version: null },
     hermes: { installed: false, version: null },
@@ -1036,16 +1034,6 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   // "hidden by your list" disclosure — the uncurated case is the one that
   // looks identical to having no feature at all.
   get_prime_model_allow_list: () => [...mockPrimeModelAllowList],
-  list_prime_packages: () => mockPrimePackages,
-  install_prime_package: (args: { source?: string }) => {
-    const source = String(args?.source ?? '').trim()
-    if (!source) throw new Error('Choose a package to install.')
-    const spec = source.startsWith('npm:') || source.startsWith('git:') || source.startsWith('http') || source.startsWith('/')
-      ? source
-      : `npm:${source}`
-    if (!mockPrimePackages.includes(spec)) mockPrimePackages.push(spec)
-    return { source: spec, reloaded: true }
-  },
   ensure_nous_portal_models: () => ({
     provider: 'nous-portal',
     modelCount: 1,

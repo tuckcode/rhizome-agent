@@ -1221,23 +1221,6 @@ pub async fn save_prime_provider_key(provider: String, key: String) -> Result<()
     .map_err(|error| format!("Saving the key failed: {error}"))?
 }
 
-/// Packages listed in Prime's global settings. Catalog search is the public
-/// npm `pi-package` index.
-#[tauri::command]
-pub fn list_prime_packages() -> Vec<crate::prime_settings::InstalledPrimePackage> {
-    crate::prime_settings::list_packages()
-}
-
-/// Run `prime-agent package install`, then reload the attached session.
-#[tauri::command]
-pub async fn install_prime_package(
-    source: String,
-) -> Result<crate::prime_packages::InstallPrimePackageResult, String> {
-    tokio::task::spawn_blocking(move || crate::prime_packages::install(&source))
-        .await
-        .map_err(|error| format!("Install task failed: {error}"))?
-}
-
 /// Fetch Nous Portal's public model list and merge it into Prime's catalog.
 ///
 /// Does not write the API key. Prime still reads `NOUS_API_KEY` from the

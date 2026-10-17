@@ -405,8 +405,6 @@
   "ai.panel.stop": "Spynić adkaz",
   "ai.panel.stoppedResponse": "Spyniena.",
   "ai.error.claude.tooManyRedirects": "Claude Code nia zmoh padklučycca da svajho pastaŭščyka, tamu što zapyt API pieranakiroŭvaŭsia zanadta šmat razoŭ. U Terminal zapusćicie `claude auth status`, a zatym, pry nieabchodnasci, `claude auth login`. Kali vy vykarystoŭvajecie karystalnicki pravajdar abo proksi, pravierycie nalady ANTHROPIC_BASE_URL, HTTPS_PROXY, HTTP_PROXY i karparatyŭnaha SSO/proksi, a zatym pierazapusćicie Rhizome.",
-  "ai.error.pi.emptyOutput": "Pi CLI zaviaršyŭsia biez vychadu ahienta. Rhizome čakawa JSON-strumiennyja padziei ad `pi --mode json`; zapusćicie Pi u terminale, kab praveryć nastaŭliennie.",
-  "ai.error.pi.emptyOutputWithDiagnostic": "Pi CLI zaviaršyŭsia biez vychadu ahienta. Rhizome čakawa JSON-strumiennyja padziei ad `pi --mode json`, ale Pi napisaŭ tolki:\n{diagnostic_output}",
   "ai.message.regenerate": "Stvaryć adkaz nanova",
   "ai.message.copy": "Skapijavać adkaz",
   "ai.message.fork": "Adhalinavać čat adsiul",
@@ -964,5 +962,4 @@
   "ai.composer.modelsFilter": "Filter models…",
   "ai.composer.modelsNotConnected": "Not connected · {count}",
   "ai.composer.modelsHidden": "Hidden by your list · {count}"
-
 }
