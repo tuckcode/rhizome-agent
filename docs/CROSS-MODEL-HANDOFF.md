@@ -120,9 +120,11 @@ Commit `62be2cbc` made macOS/Windows build **unsigned**. Publish used to
 hard-require `.sig` for every platform — that contradiction is fixed:
 
 - `release.yml` / `release-stable.yml`: `.sig` optional; latest.json omits
-  `signature` when missing and still publishes download URLs.
-- macOS packages `.app.tar.gz` manually when Tauri does not
-  (`createUpdaterArtifacts: false`).
+  `signature` when missing and still publishes download URLs. When a
+  `.sig` exists, its contents are JSON-escaped into `signature`.
+- `createUpdaterArtifacts` is true. A release build without
+  `TAURI_SIGNING_PRIVATE_KEY` turns it off for that build and warns.
+  macOS still packages `.app.tar.gz` by hand on that unsigned path.
 - Intel Mac dropped; Linux unsigned + `ubuntu-24.04`; `fail-fast: false`.
 - Publish still needs **all remaining** build jobs green (aarch64 macOS +
   Linux + Windows) — no partial releases. See `docs/HANDOFF.md` release
@@ -436,7 +438,7 @@ it's phrased.
 - **pnpm 10 vs 11 lockfile mismatch:** CI pins pnpm 10. Local is pnpm 11. Regenerate with `CI=true npx pnpm@10 install --no-frozen-lockfile`.
 - **Local QA scripts don't exist** — `~/.openclaw/skills/tolaria-qa/scripts/` is a dead path. Fix already applied: AGENTS.md native QA block and QA scripts section now reference `computer-use` instead.
 - **`tests/smoke/fix-crash-create-note.spec.ts` is timing-flaky** — pre-existing, unrelated to shell waves. Worth a fix-flaky pass per AGENTS.md.
-- **TAURI_SIGNING_PRIVATE_KEY missing** / **Updater pubkey empty** — free Tauri updater key, not a paid Authenticode cert. `tauri.conf.json` has an empty `pubkey`. Don't fix without a real signing keypair.
+- **TAURI_SIGNING_PRIVATE_KEY missing** / **Updater pubkey placeholder** — free Tauri updater key, not a paid Authenticode cert. `tauri.conf.json` pubkey is `PLACEHOLDER_KNISPO_TAURI_UPDATER_PUBKEY`. Don't invent a key. Generate it outside the repo with `pnpm tauri signer generate -w ~/.tauri/rhizome-updater.key`. Paste `.key.pub` into `plugins.updater.pubkey`. Put `.key` in `TAURI_SIGNING_PRIVATE_KEY` and the password in `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Never commit the private key.
 
 ## 15. OBSOLETE — MCP server path mismatch (fixed in 2fa620a5)
 

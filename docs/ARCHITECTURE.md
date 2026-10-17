@@ -2194,19 +2194,22 @@ sequenceDiagram
 **Origin:** Cursor Grok 4.6 · 2026-09-20 · #26 Chat-engine apply
 
 Rhizome has two update paths. The **app** path (`app_updater.rs`,
-`useUpdater`, `UpdateBanner`) is still a stub: `check_for_app_update`
-returns none, and `download_and_install_app_update` errors, because there
-is no signed Rhizome feed yet (`tauri.conf.json` `endpoints` is empty).
-The **Chat-engine** path (`prime_update.rs`, `usePrimeUpdate`) checks
-GitHub, then `apply_prime_update` runs the resolved `prime-agent update`
-only after Update now. The host refuses when `is_streaming()` is true.
-The client `chatBusy` flag is only a hint. It does not start a new session.
-
-The app-update chrome is still wired for a future signed feed:
+`useUpdater`, `UpdateBanner`) checks the moving GitHub release tag for
+the selected channel (`alpha-latest` or `stable-latest`), then downloads
+and installs through the Tauri updater plugin. Restart stays on the
+existing Restart control. While the pubkey is
+`PLACEHOLDER_KNISPO_TAURI_UPDATER_PUBKEY`, check and install return
+before any feed request. A real key is generated outside the repo with
+`pnpm tauri signer generate -w ~/.tauri/rhizome-updater.key`. The
+**Chat-engine** path
+(`prime_update.rs`, `usePrimeUpdate`) checks GitHub, then
+`apply_prime_update` runs the resolved `prime-agent update` only after
+Update now. The host refuses when `is_streaming()` is true. The client
+`chatBusy` flag is only a hint. It does not start a new session.
 
 - `useUpdater(releaseChannel, automaticChecksEnabled)` waits 3 seconds after launch when automatic checks are enabled, then calls the Rust commands
 - `automatic_update_checks_enabled` is an installation-local Settings flag that defaults to enabled; disabling it skips only the startup probe, not a manual status-bar check
-- `download_and_install_app_update` would stream progress into `UpdateBanner` once a feed exists. Today it returns the stub error.
+- `download_and_install_app_update` streams progress into `UpdateBanner` and installs through the updater plugin
 
 ### Feature Flags (PostHog + Release Channels)
 
