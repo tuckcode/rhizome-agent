@@ -551,6 +551,8 @@ mod tests {
             reasoning_notices_seen: None,
             chat_images: Vec::new(),
             vision_state: crate::chat_images::VisionState::Unknown,
+            send_anyway: false,
+            image_session_id: None,
         }
     }
 

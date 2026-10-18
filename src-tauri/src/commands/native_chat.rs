@@ -144,7 +144,14 @@ impl NativeChats {
         engine: NativeEngine<M>,
         emit: impl FnMut(EngineEvent) + Send + 'static,
     ) -> Result<String, String> {
-        self.start_named(uuid::Uuid::new_v4().to_string(), prompt, &[], engine, emit)
+        self.start_named(
+            uuid::Uuid::new_v4().to_string(),
+            prompt,
+            &[],
+            false,
+            engine,
+            emit,
+        )
     }
 
     pub fn start_named<M: Model + Send + 'static>(
@@ -152,6 +159,7 @@ impl NativeChats {
         id: String,
         prompt: &str,
         images: &[crate::chat_images::ChatImage],
+        send_anyway: bool,
         engine: NativeEngine<M>,
         emit: impl FnMut(EngineEvent) + Send + 'static,
     ) -> Result<String, String> {
@@ -224,6 +232,7 @@ impl NativeChats {
             }
         });
         claim_turn(&turn_busy)?;
+        crate::chat_images::note_send_anyway(&id, send_anyway);
         if let Err(error) = crate::chat_images::push_turn(&id, images.to_vec()) {
             turn_busy.store(false, Ordering::SeqCst);
             return Err(error);
@@ -277,16 +286,11 @@ impl NativeChats {
             return Err("native session is read-only".into());
         }
         if !images.is_empty() {
-            let target = self
-                .targets
-                .lock()
-                .expect("native targets")
-                .get(session_id)
-                .cloned()
-                .ok_or_else(|| format!("unknown native session {session_id}"))?;
+            let target = self.target_for(session_id)?;
             gate_images(&target, images, send_anyway)?;
         }
         claim_turn(&session.turn_busy)?;
+        crate::chat_images::note_send_anyway(session_id, send_anyway);
         if let Err(error) = crate::chat_images::push_turn(session_id, images.to_vec()) {
             session.turn_busy.store(false, Ordering::SeqCst);
             return Err(error);
@@ -314,6 +318,7 @@ impl NativeChats {
         emit: impl FnMut(EngineEvent) + Send + 'static,
     ) -> Result<String, String> {
         if self.is_live(&id) {
+            self.remember_logged_target(&id);
             return Ok(id);
         }
         let opened = crate::engines::native_log::open_session_log(&id)?;
@@ -399,7 +404,59 @@ impl NativeChats {
                 turn_busy,
             },
         );
+        self.remember_logged_target(&id);
         Ok(id)
+    }
+
+    fn remember_target(&self, session_id: &str, target: &str) {
+        if session_id.is_empty() || target.trim().is_empty() {
+            return;
+        }
+        self.targets
+            .lock()
+            .expect("native targets")
+            .insert(session_id.to_string(), target.to_string());
+    }
+
+    fn remember_logged_target(&self, session_id: &str) {
+        if self
+            .targets
+            .lock()
+            .expect("native targets")
+            .get(session_id)
+            .is_some_and(|target| !target.is_empty())
+        {
+            return;
+        }
+        if let Ok(opened) = crate::engines::native_log::open_session_log(session_id) {
+            self.remember_target(session_id, &opened.header.target);
+            if let Some(successor) = opened.successor_id.as_deref() {
+                if let Ok(next) = crate::engines::native_log::open_session_log(successor) {
+                    self.remember_target(successor, &next.header.target);
+                }
+            }
+        }
+    }
+
+    fn target_for(&self, session_id: &str) -> Result<String, String> {
+        if let Some(target) = self
+            .targets
+            .lock()
+            .expect("native targets")
+            .get(session_id)
+            .cloned()
+            .filter(|target| !target.is_empty())
+        {
+            return Ok(target);
+        }
+        self.remember_logged_target(session_id);
+        self.targets
+            .lock()
+            .expect("native targets")
+            .get(session_id)
+            .cloned()
+            .filter(|target| !target.is_empty())
+            .ok_or_else(|| format!("unknown native session {session_id}"))
     }
 
     pub fn note_read_only(&self, session_id: &str) {
@@ -466,6 +523,14 @@ impl NativeChats {
             join_with_bound(worker, NATIVE_QUIT_BOUND);
         }
         crate::chat_images::drop_ledger(session_id);
+        self.targets
+            .lock()
+            .expect("native targets")
+            .remove(session_id);
+        self.reasoning_slots
+            .lock()
+            .expect("reasoning slots")
+            .remove(session_id);
         Ok(())
     }
 
@@ -856,6 +921,15 @@ fn persist_reasoning(chats: &NativeChats, session_id: &str, reasoning_level: Rea
     }
 }
 
+fn free_tier_vision_state() -> crate::chat_images::VisionState {
+    let catalog = crate::rhizome_routing::Catalog::pinned();
+    crate::chat_images::vision_from_states(catalog.providers.iter().flat_map(|provider| {
+        provider.models.iter().map(|model| {
+            crate::chat_images::vision_state(&provider.id, &provider.base_url, &model.id, false)
+        })
+    }))
+}
+
 /// Refuses a new image before the turn is logged.
 fn gate_images(
     target: &str,
@@ -866,6 +940,7 @@ fn gate_images(
         return Ok(());
     }
     crate::chat_images::validate(images)?;
+    crate::chat_images::ensure_current_turn_fits(images)?;
     let model_label = target.rsplit('/').next().unwrap_or(target);
     match resolve_native_target(target)? {
         NativeChatTarget::FreeTier => {
@@ -1040,7 +1115,14 @@ fn start_named_request(
                 system.clone(),
             );
             engine.set_saved_reasoning_level(reasoning.level);
-            chats.start_named(id, &request.prompt, &request.images, engine, emit)
+            chats.start_named(
+                id,
+                &request.prompt,
+                &request.images,
+                request.send_anyway,
+                engine,
+                emit,
+            )
         }
         NativeChatTarget::Catalog {
             provider_kind,
@@ -1062,6 +1144,8 @@ fn start_named_request(
                 reasoning_notices_seen: None,
                 chat_images: Vec::new(),
                 vision_state: crate::chat_images::VisionState::Unknown,
+                send_anyway: false,
+                image_session_id: None,
             };
             apply_catalog_reasoning(&mut stream, &reasoning);
             stamp_model_vision(&mut stream);
@@ -1078,7 +1162,14 @@ fn start_named_request(
                 system.clone(),
             );
             engine.set_saved_reasoning_level(reasoning.level);
-            chats.start_named(id, &request.prompt, &request.images, engine, emit)
+            chats.start_named(
+                id,
+                &request.prompt,
+                &request.images,
+                request.send_anyway,
+                engine,
+                emit,
+            )
         }
     }
 }
@@ -1140,7 +1231,7 @@ pub fn native_chat_list() -> Result<Vec<NativeChatListItem>, String> {
 pub fn native_model_vision(target: String) -> Result<String, String> {
     let resolved = resolve_native_target(&target)?;
     let state = match resolved {
-        NativeChatTarget::FreeTier => crate::chat_images::VisionState::Unknown,
+        NativeChatTarget::FreeTier => free_tier_vision_state(),
         NativeChatTarget::Catalog {
             provider_kind,
             provider_id,
@@ -1324,6 +1415,7 @@ where
                 request.system_prompt.clone(),
             );
             engine.set_saved_reasoning_level(reasoning.level);
+            chats.remember_target(&live_id, &request.target);
             chats.open_with_engine(live_id, engine, emit)?;
         }
         NativeChatTarget::Catalog {
@@ -1346,6 +1438,8 @@ where
                 reasoning_notices_seen: None,
                 chat_images: Vec::new(),
                 vision_state: crate::chat_images::VisionState::Unknown,
+                send_anyway: false,
+                image_session_id: None,
             };
             apply_catalog_reasoning(&mut stream, &reasoning);
             stamp_model_vision(&mut stream);
@@ -1363,6 +1457,7 @@ where
                 request.system_prompt.clone(),
             );
             engine.set_saved_reasoning_level(reasoning.level);
+            chats.remember_target(&live_id, &request.target);
             chats.open_with_engine(live_id, engine, emit)?;
         }
     }
@@ -1886,6 +1981,97 @@ mod tests {
                 users.contains(&"First") && users.contains(&"Second"),
                 "forked model must see kept turns: {users:?}"
             );
+        });
+    }
+
+    fn tiny_png() -> crate::chat_images::ChatImage {
+        use base64::Engine;
+        crate::chat_images::ChatImage {
+            mime_type: "image/png".into(),
+            data: base64::engine::general_purpose::STANDARD.encode(b"\x89PNG\r\n\x1a\nA"),
+        }
+    }
+
+    #[test]
+    fn a_reopened_chat_can_send_an_image() {
+        with_temp_home(|_| {
+            write_native_log("reopen-image", 1, "openai/gpt-4o", &[]);
+            let id = log_id("reopen-image");
+            let chats = NativeChats::new();
+            let (tx, rx) = mpsc::channel();
+            chats
+                .open_with_engine(
+                    id.clone(),
+                    NativeEngine::from_parts(AgentLoop::new(), FakeModel::saying("seen")),
+                    move |event| {
+                        let _ = tx.send(event);
+                    },
+                )
+                .expect("open");
+            chats
+                .send_with_reasoning(
+                    &id,
+                    "what is this",
+                    ReasoningLevelUpdate::Keep,
+                    &[tiny_png()],
+                    false,
+                )
+                .expect("image send after reopen");
+            let events = wait_for_turn_end(&rx);
+            assert!(events
+                .iter()
+                .any(|event| matches!(event, EngineEvent::TextDelta { text } if text == "seen")));
+            let turns = crate::chat_images::read_turns(&id).expect("ledger");
+            assert_eq!(turns.last().map(Vec::len), Some(1));
+        });
+    }
+
+    #[test]
+    fn a_failed_send_does_not_shift_later_images() {
+        with_temp_home(|_| {
+            write_native_log("failed-image", 1, "openai/gpt-4o", &[]);
+            let id = log_id("failed-image");
+            let chats = NativeChats::new();
+            let (tx, rx) = mpsc::channel();
+            chats
+                .open_with_engine(
+                    id.clone(),
+                    NativeEngine::from_parts(AgentLoop::new(), FakeModel::saying("ok")),
+                    move |event| {
+                        let _ = tx.send(event);
+                    },
+                )
+                .expect("open");
+            chats
+                .send_with_reasoning(&id, "one", ReasoningLevelUpdate::Keep, &[tiny_png()], false)
+                .expect("first image");
+            let _ = wait_for_turn_end(&rx);
+            let original = {
+                let mut sessions = chats.sessions.lock().expect("sessions");
+                let session = sessions.get_mut(&id).expect("live");
+                let (tx, disconnected) = mpsc::channel();
+                drop(disconnected);
+                std::mem::replace(&mut session.ops, tx)
+            };
+            let failed = chats.send_with_reasoning(
+                &id,
+                "phantom",
+                ReasoningLevelUpdate::Keep,
+                &[tiny_png()],
+                false,
+            );
+            assert!(failed.is_err(), "a closed worker must refuse the send");
+            {
+                let mut sessions = chats.sessions.lock().expect("sessions");
+                sessions.get_mut(&id).expect("live").ops = original;
+            }
+            chats
+                .send_with_reasoning(&id, "two", ReasoningLevelUpdate::Keep, &[tiny_png()], false)
+                .expect("later image");
+            let loaded = crate::chat_images::read_turns(&id).expect("ledger");
+            assert_eq!(loaded.len(), 2);
+            assert_eq!(loaded[0].len(), 1);
+            assert_eq!(loaded[1].len(), 1);
         });
     }
 

@@ -31,7 +31,8 @@ import {
 import { chatEngineAllowsSendWithoutPrime } from '../lib/chatEngine'
 import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
 import { nativeModelVision, type NativeVision } from '../lib/nativeVision'
-import { rememberVisionSendAnyway, visionSendAnywayFor } from '../lib/visionChoice'
+import { forgetVisionSendAnyway, rememberVisionSendAnyway, visionSendAnywayFor } from '../lib/visionChoice'
+import { setNativeTurnAcceptedHandler } from '../lib/nativeTurnAccepted'
 import type { AiTarget } from '../lib/aiTargets'
 import type { AppLocale } from '../lib/i18n'
 import { type NoteListItem } from '../utils/ai-context'
@@ -354,11 +355,18 @@ export function AiPanelView({
     vision: NativeVision
   } | null>(null)
   const [, setVisionSendAnywayRevision] = useState(0)
-  const [attachmentNotice, setAttachmentNotice] = useState<string | null>(null)
-  const modelTarget = nativeTarget ?? ''
-  const vision: NativeVision =
-    !modelTarget || visionForTarget?.target !== modelTarget ? 'unknown' : visionForTarget.vision
+  const [attachmentNoticeFor, setAttachmentNoticeFor] = useState<{
+    target: string
+    message: string
+  } | null>(null)
+  const modelTarget = resolveNativeChatTarget(nativeTarget)
+  const vision: NativeVision | 'pending' = visionForTarget?.target === modelTarget
+    ? visionForTarget.vision
+    : 'pending'
   const visionSendAnyway = visionSendAnywayFor(modelTarget)
+  const attachmentNotice = attachmentNoticeFor?.target === modelTarget
+    ? attachmentNoticeFor.message
+    : null
   useEffect(() => {
     if (!modelTarget) return
     let cancelled = false
@@ -370,7 +378,7 @@ export function AiPanelView({
     }
   }, [modelTarget])
   const reportAttachment = (message: string) => {
-    setAttachmentNotice(message)
+    setAttachmentNoticeFor({ target: modelTarget, message })
     onUnsupportedAiPaste?.(message)
   }
   const { attachments, attachImages, removeAttachment, clearAttachments } = useAiPanelAttachments({
@@ -380,6 +388,10 @@ export function AiPanelView({
     modelName: primeHost.modelName,
     modelId: primeHost.modelId,
   })
+  useEffect(() => {
+    setNativeTurnAcceptedHandler(clearAttachments)
+    return () => setNativeTurnAcceptedHandler(null)
+  }, [clearAttachments])
 
   // Prime owns the queue. Chat used to remember follow-ups locally because
   // we had no read; `get_queue` is that read.
@@ -645,6 +657,10 @@ export function AiPanelView({
         visionSendAnyway={visionSendAnyway}
         onVisionSendAnyway={() => {
           rememberVisionSendAnyway(modelTarget)
+          setVisionSendAnywayRevision((revision) => revision + 1)
+        }}
+        onVisionUndo={() => {
+          forgetVisionSendAnyway(modelTarget)
           setVisionSendAnywayRevision((revision) => revision + 1)
         }}
         attachmentNotice={attachmentNotice}

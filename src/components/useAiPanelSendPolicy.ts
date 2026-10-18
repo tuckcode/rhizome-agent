@@ -71,9 +71,9 @@ export function useAiPanelSendPolicy({
     const latest = latestTurnState.current
     latest.onSendPrompt?.(text)
     latest.handleSend(text, references, toPrimeImages(attachments) ?? undefined)
-    clearAttachments()
+    if (isPrimeTarget) clearAttachments()
     refreshQueue()
-  }, [attachments, clearAttachments, refreshQueue])
+  }, [attachments, clearAttachments, isPrimeTarget, refreshQueue])
 
   const sendAsNewTurnIfIdle = useCallback((text: string, references: SendReferences) => {
     if (latestTurnState.current.isActive) return

@@ -121,6 +121,8 @@ pub struct RoutingModel<K: KeyStore, C: Clock> {
     reasoning_notices_seen:
         Option<std::sync::Arc<std::sync::Mutex<std::collections::HashSet<String>>>>,
     chat_images: Vec<Vec<crate::chat_images::ChatImage>>,
+    send_anyway: bool,
+    image_session_id: Option<String>,
 }
 
 impl<K: KeyStore, C: Clock> RoutingModel<K, C> {
@@ -140,6 +142,8 @@ impl<K: KeyStore, C: Clock> RoutingModel<K, C> {
             reasoning_notice_tx: None,
             reasoning_notices_seen: None,
             chat_images: Vec::new(),
+            send_anyway: false,
+            image_session_id: None,
         }
     }
 
@@ -193,11 +197,21 @@ impl<K: KeyStore, C: Clock> RoutingModel<K, C> {
         self.budget = budget;
         self
     }
+
+    #[cfg(test)]
+    fn with_send_anyway(mut self, send_anyway: bool) -> Self {
+        self.send_anyway = send_anyway;
+        self
+    }
 }
 
 impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
     fn set_chat_images(&mut self, images: Vec<Vec<crate::chat_images::ChatImage>>) {
         self.chat_images = images;
+        if let Some((session, send_anyway)) = crate::chat_images::armed_image_turn() {
+            self.image_session_id = Some(session);
+            self.send_anyway = send_anyway;
+        }
     }
 
     fn complete(&mut self, view: &ModelView, emit: &mut dyn FnMut(ModelEvent) -> bool) -> bool {
@@ -216,6 +230,8 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
             reasoning_notice_tx,
             reasoning_notices_seen,
             chat_images,
+            send_anyway,
+            image_session_id,
         } = self;
         let mut report = |attempt: ProviderAttempt| {
             if let Some(observer) = observer.as_mut() {
@@ -251,10 +267,6 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
                 key: fingerprint(credential.as_ref()),
             };
             let now = clock.now_ms();
-            if let Some(until) = health.blocked_until(&attempt, now) {
-                reopens_at = Some(reopens_at.map_or(until, |earliest| earliest.min(until)));
-                continue;
-            }
             // The first try and one failover always run (freellmapi checklist).
             // The user's own endpoint is last and always runs, so slow free
             // providers cannot use up its turn.
@@ -267,10 +279,24 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
             let mut request =
                 provider_request(provider, &target.model, base_url.clone(), credential);
             let current_images = chat_images.last().is_some_and(|turn| !turn.is_empty());
-            if current_images && request.vision_state == crate::chat_images::VisionState::No {
+            let can_see = match request.vision_state {
+                crate::chat_images::VisionState::Yes => true,
+                crate::chat_images::VisionState::Unknown => *send_anyway,
+                crate::chat_images::VisionState::No => false,
+            };
+            if current_images && !can_see {
                 skipped_vision = true;
                 continue;
             }
+            if let Some(until) = health.blocked_until(&attempt, now) {
+                reopens_at = Some(reopens_at.map_or(until, |earliest| earliest.min(until)));
+                continue;
+            }
+            if *send_anyway && request.vision_state == crate::chat_images::VisionState::Unknown {
+                request.vision_state = crate::chat_images::VisionState::Yes;
+                request.send_anyway = true;
+            }
+            request.image_session_id = image_session_id.clone();
             request.chat_images = chat_images.clone();
             tried += 1;
             report(ProviderAttempt::Trying {
@@ -316,6 +342,16 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
             }
         }
 
+        let current_images = chat_images.last().is_some_and(|turn| !turn.is_empty());
+        if current_images && tried == 0 && reopens_at.is_some() && last_error.is_none() {
+            emit(ModelEvent::Error(crate::model_events::ModelError {
+                kind: crate::model_events::ModelErrorKind::Rejected,
+                status: None,
+                message: "Every model that can read images is cooling down. Try again shortly."
+                    .into(),
+            }));
+            return true;
+        }
         if skipped_vision && tried == 0 && last_error.is_none() {
             emit(ModelEvent::Error(crate::model_events::ModelError {
                 kind: crate::model_events::ModelErrorKind::Rejected,
@@ -660,6 +696,37 @@ mod tests {
     }
 
     #[test]
+    fn send_anyway_delivers_an_image_to_an_unknown_route() {
+        let dir = tempfile::tempdir().expect("temp");
+        std::fs::write(
+            dir.path().join("models-dev.json"),
+            r#"{"openai":{"models":{}}}"#,
+        )
+        .unwrap();
+        std::fs::write(dir.path().join("openrouter-models.json"), r#"{"data":[]}"#).unwrap();
+        crate::reasoning_levels::reset_reasoning_state_for_test(Some(dir.path().to_path_buf()));
+        let unknown = serve(vec![reply("seen")]);
+        let mut router = RoutingModel::new(
+            catalog(&[("openai", &unknown.base_url)]),
+            keys(&["openai"]),
+            FakeClock::at(T0),
+            TEST_LIMITS,
+        )
+        .with_send_anyway(true)
+        .with_chat_images(vec![vec![crate::chat_images::ChatImage {
+            mime_type: "image/png".into(),
+            data: base64::engine::general_purpose::STANDARD.encode(b"png"),
+        }]]);
+        assert_eq!(run(&mut router), done("seen"));
+        let body: Value = serde_json::from_str(&unknown.requests.lock().unwrap()[0].1).unwrap();
+        assert_eq!(body["messages"][0]["content"][1]["type"], "image_url");
+        let _restore = tempfile::tempdir().expect("temp");
+        crate::reasoning_levels::reset_reasoning_state_for_test(Some(
+            _restore.path().to_path_buf(),
+        ));
+    }
+
+    #[test]
     fn a_routing_probe_sends_no_reasoning_params() {
         let server = serve(vec![reply("ok")]);
         let mut router = RoutingModel::new(
@@ -784,6 +851,50 @@ mod tests {
             Some(ModelEvent::Error(error)) => Some(error.kind.clone()),
             _ => None,
         }
+    }
+
+    #[test]
+    fn cooling_vision_routes_refuse_instead_of_sending_a_text_model() {
+        let dir = tempfile::tempdir().expect("temp");
+        std::fs::write(
+            dir.path().join("models-dev.json"),
+            r#"{
+              "google": {"models": {"google-model": {"modalities": {"input": ["text", "image"]}}}},
+              "openai": {"models": {"openai-model": {"modalities": {"input": ["text"]}}}}
+            }"#,
+        )
+        .unwrap();
+        std::fs::write(dir.path().join("openrouter-models.json"), r#"{"data":[]}"#).unwrap();
+        crate::reasoning_levels::reset_reasoning_state_for_test(Some(dir.path().to_path_buf()));
+        let vision = serve(vec![http_response(
+            "429 Too Many Requests",
+            &["Retry-After: 30"],
+            "slow down",
+        )]);
+        let text = serve(vec![reply("half")]);
+        let mut router = RoutingModel::new(
+            catalog(&[("google", &vision.base_url), ("openai", &text.base_url)]),
+            keys(&["google", "openai"]),
+            FakeClock::at(T0),
+            TEST_LIMITS,
+        );
+        assert_eq!(run(&mut router), done("half"));
+        router = router.with_chat_images(vec![vec![crate::chat_images::ChatImage {
+            mime_type: "image/png".into(),
+            data: base64::engine::general_purpose::STANDARD.encode(b"png"),
+        }]]);
+        let events = run(&mut router);
+        match events.last() {
+            Some(ModelEvent::Error(error)) => {
+                assert!(error.message.contains("cooling down"), "{}", error.message);
+            }
+            other => panic!("expected a cooling refusal, got {other:?}"),
+        }
+        assert_eq!(text.requests.lock().unwrap().len(), 1);
+        let _restore = tempfile::tempdir().expect("temp");
+        crate::reasoning_levels::reset_reasoning_state_for_test(Some(
+            _restore.path().to_path_buf(),
+        ));
     }
 
     #[test]

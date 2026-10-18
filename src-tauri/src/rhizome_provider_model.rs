@@ -37,6 +37,10 @@ pub struct ProviderModel {
     replay_session: String,
 }
 
+fn image_rejected(status: Option<u16>) -> bool {
+    matches!(status, Some(400 | 413 | 415 | 422))
+}
+
 impl ProviderModel {
     pub fn new(request: AiModelStreamRequest, limits: HttpLimits) -> Self {
         Self {
@@ -58,6 +62,10 @@ impl ProviderModel {
 impl Model for ProviderModel {
     fn set_chat_images(&mut self, images: Vec<Vec<crate::chat_images::ChatImage>>) {
         self.request.chat_images = images;
+        if let Some((session, send_anyway)) = crate::chat_images::armed_image_turn() {
+            self.request.image_session_id = Some(session);
+            self.request.send_anyway = send_anyway;
+        }
     }
 
     fn complete(&mut self, view: &ModelView, emit: &mut dyn FnMut(ModelEvent) -> bool) -> bool {
@@ -67,7 +75,8 @@ impl Model for ProviderModel {
             base_url: self.request.provider.base_url.as_deref(),
             replay_session: &self.replay_session,
         };
-        let accepts = self.request.vision_state == crate::chat_images::VisionState::Yes;
+        let accepts = self.request.vision_state == crate::chat_images::VisionState::Yes
+            || self.request.send_anyway;
         let messages = openai_messages_for(
             view,
             view.turn_start,
@@ -140,6 +149,13 @@ impl Model for ProviderModel {
                 );
             });
             for event in receiver.iter() {
+                if let crate::model_events::ModelEvent::Error(error) = &event {
+                    if image_rejected(error.status) {
+                        if let Some(session) = &self.request.image_session_id {
+                            let _ = crate::chat_images::drop_latest_images(session);
+                        }
+                    }
+                }
                 if !emit(event) {
                     break;
                 }
@@ -1537,5 +1553,22 @@ mod tests {
         assert!(events
             .iter()
             .any(|event| matches!(event, crate::model_events::ModelEvent::TextDelta { .. })));
+    }
+
+    #[test]
+    fn an_unknown_model_with_send_anyway_gets_the_image_part() {
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"a square"},"finish_reason":"stop"}]}"#,
+            "[DONE]",
+        ])]);
+        let mut request = request(&server.base_url);
+        request.vision_state = crate::chat_images::VisionState::Unknown;
+        request.send_anyway = true;
+        request.chat_images = vec![vec![tiny_png()]];
+        let mut model = ProviderModel::new(request, TEST_LIMITS);
+        let _ = model.complete(&view("what is this", vec![]), &mut |_| true);
+        let body: serde_json::Value =
+            serde_json::from_str(&server.requests.lock().unwrap()[0].1).unwrap();
+        assert_eq!(body["messages"][0]["content"][1]["type"], "image_url");
     }
 }

@@ -23,3 +23,10 @@ export function rememberVisionSendAnyway(modelId: string | null | undefined): vo
   if (ids.includes(id)) return
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify([...ids, id]))
 }
+
+export function forgetVisionSendAnyway(modelId: string | null | undefined): void {
+  const id = modelId?.trim()
+  if (!id) return
+  const ids = readIds().filter((saved) => saved !== id)
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(ids))
+}

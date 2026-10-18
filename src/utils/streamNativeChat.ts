@@ -1,4 +1,6 @@
 import type { PrimeImageContent } from '../lib/composerAttachments'
+import { notifyNativeTurnAccepted } from '../lib/nativeTurnAccepted'
+import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
 import { visionSendAnywayFor } from '../lib/visionChoice'
 import { isTauri } from '../mock-tauri'
 import type { AiAgentPermissionMode } from '../lib/aiAgentPermissionMode'
@@ -133,10 +135,13 @@ export async function streamNativeChat(request: StreamNativeChatRequest): Promis
     request.callbacks.onDone()
     return
   }
+  const target = resolveNativeChatTarget(request.target)
+  const sendAnyway = visionSendAnywayFor(target)
   if (!isTauri()) {
     const imageCount = request.images?.length ?? 0
     const imageNote = imageCount > 0 ? ` (${imageCount} image${imageCount === 1 ? '' : 's'})` : ''
     request.callbacks.onText(`[mock-native] You said: "${request.message}"${imageNote}`)
+    notifyNativeTurnAccepted()
     request.callbacks.onDone()
     return
   }
@@ -148,7 +153,7 @@ export async function streamNativeChat(request: StreamNativeChatRequest): Promis
       ? request.sessionId
       : await invoke<string>('native_chat_start', {
         request: {
-          target: request.target,
+          target,
           prompt: request.message,
           systemPrompt: request.systemPrompt || null,
           vaultPath: request.vaultPath || null,
@@ -156,7 +161,7 @@ export async function streamNativeChat(request: StreamNativeChatRequest): Promis
           permissionMode: normalizeAiAgentPermissionMode(request.permissionMode),
           reasoningLevel: request.reasoningLevel || null,
           ...(request.images && request.images.length > 0
-            ? { images: request.images, sendAnyway: visionSendAnywayFor(request.target) }
+            ? { images: request.images, sendAnyway }
             : {}),
         },
       })
@@ -176,10 +181,11 @@ export async function streamNativeChat(request: StreamNativeChatRequest): Promis
       }
       if (request.images && request.images.length > 0) {
         send.images = request.images
-        send.sendAnyway = visionSendAnywayFor(request.target)
+        send.sendAnyway = sendAnyway
       }
       await invoke('native_chat_send', send)
     }
+    notifyNativeTurnAccepted()
     await new Promise<void>((resolve) => {
       let settled = false
       let unlisten: (() => void) | undefined

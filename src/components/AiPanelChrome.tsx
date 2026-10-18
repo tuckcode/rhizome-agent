@@ -150,11 +150,12 @@ interface AiPanelComposerProps {
   onOpenGoal?: () => void
   onOpenSchedule?: () => void
   /** Catalog vision for the selected model. Unknown asks before sending. */
-  vision?: 'yes' | 'no' | 'unknown'
+  vision?: 'yes' | 'no' | 'unknown' | 'pending'
   modelLabel?: string
   /** Remembered "Send anyway" for this model. */
   visionSendAnyway?: boolean
   onVisionSendAnyway?: () => void
+  onVisionUndo?: () => void
   /** Size, type, or count rejection, shown with the chips. */
   attachmentNotice?: string | null
 }
@@ -1049,6 +1050,7 @@ export function AiPanelComposer({
   modelLabel = 'This model',
   visionSendAnyway = false,
   onVisionSendAnyway,
+  onVisionUndo,
   attachmentNotice = null,
 }: AiPanelComposerProps) {
   const t = createTranslator(locale)
@@ -1091,7 +1093,7 @@ export function AiPanelComposer({
   }, [completionText, lastAgentMessage])
 
   const handleSend = useCallback((text: string, references: NoteReference[]) => {
-    if (attachments.length > 0 && (vision === 'no' || (vision === 'unknown' && !visionSendAnyway))) return
+    if (attachments.length > 0 && (vision === 'no' || vision === 'pending' || (vision === 'unknown' && !visionSendAnyway))) return
     const outgoing = expandReplyQuotes(text)
     // Mid-turn Enter with no steer handler is ignored by the send policy.
     // Do not push that keystroke into prompt history.
@@ -1117,7 +1119,9 @@ export function AiPanelComposer({
   const hasPayload = hasInput || attachments.length > 0
   const imageBlocked = attachments.length > 0 && vision === 'no'
   const imageNeedsConfirm = attachments.length > 0 && vision === 'unknown' && !visionSendAnyway
-  const canSend = !composerDisabled && hasPayload && !imageBlocked && !imageNeedsConfirm
+  const imageLookupPending = attachments.length > 0 && vision === 'pending'
+  const imageSendAnyway = attachments.length > 0 && vision === 'unknown' && visionSendAnyway
+  const canSend = !composerDisabled && hasPayload && !imageBlocked && !imageNeedsConfirm && !imageLookupPending
   const placeholder = getComposerPlaceholder(agentLabel, agentReadiness, t)
   const boxRef = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
@@ -1319,6 +1323,28 @@ export function AiPanelComposer({
             onClick={() => onVisionSendAnyway?.()}
           >
             Send anyway
+          </Button>
+        </p>
+      ) : null}
+      {imageSendAnyway ? (
+        <p
+          className="mb-1.5 flex flex-wrap items-center gap-1.5 rounded-md border px-2 py-1.5 text-[12px]"
+          style={{
+            color: 'var(--feedback-warning-text)',
+            background: 'var(--feedback-warning-bg)',
+            borderColor: 'var(--feedback-warning-border)',
+          }}
+          data-testid="composer-vision-send-anyway"
+        >
+          <span>Images will be sent to {modelLabel}.</span>
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            data-testid="composer-undo-send-anyway"
+            onClick={() => onVisionUndo?.()}
+          >
+            Undo
           </Button>
         </p>
       ) : null}

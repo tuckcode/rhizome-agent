@@ -3,7 +3,7 @@ import { AiMessage } from './components/AiMessage'
 import { AiPanelComposer } from './components/AiPanelChrome'
 import type { ComposerAttachment } from './lib/composerAttachments'
 
-const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='
+const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGNg2OIGAAGyAPse0xNEAAAAAElFTkSuQmCC'
 
 const attachment = (name: string): ComposerAttachment => ({
   id: name,
@@ -41,17 +41,17 @@ export function NativeImageShotHarness() {
   const inputRef = useRef<HTMLDivElement>(null)
   const many = [attachment('one.png'), attachment('two.png'), attachment('three.png'), attachment('four.png')]
   const notice = shot === 'too-large'
-    ? 'huge.png was not attached: images must be under 5 MB'
+    ? "huge.png wasn't attached. Images must be 5 MB or smaller."
     : shot === 'too-many'
       ? 'Only the first 4 images were attached.'
       : shot === 'wrong-type'
-        ? 'diagram.bmp was not attached: only PNG, JPEG, GIF and WebP images can be attached'
+        ? "diagram.bmp wasn't attached. Use a PNG, JPEG, GIF or WebP image."
         : null
   const attachments = shot === 'too-many'
     ? many
-    : shot === 'wrong-type'
-      ? []
-      : [attachment(shot === 'too-large' ? 'huge.png' : 'screenshot.png')]
+    : shot === 'text-only' || shot === 'unknown'
+      ? [attachment('screenshot.png')]
+      : []
 
   return (
     <div className="min-h-screen bg-background p-6 text-foreground" data-testid="native-image-shot">
@@ -75,7 +75,7 @@ export function NativeImageShotHarness() {
         onChange={() => {}}
         onSend={() => {}}
         onStop={() => {}}
-        attachments={shot === 'sent' ? [attachment('screenshot.png')] : attachments}
+        attachments={attachments}
         attachmentNotice={notice}
         vision={shot === 'text-only' ? 'no' : shot === 'unknown' ? 'unknown' : 'yes'}
         modelLabel={shot === 'text-only' ? 'gpt-3.5-turbo' : shot === 'unknown' ? 'llava' : 'gpt-4o'}

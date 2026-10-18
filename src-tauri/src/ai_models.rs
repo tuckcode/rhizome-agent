@@ -100,6 +100,12 @@ pub struct AiModelStreamRequest {
     pub chat_images: Vec<Vec<crate::chat_images::ChatImage>>,
     #[serde(skip, default)]
     pub vision_state: crate::chat_images::VisionState,
+    /// The user confirmed an unknown-vision model for this turn.
+    #[serde(skip, default)]
+    pub send_anyway: bool,
+    /// Session whose ledger should drop an image the provider rejected.
+    #[serde(skip, default)]
+    pub image_session_id: Option<String>,
 }
 
 /// Shown instead of a blank assistant bubble when a thinking level comes back empty.
@@ -226,6 +232,8 @@ pub fn test_ai_model_provider(request: AiModelProviderTestRequest) -> Result<Str
         reasoning_notices_seen: None,
         chat_images: Vec::new(),
         vision_state: crate::chat_images::VisionState::Unknown,
+        send_anyway: false,
+        image_session_id: None,
     };
     complete_text(&request)
 }
@@ -374,6 +382,8 @@ pub fn discover_ai_model_ids_with(
         reasoning_notices_seen: None,
         chat_images: Vec::new(),
         vision_state: crate::chat_images::VisionState::Unknown,
+        send_anyway: false,
+        image_session_id: None,
     };
     let endpoint = format!("{}/models", rejected_on_err(normalized_base_url(&request))?);
     let client = http_client(limits)?;
@@ -859,7 +869,8 @@ where
 
 fn send_anthropic_message(request: &AiModelStreamRequest) -> Result<String, String> {
     let endpoint = format!("{}/messages", normalized_base_url(request)?);
-    let accepts = request.vision_state == crate::chat_images::VisionState::Yes;
+    let accepts =
+        request.vision_state == crate::chat_images::VisionState::Yes || request.send_anyway;
     let budgeted = crate::chat_images::budget_turns(&request.chat_images, accepts);
     let turn = budgeted
         .last()
@@ -1155,6 +1166,8 @@ mod tests {
             reasoning_notices_seen: None,
             chat_images: Vec::new(),
             vision_state: crate::chat_images::VisionState::Unknown,
+            send_anyway: false,
+            image_session_id: None,
         }
     }
 

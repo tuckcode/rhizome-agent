@@ -8,7 +8,8 @@
 //! The JSONL event stays text. A log written before images existed has no
 //! sidecar and still opens.
 
-use std::collections::HashMap;
+use std::cell::RefCell;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -17,15 +18,21 @@ use base64::Engine;
 use serde_json::{json, Value};
 
 pub const IMAGE_TOO_LARGE: &str = "An image is over 5 MB.";
+pub const IMAGE_TURN_OVER_BUDGET: &str =
+    "This message's images are over 12 MB. Remove an image and try again.";
 pub const TOO_MANY_IMAGES: &str = "Only 4 images can be sent with one message.";
 pub const UNSUPPORTED_IMAGE: &str = "Only PNG, JPEG, GIF, and WebP images can be sent.";
 pub const UNREADABLE_IMAGE: &str = "An image could not be read.";
 pub const OMITTED_IMAGE_NOTE: &str = "[image from earlier turn omitted]";
+pub const CORRUPT_IMAGE_INDEX: &str =
+    "The image index is corrupt and could not be rebuilt from the image files.";
 
-/// Encoded base64 cap so Bedrock and Vertex's 5 MB limit holds.
-pub const MAX_IMAGE_ENCODED_BYTES: usize = 5 * 1024 * 1024;
+/// Decoded file cap. Base64 is about a third larger, so the old check on the
+/// encoded string was closer to 3.75 MB.
+pub const MAX_IMAGE_BYTES: usize = 5 * 1024 * 1024;
 pub const MAX_IMAGES_PER_MESSAGE: usize = 4;
-/// Whole request, under Gemini's inline limit.
+/// Encoded size of one request, which is what the provider receives.
+/// One 5 MB file encodes to about 6.7 MB, so this stays above that file.
 pub const MAX_REQUEST_ENCODED_BYTES: usize = 12 * 1024 * 1024;
 pub const KEPT_IMAGE_TURNS: usize = 2;
 
@@ -77,10 +84,65 @@ struct StoredImage {
     file: String,
 }
 
-fn ledgers() -> &'static Mutex<HashMap<String, Vec<Vec<ChatImage>>>> {
-    static LEDGERS: std::sync::OnceLock<Mutex<HashMap<String, Vec<Vec<ChatImage>>>>> =
+#[derive(Debug, Clone)]
+struct LedgerTurn {
+    images: Vec<ChatImage>,
+    files: Vec<String>,
+}
+
+fn ledgers() -> &'static Mutex<HashMap<String, Vec<LedgerTurn>>> {
+    static LEDGERS: std::sync::OnceLock<Mutex<HashMap<String, Vec<LedgerTurn>>>> =
         std::sync::OnceLock::new();
     LEDGERS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+thread_local! {
+    static ARMED_TURN: RefCell<Option<(String, bool)>> = const { RefCell::new(None) };
+}
+
+static SEND_ANYWAY: std::sync::OnceLock<Mutex<HashMap<String, bool>>> = std::sync::OnceLock::new();
+
+fn send_anyway_flags() -> &'static Mutex<HashMap<String, bool>> {
+    SEND_ANYWAY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Remembered for the worker thread that builds the provider request.
+pub fn note_send_anyway(session_id: &str, send_anyway: bool) {
+    send_anyway_flags()
+        .lock()
+        .expect("send anyway")
+        .insert(session_id.to_string(), send_anyway);
+}
+
+pub fn noted_send_anyway(session_id: &str) -> bool {
+    send_anyway_flags()
+        .lock()
+        .expect("send anyway")
+        .get(session_id)
+        .copied()
+        .unwrap_or(false)
+}
+
+pub fn clear_send_anyway(session_id: &str) {
+    send_anyway_flags()
+        .lock()
+        .expect("send anyway")
+        .remove(session_id);
+}
+
+/// Read by `set_chat_images` on the worker that is about to call the model.
+pub fn arm_image_turn(session_id: &str, send_anyway: bool) {
+    ARMED_TURN.with(|slot| {
+        *slot.borrow_mut() = Some((session_id.to_string(), send_anyway));
+    });
+}
+
+pub fn armed_image_turn() -> Option<(String, bool)> {
+    ARMED_TURN.with(|slot| slot.borrow().clone())
+}
+
+pub fn clear_armed_image_turn() {
+    ARMED_TURN.with(|slot| *slot.borrow_mut() = None);
 }
 
 /// Loads the sidecar into memory once. A later [`push_turn`] is kept.
@@ -89,7 +151,7 @@ pub fn load_ledger(session_id: &str) -> Result<(), String> {
     if ledgers.contains_key(session_id) {
         return Ok(());
     }
-    let turns = read_turns(session_id)?;
+    let turns = read_ledger(session_id)?;
     ledgers.insert(session_id.to_string(), turns);
     Ok(())
 }
@@ -99,18 +161,27 @@ pub fn load_ledger(session_id: &str) -> Result<(), String> {
 pub fn push_turn(session_id: &str, images: Vec<ChatImage>) -> Result<(), String> {
     require_session_id(session_id)?;
     let images = normalize_images(&images)?;
+    ensure_current_turn_fits(&images)?;
     let mut ledgers = ledgers().lock().expect("image ledgers");
-    let turns = ledgers
-        .entry(session_id.to_string())
-        .or_insert_with(|| read_turns(session_id).unwrap_or_default());
+    if !ledgers.contains_key(session_id) {
+        let loaded = read_ledger(session_id)?;
+        ledgers.insert(session_id.to_string(), loaded);
+    }
+    let turns = ledgers.get_mut(session_id).expect("image ledger");
     let index = turns.len();
     if images.is_empty() {
-        turns.push(Vec::new());
-        return write_index(session_id, turns);
+        turns.push(LedgerTurn {
+            images: Vec::new(),
+            files: Vec::new(),
+        });
+        return persist_ledger(session_id, turns);
     }
     let stored = write_image_files(session_id, index, &images)?;
-    turns.push(images);
-    if let Err(error) = write_stored_index(session_id, turns, &stored, index) {
+    turns.push(LedgerTurn {
+        images,
+        files: stored.iter().map(|image| image.file.clone()).collect(),
+    });
+    if let Err(error) = persist_ledger(session_id, turns) {
         turns.pop();
         return Err(error);
     }
@@ -145,10 +216,10 @@ pub fn normalize_images(images: &[ChatImage]) -> Result<Vec<ChatImage>, String> 
     let mut out = Vec::with_capacity(images.len());
     for image in images {
         let raw = raw_base64(&image.data);
-        if raw.len() > MAX_IMAGE_ENCODED_BYTES {
+        let bytes = decode_image(&image.data)?;
+        if bytes.len() > MAX_IMAGE_BYTES {
             return Err(IMAGE_TOO_LARGE.into());
         }
-        let bytes = decode_image(&image.data)?;
         let Some(mime) = sniff_image(&bytes) else {
             return Err(UNSUPPORTED_IMAGE.into());
         };
@@ -230,8 +301,13 @@ pub fn budget_turns_limited(
         .iter()
         .map(|turn| encoded_len(&turn.images))
         .sum::<usize>();
+    let current = budgeted.len().saturating_sub(1);
     while used > max_encoded {
-        let Some(index) = budgeted.iter().position(|turn| !turn.images.is_empty()) else {
+        let Some(index) = budgeted
+            .iter()
+            .enumerate()
+            .position(|(index, turn)| index < current && !turn.images.is_empty())
+        else {
             break;
         };
         used = used.saturating_sub(encoded_len(&budgeted[index].images));
@@ -241,6 +317,15 @@ pub fn budget_turns_limited(
         };
     }
     budgeted
+}
+
+/// Refuses a message whose own images exceed the request budget.
+/// Older turns can be omitted. This turn cannot.
+pub fn ensure_current_turn_fits(images: &[ChatImage]) -> Result<(), String> {
+    if encoded_len(images) > MAX_REQUEST_ENCODED_BYTES {
+        return Err(IMAGE_TURN_OVER_BUDGET.into());
+    }
+    Ok(())
 }
 
 fn encoded_len(images: &[ChatImage]) -> usize {
@@ -362,24 +447,90 @@ fn files_dir(session_id: &str) -> Result<PathBuf, String> {
 }
 
 pub fn read_turns(session_id: &str) -> Result<Vec<Vec<ChatImage>>, String> {
+    Ok(read_ledger(session_id)?
+        .into_iter()
+        .map(|turn| turn.images)
+        .collect())
+}
+
+fn read_ledger(session_id: &str) -> Result<Vec<LedgerTurn>, String> {
     require_session_id(session_id)?;
     let path = index_path(session_id)?;
     if !path.exists() {
         return Ok(Vec::new());
     }
     let bytes = fs::read(&path).map_err(|error| format!("read image index: {error}"))?;
-    let index: ImageIndex =
-        serde_json::from_slice(&bytes).map_err(|error| format!("image index: {error}"))?;
+    let index: ImageIndex = match serde_json::from_slice(&bytes) {
+        Ok(index) => index,
+        Err(error) => {
+            log::warn!("image index is corrupt ({error}); rebuilding from files");
+            return rebuild_ledger(session_id);
+        }
+    };
     let dir = files_dir(session_id)?;
     Ok(index
         .turns
         .into_iter()
         .map(|turn| {
-            turn.into_iter()
-                .filter_map(|stored| load_stored(&dir, stored))
-                .collect()
+            let mut images = Vec::new();
+            let mut files = Vec::new();
+            for stored in turn {
+                let name = stored.file.clone();
+                if let Some(image) = load_stored(&dir, stored) {
+                    images.push(image);
+                    files.push(name);
+                }
+            }
+            LedgerTurn { images, files }
         })
         .collect())
+}
+
+/// A missing file drops that entry and leaves every other file name alone.
+fn rebuild_ledger(session_id: &str) -> Result<Vec<LedgerTurn>, String> {
+    let dir = files_dir(session_id)?;
+    if !dir.is_dir() {
+        return Err(CORRUPT_IMAGE_INDEX.into());
+    }
+    let mut groups: BTreeMap<usize, BTreeMap<usize, String>> = BTreeMap::new();
+    for entry in fs::read_dir(&dir).map_err(|error| format!("read image dir: {error}"))? {
+        let entry = entry.map_err(|error| format!("read image dir: {error}"))?;
+        let name = entry.file_name().to_string_lossy().to_string();
+        if !safe_image_file_name(&name) {
+            continue;
+        }
+        let stem = name.trim_end_matches(".img");
+        let Some((turn, image)) = stem.split_once('-') else {
+            continue;
+        };
+        let (Ok(turn), Ok(image)) = (turn.parse::<usize>(), image.parse::<usize>()) else {
+            continue;
+        };
+        groups.entry(turn).or_default().insert(image, name);
+    }
+    if groups.is_empty() {
+        return Err(CORRUPT_IMAGE_INDEX.into());
+    }
+    let last = *groups.keys().next_back().expect("image turn");
+    let mut turns = Vec::new();
+    for index in 0..=last {
+        let mut images = Vec::new();
+        let mut files = Vec::new();
+        if let Some(named) = groups.get(&index) {
+            for name in named.values() {
+                let stored = StoredImage {
+                    mime_type: "image/png".into(),
+                    file: name.clone(),
+                };
+                if let Some(image) = load_stored(&dir, stored) {
+                    images.push(image);
+                    files.push(name.clone());
+                }
+            }
+        }
+        turns.push(LedgerTurn { images, files });
+    }
+    Ok(turns)
 }
 
 fn load_stored(dir: &Path, stored: StoredImage) -> Option<ChatImage> {
@@ -427,6 +578,35 @@ pub fn safe_image_file_name(name: &str) -> bool {
 
 pub fn drop_ledger(session_id: &str) {
     ledgers().lock().expect("image ledgers").remove(session_id);
+    clear_send_anyway(session_id);
+}
+
+/// Drops images on the latest turn that still has some, after a provider 4xx.
+/// The turn stays in the ledger so later turns keep their place.
+pub fn drop_latest_images(session_id: &str) -> Result<(), String> {
+    require_session_id(session_id)?;
+    let mut ledgers = ledgers().lock().expect("image ledgers");
+    if !ledgers.contains_key(session_id) {
+        let loaded = read_ledger(session_id)?;
+        ledgers.insert(session_id.to_string(), loaded);
+    }
+    let Some(turns) = ledgers.get_mut(session_id) else {
+        return Ok(());
+    };
+    let Some(index) = turns.iter().rposition(|turn| !turn.images.is_empty()) else {
+        return Ok(());
+    };
+    let names = turns[index].files.clone();
+    if let Ok(dir) = files_dir(session_id) {
+        for name in &names {
+            let _ = fs::remove_file(dir.join(name));
+        }
+    }
+    turns[index].images.clear();
+    turns[index].files.clear();
+    let snapshot = turns.clone();
+    drop(ledgers);
+    persist_ledger(session_id, &snapshot)
 }
 
 pub fn delete_session_images(session_id: &str) -> Result<(), String> {
@@ -447,7 +627,11 @@ pub fn copy_session_images(from: &str, to: &str, user_turns: usize) -> Result<()
     require_session_id(from)?;
     require_session_id(to)?;
     let turns = read_turns(from)?;
-    let kept = turns.into_iter().take(user_turns).collect::<Vec<_>>();
+    let kept = if turns.len() > user_turns {
+        turns[turns.len() - user_turns..].to_vec()
+    } else {
+        turns
+    };
     for turn in kept {
         push_turn(to, turn)?;
     }
@@ -464,61 +648,32 @@ pub fn rollback_turn(session_id: &str) -> Result<(), String> {
     let Some(removed) = turns.pop() else {
         return Ok(());
     };
-    let index = turns.len();
-    if !removed.is_empty() {
+    if !removed.files.is_empty() {
         if let Ok(dir) = files_dir(session_id) {
-            for image_index in 0..removed.len() {
-                let _ = fs::remove_file(dir.join(file_name(index, image_index)));
+            for name in &removed.files {
+                let _ = fs::remove_file(dir.join(name));
             }
         }
     }
     let snapshot = turns.clone();
     drop(ledgers);
-    write_index(session_id, &snapshot)
+    persist_ledger(session_id, &snapshot)
 }
 
-fn write_index(session_id: &str, turns: &[Vec<ChatImage>]) -> Result<(), String> {
+fn persist_ledger(session_id: &str, turns: &[LedgerTurn]) -> Result<(), String> {
     let stored: Vec<Vec<StoredImage>> = turns
         .iter()
-        .enumerate()
-        .map(|(turn_index, turn)| {
-            turn.iter()
-                .enumerate()
-                .map(|(image_index, image)| StoredImage {
+        .map(|turn| {
+            turn.files
+                .iter()
+                .zip(&turn.images)
+                .map(|(file, image)| StoredImage {
                     mime_type: normalize_mime(&image.mime_type),
-                    file: file_name(turn_index, image_index),
+                    file: file.clone(),
                 })
                 .collect()
         })
         .collect();
-    write_index_value(session_id, &stored)
-}
-
-fn write_stored_index(
-    session_id: &str,
-    turns: &[Vec<ChatImage>],
-    new_files: &[StoredImage],
-    turn_index: usize,
-) -> Result<(), String> {
-    let mut stored: Vec<Vec<StoredImage>> = turns
-        .iter()
-        .enumerate()
-        .map(|(index, turn)| {
-            if index == turn_index {
-                return new_files.to_vec();
-            }
-            turn.iter()
-                .enumerate()
-                .map(|(image_index, image)| StoredImage {
-                    mime_type: normalize_mime(&image.mime_type),
-                    file: file_name(index, image_index),
-                })
-                .collect()
-        })
-        .collect();
-    if stored.len() == turn_index {
-        stored.push(new_files.to_vec());
-    }
     write_index_value(session_id, &stored)
 }
 
@@ -584,6 +739,27 @@ fn restrict(path: &Path) -> Result<(), String> {
 
 /// Catalog vision. A saved `true` is an explicit yes. A saved `false` is not
 /// a known text-only model: that was the default on every row.
+/// One answer for a set of routes. Mixed or unknown stays unknown.
+pub fn vision_from_states(states: impl IntoIterator<Item = VisionState>) -> VisionState {
+    let mut saw_yes = false;
+    let mut saw_no = false;
+    let mut saw_unknown = false;
+    for state in states {
+        match state {
+            VisionState::Yes => saw_yes = true,
+            VisionState::No => saw_no = true,
+            VisionState::Unknown => saw_unknown = true,
+        }
+    }
+    if saw_unknown || (saw_yes && saw_no) || (!saw_yes && !saw_no) {
+        VisionState::Unknown
+    } else if saw_yes {
+        VisionState::Yes
+    } else {
+        VisionState::No
+    }
+}
+
 pub fn vision_state(
     provider_id: &str,
     base_url: &str,
@@ -616,6 +792,15 @@ mod tests {
     fn png(extra: &[u8]) -> ChatImage {
         let mut bytes = b"\x89PNG\r\n\x1a\n".to_vec();
         bytes.extend_from_slice(extra);
+        ChatImage {
+            mime_type: "image/png".into(),
+            data: base64::engine::general_purpose::STANDARD.encode(bytes),
+        }
+    }
+
+    fn png_with_len(len: usize) -> ChatImage {
+        let mut bytes = b"\x89PNG\r\n\x1a\n".to_vec();
+        bytes.resize(len, 0);
         ChatImage {
             mime_type: "image/png".into(),
             data: base64::engine::general_purpose::STANDARD.encode(bytes),
@@ -702,10 +887,7 @@ mod tests {
 
     #[test]
     fn caps_reject_size_count_and_type() {
-        let big = ChatImage {
-            mime_type: "image/png".into(),
-            data: "A".repeat(MAX_IMAGE_ENCODED_BYTES + 1),
-        };
+        let big = png_with_len(MAX_IMAGE_BYTES + 1);
         assert_eq!(validate(&[big]).unwrap_err(), IMAGE_TOO_LARGE);
         let svg = ChatImage {
             mime_type: "image/png".into(),
@@ -760,48 +942,78 @@ mod tests {
     }
 
     #[test]
-    fn a_failed_send_does_not_shift_later_images() {
+    fn a_missing_file_keeps_the_survivor_name() {
         let _home = temp_home();
         let session = uuid::Uuid::new_v4().to_string();
-        push_turn(&session, vec![png(b"A")]).unwrap();
-        push_turn(&session, Vec::new()).unwrap();
-        push_turn(&session, vec![png(b"C")]).unwrap();
-        push_turn(&session, vec![png(b"PHANTOM")]).unwrap();
-        rollback_turn(&session).unwrap();
-        push_turn(&session, vec![png(b"D")]).unwrap();
+        push_turn(&session, vec![png(b"keep"), png(b"drop")]).unwrap();
+        let dir = files_dir(&session).unwrap();
+        fs::remove_file(dir.join("0-0.img")).unwrap();
+        drop_ledger(&session);
         let loaded = read_turns(&session).unwrap();
-        assert_eq!(loaded.len(), 4);
         assert_eq!(loaded[0].len(), 1);
-        assert!(loaded[1].is_empty());
-        assert_eq!(loaded[2].len(), 1);
-        assert_eq!(loaded[3].len(), 1);
-        let sets = image_sets_for_users(4, &loaded);
-        assert_eq!(sets[0].len(), 1);
-        assert!(sets[1].is_empty());
-        assert_eq!(sets[2].len(), 1);
-        assert_eq!(sets[3].len(), 1);
+        push_turn(&session, Vec::new()).unwrap();
+        let index = fs::read_to_string(index_path(&session).unwrap()).unwrap();
+        assert!(index.contains("0-1.img"), "{index}");
+        assert!(dir.join("0-1.img").exists());
+    }
+
+    #[test]
+    fn a_corrupt_index_is_rebuilt_from_files() {
+        let _home = temp_home();
+        let session = uuid::Uuid::new_v4().to_string();
+        push_turn(&session, vec![png(b"kept")]).unwrap();
+        fs::write(index_path(&session).unwrap(), b"not-json").unwrap();
+        drop_ledger(&session);
+        let loaded = read_turns(&session).unwrap();
+        assert_eq!(loaded[0].len(), 1);
+        let empty = uuid::Uuid::new_v4().to_string();
+        let dir = sessions_dir().unwrap();
+        fs::create_dir_all(&dir).unwrap();
+        fs::write(index_path(&empty).unwrap(), b"not-json").unwrap();
+        assert_eq!(read_turns(&empty).unwrap_err(), CORRUPT_IMAGE_INDEX);
+    }
+
+    #[test]
+    fn fork_keeps_the_latest_turns() {
+        let _home = temp_home();
+        let source = uuid::Uuid::new_v4().to_string();
+        let fork = uuid::Uuid::new_v4().to_string();
+        push_turn(&source, vec![png(b"old")]).unwrap();
+        push_turn(&source, vec![png(b"new")]).unwrap();
+        copy_session_images(&source, &fork, 1).unwrap();
+        let copied = read_turns(&fork).unwrap();
+        assert_eq!(copied.len(), 1);
+        let raw = base64::engine::general_purpose::STANDARD
+            .decode(&copied[0][0].data)
+            .unwrap();
+        assert!(raw.ends_with(b"new"), "fork must keep the latest image");
     }
 
     #[test]
     fn a_long_chat_stays_under_the_image_budget_and_keeps_text() {
-        let image = png(b"budget");
+        let image = png_with_len(4 * 1024 * 1024);
         let turns = vec![
             vec![image.clone()],
             vec![image.clone()],
             vec![image.clone()],
-            vec![image],
         ];
-        let budgeted = budget_turns_limited(&turns, true, 2, 10_000);
+        let budgeted = budget_turns(&turns, true);
         let kept: usize = budgeted.iter().map(|turn| encoded_len(&turn.images)).sum();
-        assert!(kept <= 10_000);
-        assert!(budgeted[0].omitted);
-        assert!(budgeted[1].omitted);
+        assert!(kept <= MAX_REQUEST_ENCODED_BYTES);
+        assert!(!budgeted.last().expect("current").images.is_empty());
+        assert!(!budgeted.last().expect("current").omitted);
+        assert!(budgeted.iter().take(2).any(|turn| turn.omitted));
         let text_only = budget_turns(&turns, false);
         assert!(text_only.iter().all(|turn| turn.images.is_empty()));
         assert!(text_only.iter().all(|turn| turn.omitted));
         let note = compose_user_text("hello", true);
         assert!(note.starts_with("hello"));
         assert!(note.contains(OMITTED_IMAGE_NOTE));
+        let over = vec![png_with_len(MAX_IMAGE_BYTES), png_with_len(MAX_IMAGE_BYTES)];
+        assert_eq!(
+            ensure_current_turn_fits(&over).unwrap_err(),
+            IMAGE_TURN_OVER_BUDGET
+        );
     }
 
     #[test]
@@ -810,10 +1022,28 @@ mod tests {
         let session = uuid::Uuid::new_v4().to_string();
         push_turn(&session, vec![png(b"secret")]).unwrap();
         assert!(index_path(&session).unwrap().exists());
-        delete_session_images(&session).unwrap();
+        crate::commands::native_chat::delete_native_session(
+            &crate::commands::native_chat::NativeChats::new(),
+            &session,
+        )
+        .unwrap();
         assert!(!index_path(&session).unwrap().exists());
         assert!(!files_dir(&session).unwrap().exists());
         assert!(read_turns(&session).unwrap().is_empty());
+    }
+
+    #[test]
+    fn vision_from_states_reports_a_single_answer() {
+        assert_eq!(vision_from_states([VisionState::Yes]), VisionState::Yes);
+        assert_eq!(vision_from_states([VisionState::No]), VisionState::No);
+        assert_eq!(
+            vision_from_states([VisionState::Yes, VisionState::No]),
+            VisionState::Unknown
+        );
+        assert_eq!(
+            vision_from_states([VisionState::Unknown]),
+            VisionState::Unknown
+        );
     }
 
     #[test]
