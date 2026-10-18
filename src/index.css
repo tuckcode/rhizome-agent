@@ -656,12 +656,14 @@
 /* --- Tailwind v4 theme inline: register colors + radii --- */
 @theme inline {
   /*
-   * font-mono resolved to Tailwind's built-in system-monospace stack, so the
-   * two monospace faces the app actually loads (IBM Plex Mono for agent code,
-   * JetBrains Mono for the wordmark) were never what any `font-mono` utility
-   * rendered in. Registering it here is the one-line fix: every existing
-   * `font-mono` class picks it up without touching call sites.
+   * font-sans and font-mono resolved to Tailwind's built-in stacks, so Inter
+   * (linked in index.html) and the monospace faces the app loads (IBM Plex
+   * Mono for agent code, JetBrains Mono for the wordmark) were never what the
+   * utilities rendered. Registering them here is the fix: every existing class
+   * picks them up without touching call sites.
    */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    Oxygen, Ubuntu, Cantarell, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);

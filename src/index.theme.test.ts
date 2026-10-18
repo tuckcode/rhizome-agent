@@ -20,6 +20,14 @@ function extractAccentBlue(blockSelectorRegex: RegExp): string {
   return accentMatch![1]
 }
 
+describe('index.css Tailwind font tokens', () => {
+  it('registers --font-sans in @theme inline with the app Inter stack', () => {
+    expect(css).toMatch(
+      /--font-sans:\s*'Inter',\s*-apple-system,\s*BlinkMacSystemFont,\s*'Segoe UI',\s*Roboto,/,
+    )
+  })
+})
+
 describe('index.css default theme tokens', () => {
   it('keeps the Rhizome green accent in the default light theme', () => {
     const lightBlock = /:root,\s*\n\[data-theme="light"\]\s*\{/
