@@ -19,7 +19,7 @@ You need:
 4. Rust `1.77.2` or newer
 5. git
 
-Prime Agent is not required for Chat. Rhizome's own engine is the only chat engine. Prime and Hermes are removed from the app (ADR-0189).
+Prime Agent is not required for Chat. Rhizome's own engine is the only chat engine. Prime and Hermes are no longer chat engines (ADR-0189); leftover code is still in the repo until the follow-up PRs.
 
 ## Build and run
 

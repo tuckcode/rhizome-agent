@@ -420,10 +420,12 @@ Closed C32, C35 and C41 moved to [`archive-closed-threads.md`](plans/handoffs/ar
 - **C50-DECIDED (2026-08-24): selective harness doctrine.** Borrow with
   care. ADR-0180 (2026-10-09) supersedes the Prime-only execution lock:
   Rhizome owns its loop, tools, plugins, and routing. Prime and Hermes
-  are optional engines. Coverage is by user job, not command count.
+  are optional engines (superseded by ADR-0189: they are no longer chat
+  engines). Coverage is by user job, not command count.
   Ledger: `docs/design/harness-doctrine.md`, ADR-0168 (amended). Reviews
   in `docs/plans/2026-08-24-*`. TokenJuice path read 2026-08-26. ADR-0177
-  is superseded. Hermes ACP (ADR-0178) stays an optional engine. #56 is
+  is superseded. Hermes ACP (ADR-0178) stays an optional engine (superseded by ADR-0189:
+  Hermes is no longer an engine; the generic ACP client stays open). #56 is
   won't-remove: `ai_models.rs` starts the Rhizome loop. Vault layer from
   0177 still holds. Older `harness-composition.md` numbering differs.
   **2026-09-19 metabolite (source + live skill, not a new runtime):**

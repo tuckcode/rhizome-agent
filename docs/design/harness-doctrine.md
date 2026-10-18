@@ -4,8 +4,9 @@
 **Audience:** anyone deciding whether Rhizome should borrow a harness idea
 
 ADR-0180 supersedes the Prime-only execution lock. Rhizome owns its
-loop. Rhizome's own engine is the only one; Prime and Hermes are removed
-(ADR-0189). Borrow-care below still holds for foreign runtimes. The Prime
+loop. Rhizome's own engine is the only one; Prime and Hermes are no longer
+chat engines (ADR-0189); their leftover code is still in the repo until
+the follow-up PRs. Borrow-care below still holds for foreign runtimes. The Prime
 and Hermes verdicts below are kept for history.
 
 This is the Take / Adapt / Reject / Defer rule for Rhizome. It is not an
@@ -66,8 +67,8 @@ These three identities may evolve. They may not exchange ownership.
 | Durable memory | Rhizome vault | better promote/search/provenance | silent dual-write or a second `MEMORY.md` authority |
 | Background permission | the user | visible leases with stop/expiry | inferred persistence from close, hide, or crash |
 
-Core chat depends on the Rhizome loop. An optional engine may be attached.
-If a borrowed surface or optional engine fails, the product degrades to
+Core chat depends on the Rhizome loop. There is no optional engine
+(ADR-0189). If a borrowed surface fails, the product degrades to
 the bare Rhizome loop. It does not take the app down with it.
 
 ## Source verdicts

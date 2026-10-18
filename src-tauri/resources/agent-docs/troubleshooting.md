@@ -5,7 +5,7 @@ URL: /troubleshooting/ai-agent-not-found
 
 Rhizome runs Prime Agent as a separate program. It can only use Prime when Prime is installed and Rhizome can find it.
 
-You don't need Prime for Chat. Rhizome's own engine is the only chat engine, and Prime is removed from the app (ADR-0189).
+You don't need Prime for Chat. Rhizome's own engine is the only chat engine, and Prime is no longer a chat engine (ADR-0189); its leftover code is still in the repo until the follow-up PRs.
 
 ## Symptoms
 
@@ -26,7 +26,6 @@ You don't need Prime for Chat. Rhizome's own engine is the only chat engine, and
    ```bash
    (prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status
    ```
-
 
 ## Path issues
 

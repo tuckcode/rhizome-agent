@@ -11,7 +11,7 @@ Do not push this repo to the Desktop remote. Do not rename the product back to D
 
 | | Rhizome Desktop | Rhizome (this repo) |
 |---|---|---|
-| Purpose | Personal knowledge / vault / wiki app | Chat UI plus Rhizome's own harness; Rhizome's own engine is the only chat engine (ADR-0187); Prime and Hermes are removed ([ADR-0189](adr/0189-no-ties-to-outside-harnesses.md)) |
+| Purpose | Personal knowledge / vault / wiki app | Chat UI plus Rhizome's own harness; Rhizome's own engine is the only chat engine (ADR-0187); Prime and Hermes are no longer chat engines ([ADR-0189](adr/0189-no-ties-to-outside-harnesses.md)); leftover code is still in the repo until the follow-up PRs |
 | GitHub | `knispo/rhizome` (public AGPL desktop) | `tuckcode/rhizome-agent` |
 | Folder (local) | e.g. Grok worktree `code-lens` | `~/code/projects/rhizome-agent` |
 | Bundle id | `ai.rhizome.desktop` | `ai.rhizome.agent` |
@@ -54,7 +54,7 @@ say so explicitly and record why before diverging.
 ## Near-term direction
 
 - UI: chat-like experience (existing AI panel as starting point).
-- Harness: Rhizome owns the agent loop (ADR-0180). Native is the only chat engine (ADR-0187). Prime and Hermes are removed (ADR-0189); the chat engine picker went in #218, and the leftover engine code comes out in follow-up PRs.
+- Harness: Rhizome owns the agent loop (ADR-0180). Native is the only chat engine (ADR-0187). Prime and Hermes are no longer chat engines (ADR-0189); the chat engine picker went in #218, and leftover code is still in the repo until the follow-up PRs.
 - Vault: Rhizome MCP tools when a vault is attached — not a second full wiki product on day one.
 
 Session-host spike (slice 1): `docs/plans/2026-08-09-prime-harness-chat-spike.md`.

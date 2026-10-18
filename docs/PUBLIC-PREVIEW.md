@@ -1,6 +1,6 @@
 # Public preview
 
-A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own. Chat runs on Rhizome's own engine (ADR-0187). Prime and Hermes are removed from the app ([ADR-0189](adr/0189-no-ties-to-outside-harnesses.md)).
+A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own. Chat runs on Rhizome's own engine (ADR-0187). Prime and Hermes are no longer chat engines ([ADR-0189](adr/0189-no-ties-to-outside-harnesses.md)); leftover code is still in the repo until the follow-up PRs.
 
 This page is the install and recovery guide. Developer commands live in [`GETTING-STARTED.md`](GETTING-STARTED.md).
 

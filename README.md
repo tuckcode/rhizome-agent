@@ -5,7 +5,7 @@
 
 A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own.
 
-This is a developer preview. There is no signed download. Chat runs on Rhizome's own engine, the only chat engine. Prime and Hermes are removed from the app ([ADR-0189](docs/adr/0189-no-ties-to-outside-harnesses.md)). You read and diff notes in the app. The native engine can read, search, and edit vault files. It cannot search old Mycelium sessions.
+This is a developer preview. There is no signed download. Chat runs on Rhizome's own engine, the only chat engine. Prime and Hermes are no longer chat engines ([ADR-0189](docs/adr/0189-no-ties-to-outside-harnesses.md)); leftover code is still in the repo until the follow-up PRs. You read and diff notes in the app. The native engine can read, search, and edit vault files. It cannot search old Mycelium sessions.
 
 | | |
 |---|---|

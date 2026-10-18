@@ -222,8 +222,9 @@ Filter: ADR-0168 / [`harness-doctrine.md`](design/harness-doctrine.md).
 harness and owns the loop. ADR-0177 (client of harnesses, 2026-10-05) is
 superseded. [ADR-0189](adr/0189-no-ties-to-outside-harnesses.md)
 (2026-10-17) removes Prime and Hermes as engines; Rhizome's own engine is
-the only one. #5 (Prime surface) and Hermes ACP
-([ADR-0178](adr/0178-generic-acp-client.md)) are history.
+the only one. #5 (Prime surface) is history. The generic ACP client
+([ADR-0178](adr/0178-generic-acp-client.md)) stays open (ADR-0189
+decision 7); only Hermes as an engine is gone.
 **#56** is won't-remove: `ai_models.rs` is a starting point for the
 Rhizome loop. Re-read #45 and #48 under ADR-0180.
 
@@ -363,7 +364,7 @@ column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 | | |
 |---|---|
 | #5 | Spec: the Prime harness surface — parent of #40; **B** on §1 / `harness-composition.md` |
-| #40 | Harness or client — **reversed ADR-0180**. Hermes ACP client (ADR-0178) is removed by ADR-0189. |
+| #40 | Harness or client — **reversed ADR-0180**. Hermes as an engine is gone (ADR-0189); the generic ACP client (ADR-0178) stays open (ADR-0189 decision 7). |
 | #56 | Direct-to-provider path — **won't-remove** under ADR-0180; starting point for the Rhizome loop |
 
 #29 (credential redaction) is **closed**. #46 (HOME vault / wide MCP) is the

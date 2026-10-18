@@ -1,6 +1,6 @@
 # Architecture
 
-> This document describes Rhizome (`ai.rhizome.agent`, `tuckcode/rhizome-agent`) — a coding harness that runs its own agent loop (ADR-0180). Rhizome's own engine is the only chat engine. Prime and Hermes are removed from the app ([ADR-0189](adr/0189-no-ties-to-outside-harnesses.md)); their leftover code comes out in follow-up PRs. Not Rhizome Desktop (`knispo/rhizome`). See `docs/IDENTITY.md`. "Tolaria" below is the pre-fork product name, not renamed on every line; treat it as a synonym for "the app," not evidence of the wrong product.
+> This document describes Rhizome (`ai.rhizome.agent`, `tuckcode/rhizome-agent`) — a coding harness that runs its own agent loop (ADR-0180). Rhizome's own engine is the only chat engine. Prime and Hermes are no longer chat engines ([ADR-0189](adr/0189-no-ties-to-outside-harnesses.md)); leftover code is still in the repo until the follow-up PRs. Not Rhizome Desktop (`knispo/rhizome`). See `docs/IDENTITY.md`. "Tolaria" below is the pre-fork product name, not renamed on every line; treat it as a synonym for "the app," not evidence of the wrong product.
 
 Tolaria is a personal knowledge and life management desktop app. It reads a vault of markdown files with YAML frontmatter and presents them in a four-panel UI inspired by Bear Notes.
 
@@ -501,7 +501,7 @@ Hermes wrappers. ADR-0187: native is the only chat engine; the picker is
 gone (#218). `readChatEngine` in `src/lib/chatEngine.ts` always returns
 `native`. Settings may still load a stored `chat_engine` value for
 compatibility; nothing writes a Prime choice for new chats. New chats call
-native paths only. An open Prime-locked chat keeps that lock until closed.
+native paths only.
 Native chat can send when Prime is not installed. Cmd+K uses the same
 native-or-ready gate. Native mode does not poll Prime or show Prime chrome.
 Native no-key errors point at Settings → AI Agents → API models.
