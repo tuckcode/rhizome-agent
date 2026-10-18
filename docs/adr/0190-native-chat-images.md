@@ -36,7 +36,10 @@ is at most 5 MB of decoded file bytes. The types are PNG, JPEG, GIF,
 and WebP. A message whose own images encode past 12 MB is refused
 before the turn is logged. Older image turns can be replaced with a
 note so the request stays under that budget. The current turn's images
-are never the ones dropped.
+are never the ones dropped. Bedrock and Vertex still cap a single
+image at 5 MB of base64, which is about 3.75 MB of file bytes. A 5 MB
+decoded file can be too large for those two hosts even though Rhizome
+accepts it.
 
 **The provider call uses that provider's content shape.** OpenAI,
 Gemini, Ollama, LM Studio, OpenRouter, and other OpenAI-compatible

@@ -82,12 +82,16 @@ struct ImageIndex {
 struct StoredImage {
     mime_type: String,
     file: String,
+    /// The provider rejected this image. The file stays; later turns do not resend it.
+    #[serde(default)]
+    skip: bool,
 }
 
 #[derive(Debug, Clone)]
 struct LedgerTurn {
     images: Vec<ChatImage>,
     files: Vec<String>,
+    skip: Vec<bool>,
 }
 
 fn ledgers() -> &'static Mutex<HashMap<String, Vec<LedgerTurn>>> {
@@ -173,6 +177,7 @@ pub fn push_turn(session_id: &str, images: Vec<ChatImage>) -> Result<(), String>
         turns.push(LedgerTurn {
             images: Vec::new(),
             files: Vec::new(),
+            skip: Vec::new(),
         });
         return persist_ledger(session_id, turns);
     }
@@ -180,6 +185,7 @@ pub fn push_turn(session_id: &str, images: Vec<ChatImage>) -> Result<(), String>
     turns.push(LedgerTurn {
         images,
         files: stored.iter().map(|image| image.file.clone()).collect(),
+        skip: vec![false; stored.len()],
     });
     if let Err(error) = persist_ledger(session_id, turns) {
         turns.pop();
@@ -322,8 +328,12 @@ pub fn budget_turns_limited(
 /// Refuses a message whose own images exceed the request budget.
 /// Older turns can be omitted. This turn cannot.
 pub fn ensure_current_turn_fits(images: &[ChatImage]) -> Result<(), String> {
-    if encoded_len(images) > MAX_REQUEST_ENCODED_BYTES {
-        return Err(IMAGE_TURN_OVER_BUDGET.into());
+    let encoded = encoded_len(images);
+    if encoded > MAX_REQUEST_ENCODED_BYTES {
+        let combined_mb = encoded as f64 / (1024.0 * 1024.0);
+        return Err(format!(
+            "This message's images are {combined_mb:.1} MB encoded together. The limit is 12 MB."
+        ));
     }
     Ok(())
 }
@@ -449,7 +459,13 @@ fn files_dir(session_id: &str) -> Result<PathBuf, String> {
 pub fn read_turns(session_id: &str) -> Result<Vec<Vec<ChatImage>>, String> {
     Ok(read_ledger(session_id)?
         .into_iter()
-        .map(|turn| turn.images)
+        .map(|turn| {
+            turn.images
+                .into_iter()
+                .zip(turn.skip)
+                .filter_map(|(image, skip)| if skip { None } else { Some(image) })
+                .collect()
+        })
         .collect())
 }
 
@@ -464,7 +480,15 @@ fn read_ledger(session_id: &str) -> Result<Vec<LedgerTurn>, String> {
         Ok(index) => index,
         Err(error) => {
             log::warn!("image index is corrupt ({error}); rebuilding from files");
-            return rebuild_ledger(session_id);
+            return match rebuild_ledger(session_id) {
+                Ok(turns) => Ok(turns),
+                Err(rebuild) => {
+                    log::warn!(
+                        "could not rebuild the image index ({rebuild}); continuing with no images"
+                    );
+                    Ok(Vec::new())
+                }
+            };
         }
     };
     let dir = files_dir(session_id)?;
@@ -474,19 +498,38 @@ fn read_ledger(session_id: &str) -> Result<Vec<LedgerTurn>, String> {
         .map(|turn| {
             let mut images = Vec::new();
             let mut files = Vec::new();
+            let mut skip = Vec::new();
             for stored in turn {
                 let name = stored.file.clone();
+                let skipped = stored.skip;
                 if let Some(image) = load_stored(&dir, stored) {
                     images.push(image);
                     files.push(name);
+                    skip.push(skipped);
                 }
             }
-            LedgerTurn { images, files }
+            LedgerTurn {
+                images,
+                files,
+                skip,
+            }
         })
         .collect())
 }
 
+fn logged_user_turns(session_id: &str) -> Option<usize> {
+    let opened = crate::engines::native_log::open_session_log(session_id).ok()?;
+    Some(
+        opened
+            .events
+            .iter()
+            .filter(|event| matches!(event, crate::rhizome_loop::DurableEvent::User { .. }))
+            .count(),
+    )
+}
+
 /// A missing file drops that entry and leaves every other file name alone.
+/// Turn length follows the session log so a trailing empty turn is not lost.
 fn rebuild_ledger(session_id: &str) -> Result<Vec<LedgerTurn>, String> {
     let dir = files_dir(session_id)?;
     if !dir.is_dir() {
@@ -511,9 +554,12 @@ fn rebuild_ledger(session_id: &str) -> Result<Vec<LedgerTurn>, String> {
     if groups.is_empty() {
         return Err(CORRUPT_IMAGE_INDEX.into());
     }
-    let last = *groups.keys().next_back().expect("image turn");
+    let file_span = groups.keys().next_back().map(|turn| turn + 1).unwrap_or(0);
+    let len = logged_user_turns(session_id)
+        .unwrap_or(file_span)
+        .max(file_span);
     let mut turns = Vec::new();
-    for index in 0..=last {
+    for index in 0..len {
         let mut images = Vec::new();
         let mut files = Vec::new();
         if let Some(named) = groups.get(&index) {
@@ -521,6 +567,7 @@ fn rebuild_ledger(session_id: &str) -> Result<Vec<LedgerTurn>, String> {
                 let stored = StoredImage {
                     mime_type: "image/png".into(),
                     file: name.clone(),
+                    skip: false,
                 };
                 if let Some(image) = load_stored(&dir, stored) {
                     images.push(image);
@@ -528,7 +575,12 @@ fn rebuild_ledger(session_id: &str) -> Result<Vec<LedgerTurn>, String> {
                 }
             }
         }
-        turns.push(LedgerTurn { images, files });
+        let skip = vec![false; images.len()];
+        turns.push(LedgerTurn {
+            images,
+            files,
+            skip,
+        });
     }
     Ok(turns)
 }
@@ -581,9 +633,20 @@ pub fn drop_ledger(session_id: &str) {
     clear_send_anyway(session_id);
 }
 
-/// Drops images on the latest turn that still has some, after a provider 4xx.
-/// The turn stays in the ledger so later turns keep their place.
-pub fn drop_latest_images(session_id: &str) -> Result<(), String> {
+pub fn error_mentions_image(message: &str) -> bool {
+    let lower = message.to_ascii_lowercase();
+    ["image", "image_url", "media", "vision", "mime"]
+        .iter()
+        .any(|word| lower.contains(word))
+}
+
+pub fn image_client_status(status: Option<u16>) -> bool {
+    matches!(status, Some(400 | 413 | 415 | 422))
+}
+
+/// Marks the current turn's images so a later request does not resend them.
+/// The files stay on disk. An earlier turn is left alone.
+pub fn skip_current_turn_images(session_id: &str) -> Result<(), String> {
     require_session_id(session_id)?;
     let mut ledgers = ledgers().lock().expect("image ledgers");
     if !ledgers.contains_key(session_id) {
@@ -593,17 +656,13 @@ pub fn drop_latest_images(session_id: &str) -> Result<(), String> {
     let Some(turns) = ledgers.get_mut(session_id) else {
         return Ok(());
     };
-    let Some(index) = turns.iter().rposition(|turn| !turn.images.is_empty()) else {
+    let Some(turn) = turns.last_mut() else {
         return Ok(());
     };
-    let names = turns[index].files.clone();
-    if let Ok(dir) = files_dir(session_id) {
-        for name in &names {
-            let _ = fs::remove_file(dir.join(name));
-        }
+    if turn.images.is_empty() || turn.skip.iter().all(|skip| *skip) {
+        return Ok(());
     }
-    turns[index].images.clear();
-    turns[index].files.clear();
+    turn.skip = vec![true; turn.images.len()];
     let snapshot = turns.clone();
     drop(ledgers);
     persist_ledger(session_id, &snapshot)
@@ -623,17 +682,30 @@ pub fn delete_session_images(session_id: &str) -> Result<(), String> {
     Ok(())
 }
 
-pub fn copy_session_images(from: &str, to: &str, user_turns: usize) -> Result<(), String> {
+/// Copies the ledger rows for the first `kept_user_turns` of the source.
+///
+/// The ledger lines up with the source's user turns from the end. `U` is
+/// that user count and `L` is the ledger length. The first `k` user turns
+/// own `ledger[..k - (U - L)]`, and nothing when `k` is still in the
+/// unlogged prefix.
+pub fn copy_session_images(from: &str, to: &str, kept_user_turns: usize) -> Result<(), String> {
     require_session_id(from)?;
     require_session_id(to)?;
-    let turns = read_turns(from)?;
-    let kept = if turns.len() > user_turns {
-        turns[turns.len() - user_turns..].to_vec()
-    } else {
-        turns
-    };
-    for turn in kept {
-        push_turn(to, turn)?;
+    let turns = read_ledger(from)?;
+    let source_users = logged_user_turns(from).unwrap_or(turns.len());
+    let pad = source_users.saturating_sub(turns.len());
+    if kept_user_turns <= pad {
+        return Ok(());
+    }
+    let take = (kept_user_turns - pad).min(turns.len());
+    for turn in turns.into_iter().take(take) {
+        let images = turn
+            .images
+            .into_iter()
+            .zip(turn.skip)
+            .filter_map(|(image, skip)| if skip { None } else { Some(image) })
+            .collect();
+        push_turn(to, images)?;
     }
     Ok(())
 }
@@ -667,9 +739,11 @@ fn persist_ledger(session_id: &str, turns: &[LedgerTurn]) -> Result<(), String> 
             turn.files
                 .iter()
                 .zip(&turn.images)
-                .map(|(file, image)| StoredImage {
+                .zip(turn.skip.iter().chain(std::iter::repeat(&false)))
+                .map(|((file, image), skip)| StoredImage {
                     mime_type: normalize_mime(&image.mime_type),
                     file: file.clone(),
+                    skip: *skip,
                 })
                 .collect()
         })
@@ -717,6 +791,7 @@ fn write_image_files(
         stored.push(StoredImage {
             mime_type: normalize_mime(&image.mime_type),
             file: name,
+            skip: false,
         });
     }
     Ok(stored)
@@ -740,6 +815,15 @@ fn restrict(path: &Path) -> Result<(), String> {
 /// Catalog vision. A saved `true` is an explicit yes. A saved `false` is not
 /// a known text-only model: that was the default on every row.
 /// One answer for a set of routes. Mixed or unknown stays unknown.
+/// Yes when any route can take an image, because the free tier skips the rest.
+pub fn vision_for_free_tier(states: impl IntoIterator<Item = VisionState>) -> VisionState {
+    let states: Vec<VisionState> = states.into_iter().collect();
+    if states.contains(&VisionState::Yes) {
+        return VisionState::Yes;
+    }
+    vision_from_states(states)
+}
+
 pub fn vision_from_states(states: impl IntoIterator<Item = VisionState>) -> VisionState {
     let mut saw_yes = false;
     let mut saw_no = false;
@@ -970,23 +1054,99 @@ mod tests {
         let dir = sessions_dir().unwrap();
         fs::create_dir_all(&dir).unwrap();
         fs::write(index_path(&empty).unwrap(), b"not-json").unwrap();
-        assert_eq!(read_turns(&empty).unwrap_err(), CORRUPT_IMAGE_INDEX);
+        assert!(read_turns(&empty).unwrap().is_empty());
+        push_turn(&empty, Vec::new()).unwrap();
+    }
+
+    #[test]
+    fn a_corrupt_index_keeps_the_image_on_its_logged_turn() {
+        let _home = temp_home();
+        let session = uuid::Uuid::new_v4().to_string();
+        let header = crate::engines::native_log::SessionHeader {
+            version: crate::engines::native_log::NATIVE_LOG_VERSION,
+            session_id: session.clone(),
+            created_at: "2026-10-18T00:00:00Z".into(),
+            target: "openai/gpt-4o".into(),
+            permission_mode: "safe".into(),
+            vault_path: None,
+            vault_paths: Vec::new(),
+            system_prompt: None,
+            reasoning_level: None,
+        };
+        let user = |text: &str| crate::rhizome_loop::DurableEvent::User { text: text.into() };
+        crate::engines::native_log::write_session_events(
+            &header,
+            &[
+                user("one"),
+                crate::rhizome_loop::DurableEvent::TurnEnd,
+                user("two"),
+                crate::rhizome_loop::DurableEvent::TurnEnd,
+                user("three"),
+                crate::rhizome_loop::DurableEvent::TurnEnd,
+            ],
+        )
+        .unwrap();
+        push_turn(&session, Vec::new()).unwrap();
+        push_turn(&session, vec![png(b"T0")]).unwrap();
+        push_turn(&session, Vec::new()).unwrap();
+        fs::write(index_path(&session).unwrap(), b"not-json").unwrap();
+        drop_ledger(&session);
+        let loaded = read_turns(&session).unwrap();
+        assert_eq!(loaded.len(), 3);
+        assert!(loaded[0].is_empty());
+        assert_eq!(loaded[1].len(), 1);
+        assert!(loaded[2].is_empty());
     }
 
     #[test]
     fn fork_keeps_the_latest_turns() {
         let _home = temp_home();
         let source = uuid::Uuid::new_v4().to_string();
-        let fork = uuid::Uuid::new_v4().to_string();
-        push_turn(&source, vec![png(b"old")]).unwrap();
-        push_turn(&source, vec![png(b"new")]).unwrap();
-        copy_session_images(&source, &fork, 1).unwrap();
+        let header = crate::engines::native_log::SessionHeader {
+            version: crate::engines::native_log::NATIVE_LOG_VERSION,
+            session_id: source.clone(),
+            created_at: "2026-10-18T00:00:00Z".into(),
+            target: "openai/gpt-4o".into(),
+            permission_mode: "safe".into(),
+            vault_path: None,
+            vault_paths: Vec::new(),
+            system_prompt: None,
+            reasoning_level: None,
+        };
+        let user = |text: &str| crate::rhizome_loop::DurableEvent::User { text: text.into() };
+        crate::engines::native_log::write_session_events(
+            &header,
+            &[
+                user("old"),
+                crate::rhizome_loop::DurableEvent::TurnEnd,
+                user("new"),
+                crate::rhizome_loop::DurableEvent::TurnEnd,
+            ],
+        )
+        .unwrap();
+        push_turn(&source, vec![png(b"OLD")]).unwrap();
+        push_turn(&source, vec![png(b"NEW")]).unwrap();
+        let fork = crate::commands::native_chat::fork_native_session(
+            crate::commands::native_chat::NativeChatForkRequest {
+                events: vec![user("old"), crate::rhizome_loop::DurableEvent::TurnEnd],
+                target: "openai/gpt-4o".into(),
+                system_prompt: None,
+                vault_path: None,
+                vault_paths: Vec::new(),
+                permission_mode: crate::ai_agents::AiAgentPermissionMode::Safe,
+                source_session_id: Some(source),
+            },
+        )
+        .unwrap();
         let copied = read_turns(&fork).unwrap();
         assert_eq!(copied.len(), 1);
         let raw = base64::engine::general_purpose::STANDARD
             .decode(&copied[0][0].data)
             .unwrap();
-        assert!(raw.ends_with(b"new"), "fork must keep the latest image");
+        assert!(
+            raw.ends_with(b"OLD"),
+            "forking at turn 1 keeps the first image"
+        );
     }
 
     #[test]
@@ -1010,10 +1170,9 @@ mod tests {
         assert!(note.starts_with("hello"));
         assert!(note.contains(OMITTED_IMAGE_NOTE));
         let over = vec![png_with_len(MAX_IMAGE_BYTES), png_with_len(MAX_IMAGE_BYTES)];
-        assert_eq!(
-            ensure_current_turn_fits(&over).unwrap_err(),
-            IMAGE_TURN_OVER_BUDGET
-        );
+        let refusal = ensure_current_turn_fits(&over).unwrap_err();
+        assert!(refusal.contains("12 MB"), "{refusal}");
+        assert!(refusal.contains("MB encoded together"), "{refusal}");
     }
 
     #[test]
@@ -1042,6 +1201,14 @@ mod tests {
         );
         assert_eq!(
             vision_from_states([VisionState::Unknown]),
+            VisionState::Unknown
+        );
+        assert_eq!(
+            vision_for_free_tier([VisionState::Yes, VisionState::No]),
+            VisionState::Yes
+        );
+        assert_eq!(
+            vision_for_free_tier([VisionState::No, VisionState::Unknown]),
             VisionState::Unknown
         );
     }

@@ -16,6 +16,7 @@ import {
   nativeEventsToConversation,
   type NativeChatOpenResult,
 } from '../lib/nativeChatTranscript'
+import { rememberNativeSessionTarget } from '../lib/nativeSessionTarget'
 import type { PrimeSessionTree } from '../lib/primeSessionTree'
 import type { PrimeSessionSummary } from '../lib/primeSessionMeta'
 import { useMenuBarSessionOpen } from '../hooks/useMenuBarSessionOpen'
@@ -185,7 +186,12 @@ export function usePrimeSessionSwitcher({
         if (opened.error) {
           reportSwitchError(opened.error)
         }
-        agent.setNativeSession(opened.successorId || opened.sessionId || session.id, readOnly)
+        const liveId = opened.successorId || opened.sessionId || session.id
+        if (opened.target) {
+          rememberNativeSessionTarget(liveId, opened.target)
+          if (opened.sessionId) rememberNativeSessionTarget(opened.sessionId, opened.target)
+        }
+        agent.setNativeSession(liveId, readOnly)
         startTransition(() => {
           agent.replaceMessages(nativeEventsToConversation(opened.events, opened.images))
           setTranscriptState('ready')

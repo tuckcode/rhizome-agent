@@ -126,6 +126,7 @@ async function streamWithSelectedTarget({
       vaultPaths: context.vaultPaths,
       permissionMode: context.permissionMode,
       sessionId: context.nativeSessionId,
+      acceptKey: context.nativeLiveSlot,
       images,
       callbacks,
       signal,

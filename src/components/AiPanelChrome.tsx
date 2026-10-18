@@ -1303,6 +1303,14 @@ export function AiPanelComposer({
           </span>
         </p>
       ) : null}
+      {imageLookupPending ? (
+        <p
+          className="mb-1.5 px-2 py-1.5 text-[12px] text-muted-foreground"
+          data-testid="composer-vision-pending"
+        >
+          Checking image support…
+        </p>
+      ) : null}
       {imageNeedsConfirm ? (
         <p
           className="mb-1.5 flex flex-wrap items-center gap-1.5 rounded-md border px-2 py-1.5 text-[12px]"

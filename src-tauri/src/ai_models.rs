@@ -103,6 +103,9 @@ pub struct AiModelStreamRequest {
     /// The user confirmed an unknown-vision model for this turn.
     #[serde(skip, default)]
     pub send_anyway: bool,
+    /// Free-tier routing decides the skip after failover, not on the first 400.
+    #[serde(skip, default)]
+    pub defer_image_skip: bool,
     /// Session whose ledger should drop an image the provider rejected.
     #[serde(skip, default)]
     pub image_session_id: Option<String>,
@@ -233,6 +236,7 @@ pub fn test_ai_model_provider(request: AiModelProviderTestRequest) -> Result<Str
         chat_images: Vec::new(),
         vision_state: crate::chat_images::VisionState::Unknown,
         send_anyway: false,
+        defer_image_skip: false,
         image_session_id: None,
     };
     complete_text(&request)
@@ -383,6 +387,7 @@ pub fn discover_ai_model_ids_with(
         chat_images: Vec::new(),
         vision_state: crate::chat_images::VisionState::Unknown,
         send_anyway: false,
+        defer_image_skip: false,
         image_session_id: None,
     };
     let endpoint = format!("{}/models", rejected_on_err(normalized_base_url(&request))?);
@@ -1167,6 +1172,7 @@ mod tests {
             chat_images: Vec::new(),
             vision_state: crate::chat_images::VisionState::Unknown,
             send_anyway: false,
+            defer_image_skip: false,
             image_session_id: None,
         }
     }

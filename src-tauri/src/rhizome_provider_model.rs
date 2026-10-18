@@ -37,8 +37,23 @@ pub struct ProviderModel {
     replay_session: String,
 }
 
-fn image_rejected(status: Option<u16>) -> bool {
-    matches!(status, Some(400 | 413 | 415 | 422))
+fn note_image_skip(request: &AiModelStreamRequest, error: &crate::model_events::ModelError) {
+    if request.defer_image_skip {
+        return;
+    }
+    let current = request
+        .chat_images
+        .last()
+        .is_some_and(|turn| !turn.is_empty());
+    if !current
+        || !crate::chat_images::image_client_status(error.status)
+        || !crate::chat_images::error_mentions_image(&error.message)
+    {
+        return;
+    }
+    if let Some(session) = &request.image_session_id {
+        let _ = crate::chat_images::skip_current_turn_images(session);
+    }
 }
 
 impl ProviderModel {
@@ -150,11 +165,7 @@ impl Model for ProviderModel {
             });
             for event in receiver.iter() {
                 if let crate::model_events::ModelEvent::Error(error) = &event {
-                    if image_rejected(error.status) {
-                        if let Some(session) = &self.request.image_session_id {
-                            let _ = crate::chat_images::drop_latest_images(session);
-                        }
-                    }
+                    note_image_skip(&self.request, error);
                 }
                 if !emit(event) {
                     break;
@@ -419,7 +430,7 @@ fn tool_definitions(names: &[String]) -> Vec<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ai_models::test_server::{serve, sse, TEST_LIMITS};
+    use crate::ai_models::test_server::{http_response, serve, sse, TEST_LIMITS};
     use crate::ai_models::{clear_reasoning_session, recall_call_reasoning};
     use crate::rhizome_loop::{AgentLoop, DurableEvent, ToolCall};
     use serde_json::json;
@@ -1570,5 +1581,118 @@ mod tests {
         let body: serde_json::Value =
             serde_json::from_str(&server.requests.lock().unwrap()[0].1).unwrap();
         assert_eq!(body["messages"][0]["content"][1]["type"], "image_url");
+    }
+
+    fn with_home<T>(body: impl FnOnce() -> T) -> T {
+        let _lock = crate::app_config::TEST_CONFIG_ENV
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let home = tempfile::tempdir().expect("home");
+        let previous = std::env::var("HOME").ok();
+        let previous_xdg = std::env::var("XDG_CONFIG_HOME").ok();
+        std::env::set_var("HOME", home.path());
+        std::env::remove_var("XDG_CONFIG_HOME");
+        let result = body();
+        match previous {
+            Some(value) => std::env::set_var("HOME", value),
+            None => std::env::remove_var("HOME"),
+        }
+        match previous_xdg {
+            Some(value) => std::env::set_var("XDG_CONFIG_HOME", value),
+            None => std::env::remove_var("XDG_CONFIG_HOME"),
+        }
+        result
+    }
+
+    #[test]
+    fn a_context_length_400_keeps_an_earlier_image() {
+        with_home(|| {
+            let session = uuid::Uuid::new_v4().to_string();
+            crate::chat_images::push_turn(&session, vec![stored_png()]).unwrap();
+            crate::chat_images::push_turn(&session, Vec::new()).unwrap();
+            let kept = crate::chat_images::read_turns(&session).unwrap();
+            let server = serve(vec![http_response(
+                "400 Bad Request",
+                &[],
+                "maximum context length exceeded",
+            )]);
+            let mut request = request(&server.base_url);
+            request.vision_state = crate::chat_images::VisionState::Yes;
+            request.image_session_id = Some(session.clone());
+            request.chat_images = kept;
+            let mut model = ProviderModel::new(request, TEST_LIMITS);
+            let _ = model.complete(&view("hello", vec![]), &mut |_| true);
+            let turns = crate::chat_images::read_turns(&session).unwrap();
+            assert_eq!(turns[0].len(), 1, "an earlier image stays");
+            assert!(turns[1].is_empty());
+        });
+    }
+
+    #[test]
+    fn an_image_400_skips_resend_without_deleting_the_file() {
+        with_home(|| {
+            let session = uuid::Uuid::new_v4().to_string();
+            crate::chat_images::push_turn(&session, vec![stored_png()]).unwrap();
+            let server = serve(vec![http_response(
+                "400 Bad Request",
+                &[],
+                "invalid image_url payload",
+            )]);
+            let mut request = request(&server.base_url);
+            request.vision_state = crate::chat_images::VisionState::Yes;
+            request.image_session_id = Some(session.clone());
+            request.chat_images = crate::chat_images::read_turns(&session).unwrap();
+            let mut model = ProviderModel::new(request, TEST_LIMITS);
+            let _ = model.complete(&view("what is this", vec![]), &mut |_| true);
+            let turns = crate::chat_images::read_turns(&session).unwrap();
+            assert!(turns[0].is_empty(), "the rejected image is not resent");
+            let dir = home_images(&session);
+            assert!(
+                dir.read_dir().unwrap().next().is_some(),
+                "the file stays on disk"
+            );
+        });
+    }
+
+    fn stored_png() -> crate::chat_images::ChatImage {
+        use base64::Engine;
+        crate::chat_images::ChatImage {
+            mime_type: "image/png".into(),
+            data: base64::engine::general_purpose::STANDARD.encode(b"\x89PNG\r\n\x1a\nA"),
+        }
+    }
+
+    fn home_images(session: &str) -> std::path::PathBuf {
+        crate::app_config::preferred_app_config_path("native-sessions")
+            .unwrap()
+            .join(format!("{session}-images"))
+    }
+
+    #[test]
+    fn send_anyway_keeps_an_earlier_image_on_a_text_follow_up() {
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"still there"},"finish_reason":"stop"}]}"#,
+            "[DONE]",
+        ])]);
+        let mut request = request(&server.base_url);
+        request.vision_state = crate::chat_images::VisionState::Unknown;
+        request.send_anyway = true;
+        request.chat_images = vec![vec![tiny_png()], Vec::new()];
+        let mut model = ProviderModel::new(request, TEST_LIMITS);
+        let history = vec![
+            crate::rhizome_loop::HistoryItem::User {
+                text: "what is this".into(),
+            },
+            crate::rhizome_loop::HistoryItem::Assistant {
+                text: "a square".into(),
+                tool_calls: vec![],
+            },
+        ];
+        let _ = model.complete(&view("and now", history), &mut |_| true);
+        let body: serde_json::Value =
+            serde_json::from_str(&server.requests.lock().unwrap()[0].1).unwrap();
+        let messages = body["messages"].as_array().unwrap();
+        let first = &messages[0]["content"];
+        assert_eq!(first[1]["type"], "image_url");
     }
 }

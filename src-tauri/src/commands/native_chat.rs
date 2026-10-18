@@ -726,6 +726,10 @@ pub struct NativeChatOpenResult {
     pub successor_id: Option<String>,
     #[serde(default)]
     pub images: Vec<Vec<crate::chat_images::ChatImage>>,
+    /// Model the session log was started with. The composer uses this until
+    /// the picker changes.
+    #[serde(default)]
+    pub target: String,
 }
 
 pub fn list_native_sessions() -> Result<Vec<NativeChatListItem>, String> {
@@ -809,6 +813,7 @@ pub fn open_native_session_record(session_id: &str) -> Result<NativeChatOpenResu
         error,
         successor_id: opened.successor_id,
         images: crate::chat_images::read_turns(session_id).unwrap_or_default(),
+        target: opened.header.target,
     })
 }
 
@@ -923,7 +928,7 @@ fn persist_reasoning(chats: &NativeChats, session_id: &str, reasoning_level: Rea
 
 fn free_tier_vision_state() -> crate::chat_images::VisionState {
     let catalog = crate::rhizome_routing::Catalog::pinned();
-    crate::chat_images::vision_from_states(catalog.providers.iter().flat_map(|provider| {
+    crate::chat_images::vision_for_free_tier(catalog.providers.iter().flat_map(|provider| {
         provider.models.iter().map(|model| {
             crate::chat_images::vision_state(&provider.id, &provider.base_url, &model.id, false)
         })
@@ -1145,6 +1150,7 @@ fn start_named_request(
                 chat_images: Vec::new(),
                 vision_state: crate::chat_images::VisionState::Unknown,
                 send_anyway: false,
+                defer_image_skip: false,
                 image_session_id: None,
             };
             apply_catalog_reasoning(&mut stream, &reasoning);
@@ -1439,6 +1445,7 @@ where
                 chat_images: Vec::new(),
                 vision_state: crate::chat_images::VisionState::Unknown,
                 send_anyway: false,
+                defer_image_skip: false,
                 image_session_id: None,
             };
             apply_catalog_reasoning(&mut stream, &reasoning);

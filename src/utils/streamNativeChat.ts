@@ -1,5 +1,6 @@
 import type { PrimeImageContent } from '../lib/composerAttachments'
 import { notifyNativeTurnAccepted } from '../lib/nativeTurnAccepted'
+import { nativeSessionTarget, rememberNativeSessionTarget } from '../lib/nativeSessionTarget'
 import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
 import { visionSendAnywayFor } from '../lib/visionChoice'
 import { isTauri } from '../mock-tauri'
@@ -41,6 +42,8 @@ export interface StreamNativeChatRequest {
   permissionMode?: AiAgentPermissionMode
   /** Continue this live native session instead of starting a new log. */
   sessionId?: string | null
+  /** Panel or workspace slot. Accept clears only that composer's images. */
+  acceptKey?: string | null
   /** Saved on this chat and sent on the user turn. Omitted keeps the saved level. */
   reasoningLevel?: string | null
   /** Staged composer images. Omitted on a text turn so the invoke stays the old shape. */
@@ -135,13 +138,14 @@ export async function streamNativeChat(request: StreamNativeChatRequest): Promis
     request.callbacks.onDone()
     return
   }
-  const target = resolveNativeChatTarget(request.target)
+  const stored = request.sessionId ? nativeSessionTarget(request.sessionId) : null
+  const target = resolveNativeChatTarget(stored || request.target)
   const sendAnyway = visionSendAnywayFor(target)
   if (!isTauri()) {
     const imageCount = request.images?.length ?? 0
     const imageNote = imageCount > 0 ? ` (${imageCount} image${imageCount === 1 ? '' : 's'})` : ''
     request.callbacks.onText(`[mock-native] You said: "${request.message}"${imageNote}`)
-    notifyNativeTurnAccepted()
+    notifyNativeTurnAccepted(request.acceptKey)
     request.callbacks.onDone()
     return
   }
@@ -160,8 +164,9 @@ export async function streamNativeChat(request: StreamNativeChatRequest): Promis
           vaultPaths: request.vaultPaths ?? [],
           permissionMode: normalizeAiAgentPermissionMode(request.permissionMode),
           reasoningLevel: request.reasoningLevel || null,
+          sendAnyway,
           ...(request.images && request.images.length > 0
-            ? { images: request.images, sendAnyway }
+            ? { images: request.images }
             : {}),
         },
       })
@@ -179,13 +184,14 @@ export async function streamNativeChat(request: StreamNativeChatRequest): Promis
       if (request.reasoningLevel !== undefined) {
         send.reasoningLevel = request.reasoningLevel
       }
+      send.sendAnyway = sendAnyway
       if (request.images && request.images.length > 0) {
         send.images = request.images
-        send.sendAnyway = sendAnyway
       }
       await invoke('native_chat_send', send)
     }
-    notifyNativeTurnAccepted()
+    rememberNativeSessionTarget(sessionId, target)
+    notifyNativeTurnAccepted(request.acceptKey)
     await new Promise<void>((resolve) => {
       let settled = false
       let unlisten: (() => void) | undefined

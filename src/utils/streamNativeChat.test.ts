@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentStreamCallbacks } from './streamAiAgent'
+import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
+import { rememberVisionSendAnyway } from '../lib/visionChoice'
 import {
   NATIVE_NO_KEY_GUIDANCE,
   applyNativeEvent,
@@ -292,6 +294,7 @@ describe('native stream listen', () => {
     expect(invokeMock).toHaveBeenCalledWith('native_chat_send', {
       sessionId: 'already-open',
       text: 'what next',
+      sendAnyway: false,
     })
     expect(invokeMock).not.toHaveBeenCalledWith('native_chat_start', expect.anything())
   })
@@ -332,6 +335,7 @@ describe('native stream listen', () => {
       sessionId: 'already-open',
       text: 'again',
       reasoningLevel: 'low',
+      sendAnyway: false,
     })
   })
 
@@ -357,6 +361,7 @@ describe('native stream listen', () => {
       sessionId: 'already-open',
       text: 'clear it',
       reasoningLevel: null,
+      sendAnyway: false,
     })
   })
 
@@ -402,5 +407,27 @@ describe('native stream listen', () => {
       images,
       sendAnyway: false,
     })
+  })
+
+  it('sends the remembered send-anyway flag on a text follow-up', async () => {
+    listenMock.mockImplementation(async (_name: string, handler: (event: { payload: unknown }) => void) => {
+      queueMicrotask(() => {
+        handler({ payload: { kind: 'turn_end' } })
+      })
+      return vi.fn()
+    })
+    const target = resolveNativeChatTarget('openai/gpt-4o')
+    rememberVisionSendAnyway(target)
+    await streamNativeChat({
+      target,
+      message: 'and the caption',
+      vaultPath: '/vault',
+      sessionId: 'follow-up-images',
+      callbacks: callbacks(),
+    })
+    expect(invokeMock).toHaveBeenCalledWith('native_chat_send', expect.objectContaining({
+      text: 'and the caption',
+      sendAnyway: true,
+    }))
   })
 })

@@ -203,6 +203,12 @@ impl<K: KeyStore, C: Clock> RoutingModel<K, C> {
         self.send_anyway = send_anyway;
         self
     }
+
+    #[cfg(test)]
+    fn with_image_session(mut self, session: String) -> Self {
+        self.image_session_id = Some(session);
+        self
+    }
 }
 
 impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
@@ -244,6 +250,7 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
         let mut skipped_vision = false;
         let mut reopens_at: Option<Millis> = None;
         let mut last_error: Option<ModelError> = None;
+        let mut image_rejection = false;
         let mut keychain_error: Option<String> = None;
 
         for target in catalog.targets(options) {
@@ -296,6 +303,7 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
                 request.vision_state = crate::chat_images::VisionState::Yes;
                 request.send_anyway = true;
             }
+            request.defer_image_skip = true;
             request.image_session_id = image_session_id.clone();
             request.chat_images = chat_images.clone();
             tried += 1;
@@ -331,6 +339,13 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
                 }
                 Outcome::Stopped => return true,
                 Outcome::FailedEarly(error) => {
+                    let current_images = chat_images.last().is_some_and(|turn| !turn.is_empty());
+                    if current_images
+                        && crate::chat_images::image_client_status(error.status)
+                        && crate::chat_images::error_mentions_image(&error.message)
+                    {
+                        image_rejection = true;
+                    }
                     health.record_failure(&attempt, &error, clock.now_ms());
                     report(ProviderAttempt::FailedOver {
                         provider_id,
@@ -359,6 +374,11 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
                 message: crate::chat_images::text_only_refusal("This model"),
             }));
             return true;
+        }
+        if image_rejection {
+            if let Some(session) = image_session_id.clone() {
+                let _ = crate::chat_images::skip_current_turn_images(&session);
+            }
         }
         let error = exhausted(
             last_error,
@@ -720,6 +740,72 @@ mod tests {
         assert_eq!(run(&mut router), done("seen"));
         let body: Value = serde_json::from_str(&unknown.requests.lock().unwrap()[0].1).unwrap();
         assert_eq!(body["messages"][0]["content"][1]["type"], "image_url");
+        let _restore = tempfile::tempdir().expect("temp");
+        crate::reasoning_levels::reset_reasoning_state_for_test(Some(
+            _restore.path().to_path_buf(),
+        ));
+    }
+
+    #[test]
+    fn a_failover_400_does_not_skip_the_image() {
+        let _lock = crate::app_config::TEST_CONFIG_ENV
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let home = tempfile::tempdir().expect("home");
+        let previous = std::env::var("HOME").ok();
+        let previous_xdg = std::env::var("XDG_CONFIG_HOME").ok();
+        std::env::set_var("HOME", home.path());
+        std::env::remove_var("XDG_CONFIG_HOME");
+        let session = uuid::Uuid::new_v4().to_string();
+        crate::chat_images::push_turn(
+            &session,
+            vec![crate::chat_images::ChatImage {
+                mime_type: "image/png".into(),
+                data: base64::engine::general_purpose::STANDARD.encode(b"\x89PNG\r\n\x1a\nA"),
+            }],
+        )
+        .unwrap();
+        let dir = tempfile::tempdir().expect("temp");
+        std::fs::write(
+            dir.path().join("models-dev.json"),
+            r#"{
+              "google": {"models": {"google-model": {"modalities": {"input": ["text", "image"]}}}},
+              "openai": {"models": {"openai-model": {"modalities": {"input": ["text", "image"]}}}}
+            }"#,
+        )
+        .unwrap();
+        std::fs::write(dir.path().join("openrouter-models.json"), r#"{"data":[]}"#).unwrap();
+        crate::reasoning_levels::reset_reasoning_state_for_test(Some(dir.path().to_path_buf()));
+        let first = serve(vec![http_response(
+            "400 Bad Request",
+            &[],
+            "unsupported image_url",
+        )]);
+        let second = serve(vec![reply("seen")]);
+        let mut router = RoutingModel::new(
+            catalog(&[("google", &first.base_url), ("openai", &second.base_url)]),
+            keys(&["google", "openai"]),
+            FakeClock::at(T0),
+            TEST_LIMITS,
+        )
+        .with_image_session(session.clone())
+        .with_chat_images(crate::chat_images::read_turns(&session).unwrap());
+        assert_eq!(run(&mut router), done("seen"));
+        assert_eq!(
+            crate::chat_images::read_turns(&session).unwrap()[0].len(),
+            1,
+            "failover success keeps the image"
+        );
+        if let Some(value) = previous {
+            std::env::set_var("HOME", value);
+        } else {
+            std::env::remove_var("HOME");
+        }
+        if let Some(value) = previous_xdg {
+            std::env::set_var("XDG_CONFIG_HOME", value);
+        } else {
+            std::env::remove_var("XDG_CONFIG_HOME");
+        }
         let _restore = tempfile::tempdir().expect("temp");
         crate::reasoning_levels::reset_reasoning_state_for_test(Some(
             _restore.path().to_path_buf(),

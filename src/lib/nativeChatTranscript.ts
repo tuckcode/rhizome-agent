@@ -25,6 +25,8 @@ export interface NativeChatOpenResult {
   error?: string | null
   successorId?: string | null
   images?: Array<Array<{ mimeType?: string; data?: string }>>
+  /** Model stored on the session log. */
+  target?: string
 }
 
 export type NativeDurableEvent =

@@ -33,6 +33,7 @@ import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
 import { nativeModelVision, type NativeVision } from '../lib/nativeVision'
 import { forgetVisionSendAnyway, rememberVisionSendAnyway, visionSendAnywayFor } from '../lib/visionChoice'
 import { setNativeTurnAcceptedHandler } from '../lib/nativeTurnAccepted'
+import { nativeSessionTarget } from '../lib/nativeSessionTarget'
 import type { AiTarget } from '../lib/aiTargets'
 import type { AppLocale } from '../lib/i18n'
 import { type NoteListItem } from '../utils/ai-context'
@@ -359,7 +360,11 @@ export function AiPanelView({
     target: string
     message: string
   } | null>(null)
-  const modelTarget = resolveNativeChatTarget(nativeTarget)
+  const nativeSessionIdForTarget = agent.getNativeSession().sessionId
+  const sessionModel = nativeSessionIdForTarget
+    ? nativeSessionTarget(nativeSessionIdForTarget)
+    : null
+  const modelTarget = resolveNativeChatTarget(sessionModel || nativeTarget)
   const vision: NativeVision | 'pending' = visionForTarget?.target === modelTarget
     ? visionForTarget.vision
     : 'pending'
@@ -388,10 +393,14 @@ export function AiPanelView({
     modelName: primeHost.modelName,
     modelId: primeHost.modelId,
   })
+  const acceptKey = agent.getNativeLiveSlot?.() ?? 'panel'
   useEffect(() => {
-    setNativeTurnAcceptedHandler(clearAttachments)
-    return () => setNativeTurnAcceptedHandler(null)
-  }, [clearAttachments])
+    setNativeTurnAcceptedHandler(acceptKey, () => {
+      clearAttachments()
+      setAttachmentNoticeFor(null)
+    })
+    return () => setNativeTurnAcceptedHandler(acceptKey, null)
+  }, [acceptKey, clearAttachments])
 
   // Prime owns the queue. Chat used to remember follow-ups locally because
   // we had no read; `get_queue` is that read.
@@ -399,6 +408,7 @@ export function AiPanelView({
     handleSend,
     isActive,
     isPrimeTarget,
+    clearOnSend: chatEngine !== 'native',
     onSendPrompt,
     attachments,
     clearAttachments,

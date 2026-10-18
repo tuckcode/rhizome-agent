@@ -179,6 +179,30 @@ describe('AiPanelComposer attachments', () => {
     expect(onVisionSendAnyway).toHaveBeenCalled()
   })
 
+  it('undoes send anyway for this model', () => {
+    const onVisionUndo = vi.fn()
+    renderComposer({
+      attachments: [attachment()],
+      input: 'look',
+      vision: 'unknown',
+      visionSendAnyway: true,
+      modelLabel: 'llava',
+      onVisionUndo,
+    })
+    fireEvent.click(screen.getByTestId('composer-undo-send-anyway'))
+    expect(onVisionUndo).toHaveBeenCalled()
+  })
+
+  it('says it is checking image support while the lookup is pending', () => {
+    renderComposer({
+      attachments: [attachment()],
+      input: 'look',
+      vision: 'pending',
+    })
+    expect(screen.getByTestId('composer-vision-pending')).toHaveTextContent('Checking image support…')
+    expect(screen.getByTestId('agent-send')).toBeDisabled()
+  })
+
   it('shows a size or type rejection next to the chips', () => {
     renderComposer({
       attachments: [attachment()],
