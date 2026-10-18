@@ -349,19 +349,21 @@ export function AiPanelView({
   // 180–420: narrower and a session title is a truncation, wider and the
   // transcript starts losing the room the design gives it.
   const sessionsWidth = usePanelWidth(APP_STORAGE_KEYS.chatSessionsWidth, 228, 180, 420)
-  const [vision, setVision] = useState<NativeVision>('unknown')
-  const [visionSendAnyway, setVisionSendAnyway] = useState(false)
+  const [visionForTarget, setVisionForTarget] = useState<{
+    target: string
+    vision: NativeVision
+  } | null>(null)
+  const [, setVisionSendAnywayRevision] = useState(0)
   const [attachmentNotice, setAttachmentNotice] = useState<string | null>(null)
   const modelTarget = nativeTarget ?? ''
+  const vision: NativeVision =
+    !modelTarget || visionForTarget?.target !== modelTarget ? 'unknown' : visionForTarget.vision
+  const visionSendAnyway = visionSendAnywayFor(modelTarget)
   useEffect(() => {
+    if (!modelTarget) return
     let cancelled = false
-    setVisionSendAnyway(visionSendAnywayFor(modelTarget))
-    if (!modelTarget) {
-      setVision('unknown')
-      return
-    }
     void nativeModelVision(modelTarget).then((next) => {
-      if (!cancelled) setVision(next)
+      if (!cancelled) setVisionForTarget({ target: modelTarget, vision: next })
     })
     return () => {
       cancelled = true
@@ -643,7 +645,7 @@ export function AiPanelView({
         visionSendAnyway={visionSendAnyway}
         onVisionSendAnyway={() => {
           rememberVisionSendAnyway(modelTarget)
-          setVisionSendAnyway(true)
+          setVisionSendAnywayRevision((revision) => revision + 1)
         }}
         attachmentNotice={attachmentNotice}
         attachments={attachments}
