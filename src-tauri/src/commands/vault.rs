@@ -54,6 +54,8 @@ mod tests {
             sort: None,
             list_properties_display: vec![],
             filters: crate::vault::FilterGroup::All(vec![]),
+            presentation: None,
+            extra: Default::default(),
         }
     }
 

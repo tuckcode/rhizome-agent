@@ -77,6 +77,34 @@ describe('useSavedViewOrdering', () => {
     expect(onToast).toHaveBeenCalledWith('Views reordered')
   })
 
+  it('carries unknown view keys through a reorder', async () => {
+    const reloadViews = vi.fn().mockResolvedValue([])
+    const board = {
+      ...makeView('board.yml', 'Board', 1).definition,
+      presentation: { type: 'board', groupBy: 'Status', columns: ['Done'], cardSize: 'large' },
+      futureSetting: { nested: true },
+    }
+    const views = [makeView('alpha.yml', 'Alpha', 0), { filename: 'board.yml', definition: board } as ViewFile]
+    const { result } = renderHook(() => useSavedViewOrdering({
+      views,
+      selection: { kind: 'view', filename: 'board.yml' },
+      vaultPath: '/vault',
+      reloadViews,
+      loadModifiedFiles: vi.fn().mockResolvedValue(undefined),
+      onToast: vi.fn(),
+    }))
+
+    await act(async () => {
+      await result.current.onMoveView('board.yml', 'up')
+    })
+
+    expect(mockInvokeFn).toHaveBeenCalledWith('save_view_cmd', {
+      vaultPath: '/vault',
+      filename: 'board.yml',
+      definition: { ...board, order: 0 },
+    })
+  })
+
   it('exposes command state for the selected saved view', () => {
     const { result } = renderOrdering()
 

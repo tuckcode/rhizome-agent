@@ -5032,6 +5032,7 @@ dependencies = [
  "globset",
  "gray_matter",
  "ignore",
+ "indexmap 2.13.0",
  "ironcalc_base",
  "keyring",
  "libc",
