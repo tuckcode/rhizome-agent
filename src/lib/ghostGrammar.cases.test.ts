@@ -11,6 +11,7 @@ const files = [
   'cases245g_432d.json',
   'cases245h_ed23.json',
   'cases245i_fc89.json',
+  'cases245j_5567.json',
 ] as const
 
 const expected = JSON.parse(readFileSync(`${root}/expected.json`, 'utf8')) as Record<
