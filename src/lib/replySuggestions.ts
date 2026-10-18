@@ -102,11 +102,13 @@ export function suggestReply(agentMessage: string): ReplySuggestion | null {
  * not become a ghost after the agent has already moved on.
  */
 function lastSentenceOf(text: string): string {
-  const sentences = text
+  const paragraphs = text.split(/\n\s*\n/).map((part) => part.trim()).filter((part) => part.length > 0)
+  const tail = paragraphs.length > 1 ? paragraphs[paragraphs.length - 1] ?? text : text
+  const sentences = tail
     .split(/(?<=[.!?])(?:\s+|$)/)
     .map((part) => part.trim())
     .filter((part) => part.length > 0)
-  return sentences[sentences.length - 1] ?? text
+  return sentences[sentences.length - 1] ?? tail
 }
 
 function tryExtractCompletion(text: string): ReplySuggestion | null {

@@ -145,6 +145,7 @@ const EXPLAIN_STOP = new Set([
   'it', 'them', 'this', 'that', 'all', 'every', 'each', 'now',
 ])
 const DENY_WORD = /^(?:push|delete|remove|drop|deploy|ship|merge|pay|send|post|rm|run|migrate|apply|wipe|reset|force|publish|sync|overwrite|commit|rebase|revert|execute|approve|install|kill|purge|trash|erase|truncate)(?:s|es|d|ed|ing)?$/i
+const DENY_ING = /^(?:delet|remov|merg|migrat|wip|approv|execut|purg|eras|truncat|runn|dropp|shipp|committ)ing$/i
 const LANGUAGES = new Set([
   'english', 'french', 'spanish', 'german', 'italian', 'portuguese', 'dutch',
   'japanese', 'chinese', 'korean', 'russian', 'arabic', 'hindi', 'polish', 'swedish',
@@ -241,7 +242,7 @@ function ghostGrammarAccepts(display: string, fullMessage?: string): boolean {
     return tail.every((token) => (
       /^[a-z0-9]+$/.test(token)
       && !TAIL_STOP.has(token)
-      && !DENY_WORD.test(token)
+      && !isDenyWord(token)
     ))
   }
   if (!GHOST_VERBS.has(verb)) return false
@@ -293,66 +294,183 @@ function prepareText(text: string): string {
  * A secret, a raw credential, or inline code anywhere in the text.
  * Boundaries are letters only, so API_KEY and access_token still match.
  */
-export function looksSecret(text: string): boolean {
+function secretReason(text: string): string | null {
   const prepared = prepareText(text)
-  if (/```/.test(prepared) || /`[^`\n]+`/.test(prepared)) return true
-  if (/[A-Za-z0-9_]+\s*=\s*\S/.test(prepared)) return true
-  if (/[A-Za-z0-9_-]{16,}/.test(prepared)) return true
-  if ([...prepared].some((char) => (char.codePointAt(0) ?? 0) > 127 && /\p{L}/u.test(char))) return true
-  if (/(?<![0-9])\d{4,}(?![0-9])/.test(prepared)) return true
-  if (/(?<!\S)(?=\S*[A-Za-z])(?=\S*[0-9])\S{8,}(?!\S)/.test(prepared)) return true
-  if (hasShortBase64(prepared)) return true
-  if (/(?<![a-z0-9])sk-live-/i.test(prepared)) return true
-  if (/(?<![a-z0-9])sk-/i.test(prepared)) return true
-  if (/(?<![a-z0-9])(?:ghp_|gho_|github_pat_)/i.test(prepared)) return true
-  if (/(?<![a-z])akia/i.test(prepared)) return true
-  if (/(?<![a-z])bearer(?![a-z])/i.test(prepared)) return true
-  if (/(?<![a-z0-9])eyj/i.test(prepared)) return true
-  const lower = prepared.toLowerCase()
-  if (/(?<![a-z])p@sswords?(?![a-z])/.test(lower)) return true
-  if (/(?<![a-z])pass[- ]words?(?![a-z])/.test(lower)) return true
-  if (/(?<![a-z])passcodes?(?![a-z])/.test(lower)) return true
-  if (/(?<![a-z])codes?(?![a-z])/.test(lower)) return true
-  if (/(?<![a-z])cvv(?![a-z])/.test(lower)) return true
-  if (/(?<![a-z])ssn(?![a-z])/.test(lower)) return true
-  if (/(?<![a-z])cards?(?![a-z])/.test(lower)) return true
-  if (/(?<![a-z])logins?(?![a-z])/.test(lower)) return true
-  if (/(?<![a-z])api[_ ]?keys?(?![a-z])/.test(lower)) return true
-  if (/(?<![a-z])private[_ ]?keys?(?![a-z])/.test(lower)) return true
-  if (/(?<![a-z])passwords?(?![a-z])/.test(lower)) return true
-  if (/(?<![a-z])passphrases?(?![a-z])/.test(lower)) return true
-  if (/(?<![a-z])passwd(?![a-z])/.test(lower)) return true
-  if (/(?<![a-z])pwd(?![a-z])/.test(lower)) return true
-  if (/(?<![a-z])pins?(?![a-z])/.test(lower)) return true
-  if (/(?<![a-z])otp(?![a-z])/.test(lower)) return true
-  if (/(?<![a-z])recovery[_ ]codes?(?![a-z])/.test(lower)) return true
-  if (/(?<![a-z])seed[_ ]phrases?(?![a-z])/.test(lower)) return true
-  if (/(?<![a-z])mnemonics?(?![a-z])/.test(lower)) return true
-  if (/(?<![a-z])tokens?(?![a-z])/.test(lower)) return true
-  if (/(?<![a-z])secrets?(?![a-z])/.test(lower)) return true
-  if (/(?<![a-z])credentials?(?![a-z])/.test(lower)) return true
-  if (/(?<![a-z])keys?(?![a-z])/.test(lower)) return true
-  if (/(?<![a-z])ssh(?![a-z])/.test(lower)) return true
-  if (/(?<![a-z0-9])id_rsa(?![a-z0-9])/.test(lower)) return true
-  if (/(?<![a-z])keychain(?![a-z])/.test(lower)) return true
-  if (/\.env(?![a-z])/i.test(lower) || /\.pem(?![a-z])/i.test(lower)) return true
-  return false
+  if (hasDangerousBacktick(prepared)) return 'backtick'
+  if (hasSecretAssignment(prepared)) return 'assign'
+  if (hasMixedScriptWord(prepared)) return 'script'
+  if (hasSuspiciousDigits(prepared)) return 'digits'
+  if (hasCredentialToken(prepared)) return 'token'
+  if (hasPasswordishToken(prepared)) return 'pwtoken'
+  if (hasShortBase64(prepared)) return 'b64'
+  if (/(?<![A-Za-z])[a-z]{16,}(?![A-Za-z])/.test(prepared)) return 'long'
+  if (/(?<![a-z0-9])sk-live-/i.test(prepared)) return 'sk-live'
+  if (/(?<![a-z0-9])sk-/i.test(prepared)) return 'sk'
+  if (/(?<![a-z0-9])(?:ghp_|gho_|github_pat_)/i.test(prepared)) return 'ghp'
+  if (/(?<![a-z])akia/i.test(prepared)) return 'akia'
+  if (/(?<![a-z])bearer(?![a-z])/i.test(prepared)) return 'bearer'
+  if (/(?<![a-z0-9])eyj/i.test(prepared)) return 'eyj'
+  if (looksLikeSharedSecret(prepared)) return 'shared'
+  const lower = collapseSpacedLetters(prepared).toLowerCase()
+  const checks: [string, RegExp][] = [
+    ['p@ss', /(?<![a-z])p@sswords?(?![a-z])/],
+    ['pass word', /(?<![a-z])pass[- ]words?(?![a-z])/],
+    ['passcode', /(?<![a-z])passcodes?(?![a-z])/],
+    ['code is', /(?<![a-z])(?:codes?|cards?|logins?|cvv|ssn)\s*(?:=|:|is)\s*\S/],
+    ['cvv', /(?<![a-z])(?:cvv|ssn)\b/],
+    ['api key', /(?<![a-z])api[_ ]?keys?(?![a-z])/],
+    ['private key', /(?<![a-z])private[_ ]?keys?(?![a-z])/],
+    ['password', /(?<![a-z])passwords?(?![a-z])/],
+    ['passphrase', /(?<![a-z])passphrases?(?![a-z])/],
+    ['passwd', /(?<![a-z])passwd(?![a-z])/],
+    ['pwd', /(?<![a-z])pwd(?![a-z])/],
+    ['pin', /(?<![a-z])pins?(?![a-z])/],
+    ['otp', /(?<![a-z])otp(?![a-z])/],
+    ['recovery', /(?<![a-z])recovery[_ ]codes?(?![a-z])/],
+    ['seed', /(?<![a-z])seed[_ ]phrases?(?![a-z])/],
+    ['mnemonic', /(?<![a-z])mnemonics?(?![a-z])/],
+    ['token', /(?<![a-z])tokens?(?![a-z])/],
+    ['secret', /(?<![a-z])secrets?(?![a-z])/],
+    ['credential', /(?<![a-z])credentials?(?![a-z])/],
+    ['key', /(?<![a-z])keys?(?![a-z])/],
+    ['ssh', /(?<![a-z])ssh(?![a-z])/],
+    ['id_rsa', /(?<![a-z0-9])id_rsa(?![a-z0-9])/],
+    ['keychain', /(?<![a-z])keychain(?![a-z])/],
+    ['env', /\.env(?![a-z])/i],
+    ['pem', /\.pem(?![a-z])/i],
+  ]
+  for (const [name, pattern] of checks) {
+    if (pattern.test(lower)) return name
+  }
+  return null
+}
+
+export function looksSecret(text: string): boolean {
+  return secretReason(text) !== null
+}
+
+function caseSwitches(word: string): number {
+  let switches = 0
+  for (let index = 1; index < word.length; index += 1) {
+    const previous = word[index - 1] ?? ''
+    const current = word[index] ?? ''
+    const previousUpper = previous >= 'A' && previous <= 'Z'
+    const currentUpper = current >= 'A' && current <= 'Z'
+    const previousLower = previous >= 'a' && previous <= 'z'
+    const currentLower = current >= 'a' && current <= 'z'
+    if ((previousUpper && currentLower) || (previousLower && currentUpper)) switches += 1
+  }
+  return switches
 }
 
 function hasShortBase64(text: string): boolean {
-  const pieces = text.split(/[^A-Za-z0-9+/=]+/)
-  return pieces.some((piece) => (
-    piece.length >= 8
-    && piece.length <= 24
-    && /^[A-Za-z0-9+/=]+$/.test(piece)
-    && /[A-Z]/.test(piece)
-    && /[a-z]/.test(piece)
-  ))
+  const pattern = /(?<![A-Za-z0-9+/=])([A-Za-z0-9+/=]{8,24})(?![A-Za-z0-9+/=])/g
+  for (const match of text.matchAll(pattern)) {
+    const piece = match[1] ?? ''
+    if (/^[A-Z][a-z]+$/.test(piece)) continue
+    if (/^[A-Z][a-z]+(?:[A-Z][a-z]+)+$/.test(piece)) continue
+    const before = text.slice(0, match.index)
+    if (/^[0-9a-f]{7,12}$/i.test(piece) && /(?:commit|sha)\s*$/i.test(before)) continue
+    const hasDigitOrSign = /[0-9+=]/.test(piece)
+    const slashOnly = piece.includes('/') && !hasDigitOrSign
+    if (slashOnly && caseSwitches(piece) < 3) continue
+    if (hasDigitOrSign || piece.includes('/') || caseSwitches(piece) >= 3) return true
+  }
+  return false
+}
+
+function hasMixedScriptWord(text: string): boolean {
+  return text.split(/\s+/).some((word) => {
+    let latin = false
+    let other = false
+    for (const char of word) {
+      if (/\p{Script=Latin}/u.test(char)) latin = true
+      else if (/\p{Script=Cyrillic}/u.test(char) || /\p{Script=Greek}/u.test(char)) other = true
+    }
+    return latin && other
+  })
+}
+
+function hasSuspiciousDigits(text: string): boolean {
+  const pattern = /(?<![0-9])(\d{4,})(?![0-9])/g
+  for (const match of text.matchAll(pattern)) {
+    const digits = match[1] ?? ''
+    const value = Number(digits)
+    if (digits.length === 4 && value >= 1900 && value <= 2099) continue
+    const before = text.slice(Math.max(0, match.index - 16), match.index)
+    const after = text.slice(match.index + digits.length, match.index + digits.length + 12)
+    if (/\d{4}-\d{2}-\d{2}/.test(text.slice(Math.max(0, match.index - 8), match.index + digits.length + 6))) {
+      continue
+    }
+    if (/\s*(?:dollars?|words?|errors?|chapters?)\b/i.test(after)) continue
+    if (/(?:is|=|:)\s*$/i.test(before)) return true
+    if (/(?<![a-z])(?:code|pin|otp|cvv|ssn|card|password|passwd|pwd|passcode|token|secret|key)s?\s*$/i.test(before)) {
+      return true
+    }
+  }
+  return false
+}
+
+function hasCredentialToken(text: string): boolean {
+  const pattern = /(?<!\S)(\S{8,})(?!\S)/g
+  for (const match of text.matchAll(pattern)) {
+    const token = match[1] ?? ''
+    if (!/[A-Z]/.test(token) || !/[a-z]/.test(token) || !/[0-9]/.test(token)) continue
+    return true
+  }
+  return false
+}
+
+function collapseSpacedLetters(text: string): string {
+  return text.replace(/\b(?:[A-Za-z] ){3,}[A-Za-z]\b/g, (run) => run.replace(/ /g, ''))
+}
+
+function hasPasswordishToken(text: string): boolean {
+  const pattern = /(?<![A-Za-z0-9])([A-Za-z]+\d[A-Za-z0-9]*)(?![A-Za-z0-9])/g
+  for (const match of text.matchAll(pattern)) {
+    const token = match[1] ?? ''
+    if (token.length < 6 || token.length > 16) continue
+    const before = text.slice(0, match.index)
+    if (/^[0-9a-f]{7,12}$/i.test(token) && /(?:commit|sha)\s*$/i.test(before)) continue
+    return true
+  }
+  return false
+}
+
+function looksLikeSharedSecret(text: string): boolean {
+  const lower = text.toLowerCase()
+  if (/\buse\s+\S+(?:\s+\S+){0,5}\s+to sign in\b/.test(lower)) return true
+  if (/\bcombo\s+is\s+\S/.test(lower)) return true
+  if (/\bis\s+[a-z]+\d[a-z0-9]*(?![a-z0-9.])/i.test(lower)) return true
+  return false
+}
+
+function hasSecretAssignment(text: string): boolean {
+  return /(?<![a-z])(?:api[_ ]?key|token|secret|password|passwd|pwd|access[_ ]?token|client[_ ]?secret|github[_ ]?token)\w*\s*=\s*\S/i.test(text)
+    || /\?[A-Za-z0-9_]+=/.test(text)
+}
+
+function hasDangerousBacktick(text: string): boolean {
+  const spans = text.match(/`[^`\n]+`/g) ?? []
+  return spans.some((span) => {
+    const inner = span.slice(1, -1)
+    return /=/.test(inner) || looksDangerousCommand(inner) || /(?<![a-z])(?:key|token|secret|password)s?(?![a-z])/i.test(inner)
+  })
 }
 
 function looksDangerousCommand(text: string): boolean {
   const prepared = prepareText(text)
-  return /```/.test(prepared) || /`[^`\n]+`/.test(prepared) || /\brm\s+-rf\b/i.test(prepared)
+  return /\brm\s+-[rf]{1,2}\b/i.test(prepared)
+    || /(?:^|\s)--(?:force|hard)\b/i.test(prepared)
+    || /\bgit\s+push\s+-f\b/i.test(prepared)
+    || /\bdrop\s+table\b/i.test(prepared)
+    || /(?:^|\n)(?: {4}|\t)\S/.test(prepared)
+    || /hooks\.slack\.com/i.test(prepared)
+    || /https?:\/\/\S*\/reset\b/i.test(prepared)
+}
+
+function isDenyWord(word: string): boolean {
+  return DENY_WORD.test(word) || DENY_ING.test(word)
 }
 
 function clauseWords(action: string): string[] {
@@ -513,7 +631,7 @@ function explainTopicOk(topic: string): boolean {
     if (word === 'sort' && parts[index - 1] === 'merge') return []
     if (word === 'apply' && parts[index + 1] === 'functions') return []
     if (word === 'functions' && parts[index - 1] === 'apply') return []
-    return DENY_WORD.test(word) ? [index] : []
+    return isDenyWord(word) ? [index] : []
   })
   if (denyAt.length > 1) return false
   if (denyAt.length === 1) {
@@ -529,7 +647,7 @@ function explainTopicOk(topic: string): boolean {
       for (let index = at + 1; index < parts.length; index += 1) {
         const word = parts[index] ?? ''
         if (
-          DENY_WORD.test(word)
+          isDenyWord(word)
           || EXPLAIN_APPROVAL.has(word)
           || word === 'the'
           || word === 'a'
@@ -567,8 +685,8 @@ function restoreGhostClause(display: string, fullMessage?: string): boolean {
   if (
     called?.[1]
     && explainTopicOk(called[1])
-    && !DENY_WORD.test(called[1])
-    && !called[1].split(' ').some((word) => DENY_WORD.test(word))
+    && !isDenyWord(called[1])
+    && !called[1].split(' ').some((word) => isDenyWord(word))
   ) {
     return true
   }
@@ -594,8 +712,11 @@ function nextStepCompletion(sentence: string, fullMessage?: string): string | nu
   if (!match?.[1]) return null
   const original = match[1].replace(/[.]+$/, '').trim()
   const echo = swapListenerPossessives(original)
-  if (!ghostGrammarAccepts(echo, fullMessage) && !restoreGhostClause(echo, fullMessage)) return null
-  return echo.charAt(0).toUpperCase() + echo.slice(1)
+  const yearTail = echo.match(/\s+for the (?:19|20)\d{2} ([a-z]+)$/i)
+  const core = yearTail && !isDenyWord(yearTail[1] ?? '') ? echo.slice(0, echo.length - yearTail[0].length) : echo
+  if (!ghostGrammarAccepts(core, fullMessage) && !restoreGhostClause(core, fullMessage)) return null
+  const shown = echo.charAt(0).toUpperCase() + echo.slice(1)
+  return shown
 }
 
 /**

@@ -2092,7 +2092,7 @@
     },
     {
       "phrase": "Would you like me to explain the code?",
-      "ghost": null
+      "ghost": "Yes — explain the code"
     },
     {
       "phrase": "I can summarize the thread if you'd like.",
@@ -2414,11 +2414,11 @@
     },
     {
       "phrase": "Here is the command: git push --force origin main. Want me to explain it?",
-      "ghost": "Yes — explain it"
+      "ghost": null
     },
     {
       "phrase": "I can run git push --force. Want me to summarize it?",
-      "ghost": "Yes — summarize it"
+      "ghost": null
     },
     {
       "phrase": "I'll push to main next. Want me to draft the note?",
@@ -2538,7 +2538,7 @@
     },
     {
       "phrase": "Want me to draft the `note`?",
-      "ghost": null
+      "ghost": "Yes — draft the `note`"
     },
     {
       "phrase": "Want me to draft the note in this note?",
@@ -2892,7 +2892,7 @@
     },
     {
       "phrase": "Want me to explain deleting the branch?",
-      "ghost": "Yes — explain deleting the branch"
+      "ghost": null
     },
     {
       "phrase": "Want me to write up the meeting notes?",
@@ -3892,7 +3892,7 @@
     },
     {
       "phrase": "I'll git push --force now.\n\nShall I draft the summary?",
-      "ghost": "Yes — draft the summary"
+      "ghost": null
     },
     {
       "phrase": "Want me to explain git push merge?",
@@ -4048,7 +4048,7 @@
     },
     {
       "phrase": "Want me to explain shipping costs?",
-      "ghost": "Yes — explain shipping costs"
+      "ghost": null
     },
     {
       "phrase": "Want me to explain the runbook?",
@@ -4173,6 +4173,322 @@
     {
       "phrase": "Want me to read the readme.markdown?",
       "ghost": null
+    }
+  ],
+  "cases245k_a794.json": [
+    {
+      "phrase": "I'll run git push --force origin main next. Want me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "I'll run git push --force origin main next. Shall I run it?",
+      "ghost": null
+    },
+    {
+      "phrase": "I'll run git push --force origin main next. Want me to push it?",
+      "ghost": null
+    },
+    {
+      "phrase": "I prepared git push --force origin main for you. Want me to do it?",
+      "ghost": null
+    },
+    {
+      "phrase": "I prepared git push --force origin main for you. Should I proceed?",
+      "ghost": null
+    },
+    {
+      "phrase": "The command is rm -rf ~/notes. Shall I run it?",
+      "ghost": null
+    },
+    {
+      "phrase": "The command is rm -r ~/notes. Want me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "The command is rm -fr ~. Want me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "The command is rm --recursive --force ~. Want me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "The command is git reset --hard. Want me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "The command is DROP TABLE users. Want me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Here's the fix:\n\n    git push --force origin main\n\nWant me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Here's the fix:\n\n    rm -rf ~\n\nWant me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Here's the fix:\n\n    export API_KEY=sk-live-abcdef\n\nWant me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Here's the fix:\n\n\tgit push -f\n\nThat's all.\n\nWant me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Here's the fix:\n\n    git push -f\n\nThat's all.\n\nWant me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to draft the note? P.S. your password is hunter2.",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to draft the note?\n\nP.S. your password is hunter2.",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to draft the note?\n\nPS: run git push --force after.",
+      "ghost": null
+    },
+    {
+      "phrase": "Want me to draft the note? Your token: abc.",
+      "ghost": null
+    },
+    {
+      "phrase": "See [the docs](https://example.com/?t=sk-abc). Want me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "See [the docs](https://example.com/?token=abc). Want me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "See [docs](https://ex.com/x?a=b). Want me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "See <a href=\"https://ex.com/?k=ghp_x\">docs</a>. Want me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "See https://ex.com/reset. Want me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "See https://hooks.slack.com/services/T0/B0/xyz. Want me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Your hunter2 is set. Want me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "The wifi is hunter2. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Use abc123 to sign in. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Use hunter2 to sign in. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "The combo is 12-34-56. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "The combo is 123. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Use Tr0ub4dor to sign in. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Use tr0ub4 to sign in. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Use correcthorsebattery to sign in. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Use correct horse battery staple to sign in. Want me to make a note of that?",
+      "ghost": null
+    }
+  ],
+  "cases245benign_dd0b.json": [
+    {
+      "phrase": "I updated the plan for Q3 2026. Want me to draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "The release is v2.4.1. Want me to summarize the thread?",
+      "ghost": "Yes — summarize the thread"
+    },
+    {
+      "phrase": "PR #245 is ready for review. Want me to summarize the thread?",
+      "ghost": "Yes — summarize the thread"
+    },
+    {
+      "phrase": "The fix landed in commit 4c82b969. Want me to draft the summary?",
+      "ghost": "Yes — draft the summary"
+    },
+    {
+      "phrase": "I looked at src/lib/replySuggestions.ts. Want me to explain the code?",
+      "ghost": "Yes — explain the code"
+    },
+    {
+      "phrase": "The meeting is at 10:30 tomorrow. Want me to draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "I talked to José about the café menu. Want me to draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "Here's the outline for your talk at Zürich. Want me to write the intro?",
+      "ghost": "Yes — write the intro"
+    },
+    {
+      "phrase": "I read the article from TechCrunch. Want me to summarize the main points?",
+      "ghost": "Yes — summarize the main points"
+    },
+    {
+      "phrase": "The function `parseDate` handles that case. Want me to explain it?",
+      "ghost": "Yes — explain it"
+    },
+    {
+      "phrase": "Here's a quick example:\n```ts\nconst x = 1\n```\n\nWant me to explain it?",
+      "ghost": "Yes — explain it"
+    },
+    {
+      "phrase": "I found three notes about JavaScript. Want me to summarize these notes?",
+      "ghost": "Yes — summarize these notes"
+    },
+    {
+      "phrase": "Your notes mention LinkedIn twice. Want me to draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "I reviewed the TypeScript types. Want me to explain the code?",
+      "ghost": "Yes — explain the code"
+    },
+    {
+      "phrase": "I cleaned up the formatting in your daily note for October 17. Want me to add a conclusion?",
+      "ghost": "Yes — add a conclusion"
+    },
+    {
+      "phrase": "The budget is 12000 dollars. Want me to draft the summary?",
+      "ghost": "Yes — draft the summary"
+    },
+    {
+      "phrase": "There are 1500 words in the draft. Want me to shorten the intro?",
+      "ghost": "Yes — shorten the intro"
+    },
+    {
+      "phrase": "I fixed the build on iOS 18. Want me to draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "The doc lives at docs/plans/roadmap.md. Want me to summarize the thread?",
+      "ghost": "Yes — summarize the thread"
+    },
+    {
+      "phrase": "I compared PostgreSQL and SQLite. Want me to list the pros and cons?",
+      "ghost": "Yes — list the pros and cons"
+    },
+    {
+      "phrase": "The talk is about OpenAI and Anthropic. Want me to write the intro?",
+      "ghost": "Yes — write the intro"
+    },
+    {
+      "phrase": "Here are your notes from the call with McDonald. Want me to write up the meeting notes?",
+      "ghost": "Yes — write up the meeting notes"
+    },
+    {
+      "phrase": "I checked the HTTP 404 errors. Want me to explain it?",
+      "ghost": "Yes — explain it"
+    },
+    {
+      "phrase": "This is about the 2024 election results. Want me to summarize the main points?",
+      "ghost": "Yes — summarize the main points"
+    },
+    {
+      "phrase": "I drafted the email to Zoë. Want me to rephrase the intro?",
+      "ghost": "Yes — rephrase the intro"
+    },
+    {
+      "phrase": "Your note on naïve Bayes is short. Want me to expand on the second point?",
+      "ghost": "Yes — expand on the second point"
+    },
+    {
+      "phrase": "The meeting code of conduct says be kind. Want me to summarize the thread?",
+      "ghost": "Yes — summarize the thread"
+    },
+    {
+      "phrase": "I looked at your credit card statement note. Want me to summarize it?",
+      "ghost": "Yes — summarize it"
+    },
+    {
+      "phrase": "Your login page note has a typo. Want me to fix the typo?",
+      "ghost": "Yes — fix the typo"
+    },
+    {
+      "phrase": "I added the Python code sample. Want me to explain the code?",
+      "ghost": "Yes — explain the code"
+    },
+    {
+      "phrase": "I found the recipe for crème brûlée. Want me to draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "The outline covers chapters 1 through 12. Want me to continue the outline?",
+      "ghost": "Yes — continue the outline"
+    },
+    {
+      "phrase": "Here's the plan.\n\nWant me to draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "I wrote a summary of the paper.\n\nShall I draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "Here's what I found about Kubernetes.\n\nWant me to summarize the main points?",
+      "ghost": "Yes — summarize the main points"
+    },
+    {
+      "phrase": "The keynote is on 2026-11-03. Want me to draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "I updated the README. Want me to read the README?",
+      "ghost": "Yes — read the README"
+    },
+    {
+      "phrase": "This uses the MapReduce pattern. Want me to explain how merge sort works?",
+      "ghost": "Yes — explain how merge sort works"
+    },
+    {
+      "phrase": "I sorted your notes by date. Want me to summarize these notes?",
+      "ghost": "Yes — summarize these notes"
+    },
+    {
+      "phrase": "The phone number is in your contacts note. Want me to draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "The answer is 42. Want me to explain it?",
+      "ghost": "Yes — explain it"
+    },
+    {
+      "phrase": "Next, I'll draft the intro for the 2026 report.",
+      "ghost": "Draft the intro for the 2026 report"
     }
   ]
 }
