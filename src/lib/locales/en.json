@@ -1272,7 +1272,7 @@
   "ai.composer.attachments": "Attached images",
   "ai.composer.attachmentRemove": "Remove {name}",
   "ai.composer.attachmentRejected": "{name} was not attached: {reason}",
-  "ai.composer.attachmentTooLarge": "images must be under 5 MB",
+  "ai.composer.attachmentTooLarge": "Images must be 5 MB or smaller.",
   "ai.composer.attachmentUnsupported": "only PNG, JPEG, GIF and WebP images can be attached",
   "ai.composer.attachmentUnreadable": "the file could not be read",
   "ai.composer.attachmentTooMany": "Only the first {count} images were attached.",

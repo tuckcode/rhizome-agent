@@ -27,6 +27,9 @@ import { reloadFrontendOnceIfStartupFailed } from './utils/frontendReady'
 import { shouldAllowNativeContextMenu } from './utils/nativeContextMenu'
 
 const RootApp = lazy(() => import('./App.tsx'))
+const NativeImageShotHarness = lazy(() => import('./nativeImageShotHarness.tsx').then((mod) => ({
+  default: mod.NativeImageShotHarness,
+})))
 
 function dataTransferHasFiles(dataTransfer: DataTransfer | null): boolean {
   if (!dataTransfer) return false
@@ -193,7 +196,7 @@ createRoot(document.getElementById('root')!, {
       <LinuxTitlebar />
       <MacOSTitlebar />
       <Suspense fallback={<BootSplash />}>
-        <RootApp />
+        {window.location.hash.startsWith('#native-image-shots') ? <NativeImageShotHarness /> : <RootApp />}
         <FrontendReadyMarker />
       </Suspense>
     </TooltipProvider>

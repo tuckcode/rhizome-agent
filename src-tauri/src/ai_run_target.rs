@@ -126,6 +126,11 @@ where
                 reasoning_slot: None,
                 reasoning_notice_tx: None,
                 reasoning_notices_seen: None,
+                chat_images: Vec::new(),
+                vision_state: crate::chat_images::VisionState::Unknown,
+                send_anyway: false,
+                defer_image_skip: false,
+                image_session_id: None,
             };
             model_runner(request, &mut |event| {
                 accumulate(event, &mut response, on_line)

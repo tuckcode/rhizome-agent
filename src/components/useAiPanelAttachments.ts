@@ -75,10 +75,12 @@ export function useAiPanelAttachments({
       // looks like a working one.
       for (const result of results) {
         if (result.ok) continue
-        onUnsupportedAiPaste?.(translate(locale, 'ai.composer.attachmentRejected', {
-          name: result.name,
-          reason: translate(locale, ATTACHMENT_REJECTION_KEYS[result.reason]),
-        }))
+        const reason = result.reason === 'too_large'
+          ? translate(locale, 'ai.composer.attachmentTooLarge')
+          : result.reason === 'unsupported_type'
+            ? 'Use a PNG, JPEG, GIF or WebP image.'
+            : translate(locale, ATTACHMENT_REJECTION_KEYS[result.reason])
+        onUnsupportedAiPaste?.(`${result.name} wasn't attached. ${reason}`)
       }
       if (accepted.length === 0) return
       // Say something only when Prime has actually told us the model is

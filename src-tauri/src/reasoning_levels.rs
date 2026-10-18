@@ -360,6 +360,152 @@ pub fn support_for_free_tier(
     resolve(&query, &sources, &mut cache).support
 }
 
+/// Whether a catalog row says this model accepts image input.
+///
+/// `Some(true)` when a row lists `image` in its input modalities.
+/// `Some(false)` when a row lists input modalities and `image` is not one of
+/// them. `None` when no row answers. The model id is not used as a guess.
+pub fn vision_from_catalog(provider_id: &str, base_url: &str, model_id: &str) -> Option<bool> {
+    let query = ResolveQuery {
+        provider: provider_id,
+        preset: None,
+        base_url,
+        model_id,
+        account: None,
+        api_key: None,
+        requested_level: None,
+        user_override: None,
+    };
+    let sources = DiskSources {
+        dir: reasoning_cache_dir(),
+    };
+    for id in catalog_model_keys(model_id) {
+        if is_openrouter(&query) {
+            if let Some(item) = sources.openrouter_model(&id) {
+                if let Some(answer) = vision_from_openrouter(&item) {
+                    return Some(answer);
+                }
+            }
+        }
+        for family in vision_families(&query) {
+            if let Some(item) = sources.models_dev_model(&family, &id) {
+                if let Some(answer) = vision_from_models_dev(&item) {
+                    return Some(answer);
+                }
+            }
+        }
+    }
+    pinned_vision_answer(&query)
+}
+
+/// Pinned models.dev `modalities.input` snapshot (2026-10-18,
+/// <https://models.dev/api.json>). Used when the on-disk cache has no row.
+/// `true` means that row's input list contains `image`.
+fn pinned_vision() -> &'static HashMap<String, HashMap<String, bool>> {
+    static PIN: std::sync::OnceLock<HashMap<String, HashMap<String, bool>>> =
+        std::sync::OnceLock::new();
+    PIN.get_or_init(|| {
+        serde_json::from_str(include_str!("vision_catalog.json")).expect("vision catalog")
+    })
+}
+
+fn pinned_vision_answer(query: &ResolveQuery<'_>) -> Option<bool> {
+    let pin = pinned_vision();
+    for id in catalog_model_keys(query.model_id) {
+        for family in vision_families(query) {
+            if let Some(answer) = pin.get(&family).and_then(|models| models.get(&id)) {
+                return Some(*answer);
+            }
+        }
+    }
+    None
+}
+
+/// Exact catalog id, then the segment after the last `/`.
+///
+/// Free-tier rows use `openai/gpt-oss-120b`. models.dev stores `gpt-oss-120b`
+/// under the `openai` provider. Both keys are looked up. The name itself
+/// never decides vision.
+fn push_key(keys: &mut Vec<String>, key: &str) {
+    let key = key.trim();
+    if !key.is_empty() && !keys.iter().any(|seen| seen == key) {
+        keys.push(key.to_string());
+    }
+}
+
+fn catalog_model_keys(model_id: &str) -> Vec<String> {
+    let trimmed = model_id.trim().trim_end_matches(':').trim();
+    let mut keys = Vec::new();
+    push_key(&mut keys, trimmed);
+    if let Some((name, _tag)) = trimmed.split_once(':') {
+        push_key(&mut keys, name);
+    }
+    if let Some((_, suffix)) = trimmed.rsplit_once('/') {
+        push_key(&mut keys, suffix);
+        if let Some((name, _tag)) = suffix.split_once(':') {
+            push_key(&mut keys, name);
+        }
+    }
+    let snapshot = keys.clone();
+    for key in snapshot {
+        push_key(&mut keys, &key.replace('.', "-"));
+        push_key(&mut keys, &dash_versions_to_dots(&key));
+        if let Some(stem) = key.strip_suffix("-latest") {
+            push_key(&mut keys, stem);
+            push_key(&mut keys, &stem.replace('.', "-"));
+            push_key(&mut keys, &dash_versions_to_dots(stem));
+        }
+        if key == "chatgpt-4o-latest" {
+            push_key(&mut keys, "gpt-4o");
+        }
+        if key == "claude-3-5-sonnet-latest" || key == "claude-3.5-sonnet-latest" {
+            push_key(&mut keys, "claude-3-5-sonnet");
+            push_key(&mut keys, "claude-3.5-sonnet");
+        }
+    }
+    keys
+}
+
+/// `claude-sonnet-5-5` and `claude-sonnet-5.5` are the same catalog id.
+fn dash_versions_to_dots(key: &str) -> String {
+    let chars: Vec<char> = key.chars().collect();
+    let mut out = String::new();
+    for (index, ch) in chars.iter().enumerate() {
+        let digit_neighbors = index > 0
+            && index + 1 < chars.len()
+            && chars[index - 1].is_ascii_digit()
+            && chars[index + 1].is_ascii_digit();
+        if *ch == '-' && digit_neighbors {
+            out.push('.');
+        } else {
+            out.push(*ch);
+        }
+    }
+    out
+}
+
+fn vision_from_openrouter(item: &Value) -> Option<bool> {
+    modalities_include_image(item.pointer("/architecture/input_modalities"))
+}
+
+fn vision_from_models_dev(item: &Value) -> Option<bool> {
+    modalities_include_image(item.pointer("/modalities/input"))
+}
+
+/// `None` when the list is missing or empty. An empty list does not mean
+/// text-only.
+fn modalities_include_image(list: Option<&Value>) -> Option<bool> {
+    let values = list?.as_array()?;
+    if values.is_empty() {
+        return None;
+    }
+    Some(values.iter().any(|value| {
+        value
+            .as_str()
+            .is_some_and(|token| token.eq_ignore_ascii_case("image"))
+    }))
+}
+
 fn shared_lookup_cache() -> &'static Mutex<ReasoningLookupCache> {
     static CACHE: std::sync::OnceLock<Mutex<ReasoningLookupCache>> = std::sync::OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(ReasoningLookupCache::default()))
@@ -656,6 +802,22 @@ fn toggle_wire(family: &str) -> Option<(&'static str, WireSend)> {
         "ollama" => Some(("think", WireSend::Boolean)),
         _ => None,
     }
+}
+
+fn vision_families(query: &ResolveQuery<'_>) -> Vec<String> {
+    let mut families = models_dev_families(query);
+    let provider = query.provider.trim().to_lowercase().replace('-', "_");
+    let extra: &[&str] = match provider.as_str() {
+        "lmstudio" | "lm_studio" => &["lmstudio"],
+        "ollama" | "ollama_cloud" => &["ollama-cloud", "ollama"],
+        _ => &[],
+    };
+    for family in extra {
+        if !families.iter().any(|seen| seen == family) {
+            families.push((*family).to_string());
+        }
+    }
+    families
 }
 
 fn models_dev_families(query: &ResolveQuery<'_>) -> Vec<String> {
@@ -2423,5 +2585,105 @@ mod tests {
         assert_eq!(stepped.selected_level.as_deref(), Some("xhigh"));
         assert_eq!(stepped.downgraded_from.as_deref(), Some("max"));
         assert_eq!(stepped.body["reasoning_effort"], json!("xhigh"));
+    }
+
+    #[test]
+    fn vision_comes_from_catalog_modalities_not_the_model_name() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("models-dev.json"),
+            r#"{
+              "openai": {"models": {
+                "gpt-4o": {"modalities": {"input": ["text", "image"]}},
+                "gpt-4.1-mini": {"modalities": {"input": ["text"]}},
+                "mystery-vision-name": {}
+              }},
+              "google": {"models": {
+                "gemini-2.5-flash": {"modalities": {"input": ["text", "image"]}}
+              }}
+            }"#,
+        )
+        .unwrap();
+        std::fs::write(
+            dir.path().join("openrouter-models.json"),
+            r#"{"data":[
+              {"id":"openai/gpt-4o:free","architecture":{"input_modalities":["text","image"]}},
+              {"id":"meta/text-only","architecture":{"input_modalities":["text"]}}
+            ]}"#,
+        )
+        .unwrap();
+        reset_reasoning_state_for_test(Some(dir.path().to_path_buf()));
+
+        assert_eq!(
+            vision_from_catalog("openai", "https://api.openai.com/v1", "gpt-4o"),
+            Some(true)
+        );
+        assert_eq!(
+            vision_from_catalog("openai", "https://api.openai.com/v1", "openai/gpt-4o"),
+            Some(true)
+        );
+        assert_eq!(
+            vision_from_catalog("openai", "https://api.openai.com/v1", "gpt-4.1-mini"),
+            Some(false)
+        );
+        assert_eq!(
+            vision_from_catalog("openai", "https://api.openai.com/v1", "mystery-vision-name"),
+            None
+        );
+        assert_eq!(
+            vision_from_catalog("openai", "https://api.openai.com/v1", "not-listed"),
+            None
+        );
+        assert_eq!(
+            vision_from_catalog(
+                "google",
+                "https://generativelanguage.googleapis.com/v1beta/openai",
+                "gemini-2.5-flash"
+            ),
+            Some(true)
+        );
+        assert_eq!(
+            vision_from_catalog(
+                "openrouter",
+                "https://openrouter.ai/api/v1",
+                "openai/gpt-4o:free"
+            ),
+            Some(true)
+        );
+        assert_eq!(
+            vision_from_catalog(
+                "openrouter",
+                "https://openrouter.ai/api/v1",
+                "meta/text-only"
+            ),
+            Some(false)
+        );
+
+        let _restore = tempfile::tempdir().unwrap();
+        reset_reasoning_state_for_test(Some(_restore.path().to_path_buf()));
+    }
+
+    #[test]
+    fn the_pinned_catalog_does_not_mark_every_model_text_only() {
+        let dir = tempfile::tempdir().unwrap();
+        reset_reasoning_state_for_test(Some(dir.path().to_path_buf()));
+        assert_eq!(
+            vision_from_catalog("openai", "https://api.openai.com/v1", "gpt-4.1-mini"),
+            Some(true)
+        );
+        assert_eq!(
+            vision_from_catalog("openai", "https://api.openai.com/v1", "gpt-3.5-turbo"),
+            Some(false)
+        );
+        assert_eq!(
+            vision_from_catalog("groq", "https://api.groq.com/openai/v1", "qwen/qwen3.6-27b"),
+            Some(true)
+        );
+        assert_eq!(
+            vision_from_catalog("openai", "https://api.openai.com/v1", "not-a-real-model"),
+            None
+        );
+        let _restore = tempfile::tempdir().unwrap();
+        reset_reasoning_state_for_test(Some(_restore.path().to_path_buf()));
     }
 }

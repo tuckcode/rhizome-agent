@@ -691,6 +691,12 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   stream_prime_session: () => 'mock-session',
   native_chat_start: () => 'mock-native-session',
   native_chat_send: () => null,
+  native_model_vision: (args?: Record<string, unknown>) => {
+    const target = String(args?.target ?? '')
+    if (target.includes('gpt-3.5') || target.includes('text-only')) return 'no'
+    if (target.includes('gpt-4o') || target.includes('qwen3.6') || target.includes('gemini')) return 'yes'
+    return 'unknown'
+  },
   native_chat_cancel: () => null,
   native_chat_approval_reply: () => null,
   native_chat_end: () => null,

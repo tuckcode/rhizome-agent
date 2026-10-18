@@ -675,6 +675,29 @@ describe('aiAgentSession', () => {
     expect(streamNativeChatMock.mock.calls[0]?.[0]?.message).not.toContain('Previous')
   })
 
+  it('sends composer images on the native path', async () => {
+    nextMessageIdMock.mockReturnValue('msg-native-image')
+    const session = createRuntime()
+    const images = [{ type: 'image' as const, data: 'aaaa', mimeType: 'image/png' }]
+    await sendAgentMessage({
+      runtime: session.runtime,
+      context: {
+        agent: 'prime',
+        ready: true,
+        vaultPath: '/vault',
+        permissionMode: 'safe',
+        chatEngine: 'native',
+        nativeTarget: 'open_ai/gpt-4o',
+      },
+      prompt: { text: 'what is this', images },
+    })
+    expect(streamNativeChatMock).toHaveBeenCalledWith(expect.objectContaining({
+      target: 'open_ai/gpt-4o',
+      images,
+    }))
+    expect(streamAiAgentMock).not.toHaveBeenCalled()
+  })
+
   it('does not send on a read-only native session', async () => {
     nextMessageIdMock.mockReturnValue('msg-native-readonly')
     const session = createRuntime()

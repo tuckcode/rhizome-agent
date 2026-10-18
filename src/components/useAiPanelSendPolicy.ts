@@ -12,6 +12,8 @@ interface UseAiPanelSendPolicyArgs {
   handleSend: HandleSend
   isActive: boolean
   isPrimeTarget: boolean
+  /** Native clears chips when the server accepts. Every other target clears on send. */
+  clearOnSend?: boolean
   onSendPrompt?: (text: string) => void
   attachments: ComposerAttachment[]
   clearAttachments: () => void
@@ -55,6 +57,7 @@ export function useAiPanelSendPolicy({
   handleSend,
   isActive,
   isPrimeTarget,
+  clearOnSend = true,
   onSendPrompt,
   attachments,
   clearAttachments,
@@ -71,9 +74,9 @@ export function useAiPanelSendPolicy({
     const latest = latestTurnState.current
     latest.onSendPrompt?.(text)
     latest.handleSend(text, references, toPrimeImages(attachments) ?? undefined)
-    clearAttachments()
+    if (clearOnSend) clearAttachments()
     refreshQueue()
-  }, [attachments, clearAttachments, refreshQueue])
+  }, [attachments, clearAttachments, clearOnSend, refreshQueue])
 
   const sendAsNewTurnIfIdle = useCallback((text: string, references: SendReferences) => {
     if (latestTurnState.current.isActive) return

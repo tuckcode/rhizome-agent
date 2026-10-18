@@ -1669,6 +1669,9 @@ pub fn delete_session_log(session_id: &str) -> Result<(), String> {
     if let Ok(path) = reasoning_sidecar_path(session_id) {
         let _ = fs::remove_file(path);
     }
+    if let Err(error) = crate::chat_images::delete_session_images(session_id) {
+        log::warn!("image files were not removed with the chat: {error}");
+    }
     Ok(())
 }
 

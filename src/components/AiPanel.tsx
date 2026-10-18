@@ -1,4 +1,4 @@
-import { useEffect, useRef, type MutableRefObject, type ReactNode, type RefObject } from 'react'
+import { useEffect, useRef, useState, type MutableRefObject, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { aiPanelFrameStyle } from './aiPanelPulse'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
@@ -30,6 +30,10 @@ import {
 } from '../lib/aiAgents'
 import { chatEngineAllowsSendWithoutPrime } from '../lib/chatEngine'
 import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
+import { nativeModelVision, type NativeVision } from '../lib/nativeVision'
+import { forgetVisionSendAnyway, rememberVisionSendAnyway, visionSendAnywayFor } from '../lib/visionChoice'
+import { setNativeTurnAcceptedHandler } from '../lib/nativeTurnAccepted'
+import { nativeSessionTarget } from '../lib/nativeSessionTarget'
 import type { AiTarget } from '../lib/aiTargets'
 import type { AppLocale } from '../lib/i18n'
 import { type NoteListItem } from '../utils/ai-context'
@@ -347,13 +351,56 @@ export function AiPanelView({
   // 180–420: narrower and a session title is a truncation, wider and the
   // transcript starts losing the room the design gives it.
   const sessionsWidth = usePanelWidth(APP_STORAGE_KEYS.chatSessionsWidth, 228, 180, 420)
+  const [visionForTarget, setVisionForTarget] = useState<{
+    target: string
+    vision: NativeVision
+  } | null>(null)
+  const [, setVisionSendAnywayRevision] = useState(0)
+  const [attachmentNoticeFor, setAttachmentNoticeFor] = useState<{
+    target: string
+    message: string
+  } | null>(null)
+  const nativeSessionIdForTarget = agent.getNativeSession().sessionId
+  const sessionModel = nativeSessionIdForTarget
+    ? nativeSessionTarget(nativeSessionIdForTarget)
+    : null
+  const modelTarget = resolveNativeChatTarget(sessionModel || nativeTarget)
+  const vision: NativeVision | 'pending' = visionForTarget?.target === modelTarget
+    ? visionForTarget.vision
+    : 'pending'
+  const visionSendAnyway = visionSendAnywayFor(modelTarget)
+  const attachmentNotice = attachmentNoticeFor?.target === modelTarget
+    ? attachmentNoticeFor.message
+    : null
+  useEffect(() => {
+    if (!modelTarget) return
+    let cancelled = false
+    void nativeModelVision(modelTarget).then((next) => {
+      if (!cancelled) setVisionForTarget({ target: modelTarget, vision: next })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [modelTarget])
+  const reportAttachment = (message: string) => {
+    setAttachmentNoticeFor({ target: modelTarget, message })
+    onUnsupportedAiPaste?.(message)
+  }
   const { attachments, attachImages, removeAttachment, clearAttachments } = useAiPanelAttachments({
     locale,
-    onUnsupportedAiPaste,
-    modelAcceptsImages: primeHost.modelAcceptsImages,
+    onUnsupportedAiPaste: reportAttachment,
+    modelAcceptsImages: chatEngine === 'prime' ? primeHost.modelAcceptsImages : null,
     modelName: primeHost.modelName,
     modelId: primeHost.modelId,
   })
+  const acceptKey = agent.getNativeLiveSlot?.() ?? 'panel'
+  useEffect(() => {
+    setNativeTurnAcceptedHandler(acceptKey, () => {
+      clearAttachments()
+      setAttachmentNoticeFor(null)
+    })
+    return () => setNativeTurnAcceptedHandler(acceptKey, null)
+  }, [acceptKey, clearAttachments])
 
   // Prime owns the queue. Chat used to remember follow-ups locally because
   // we had no read; `get_queue` is that read.
@@ -361,6 +408,7 @@ export function AiPanelView({
     handleSend,
     isActive,
     isPrimeTarget,
+    clearOnSend: chatEngine !== 'native',
     onSendPrompt,
     attachments,
     clearAttachments,
@@ -430,6 +478,7 @@ export function AiPanelView({
         target: resolveNativeChatTarget(nativeTarget),
         vaultPath,
         permissionMode,
+        sourceSessionId: nativeSessionId,
       })
       await pickSession({
         id: sessionId,
@@ -612,7 +661,19 @@ export function AiPanelView({
         queue={isPrimeTarget ? queue : undefined}
         onClearQueue={isPrimeTarget ? () => void clearQueue() : undefined}
         onStop={handleStop}
-        onUnsupportedAiPaste={onUnsupportedAiPaste}
+        onUnsupportedAiPaste={reportAttachment}
+        vision={vision}
+        modelLabel={modelTarget.split('/').pop() || 'This model'}
+        visionSendAnyway={visionSendAnyway}
+        onVisionSendAnyway={() => {
+          rememberVisionSendAnyway(modelTarget)
+          setVisionSendAnywayRevision((revision) => revision + 1)
+        }}
+        onVisionUndo={() => {
+          forgetVisionSendAnyway(modelTarget)
+          setVisionSendAnywayRevision((revision) => revision + 1)
+        }}
+        attachmentNotice={attachmentNotice}
         attachments={attachments}
         onAttachImages={attachImages}
         onRemoveAttachment={removeAttachment}

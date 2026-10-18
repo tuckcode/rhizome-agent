@@ -270,5 +270,6 @@ export function useCliAiAgent(
     replaceMessages,
     setNativeSession,
     getNativeSession,
+    getNativeLiveSlot: () => nativeLiveSlot,
   }
 }

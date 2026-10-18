@@ -131,6 +131,11 @@ export function NativeChatModelPicker({
   const filterRef = useRef<HTMLInputElement>(null)
   const selectedRowRef = useRef<HTMLDivElement | null>(null)
   const [open, setOpen] = useState(false)
+  useEffect(() => {
+    const openPicker = () => setOpen(true)
+    window.addEventListener('rhizome-open-model-picker', openPicker)
+    return () => window.removeEventListener('rhizome-open-model-picker', openPicker)
+  }, [])
   const [query, setQuery] = useState('')
   const [models, setModels] = useState<RhizomeChatModel[]>(() => seedRhizomeChatModels(providers))
   const [primeModels, setPrimeModels] = useState<PrimeModel[]>([])

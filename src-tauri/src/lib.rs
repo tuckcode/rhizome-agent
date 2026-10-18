@@ -69,6 +69,7 @@ pub mod engines;
 pub mod rhizome_loop;
 // Provider adapter and free-tier routing. They compile now. Chat must not
 // call them until Phase 6.
+pub mod chat_images;
 pub mod hermes_reasoning;
 pub mod provider_keys;
 #[cfg(test)]
@@ -815,6 +816,7 @@ macro_rules! app_invoke_handler {
             commands::stream_ai_model,
             commands::native_chat_start,
             commands::native_chat_send,
+            commands::native_model_vision,
             commands::native_chat_cancel,
             commands::native_chat_approval_reply,
             commands::native_chat_end,

@@ -37,6 +37,25 @@ pub struct ProviderModel {
     replay_session: String,
 }
 
+fn note_image_skip(request: &AiModelStreamRequest, error: &crate::model_events::ModelError) {
+    if request.defer_image_skip {
+        return;
+    }
+    let current = request
+        .chat_images
+        .last()
+        .is_some_and(|turn| !turn.is_empty());
+    if !current
+        || !crate::chat_images::image_client_status(error.status)
+        || !crate::chat_images::error_mentions_image(&error.message)
+    {
+        return;
+    }
+    if let Some(session) = &request.image_session_id {
+        let _ = crate::chat_images::skip_current_turn_images(session);
+    }
+}
+
 impl ProviderModel {
     pub fn new(request: AiModelStreamRequest, limits: HttpLimits) -> Self {
         Self {
@@ -56,6 +75,14 @@ impl ProviderModel {
 }
 
 impl Model for ProviderModel {
+    fn set_chat_images(&mut self, images: Vec<Vec<crate::chat_images::ChatImage>>) {
+        self.request.chat_images = images;
+        if let Some((session, send_anyway)) = crate::chat_images::armed_image_turn() {
+            self.request.image_session_id = Some(session);
+            self.request.send_anyway = send_anyway;
+        }
+    }
+
     fn complete(&mut self, view: &ModelView, emit: &mut dyn FnMut(ModelEvent) -> bool) -> bool {
         let wire = OutboundWire {
             model_id: &self.request.model_id,
@@ -63,7 +90,15 @@ impl Model for ProviderModel {
             base_url: self.request.provider.base_url.as_deref(),
             replay_session: &self.replay_session,
         };
-        let messages = openai_messages_for(view, view.turn_start, &wire);
+        let accepts = self.request.vision_state == crate::chat_images::VisionState::Yes
+            || self.request.send_anyway;
+        let messages = openai_messages_for(
+            view,
+            view.turn_start,
+            &wire,
+            &self.request.chat_images,
+            accepts,
+        );
         let tools = tool_definitions(&view.offered_tools);
         // The loop calls this from inside a tokio runtime, and reqwest's
         // blocking client panics when it drops there. So the HTTP call runs
@@ -129,6 +164,9 @@ impl Model for ProviderModel {
                 );
             });
             for event in receiver.iter() {
+                if let crate::model_events::ModelEvent::Error(error) = &event {
+                    note_image_skip(&self.request, error);
+                }
                 if !emit(event) {
                     break;
                 }
@@ -153,7 +191,7 @@ impl Drop for ProviderModel {
 /// provider rejects a call id with no answer. A denied call answers with the
 /// reason. A call that never ran answers that the turn stopped first.
 pub fn openai_messages(view: &ModelView, turn_start: usize) -> Vec<Value> {
-    openai_messages_for(view, turn_start, &OutboundWire::plain())
+    openai_messages_for(view, turn_start, &OutboundWire::plain(), &[], true)
 }
 
 /// Model identity for one outbound chat-completions body.
@@ -225,7 +263,13 @@ fn is_deepseek_target(model_id: &str, provider_id: &str, base_url: Option<&str>)
 /// assistant step, including a call that another provider made before a
 /// Taproot reroute. DeepSeek gets `reasoning_content` on every
 /// assistant message. A step this process did not capture sends `""`.
-fn openai_messages_for(view: &ModelView, turn_start: usize, wire: &OutboundWire<'_>) -> Vec<Value> {
+fn openai_messages_for(
+    view: &ModelView,
+    turn_start: usize,
+    wire: &OutboundWire<'_>,
+    ledger: &[Vec<crate::chat_images::ChatImage>],
+    accepts_images: bool,
+) -> Vec<Value> {
     let gemini = needs_gemini_thought_placeholder(wire.model_id);
     let deepseek = is_deepseek_target(wire.model_id, wire.provider_id, wire.base_url);
     let split = turn_start.min(view.history.len());
@@ -253,6 +297,14 @@ fn openai_messages_for(view: &ModelView, turn_start: usize, wire: &OutboundWire<
     };
     let mut text_cursor = 0usize;
 
+    let user_count = items
+        .iter()
+        .filter(|item| matches!(item, HistoryItem::User { .. }))
+        .count();
+    let aligned = crate::chat_images::image_sets_for_users(user_count, ledger);
+    let user_images = crate::chat_images::budget_turns(&aligned, accepts_images);
+    let mut user_index = 0usize;
+
     let mut messages = Vec::new();
     let mut unanswered: Vec<String> = Vec::new();
     for item in items {
@@ -265,7 +317,17 @@ fn openai_messages_for(view: &ModelView, turn_start: usize, wire: &OutboundWire<
         }
         match item {
             HistoryItem::User { text } => {
-                messages.push(json!({ "role": "user", "content": text }));
+                let turn = user_images.get(user_index).cloned().unwrap_or(
+                    crate::chat_images::BudgetedTurn {
+                        images: Vec::new(),
+                        omitted: false,
+                    },
+                );
+                user_index += 1;
+                messages.push(json!({
+                    "role": "user",
+                    "content": crate::chat_images::openai_turn_content(text, &turn)
+                }));
             }
             HistoryItem::Assistant { text, tool_calls } => {
                 let mut message = json!({
@@ -368,7 +430,7 @@ fn tool_definitions(names: &[String]) -> Vec<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ai_models::test_server::{serve, sse, TEST_LIMITS};
+    use crate::ai_models::test_server::{http_response, serve, sse, TEST_LIMITS};
     use crate::ai_models::{clear_reasoning_session, recall_call_reasoning};
     use crate::rhizome_loop::{AgentLoop, DurableEvent, ToolCall};
     use serde_json::json;
@@ -792,7 +854,7 @@ mod tests {
         ];
         let target = wire("gemini-3.8-flash", "gemini", None, "");
 
-        let messages = openai_messages_for(&view("go", history), 1, &target);
+        let messages = openai_messages_for(&view("go", history), 1, &target, &[], true);
 
         let first = &messages[2]["tool_calls"];
         let second = &messages[5]["tool_calls"];
@@ -818,7 +880,8 @@ mod tests {
             "google/gemini-3.8-flash:free",
             "gemini-3.8-flash:free",
         ] {
-            let messages = openai_messages_for(&view, 0, &wire(model_id, "gemini", None, ""));
+            let messages =
+                openai_messages_for(&view, 0, &wire(model_id, "gemini", None, ""), &[], true);
             assert_eq!(
                 messages[1]["tool_calls"][0]["extra_content"]["google"]["thought_signature"],
                 "skip_thought_signature_validator",
@@ -827,7 +890,8 @@ mod tests {
             assert!(messages[1]["tool_calls"][1].get("extra_content").is_none());
         }
         for model_id in ["gemini-2.5-flash", "gemini-2.0-flash", "qwen", "gpt-4o"] {
-            let messages = openai_messages_for(&view, 0, &wire(model_id, "lan", None, ""));
+            let messages =
+                openai_messages_for(&view, 0, &wire(model_id, "lan", None, ""), &[], true);
             assert!(
                 messages[1]["tool_calls"][0].get("extra_content").is_none(),
                 "{model_id}"
@@ -846,7 +910,8 @@ mod tests {
             "models/gemini-flash-latest",
             "google/gemini-pro-latest:free",
         ] {
-            let messages = openai_messages_for(&view, 0, &wire(model_id, "gemini", None, ""));
+            let messages =
+                openai_messages_for(&view, 0, &wire(model_id, "gemini", None, ""), &[], true);
             assert_eq!(
                 messages[1]["tool_calls"][0]["extra_content"]["google"]["thought_signature"],
                 "skip_thought_signature_validator",
@@ -854,7 +919,8 @@ mod tests {
             );
         }
         for model_id in ["gemini-2.5-flash", "gemini-1.5-pro"] {
-            let messages = openai_messages_for(&view, 0, &wire(model_id, "lan", None, ""));
+            let messages =
+                openai_messages_for(&view, 0, &wire(model_id, "lan", None, ""), &[], true);
             assert!(
                 messages[1]["tool_calls"][0].get("extra_content").is_none(),
                 "{model_id}"
@@ -983,7 +1049,7 @@ mod tests {
             "deepseek-unit",
         );
 
-        let messages = openai_messages_for(&view("go", history), 2, &target);
+        let messages = openai_messages_for(&view("go", history), 2, &target, &[], true);
 
         assert_eq!(messages[1]["reasoning_content"], "");
         assert_eq!(messages[3]["reasoning_content"], "because the tool");
@@ -1011,7 +1077,7 @@ mod tests {
         ];
         let target = wire("deepseek-flash", "deepseek", None, "deepseek-order");
 
-        let messages = openai_messages_for(&view("go", history), 3, &target);
+        let messages = openai_messages_for(&view("go", history), 3, &target, &[], true);
 
         assert_eq!(messages[0]["reasoning_content"], "first thought");
         assert_eq!(messages[2]["reasoning_content"], "second thought");
@@ -1042,7 +1108,7 @@ mod tests {
         ];
         let target = wire("deepseek-flash", "deepseek", None, "deepseek-gap");
 
-        let messages = openai_messages_for(&view("go", history), 5, &target);
+        let messages = openai_messages_for(&view("go", history), 5, &target, &[], true);
 
         assert_eq!(messages[0]["reasoning_content"], "first");
         assert_eq!(messages[2]["reasoning_content"], "");
@@ -1084,7 +1150,13 @@ mod tests {
         ];
         let seen = view("go", history);
         let plain = openai_messages(&seen, 0);
-        let qwen = openai_messages_for(&seen, 0, &wire("qwen", "lan", None, "deepseek-unit"));
+        let qwen = openai_messages_for(
+            &seen,
+            0,
+            &wire("qwen", "lan", None, "deepseek-unit"),
+            &[],
+            true,
+        );
 
         assert_eq!(qwen, plain);
         assert!(plain
@@ -1428,5 +1500,199 @@ mod tests {
             .filter(|notice| notice.code == "forced_off_for_tools")
             .collect();
         assert_eq!(notices.len(), 1);
+    }
+
+    fn tiny_png() -> crate::chat_images::ChatImage {
+        use base64::Engine;
+        crate::chat_images::ChatImage {
+            mime_type: "image/png".into(),
+            data: base64::engine::general_purpose::STANDARD.encode(b"png"),
+        }
+    }
+
+    #[test]
+    fn a_vision_model_gets_an_openai_image_part() {
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"a cat"},"finish_reason":"stop"}]}"#,
+            "[DONE]",
+        ])]);
+        let mut request = request(&server.base_url);
+        request.vision_state = crate::chat_images::VisionState::Yes;
+        let image = tiny_png();
+        request.chat_images = vec![vec![image.clone()]];
+        let mut model = ProviderModel::new(request, TEST_LIMITS);
+        let mut events = Vec::new();
+        model.complete(&view("what is this", vec![]), &mut |event| {
+            events.push(event);
+            true
+        });
+        let body: serde_json::Value =
+            serde_json::from_str(&server.requests.lock().unwrap()[0].1).unwrap();
+        assert_eq!(body["messages"][0]["content"][0]["text"], "what is this");
+        assert_eq!(body["messages"][0]["content"][1]["type"], "image_url");
+        assert!(body["messages"][0]["content"][1]["image_url"]["url"]
+            .as_str()
+            .unwrap()
+            .starts_with("data:image/png;base64,"));
+        assert!(events.iter().any(|event| matches!(
+            event,
+            crate::model_events::ModelEvent::TextDelta { text } if text == "a cat"
+        )));
+    }
+
+    #[test]
+    fn a_text_only_model_does_not_receive_stripped_text() {
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"should not run"},"finish_reason":"stop"}]}"#,
+            "[DONE]",
+        ])]);
+        let mut request = request(&server.base_url);
+        request.vision_state = crate::chat_images::VisionState::No;
+        request.chat_images = vec![vec![tiny_png()]];
+        let mut model = ProviderModel::new(request, TEST_LIMITS);
+        let mut events = Vec::new();
+        model.complete(&view("what is this", vec![]), &mut |event| {
+            events.push(event);
+            true
+        });
+        let body: serde_json::Value =
+            serde_json::from_str(&server.requests.lock().unwrap()[0].1).unwrap();
+        let content = body["messages"][0]["content"].as_str().unwrap();
+        assert!(content.contains("what is this"));
+        assert!(content.contains(crate::chat_images::OMITTED_IMAGE_NOTE));
+        assert!(body["messages"][0].get("image_url").is_none());
+        assert!(events
+            .iter()
+            .any(|event| matches!(event, crate::model_events::ModelEvent::TextDelta { .. })));
+    }
+
+    #[test]
+    fn an_unknown_model_with_send_anyway_gets_the_image_part() {
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"a square"},"finish_reason":"stop"}]}"#,
+            "[DONE]",
+        ])]);
+        let mut request = request(&server.base_url);
+        request.vision_state = crate::chat_images::VisionState::Unknown;
+        request.send_anyway = true;
+        request.chat_images = vec![vec![tiny_png()]];
+        let mut model = ProviderModel::new(request, TEST_LIMITS);
+        let _ = model.complete(&view("what is this", vec![]), &mut |_| true);
+        let body: serde_json::Value =
+            serde_json::from_str(&server.requests.lock().unwrap()[0].1).unwrap();
+        assert_eq!(body["messages"][0]["content"][1]["type"], "image_url");
+    }
+
+    fn with_home<T>(body: impl FnOnce() -> T) -> T {
+        let _lock = crate::app_config::TEST_CONFIG_ENV
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let home = tempfile::tempdir().expect("home");
+        let previous = std::env::var("HOME").ok();
+        let previous_xdg = std::env::var("XDG_CONFIG_HOME").ok();
+        std::env::set_var("HOME", home.path());
+        std::env::remove_var("XDG_CONFIG_HOME");
+        let result = body();
+        match previous {
+            Some(value) => std::env::set_var("HOME", value),
+            None => std::env::remove_var("HOME"),
+        }
+        match previous_xdg {
+            Some(value) => std::env::set_var("XDG_CONFIG_HOME", value),
+            None => std::env::remove_var("XDG_CONFIG_HOME"),
+        }
+        result
+    }
+
+    #[test]
+    fn a_context_length_400_keeps_an_earlier_image() {
+        with_home(|| {
+            let session = uuid::Uuid::new_v4().to_string();
+            crate::chat_images::push_turn(&session, vec![stored_png()]).unwrap();
+            crate::chat_images::push_turn(&session, Vec::new()).unwrap();
+            let kept = crate::chat_images::read_turns(&session).unwrap();
+            let server = serve(vec![http_response(
+                "400 Bad Request",
+                &[],
+                "maximum context length exceeded",
+            )]);
+            let mut request = request(&server.base_url);
+            request.vision_state = crate::chat_images::VisionState::Yes;
+            request.image_session_id = Some(session.clone());
+            request.chat_images = kept;
+            let mut model = ProviderModel::new(request, TEST_LIMITS);
+            let _ = model.complete(&view("hello", vec![]), &mut |_| true);
+            let turns = crate::chat_images::read_turns(&session).unwrap();
+            assert_eq!(turns[0].len(), 1, "an earlier image stays");
+            assert!(turns[1].is_empty());
+        });
+    }
+
+    #[test]
+    fn an_image_400_skips_resend_without_deleting_the_file() {
+        with_home(|| {
+            let session = uuid::Uuid::new_v4().to_string();
+            crate::chat_images::push_turn(&session, vec![stored_png()]).unwrap();
+            let server = serve(vec![http_response(
+                "400 Bad Request",
+                &[],
+                "invalid image_url payload",
+            )]);
+            let mut request = request(&server.base_url);
+            request.vision_state = crate::chat_images::VisionState::Yes;
+            request.image_session_id = Some(session.clone());
+            request.chat_images = crate::chat_images::read_turns(&session).unwrap();
+            let mut model = ProviderModel::new(request, TEST_LIMITS);
+            let _ = model.complete(&view("what is this", vec![]), &mut |_| true);
+            let turns = crate::chat_images::read_turns(&session).unwrap();
+            assert!(turns[0].is_empty(), "the rejected image is not resent");
+            let dir = home_images(&session);
+            assert!(
+                dir.read_dir().unwrap().next().is_some(),
+                "the file stays on disk"
+            );
+        });
+    }
+
+    fn stored_png() -> crate::chat_images::ChatImage {
+        use base64::Engine;
+        crate::chat_images::ChatImage {
+            mime_type: "image/png".into(),
+            data: base64::engine::general_purpose::STANDARD.encode(b"\x89PNG\r\n\x1a\nA"),
+        }
+    }
+
+    fn home_images(session: &str) -> std::path::PathBuf {
+        crate::app_config::preferred_app_config_path("native-sessions")
+            .unwrap()
+            .join(format!("{session}-images"))
+    }
+
+    #[test]
+    fn send_anyway_keeps_an_earlier_image_on_a_text_follow_up() {
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"still there"},"finish_reason":"stop"}]}"#,
+            "[DONE]",
+        ])]);
+        let mut request = request(&server.base_url);
+        request.vision_state = crate::chat_images::VisionState::Unknown;
+        request.send_anyway = true;
+        request.chat_images = vec![vec![tiny_png()], Vec::new()];
+        let mut model = ProviderModel::new(request, TEST_LIMITS);
+        let history = vec![
+            crate::rhizome_loop::HistoryItem::User {
+                text: "what is this".into(),
+            },
+            crate::rhizome_loop::HistoryItem::Assistant {
+                text: "a square".into(),
+                tool_calls: vec![],
+            },
+        ];
+        let _ = model.complete(&view("and now", history), &mut |_| true);
+        let body: serde_json::Value =
+            serde_json::from_str(&server.requests.lock().unwrap()[0].1).unwrap();
+        let messages = body["messages"].as_array().unwrap();
+        let first = &messages[0]["content"];
+        assert_eq!(first[1]["type"], "image_url");
     }
 }

@@ -8,7 +8,7 @@ mod git;
 pub mod git_clone;
 mod git_connect;
 mod memory;
-mod native_chat;
+pub(crate) mod native_chat;
 mod pdf_export;
 mod runtime;
 mod session_import;
