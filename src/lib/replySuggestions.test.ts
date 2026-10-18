@@ -45,12 +45,18 @@ describe('suggestReply', () => {
     })
 
     /**
-     * "Want me to…?" is a consent offer, not a closed choice. Pills would
-     * echo the question; Tab fills a named continuation instead of bare "yes".
+     * "Want me to…?" is a consent offer, not a closed choice. Tab names the
+     * action when that action is safe. A consequential verb ("run") stays
+     * silent — never a bare "Yes, go ahead".
      */
-    it('want_me_to_returns_named_completion', () => {
-      const result = suggestReply('Want me to run it now instead?')
-      expect(result).toEqual({ kind: 'completion', text: 'Yes, go ahead' })
+    it('want_me_to_names_a_safe_action_and_stays_silent_when_consequential', () => {
+      expect(suggestReply('Want me to draft the note?')).toEqual({
+        kind: 'completion',
+        text: 'Yes — draft the note',
+      })
+      expect(suggestReply('Want me to run it now instead?')).toBeNull()
+      expect(suggestReply('Run `rm -R ~`. Want me to draft the note?')).toBeNull()
+      expect(suggestReply('Want me to make a note of that?')).toBeNull()
     })
 
     /**
@@ -289,29 +295,81 @@ describe('suggestReply', () => {
   })
 
   describe('Tab completions', () => {
-    it('soft_consent_is_yes_go_ahead_not_bare_yes', () => {
-      expect(suggestReply('I can run the tests if you would like.')).toEqual({
+    it('names_a_safe_consent_and_refuses_a_bare_or_consequential_one', () => {
+      expect(suggestReply('I can draft the note if you would like.')).toEqual({
         kind: 'completion',
-        text: 'Yes, go ahead',
+        text: 'Yes — draft the note',
       })
-      expect(suggestReply('Shall I start the rebuild?')).toEqual({
+      expect(suggestReply('Shall I start the rebuild?')).toBeNull()
+      expect(suggestReply('Shall I start the outline?')).toBeNull()
+      expect(suggestReply('I can run the tests if you would like.')).toBeNull()
+      expect(suggestReply('Shall I proceed?')).toBeNull()
+    })
+
+    it('ready_path_names_the_action_or_stays_silent', () => {
+      expect(suggestReply("Let me know when you're ready and I'll draft the note.")).toEqual({
         kind: 'completion',
-        text: 'Yes, go ahead',
+        text: 'Yes — draft the note',
+      })
+      expect(suggestReply("I'll draft the outline when you're ready.")).toEqual({
+        kind: 'completion',
+        text: 'Yes — draft the outline',
+      })
+      expect(suggestReply("When you're ready, I'll start the outline.")).toBeNull()
+      expect(suggestReply("Let me know when you're ready and I'll wipe the vault.")).toBeNull()
+      expect(suggestReply('Let me know when you are ready.')).toBeNull()
+    })
+
+    it('stays silent for do the above after a fenced push', () => {
+      expect(suggestReply('```\ngit push origin main\n```\nWant me to do the above?')).toBeNull()
+      expect(suggestReply('Want me to execute the above?')).toBeNull()
+      expect(suggestReply('Should I draft the note?')).toEqual({
+        kind: 'completion',
+        text: 'Yes — draft the note',
+      })
+      expect(suggestReply('Would you like me to draft the note?')).toEqual({
+        kind: 'completion',
+        text: 'Yes — draft the note',
+      })
+      expect(suggestReply('Want me to draft the note\nand push it?')).toBeNull()
+      expect(suggestReply('Want me to:\n- draft the note\n- push it?')).toBeNull()
+      expect(suggestReply('Would you like me to draft the note\nand push it?')).toBeNull()
+      expect(suggestReply('I can draft the note\nif you would like.')).toBeNull()
+      expect(suggestReply("Here's the plan.\n\nWant me to draft the note?")).toEqual({
+        kind: 'completion',
+        text: 'Yes — draft the note',
+      })
+      expect(suggestReply('I fixed the bug and wrote tests.\n\nShall I draft the summary?')).toEqual({
+        kind: 'completion',
+        text: 'Yes — draft the summary',
       })
     })
 
-    it('ready_when_you_are_does_not_need_a_question_mark', () => {
-      expect(suggestReply('Let me know when you are ready.')).toEqual({
+    it('echoes_a_harmless_next_step', () => {
+      expect(suggestReply('Next I will draft the note.')).toEqual({
         kind: 'completion',
-        text: 'Ready — proceed',
+        text: 'Draft the note',
       })
     })
 
-    it('echoes_a_stated_next_step', () => {
-      expect(suggestReply('Next I will run the tests.')).toEqual({
-        kind: 'completion',
-        text: 'Run the tests',
-      })
+    it.each([
+      ['Next I will draft the note.', 'Draft the note'],
+      ["Next I'll draft the intro.", 'Draft the intro'],
+      ['Next, we will outline the next section.', 'Outline the next section'],
+      ["Next I'll draft your note.", 'Draft my note'],
+      ["Next I'll force-push to main.", null],
+      ['Next I will run the tests.', null],
+      ['The next step is to wipe the vault.', null],
+      ['Next, I will delete the branch.', null],
+      ['The next step is to clean up the repo.', null],
+      ['Next I will ship it to prod.', null],
+      ['The next step is to rm -rf build/.', null],
+    ] as const)('next step echo %j → %j', (message, expected) => {
+      if (expected === null) {
+        expect(suggestReply(message)).toBeNull()
+        return
+      }
+      expect(suggestReply(message)).toEqual({ kind: 'completion', text: expected })
     })
 
     it('open_questions_still_return_null', () => {

@@ -1266,3 +1266,98 @@ describe('AiPanel last-conversation restore', () => {
     expect(block).not.toContain('vaultPath')
   })
 })
+
+describe('AiPanel predicted completion wiring', () => {
+  const note = "Let me know when you're ready and I'll draft the note."
+
+  function renderGhost({
+    agent = 'prime',
+    chatEngine = 'native',
+    permissionMode = 'safe',
+    withTarget = true,
+    apiModel = false,
+  }: {
+    agent?: 'prime' | 'codex' | 'hermes' | 'claude_code'
+    chatEngine?: 'native' | 'prime'
+    permissionMode?: 'safe' | 'power_user'
+    withTarget?: boolean
+    apiModel?: boolean
+  } = {}) {
+    const agentTarget = {
+      kind: 'agent' as const,
+      agent,
+      id: `agent:${agent}`,
+      label: agent,
+      shortLabel: agent,
+    }
+    const modelTarget = {
+      kind: 'api_model' as const,
+      provider: {
+        id: 'openai',
+        name: 'OpenAI',
+        kind: 'open_ai' as const,
+        models: [],
+      },
+      model: {
+        id: 'gpt-test',
+        capabilities: {
+          streaming: true,
+          tools: false,
+          vision: false,
+          json_mode: false,
+          reasoning: false,
+        },
+      },
+      id: 'model:openai/gpt-test',
+      label: 'OpenAI · gpt-test',
+      shortLabel: 'gpt-test',
+    }
+    return render(
+      <AiPanelView
+        controller={primeController({
+          permissionMode,
+          agent: {
+            ...primeController().agent,
+            messages: [{ userMessage: 'Go on', response: note, actions: [] }],
+          },
+        })}
+        onClose={vi.fn()}
+        showHeader={false}
+        chatEngine={chatEngine}
+        defaultAiAgent={agent}
+        defaultAiTarget={withTarget ? (apiModel ? modelTarget : agentTarget) : undefined}
+      />,
+    )
+  }
+
+  it('shows the ghost for native Safe and for a Prime target in Safe mode', () => {
+    const native = renderGhost({ chatEngine: 'native', agent: 'prime' })
+    expect(screen.getByTestId('composer-reply-completion')).toHaveTextContent('Yes — draft the note')
+    native.unmount()
+
+    renderGhost({ chatEngine: 'prime', agent: 'prime' })
+    expect(screen.getByTestId('composer-reply-completion')).toHaveTextContent('Yes — draft the note')
+  })
+
+  it('hides the ghost for Codex, Power User, and an undefined target', () => {
+    const codex = renderGhost({ agent: 'codex', chatEngine: 'native' })
+    expect(screen.queryByTestId('composer-reply-completion')).toBeNull()
+    codex.unmount()
+
+    const power = renderGhost({ agent: 'prime', chatEngine: 'native', permissionMode: 'power_user' })
+    expect(screen.queryByTestId('composer-reply-completion')).toBeNull()
+    power.unmount()
+
+    renderGhost({ agent: 'prime', chatEngine: 'native', withTarget: false })
+    expect(screen.queryByTestId('composer-reply-completion')).toBeNull()
+  })
+
+  it('shows the ghost for an API model in Safe mode and hides Claude Code', () => {
+    const model = renderGhost({ apiModel: true, permissionMode: 'safe' })
+    expect(screen.getByTestId('composer-reply-completion')).toHaveTextContent('Yes — draft the note')
+    model.unmount()
+
+    renderGhost({ agent: 'claude_code', chatEngine: 'native', permissionMode: 'safe' })
+    expect(screen.queryByTestId('composer-reply-completion')).toBeNull()
+  })
+})

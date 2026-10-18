@@ -617,6 +617,9 @@ export function AiPanelView({
         onAttachImages={attachImages}
         onRemoveAttachment={removeAttachment}
         lastAgentMessage={getLastAgentMessage(agent.messages)}
+        targetKind={defaultAiTarget?.kind}
+        agentId={defaultAiTarget?.kind === 'agent' ? defaultAiTarget.agent : view.defaultAiAgent}
+        permissionMode={permissionMode}
         sessionPath={activeSessionPath}
         onOpenMycelium={onOpenMycelium}
         skillsLabel={isPrimeTarget ? composerSkillsLabel : undefined}

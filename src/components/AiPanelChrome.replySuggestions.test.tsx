@@ -73,6 +73,8 @@ describe('AiPanelComposer reply suggestions', () => {
       lastAgentMessage:
         'Would you prefer to (a) run the tests, or (b) skip them for now?',
       onChange,
+      targetKind: 'agent',
+      permissionMode: 'power_user',
     })
 
     const pills = screen.getAllByTestId('composer-reply-suggestion')
@@ -248,27 +250,106 @@ describe('AiPanelComposer reply suggestions', () => {
     const onChange = vi.fn()
     vi.mocked(replySuggestionsLib.suggestReply).mockReturnValue({
       kind: 'completion',
-      text: 'Yes, go ahead',
+      text: 'Yes — sketch the diagram',
     })
     renderComposer({
-      lastAgentMessage: 'Want me to run it now instead?',
+      lastAgentMessage: 'Want me to sketch the diagram?',
       onChange,
+      targetKind: 'api_model',
+      permissionMode: 'safe',
     })
 
-    expect(screen.getByTestId('composer-reply-completion')).toHaveTextContent('Yes, go ahead')
+    expect(screen.getByTestId('composer-reply-completion')).toHaveTextContent('Yes — sketch the diagram')
     expect(screen.queryByTestId('composer-reply-suggestions')).toBeNull()
 
     fireEvent.keyDown(screen.getByTestId('agent-input'), { key: 'Tab' })
-    expect(onChange).toHaveBeenCalledWith('Yes, go ahead')
+    expect(onChange).toHaveBeenCalledWith('Yes — sketch the diagram')
+  })
+
+  it('hides approval and next-step completions for a CLI agent and for Power User', () => {
+    vi.mocked(replySuggestionsLib.suggestReply).mockReturnValue({
+      kind: 'completion',
+      text: 'Yes — sketch the diagram',
+    })
+    const { unmount } = renderComposer({
+      lastAgentMessage: 'Want me to sketch the diagram?',
+      targetKind: 'agent',
+      agentId: 'codex',
+      permissionMode: 'safe',
+    })
+    expect(screen.queryByTestId('composer-reply-completion')).toBeNull()
+    unmount()
+
+    vi.mocked(replySuggestionsLib.suggestReply).mockReturnValue({
+      kind: 'completion',
+      text: 'Sketch the diagram',
+    })
+    const powerUser = renderComposer({
+      lastAgentMessage: 'Next I will sketch the diagram.',
+      targetKind: 'api_model',
+      permissionMode: 'power_user',
+    })
+    expect(screen.queryByTestId('composer-reply-completion')).toBeNull()
+    powerUser.unmount()
+
+    renderComposer({
+      lastAgentMessage: 'Next I will sketch the diagram.',
+      targetKind: 'agent',
+      agentId: 'claude_code',
+      permissionMode: 'safe',
+    })
+    expect(screen.queryByTestId('composer-reply-completion')).toBeNull()
+  })
+
+  it('shows a named ghost for the native stream in Safe mode', () => {
+    vi.mocked(replySuggestionsLib.suggestReply).mockReturnValue({
+      kind: 'completion',
+      text: 'Yes — draft the note',
+    })
+    renderComposer({
+      lastAgentMessage: "Let me know when you're ready and I'll draft the note.",
+      targetKind: 'agent',
+      agentId: 'prime',
+      permissionMode: 'safe',
+    })
+    expect(screen.getByTestId('composer-reply-completion')).toHaveTextContent('Yes — draft the note')
+  })
+
+  it('hides a ghost when the target is omitted', () => {
+    vi.mocked(replySuggestionsLib.suggestReply).mockReturnValue({
+      kind: 'completion',
+      text: 'Yes — draft the note',
+    })
+    renderComposer({
+      lastAgentMessage: "Let me know when you're ready and I'll draft the note.",
+      agentId: 'prime',
+      permissionMode: 'safe',
+    })
+    expect(screen.queryByTestId('composer-reply-completion')).toBeNull()
+  })
+
+  it('does not render a bare approval even for an API model', () => {
+    vi.mocked(replySuggestionsLib.suggestReply).mockReturnValue({
+      kind: 'completion',
+      text: 'Yes, go ahead',
+    })
+    renderComposer({
+      lastAgentMessage: 'Shall I proceed?',
+      targetKind: 'api_model',
+      permissionMode: 'safe',
+    })
+    expect(screen.queryByTestId('composer-reply-completion')).toBeNull()
   })
 
   it('Escape dismisses ghost text until the next agent message', () => {
     vi.mocked(replySuggestionsLib.suggestReply).mockReturnValue({
       kind: 'completion',
-      text: 'Ready — proceed',
+      text: 'Yes — draft the note',
     })
     const { rerender } = renderComposer({
-      lastAgentMessage: 'Let me know when you are ready.',
+      lastAgentMessage: "Let me know when you're ready and I'll draft the note.",
+      targetKind: 'api_model',
+      permissionMode: 'safe',
     })
     expect(screen.getByTestId('composer-reply-completion')).toBeInTheDocument()
 
@@ -286,7 +367,9 @@ describe('AiPanelComposer reply suggestions', () => {
         onChange={vi.fn()}
         onSend={vi.fn()}
         onStop={vi.fn()}
-        lastAgentMessage="Let me know when you are ready."
+        lastAgentMessage="Let me know when you're ready and I'll draft the note."
+        targetKind="api_model"
+        permissionMode="safe"
       />,
     )
     expect(screen.queryByTestId('composer-reply-completion')).toBeNull()

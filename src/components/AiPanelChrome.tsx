@@ -35,7 +35,9 @@ import { cn } from '@/lib/utils'
 import { composerIsMultiline } from '../lib/composerMultiline'
 import { requestMcpSetupToggle } from '../hooks/useMcpSetupDialogController'
 import { expandReplyQuotes } from '../lib/replyQuote'
+import { allowPredictedCompletion } from '../lib/consequentialAsk'
 import { suggestReply } from '../lib/replySuggestions'
+import type { AiTargetKind } from '../lib/aiTargets'
 import { latestAssistantMessageIndex } from '../lib/latestAssistantMessage'
 import { useDragRegion } from '../hooks/useDragRegion'
 import { useComposerPromptHistory } from '../hooks/useComposerPromptHistory'
@@ -130,6 +132,15 @@ interface AiPanelComposerProps {
   onCommandAction?: (action: CommandMenuAction, nextValue: string) => void
   /** The last agent message in the conversation, used to compute reply suggestions. */
   lastAgentMessage?: string | null
+  /**
+   * Chat target kind. Omitted when the panel has no resolved target, and
+   * then no predicted completion is shown.
+   */
+  targetKind?: AiTargetKind
+  /** Agent id when the target is a CLI or the native stream. */
+  agentId?: string | null
+  /** Only Safe mode may show a predicted completion. */
+  permissionMode?: AiAgentPermissionMode
   /** Open this chat in Mycelium. Absent until the session has a path. */
   sessionPath?: string | null
   onOpenMycelium?: (sessionPath: string) => void
@@ -1018,6 +1029,9 @@ export function AiPanelComposer({
   commandInstantLabel,
   onCommandAction,
   lastAgentMessage,
+  targetKind,
+  agentId,
+  permissionMode,
   skillsLabel,
   skills,
   onPickSkill,
@@ -1028,11 +1042,20 @@ export function AiPanelComposer({
   const { recordSent, browse } = useComposerPromptHistory(onChange)
   const [dismissedCompletionFor, setDismissedCompletionFor] = useState<string | null>(null)
   const replySuggestion = !isActive && lastAgentMessage ? suggestReply(lastAgentMessage) : null
+  const offeredCompletion = replySuggestion?.kind === 'completion' ? replySuggestion.text : null
+  // External CLIs and Power User get no predicted completion. Native stream
+  // and an API model may, and only in Safe mode. A missing target does not.
   const completionText =
-    replySuggestion?.kind === 'completion'
+    offeredCompletion
+    && allowPredictedCompletion({
+      text: offeredCompletion,
+      targetKind,
+      agentId,
+      permissionMode,
+    })
     && input.trim().length === 0
     && dismissedCompletionFor !== lastAgentMessage
-      ? replySuggestion.text
+      ? offeredCompletion
       : null
 
   useEffect(() => {
