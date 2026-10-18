@@ -34,12 +34,10 @@ It is **not** Rhizome Desktop (`knispo/rhizome`). Do not “fix branding
 back to Desktop.” Details: [`IDENTITY.md`](IDENTITY.md).
 
 **Rhizome is the harness and durable memory (ADR-0187).** Native is the only
-chat engine; Prime and Hermes are being removed. Chat first, vault on purpose.
+chat engine; Prime and Hermes are no longer chat engines ([ADR-0189](adr/0189-no-ties-to-outside-harnesses.md)); leftover code is still in the repo until the follow-up PRs. Chat first, vault on purpose.
 Memory is gated; execution is not. New chats use Rhizome's own engine.
 
-If Prime already has a mechanism, use Prime’s. Do not build a Rhizome
-twin beside it. Vault knowledge still lands as markdown — Prime’s
-`~/.prime/agent` is harness state, not the memory store. In-app Chat
+Vault knowledge lands as markdown. In-app Chat
 gets Hermes/Pi *manners* from the vault skill (answer first, CLI not
 IPython), not a second runtime.
 

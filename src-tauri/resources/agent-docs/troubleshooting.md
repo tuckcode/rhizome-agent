@@ -5,12 +5,11 @@ URL: /troubleshooting/ai-agent-not-found
 
 Rhizome runs Prime Agent as a separate program. It can only use Prime when Prime is installed and Rhizome can find it.
 
-You don't need Prime for new chats. Chat runs on Rhizome's own engine (ADR-0187).
+You don't need Prime for Chat. Rhizome's own engine is the only chat engine, and Prime is no longer a chat engine (ADR-0189); its leftover code is still in the repo until the follow-up PRs.
 
 ## Symptoms
 
 - Chat says Prime is missing.
-- Settings → AI Agents shows Prime Agent as **missing**.
 - `prime-agent` works in one terminal but not from Rhizome.
 
 ## Checks
@@ -27,8 +26,6 @@ You don't need Prime for new chats. Chat runs on Rhizome's own engine (ADR-0187)
    ```bash
    (prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status
    ```
-
-4. Look at Settings → AI Agents → Local agent → **Recognized local agents**. Prime Agent should show as installed, with its version.
 
 ## Path issues
 
@@ -62,7 +59,7 @@ New chats use Rhizome's own engine (ADR-0187).
 | Prime is missing | Applies to Prime-locked chats only. Install Prime with `./install.sh`, run `prime-agent` once, and start the daemon (see [Install](../start/install.md#set-up-prime-legacy)) |
 | Prime is installed, but Chat still says it's missing | Wait a few seconds. The check repeats. If it keeps failing, see [AI agent not found](ai-agent-not-found.md) |
 | Chat stopped answering after you closed a terminal | Prime stops with the terminal that started it. Start it as a daemon: `(prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status` |
-| The provider login expired | Settings → AI Agents → Local agent → **Reconnect** on that provider. Or run `prime-agent`, then `/login` |
+| The provider login expired | Run `prime-agent`, then `/login`. Settings no longer has a Prime sign-in |
 
 ## Either engine
 

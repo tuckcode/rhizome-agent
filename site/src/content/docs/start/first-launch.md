@@ -42,7 +42,7 @@ Type a message and press Enter. You should get an answer, or a clear failure:
 |---|---|
 | No provider key | Add a key in Settings → AI Agents → API model, or turn on a free provider. See [Set up models and keys](../guides/configure-ai-models.md) |
 | Prime is installed, but Chat still says it's missing | Applies to Prime-locked chats only. Wait a few seconds. The check repeats |
-| The provider login expired (Prime) | Settings → AI Agents → Local agent → **Reconnect** on that provider, or run `prime-agent` and `/login` in a terminal |
+| The provider login expired (Prime) | Run `prime-agent` and `/login` in a terminal. Settings no longer has a Prime sign-in |
 
 More cases: [Chat doesn't answer](../troubleshooting/chat-doesnt-answer.md).
 

@@ -712,4 +712,4 @@ Do not restore these claims from older briefings or from
 5. **Kanban is a hard no.** ADR-0188 lifted the park. There is still no
    board UI and still no `kanban.db`. Do not copy Hermes kanban files.
 
-Open Prime-locked chats keep that lock until closed. New chats are native.
+Chats are native.

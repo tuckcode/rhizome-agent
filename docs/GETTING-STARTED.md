@@ -10,7 +10,7 @@ How to navigate the **Rhizome** codebase, run the app, and find what you need.
 
 User-facing name is **Rhizome**. The bundle is still `ai.rhizome.agent` / `Rhizome.app`.
 
-- Rhizome owns the agent loop (ADR-0180). Native is the only chat engine (ADR-0187). Prime and Hermes are being removed. Hermes is not a usable engine in the app today.
+- Rhizome owns the agent loop (ADR-0180). Native is the only chat engine (ADR-0187). Prime and Hermes are no longer chat engines ([ADR-0189](adr/0189-no-ties-to-outside-harnesses.md)); leftover code is still in the repo until the follow-up PRs.
 - **Taproot** is the free automatic router in the model picker (stored target id `free_tier_auto` is unchanged).
 - Graphite is the default theme. Dark is Graphite, Light is Earth light, and System follows the OS between those two. Earth dark, Loam, and Mycelium are color skins.
 - Left rail Views are Research, Graph, Mycelium, and History (Ctrl+Cmd+1–4 on Mac, Ctrl+Shift+1–4 on Windows). Changes sits next to Notes.
@@ -22,7 +22,7 @@ User-facing name is **Rhizome**. The bundle is still `ai.rhizome.agent` / `Rhizo
 - **Node.js** `^20.19.0` or `>=22.12.0` (Vite 7) and **pnpm**
 - **Rust** 1.77.2+ (for the Tauri backend)
 - **git** CLI (required by the git integration features)
-- **Prime Agent** on `PATH` is not required for Chat. `./install.sh` may still fetch it for legacy optional-engine support. Not vendored.
+- **Prime Agent** on `PATH` is not required for Chat. `./install.sh` may still fetch it until the leftover engine code is removed. Not vendored.
 
 ### Linux system dependencies
 
@@ -557,7 +557,7 @@ Verified against source 2026-09-14. Longer landmine list:
   cache a failed “host is not running” catalog.
 - **Native-only chat (ADR-0187).** `readChatEngine` in
   `src/lib/chatEngine.ts` always returns `native`. `ChatEngineSettings` is
-  gone (#218). Open Prime-locked chats keep that lock until closed.
+  gone (#218).
   ChatHome still must not strip Prime chrome when the default AI *agent* is
   Prime and the default *target* is an API model.
 - **Red X quits unless Keep in taskbar.** Default close exits and

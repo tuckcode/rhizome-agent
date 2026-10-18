@@ -3,7 +3,7 @@
 Source: concepts/ai.md
 URL: /concepts/ai
 
-Chat runs on Rhizome's own engine (ADR-0187). Prime and Hermes are being removed as chat engines. Open Prime-locked chats keep that lock until closed. The vault, permissions, and saved memory stay the same.
+Chat runs on Rhizome's own engine (ADR-0187). Prime and Hermes are no longer chat engines (ADR-0189); leftover code is still in the repo until the follow-up PRs. The vault, permissions, and saved memory stay the same.
 
 ## Terms on this page
 

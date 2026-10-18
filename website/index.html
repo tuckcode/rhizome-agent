@@ -169,13 +169,12 @@
       </div>
       <div class="aside">
         <strong>Rhizome is the harness.</strong>
-        Prime is an optional engine you can switch to. Hermes is a planned adapter, not a usable engine today. Provider keys live in the system keychain.
+        Its own engine is the only chat engine. Provider keys live in the system keychain.
       </div>
     </div>
 
     <div class="strip" aria-label="Built with">
       <div><span>Harness</span>Rhizome</div>
-      <div><span>Optional engine</span>Prime Agent</div>
       <div><span>Models</span>Taproot</div>
       <div><span>Theme</span>Graphite</div>
     </div>
@@ -202,7 +201,7 @@
           <h3><span class="n">01</span>Chat on Rhizome's engine</h3>
           <div class="body">
             <p>Rhizome owns the agent loop. A non-fatal error shows a notice; it does not cut off the reply. VoiceOver hears run status.</p>
-            <ol><li><span>1.1</span>Works without Prime</li><li><span>1.2</span>Taproot</li><li><span>1.3</span>Prime is optional</li></ol>
+            <ol><li><span>1.1</span>Works without Prime</li><li><span>1.2</span>Taproot</li><li><span>1.3</span>No outside engine</li></ol>
           </div>
         </article>
         <article class="cell">
@@ -286,12 +285,12 @@
       </div>
       <div class="run">
         <div>
-          You need macOS, Node <code>^20.19.0</code> or <code>&gt;=22.12.0</code>, pnpm, Rust, and the Tauri toolchain. Chat on Rhizome's engine does not need Prime. Settings still starts Chat on Prime until you switch the Chat engine. <code>./install.sh</code> still fetches Prime for that default. There is no signed download yet.
+          You need macOS, Node <code>^20.19.0</code> or <code>&gt;=22.12.0</code>, pnpm, Rust, and the Tauri toolchain. Chat runs on Rhizome's own engine; Prime is no longer a chat engine (ADR-0189). <code>./install.sh</code> may still fetch Prime until the leftover engine code is removed. There is no signed download yet.
           <p style="margin:16px 0 0"><a href="docs/start/install/">Getting started →</a></p>
           <p style="margin:8px 0 0"><a href="https://github.com/tuckcode/rhizome-agent/blob/main/docs/for-agents/README.md">Agent instructions →</a></p>
         </div>
         <div>
-<pre><span class="c"># install Rhizome. The script still fetches Prime.</span>
+<pre><span class="c"># install Rhizome. The script may still fetch Prime until the leftover engine code is removed.</span>
 <span class="p">$</span> git clone https://github.com/tuckcode/rhizome-agent.git
 <span class="p">$</span> cd rhizome-agent &amp;&amp; ./install.sh
 <span class="p">$</span> pnpm tauri dev</pre>

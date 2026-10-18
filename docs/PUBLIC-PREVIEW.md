@@ -1,6 +1,6 @@
 # Public preview
 
-A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own. Chat runs on Rhizome's own engine (ADR-0187). Prime and Hermes are being removed as chat engines.
+A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own. Chat runs on Rhizome's own engine (ADR-0187). Prime and Hermes are no longer chat engines ([ADR-0189](adr/0189-no-ties-to-outside-harnesses.md)); leftover code is still in the repo until the follow-up PRs.
 
 This page is the install and recovery guide. Developer commands live in [`GETTING-STARTED.md`](GETTING-STARTED.md).
 
@@ -38,7 +38,7 @@ cd rhizome-agent
 pnpm tauri dev
 ```
 
-`./install.sh` installs this repo and may fetch Prime Agent when that program is not already on the machine. Chat runs on Rhizome's own engine. The script may still download the Prime command-line tool for legacy optional-engine support.
+`./install.sh` installs this repo and may fetch Prime Agent when that program is not already on the machine. Chat runs on Rhizome's own engine. The script may still download the Prime command-line tool; Chat doesn't use it, and that step comes out with the leftover engine code.
 
 `prime-agent` on macOS stops when that terminal closes. To leave the daemon running:
 
@@ -70,7 +70,7 @@ Open http://localhost:5202. The dev server does not use port 5173.
 |---|---|
 | Prime is missing | Applies only to an open Prime-locked chat. Install Prime, run `prime-agent` once, start the daemon, then reopen that chat. New chats use Rhizome's engine. |
 | Prime is installed and Chat still says it is missing | Applies only to Prime-locked chats. Wait a few seconds. The status check repeats. |
-| Provider or login failure | Settings → AI Agents. Native keys go in the system keychain. Prime owns Prime login. |
+| Provider or login failure | Settings → AI Agents. Native keys go in the system keychain. |
 | macOS blocks the vault folder | Grant access to Documents, Desktop, or Downloads, or move the vault. |
 | No network, or no model | Notes on disk still open. Chat cannot answer. |
 | The red window button | It quits, unless **Keep in taskbar** is on. Then it hides. Cmd+Q quits. |
