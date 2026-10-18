@@ -247,6 +247,7 @@ function ghostGrammarAccepts(display: string, fullMessage?: string): boolean {
   }
   if (!GHOST_VERBS.has(verb)) return false
   if (verb === 'makeanote' || verb === 'createanote') {
+    if (tokens.some((token) => token === 'it' || token === 'this' || token === 'that')) return false
     if (index < tokens.length && (tokens[index] === 'dest' || tokens[index] === 'forme' || tokens[index] === 'destthis')) {
       index += 1
     }
@@ -261,10 +262,17 @@ function ghostGrammarAccepts(display: string, fullMessage?: string): boolean {
   const object = tokens[index]
   if (!object) return false
   index += 1
+  if (object === 'it' || object === 'this' || object === 'that') {
+    const vaultWrite = verb === 'write' || verb === 'add' || verb === 'draft' || verb === 'writeup'
+      || verb === 'rewrite' || verb === 'edit' || verb === 'fix' || verb === 'format'
+    if (vaultWrite) return false
+  }
   if (object === 'it') {
     if (!IT_VERBS.has(verb)) return false
   } else if (object === 'this') {
     if (!THIS_VERBS.has(verb)) return false
+  } else if (object === 'that') {
+    return false
   } else if (!GHOST_OBJECTS.has(object)) {
     return false
   } else if (verb === 'fix' && !FIX_OBJECTS.has(object)) {
@@ -303,7 +311,6 @@ function secretReason(text: string): string | null {
   if (hasCredentialToken(prepared)) return 'token'
   if (hasPasswordishToken(prepared)) return 'pwtoken'
   if (hasShortBase64(prepared)) return 'b64'
-  if (/(?<![A-Za-z])[a-z]{16,}(?![A-Za-z])/.test(prepared)) return 'long'
   if (/(?<![a-z0-9])sk-live-/i.test(prepared)) return 'sk-live'
   if (/(?<![a-z0-9])sk-/i.test(prepared)) return 'sk'
   if (/(?<![a-z0-9])(?:ghp_|gho_|github_pat_)/i.test(prepared)) return 'ghp'
@@ -311,7 +318,7 @@ function secretReason(text: string): string | null {
   if (/(?<![a-z])bearer(?![a-z])/i.test(prepared)) return 'bearer'
   if (/(?<![a-z0-9])eyj/i.test(prepared)) return 'eyj'
   if (looksLikeSharedSecret(prepared)) return 'shared'
-  const lower = collapseSpacedLetters(prepared).toLowerCase()
+  const lower = collapseSpacedLetters(stripCombiningMarks(prepared)).toLowerCase()
   const checks: [string, RegExp][] = [
     ['p@ss', /(?<![a-z])p@sswords?(?![a-z])/],
     ['pass word', /(?<![a-z])pass[- ]words?(?![a-z])/],
@@ -369,12 +376,12 @@ function hasShortBase64(text: string): boolean {
     const piece = match[1] ?? ''
     if (/^[A-Z][a-z]+$/.test(piece)) continue
     if (/^[A-Z][a-z]+(?:[A-Z][a-z]+)+$/.test(piece)) continue
-    const before = text.slice(0, match.index)
-    if (/^[0-9a-f]{7,12}$/i.test(piece) && /(?:commit|sha)\s*$/i.test(before)) continue
+    if (/^[a-z]+(?:[A-Z][a-z0-9]+)+$/.test(piece)) continue
+    if (/^[0-9a-f]{7,12}$/i.test(piece)) continue
+    if (isProductToken(piece)) continue
     const hasDigitOrSign = /[0-9+=]/.test(piece)
-    const slashOnly = piece.includes('/') && !hasDigitOrSign
-    if (slashOnly && caseSwitches(piece) < 3) continue
-    if (hasDigitOrSign || piece.includes('/') || caseSwitches(piece) >= 3) return true
+    if (piece.includes('/') && !/[+=]/.test(piece)) continue
+    if (hasDigitOrSign || caseSwitches(piece) >= 3) return true
   }
   return false
 }
@@ -403,7 +410,10 @@ function hasSuspiciousDigits(text: string): boolean {
       continue
     }
     if (/\s*(?:dollars?|words?|errors?|chapters?)\b/i.test(after)) continue
-    if (/(?:is|=|:)\s*$/i.test(before)) return true
+    if (/(?:is|=|:)\s*$/i.test(before)) {
+      if (/(?:number|zip|order|room|(?:build\s+)?id)\s+is\s*$/i.test(before)) continue
+      return true
+    }
     if (/(?<![a-z])(?:code|pin|otp|cvv|ssn|card|password|passwd|pwd|passcode|token|secret|key)s?\s*$/i.test(before)) {
       return true
     }
@@ -416,9 +426,23 @@ function hasCredentialToken(text: string): boolean {
   for (const match of text.matchAll(pattern)) {
     const token = match[1] ?? ''
     if (!/[A-Z]/.test(token) || !/[a-z]/.test(token) || !/[0-9]/.test(token)) continue
+    if (isProductToken(token) && !usedAsCredential(text, match.index ?? 0, token)) continue
     return true
   }
   return false
+}
+
+function isProductToken(token: string): boolean {
+  if (!/^[A-Za-z]+\d{1,4}$/.test(token)) return false
+  if (/[A-Z]/.test(token)) return true
+  const digits = token.match(/\d+$/)?.[0] ?? ''
+  return digits === '64' || digits === '128' || digits === '256' || digits === '512' || digits === '1024' || digits === '2048'
+}
+
+function usedAsCredential(text: string, index: number, token: string): boolean {
+  const after = text.slice(index + token.length)
+  const near = text.slice(Math.max(0, index - 16), index)
+  return /^\s+is\b/i.test(after) || /\bis\s+$/i.test(near) || /\buse\s+$/i.test(near)
 }
 
 function collapseSpacedLetters(text: string): string {
@@ -430,8 +454,8 @@ function hasPasswordishToken(text: string): boolean {
   for (const match of text.matchAll(pattern)) {
     const token = match[1] ?? ''
     if (token.length < 6 || token.length > 16) continue
-    const before = text.slice(0, match.index)
-    if (/^[0-9a-f]{7,12}$/i.test(token) && /(?:commit|sha)\s*$/i.test(before)) continue
+    if (/^[0-9a-f]{7,12}$/i.test(token)) continue
+    if (isProductToken(token) && !usedAsCredential(text, match.index ?? 0, token)) continue
     return true
   }
   return false
@@ -454,23 +478,48 @@ function hasDangerousBacktick(text: string): boolean {
   const spans = text.match(/`[^`\n]+`/g) ?? []
   return spans.some((span) => {
     const inner = span.slice(1, -1)
-    return /=/.test(inner) || looksDangerousCommand(inner) || /(?<![a-z])(?:key|token|secret|password)s?(?![a-z])/i.test(inner)
+    return /=/.test(inner)
+      || looksDangerousCommand(inner)
+      || /\bgit\s+push\b/i.test(inner)
+      || /(?<![a-z])(?:key|token|secret|password)s?(?![a-z])/i.test(inner)
   })
+}
+
+function stripCombiningMarks(text: string): string {
+  return text.normalize('NFD').replace(/\p{M}/gu, '')
 }
 
 function looksDangerousCommand(text: string): boolean {
   const prepared = prepareText(text)
   return /\brm\s+-[rf]{1,2}\b/i.test(prepared)
+    || /\brm\s+-R\b/.test(prepared)
     || /(?:^|\s)--(?:force|hard)\b/i.test(prepared)
     || /\bgit\s+push\s+-f\b/i.test(prepared)
+    || /\bgit\s+clean\s+-f/i.test(prepared)
     || /\bdrop\s+table\b/i.test(prepared)
-    || /(?:^|\n)(?: {4}|\t)\S/.test(prepared)
+    || /\bdelete\s+from\b/i.test(prepared)
+    || /\btruncate\s+table\b/i.test(prepared)
+    || /(?:^|\n)(?: {4}|\t)(?![-*•])\S/.test(prepared)
     || /hooks\.slack\.com/i.test(prepared)
     || /https?:\/\/\S*\/reset\b/i.test(prepared)
 }
 
+export function suppressesReply(text: string): boolean {
+  return looksSecret(text) || looksDangerousCommand(text)
+}
+
 function isDenyWord(word: string): boolean {
   return DENY_WORD.test(word) || DENY_ING.test(word)
+}
+
+function countsAsExplainDeny(parts: string[], index: number): boolean {
+  const word = parts[index] ?? ''
+  if (!DENY_ING.test(word)) return DENY_WORD.test(word)
+  const previous = parts[index - 1]
+  const next = parts[index + 1]
+  if (next === 'the' || next === 'a' || next === 'an') return true
+  if (parts.slice(0, index).some((part) => EXPLAIN_TOOLS.has(part) || DENY_WORD.test(part))) return true
+  return previous !== undefined && !/^(?:the|a|an|how|why|what)$/.test(previous)
 }
 
 function clauseWords(action: string): string[] {
@@ -631,7 +680,7 @@ function explainTopicOk(topic: string): boolean {
     if (word === 'sort' && parts[index - 1] === 'merge') return []
     if (word === 'apply' && parts[index + 1] === 'functions') return []
     if (word === 'functions' && parts[index - 1] === 'apply') return []
-    return isDenyWord(word) ? [index] : []
+    return countsAsExplainDeny(parts, index) ? [index] : []
   })
   if (denyAt.length > 1) return false
   if (denyAt.length === 1) {
@@ -647,7 +696,7 @@ function explainTopicOk(topic: string): boolean {
       for (let index = at + 1; index < parts.length; index += 1) {
         const word = parts[index] ?? ''
         if (
-          isDenyWord(word)
+          countsAsExplainDeny(parts, index)
           || EXPLAIN_APPROVAL.has(word)
           || word === 'the'
           || word === 'a'
@@ -672,9 +721,6 @@ function restoreGhostClause(display: string, fullMessage?: string): boolean {
   const explained = clause.match(/^explain (?:how )?(.+?)(?: works)?$/)
   if (explained?.[1] && explainTopicOk(explained[1])) return true
   if (/^write up the (?:meeting |call |standup |interview |lecture )?(?:notes|summary)$/.test(clause)) return true
-  if (/^(?:make a note of (?:this|that)|jot (?:this|that) down|note (?:this|that) down)$/.test(clause)) {
-    return true
-  }
   if (/^find (?:related|similar) notes$/.test(clause)) return true
   if (/^compare the (?:two |three )?(?:approaches|options)$/.test(clause)) return true
   if (/^draft a reply(?: to the (?:email|message|thread))?$/.test(clause)) return true

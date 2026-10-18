@@ -55,6 +55,8 @@ describe('suggestReply', () => {
         text: 'Yes — draft the note',
       })
       expect(suggestReply('Want me to run it now instead?')).toBeNull()
+      expect(suggestReply('Run `rm -R ~`. Want me to draft the note?')).toBeNull()
+      expect(suggestReply('Want me to make a note of that?')).toBeNull()
     })
 
     /**

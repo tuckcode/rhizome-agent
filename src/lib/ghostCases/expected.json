@@ -386,15 +386,15 @@
     },
     {
       "phrase": "Want me to make a note of this?",
-      "ghost": "Yes — make a note of this"
+      "ghost": null
     },
     {
       "phrase": "Want me to jot that down?",
-      "ghost": "Yes — jot that down"
+      "ghost": null
     },
     {
       "phrase": "Want me to note that down?",
-      "ghost": "Yes — note that down"
+      "ghost": null
     },
     {
       "phrase": "Want me to translate this to French?",
@@ -2912,7 +2912,7 @@
     },
     {
       "phrase": "Want me to make a note of this?",
-      "ghost": "Yes — make a note of this"
+      "ghost": null
     },
     {
       "phrase": "Your API key is sk-123. Want me to make a note of that?",
@@ -2920,11 +2920,11 @@
     },
     {
       "phrase": "Want me to jot that down?",
-      "ghost": "Yes — jot that down"
+      "ghost": null
     },
     {
       "phrase": "Want me to note that down?",
-      "ghost": "Yes — note that down"
+      "ghost": null
     },
     {
       "phrase": "Want me to make a note of this and push?",
@@ -4048,7 +4048,7 @@
     },
     {
       "phrase": "Want me to explain shipping costs?",
-      "ghost": null
+      "ghost": "Yes — explain shipping costs"
     },
     {
       "phrase": "Want me to explain the runbook?",
@@ -4321,6 +4321,228 @@
       "ghost": null
     }
   ],
+  "cases245l_b7fe.json": [
+    {
+      "phrase": "Use AbCdEfGhIj as the value. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Use AbCdEfGh12 as the value. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Use AbcDefGhi as the value. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Your new one is HorseBatteryStaple. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Your new one is CorrectHorse. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Use Sunshine to sign on. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "The vault unlock is Sunshine. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "The vault unlock word is sunshine. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "The wifi is called Home and uses Tr0ubadour. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "The value is commit a1b2c3d4e5. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Save commit 9f8e7d6c5b as the unlock value. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Your recovery value is sha deadbeef42. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Remember commit deadbeefcafe. Want me to jot that down?",
+      "ghost": null
+    },
+    {
+      "phrase": "Your PIN 1987. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "The door unlocks with 1987. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Use 1987 to unlock the safe. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Use 2048 to unlock the safe. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "The safe opens with 2026. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "The alarm disarms with 4412 dollars. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "The alarm number is 4412 words. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Garage: 1990. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Gate 2001-01-01. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Gate is 2001-01-01. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Run `ghp_abc123def` to log in. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "The value is `sk-abc`. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "The value is `hunter2`. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "The value is `Tr0ub4dor3`. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "The value is `xK9mQ2vL7pR3`. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Paste `AKIAIOSFODNN7EXAMPLE` there. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "The value is `correcthorse`. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Run `git push origin main`. Want me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Run `rm -r -f ~`. Want me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Run `rm -R ~`. Want me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Run `git push --force-with-lease`. Want me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Run `git reset HEAD~5 --hard`. Want me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Run `git clean -fdx`. Want me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Run `truncate table users`. Want me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Run `DELETE FROM users`. Want me to draft the note?",
+      "ghost": null
+    },
+    {
+      "phrase": "Your pässword is hunter2. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Your passwörd is hunter2. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Your pаsswörd is hunter2. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Your tökén is abc. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Your sécret is abc. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Your ρassword is hunter2. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Your passwοrd is hunter2. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Your 𝗽𝗮𝘀𝘀𝘄𝗼𝗿𝗱 is hunter2. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Your password is ｈｕｎｔｅｒ２. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Your pass­word is hunter2. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Your p.a.s.s.w.o.r.d is hunter2. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Your p-a-s-s-w-o-r-d is hunter2. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Your pw is hunter2. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Your pass is hunter. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Your passwrd is hunter. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Your login: bob / hunter. Want me to make a note of that?",
+      "ghost": null
+    },
+    {
+      "phrase": "Username bob, pass hunter. Want me to make a note of that?",
+      "ghost": null
+    }
+  ],
   "cases245benign_dd0b.json": [
     {
       "phrase": "I updated the plan for Q3 2026. Want me to draft the note?",
@@ -4489,6 +4711,176 @@
     {
       "phrase": "Next, I'll draft the intro for the 2026 report.",
       "ghost": "Draft the intro for the 2026 report"
+    }
+  ],
+  "cases245benign2_7859.json": [
+    {
+      "phrase": "I met with Priya Raman on Tuesday about the Q4 roadmap. Want me to draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "Your flight to São Paulo leaves on November 14. Want me to draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "The invoice from Müller GmbH is for €3,400. Want me to draft the summary?",
+      "ghost": "Yes — draft the summary"
+    },
+    {
+      "phrase": "Rent went up to $2150 a month. Want me to draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "The quote came in at 18500 euros. Want me to draft the summary?",
+      "ghost": "Yes — draft the summary"
+    },
+    {
+      "phrase": "Version 3.12.4 of Python fixes that bug. Want me to explain it?",
+      "ghost": "Yes — explain it"
+    },
+    {
+      "phrase": "Node 20.11 is the LTS release. Want me to summarize the thread?",
+      "ghost": "Yes — summarize the thread"
+    },
+    {
+      "phrase": "I bisected it to a1b2c3d. Want me to draft the summary?",
+      "ghost": "Yes — draft the summary"
+    },
+    {
+      "phrase": "The regression started at 9f8e7d6c. Want me to draft the summary?",
+      "ghost": "Yes — draft the summary"
+    },
+    {
+      "phrase": "The article is at https://www.nytimes.com/2026/10/16/technology/ai.html. Want me to summarize the main points?",
+      "ghost": "Yes — summarize the main points"
+    },
+    {
+      "phrase": "Docs are at https://docs.python.org/3/library/asyncio.html. Want me to explain it?",
+      "ghost": "Yes — explain it"
+    },
+    {
+      "phrase": "Björk and Sigur Rós headline the festival. Want me to draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "Your notes on Dvořák are thin. Want me to expand on the second point?",
+      "ghost": "Yes — expand on the second point"
+    },
+    {
+      "phrase": "I compared GitHub Copilot with JetBrains AI. Want me to list the pros and cons?",
+      "ghost": "Yes — list the pros and cons"
+    },
+    {
+      "phrase": "I tried DaVinci Resolve and Final Cut Pro. Want me to list the pros and cons?",
+      "ghost": "Yes — list the pros and cons"
+    },
+    {
+      "phrase": "The hook `useEffect` runs twice in StrictMode. Want me to explain it?",
+      "ghost": "Yes — explain it"
+    },
+    {
+      "phrase": "The `getServerSideProps` function fetches the data. Want me to explain the code?",
+      "ghost": "Yes — explain the code"
+    },
+    {
+      "phrase": "I renamed `fetchUser` to `loadUser`. Want me to draft the summary?",
+      "ghost": "Yes — draft the summary"
+    },
+    {
+      "phrase": "Your iPhone15 backup note is outdated. Want me to draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "I installed Python3 in the venv. Want me to explain it?",
+      "ghost": "Yes — explain it"
+    },
+    {
+      "phrase": "The video uses H264 and the audio is mp3. Want me to explain it?",
+      "ghost": "Yes — explain it"
+    },
+    {
+      "phrase": "The service runs on AWS Route53 and S3. Want me to explain it?",
+      "ghost": "Yes — explain it"
+    },
+    {
+      "phrase": "This uses base64 and sha256. Want me to explain the code?",
+      "ghost": "Yes — explain the code"
+    },
+    {
+      "phrase": "The internationalization work is half done. Want me to draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "The responsibilities section is long. Want me to shorten the intro?",
+      "ghost": "Yes — shorten the intro"
+    },
+    {
+      "phrase": "Meeting notes:\n- budget approved\n    - pending legal review\n- hire two engineers\n\nWant me to draft the summary?",
+      "ghost": "Yes — draft the summary"
+    },
+    {
+      "phrase": "Your 401k contribution is 6 percent. Want me to draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "The answer is mp4. Want me to explain it?",
+      "ghost": "Yes — explain it"
+    },
+    {
+      "phrase": "The best format is h265. Want me to explain it?",
+      "ghost": "Yes — explain it"
+    },
+    {
+      "phrase": "Call Dr. O'Neill at 555-0142. Want me to draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "The room number is 4012. Want me to draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "The order number is 88431. Want me to draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "Your ZIP is 60614. Want me to draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "The build ID is 20261017.3. Want me to summarize the thread?",
+      "ghost": "Yes — summarize the thread"
+    },
+    {
+      "phrase": "I read 'Thinking, Fast and Slow' by Kahneman. Want me to summarize the main points?",
+      "ghost": "Yes — summarize the main points"
+    },
+    {
+      "phrase": "Ana and François agreed on the date. Want me to draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "The PlayStation5 launch notes are here. Want me to summarize the thread?",
+      "ghost": "Yes — summarize the thread"
+    },
+    {
+      "phrase": "Use the --dry-run flag first. Want me to explain it?",
+      "ghost": "Yes — explain it"
+    },
+    {
+      "phrase": "The total was 1,234 dollars. Want me to draft the note?",
+      "ghost": "Yes — draft the note"
+    },
+    {
+      "phrase": "Episode 1042 of the podcast covered this. Want me to summarize the main points?",
+      "ghost": "Yes — summarize the main points"
+    },
+    {
+      "phrase": "The keynote at WWDC2026 covered visionOS. Want me to summarize the main points?",
+      "ghost": "Yes — summarize the main points"
+    },
+    {
+      "phrase": "Your note mentions McKinsey and PwC. Want me to draft the note?",
+      "ghost": "Yes — draft the note"
     }
   ]
 }

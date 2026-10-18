@@ -4,6 +4,7 @@ import {
   captureActionClause,
   isBareApproval,
   isConsequentialAsk,
+  looksSecret,
   predictedCompletion,
 } from './consequentialAsk'
 
@@ -457,11 +458,22 @@ const STILL_GHOST: ReadonlyArray<readonly [string, string | null]> = [
   ['Want me to write the text?', null],
   ['Want me to edit the title?', null],
   ['Your API key is sk-123. Want me to make a note of that?', null],
-  ['Want me to make a note of this?', 'Yes — make a note of this'],
+  ['Want me to make a note of this?', null],
+  ['Want me to jot that down?', null],
+  ['Want me to note that down?', null],
+  ['Want me to make a note of that?', null],
   ['Want me to look into the failing test?', null],
   ['Want me to draft the note\nand push it?', null],
   ['Want me to:\n- draft the note\n- push it?', null],
 ]
+
+describe('accented secret words', () => {
+  it('matches a keyword after accents are stripped', () => {
+    expect(looksSecret('tökén')).toBe(true)
+    expect(looksSecret('sécret')).toBe(true)
+    expect(looksSecret('café')).toBe(false)
+  })
+})
 
 describe('single-clause allowlist', () => {
   it.each(MUST_BE_NULL)('%j is null', (phrase) => {

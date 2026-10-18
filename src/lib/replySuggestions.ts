@@ -18,7 +18,7 @@
  * reading a question the agent already asked.
  */
 
-import { predictedCompletion } from './consequentialAsk'
+import { predictedCompletion, suppressesReply } from './consequentialAsk'
 
 /** One pill. */
 export interface ReplyOption {
@@ -53,6 +53,7 @@ const MAX_OPTION_LENGTH = 40
  */
 export function suggestReply(agentMessage: string): ReplySuggestion | null {
   const trimmed = agentMessage.trim()
+  if (suppressesReply(trimmed)) return null
 
   // A newline or bullet inside the offer sentence is not a closed choice.
   // A blank line before that sentence does not count.
@@ -67,8 +68,13 @@ export function suggestReply(agentMessage: string): ReplySuggestion | null {
     return null
   }
 
+  const paragraphs = trimmed.split(/\n\s*\n/).map((part) => part.trim()).filter((part) => part.length > 0)
+  const lastParagraph = paragraphs[paragraphs.length - 1] ?? trimmed
+  const nestedList = /(?:^|\n)[ \t]{2,}[-*•]\s+/.test(trimmed)
+  const offerAfterList = nestedList && /\b(?:want me to|shall i|should i|would you like me to)\b/i.test(lastParagraph)
+
   // Closed-question pills win when both could apply. Never both.
-  if (trimmed.match(/\?+!*$/)) {
+  if (!offerAfterList && trimmed.match(/\?+!*$/)) {
     const withoutQuestion = trimmed.replace(/[?!]+$/, '').trim()
 
     const numberedOptions = tryExtractNumberedOptions(withoutQuestion)
