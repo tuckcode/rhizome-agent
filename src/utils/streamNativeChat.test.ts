@@ -295,4 +295,68 @@ describe('native stream listen', () => {
     })
     expect(invokeMock).not.toHaveBeenCalledWith('native_chat_start', expect.anything())
   })
+
+  it('passes a reasoning level on start and on the next send', async () => {
+    const next = callbacks()
+    listenMock.mockImplementation(async (_name: string, handler: (event: { payload: unknown }) => void) => {
+      queueMicrotask(() => {
+        handler({ payload: { kind: 'turn_end' } })
+      })
+      return vi.fn()
+    })
+    invokeMock.mockResolvedValue('new-id')
+
+    await streamNativeChat({
+      target: 'xai/grok-4.7',
+      message: 'hi',
+      vaultPath: '/vault',
+      reasoningLevel: 'high',
+      callbacks: next,
+    })
+
+    expect(invokeMock).toHaveBeenCalledWith('native_chat_start', expect.objectContaining({
+      request: expect.objectContaining({ reasoningLevel: 'high' }),
+    }))
+
+    invokeMock.mockClear()
+    await streamNativeChat({
+      target: 'xai/grok-4.7',
+      message: 'again',
+      vaultPath: '/vault',
+      sessionId: 'already-open',
+      reasoningLevel: 'low',
+      callbacks: callbacks(),
+    })
+
+    expect(invokeMock).toHaveBeenCalledWith('native_chat_send', {
+      sessionId: 'already-open',
+      text: 'again',
+      reasoningLevel: 'low',
+    })
+  })
+
+  it('sends null to clear a reasoning level and omits the key when unset', async () => {
+    listenMock.mockImplementation(async (_name: string, handler: (event: { payload: unknown }) => void) => {
+      queueMicrotask(() => {
+        handler({ payload: { kind: 'turn_end' } })
+      })
+      return vi.fn()
+    })
+    invokeMock.mockResolvedValue(undefined)
+
+    await streamNativeChat({
+      target: 'xai/grok-4.7',
+      message: 'clear it',
+      vaultPath: '/vault',
+      sessionId: 'already-open',
+      reasoningLevel: null,
+      callbacks: callbacks(),
+    })
+
+    expect(invokeMock).toHaveBeenCalledWith('native_chat_send', {
+      sessionId: 'already-open',
+      text: 'clear it',
+      reasoningLevel: null,
+    })
+  })
 })

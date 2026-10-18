@@ -77,6 +77,15 @@ pub enum EngineEvent {
         /// True when the turn cannot continue (no key, provider down, ensure_log).
         fatal: bool,
     },
+    /// A saved reasoning level was not sent as-is. `code` is `downgraded`
+    /// or `unsupported`. The UI maps the code; this event has no copy.
+    ReasoningLevelNotice {
+        code: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        from: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        to: Option<String>,
+    },
 }
 
 impl EngineEvent {

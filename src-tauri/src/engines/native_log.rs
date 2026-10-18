@@ -60,6 +60,10 @@ pub struct SessionHeader {
     pub vault_paths: Vec<String>,
     #[serde(default)]
     pub system_prompt: Option<String>,
+    /// Saved reasoning level for this chat. Missing on logs written before
+    /// the field existed.
+    #[serde(default)]
+    pub reasoning_level: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -148,6 +152,65 @@ pub fn native_sessions_dir() -> Result<PathBuf, String> {
 pub fn session_log_path(session_id: &str) -> Result<PathBuf, String> {
     validate_session_id(session_id)?;
     Ok(native_sessions_dir()?.join(format!("{session_id}.jsonl")))
+}
+
+pub fn reasoning_sidecar_path(session_id: &str) -> Result<PathBuf, String> {
+    validate_session_id(session_id)?;
+    Ok(native_sessions_dir()?.join(format!("{session_id}.reasoning")))
+}
+
+/// A level id is a short word. Anything longer is not a saved level.
+const REASONING_SIDECAR_CAP: usize = 64;
+
+/// `Ok(None)` when the sidecar was never written, cannot be read, or is not
+/// a short level id. `Ok(Some(None))` when it was cleared. The sidecar wins
+/// over the header on open. A bad sidecar does not make the chat unopenable.
+pub fn read_reasoning_sidecar(session_id: &str) -> Result<Option<Option<String>>, String> {
+    let path = reasoning_sidecar_path(session_id)?;
+    if !path.exists() {
+        return Ok(None);
+    }
+    let Ok(bytes) = fs::read(&path) else {
+        return Ok(None);
+    };
+    if bytes.len() > REASONING_SIDECAR_CAP {
+        return Ok(None);
+    }
+    let Ok(text) = String::from_utf8(bytes) else {
+        return Ok(None);
+    };
+    let level = text.trim();
+    if level.is_empty() {
+        Ok(Some(None))
+    } else if level.len() > REASONING_SIDECAR_CAP {
+        Ok(None)
+    } else {
+        Ok(Some(Some(level.to_string())))
+    }
+}
+
+pub fn write_reasoning_sidecar(session_id: &str, level: Option<&str>) -> Result<(), String> {
+    let path = reasoning_sidecar_path(session_id)?;
+    match level.map(str::trim).filter(|level| !level.is_empty()) {
+        Some(level) => {
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent)
+                    .map_err(|error| format!("create native-sessions dir: {error}"))?;
+            }
+            let tmp = PathBuf::from(format!("{}.tmp", path.display()));
+            fs::write(&tmp, format!("{level}\n"))
+                .map_err(|error| format!("write reasoning sidecar: {error}"))?;
+            set_owner_only(&tmp)?;
+            fs::rename(&tmp, &path).map_err(|error| format!("write reasoning sidecar: {error}"))
+        }
+        None => {
+            if path.exists() {
+                fs::remove_file(&path)
+                    .map_err(|error| format!("clear reasoning sidecar: {error}"))?;
+            }
+            Ok(())
+        }
+    }
 }
 
 fn lock_path(session_id: &str) -> Result<PathBuf, String> {
@@ -1152,7 +1215,10 @@ pub fn open_session_log(session_id: &str) -> Result<OpenedNativeLog, String> {
     if !is_header_line(&header_value) {
         return Err("native session log is missing a header".into());
     }
-    let header = parse_header(&header_value)?;
+    let mut header = parse_header(&header_value)?;
+    if let Some(level) = read_reasoning_sidecar(session_id)? {
+        header.reasoning_level = level;
+    }
     let unknown_version = header.version != NATIVE_LOG_VERSION;
     let writer_is_live = write_lock_is_held(session_id);
 
@@ -1252,6 +1318,7 @@ fn create_successor(header: &SessionHeader, events: &[DurableEvent]) -> Result<S
         vault_path: header.vault_path.clone(),
         vault_paths: header.vault_paths.clone(),
         system_prompt: header.system_prompt.clone(),
+        reasoning_level: header.reasoning_level.clone(),
     };
     write_session_events(&successor_header, events)?;
     Ok(id)
@@ -1284,6 +1351,11 @@ pub fn create_session_log(header: &SessionHeader) -> Result<NativeSessionWriter,
     let header_json = serde_json::to_string(header)
         .map_err(|error| format!("serialize native session header: {error}"))?;
     write_line(&mut file, &header_json)?;
+    if let Err(error) =
+        write_reasoning_sidecar(&header.session_id, header.reasoning_level.as_deref())
+    {
+        log::warn!("reasoning level was not saved beside the chat log: {error}");
+    }
     let len = file.metadata().map(|meta| meta.len()).unwrap_or(0);
     Ok(NativeSessionWriter {
         file,
@@ -1497,12 +1569,17 @@ impl NativeSessionWriter {
             vault_path: self.header.vault_path.clone(),
             vault_paths: self.header.vault_paths.clone(),
             system_prompt: self.header.system_prompt.clone(),
+            reasoning_level: self.header.reasoning_level.clone(),
         };
         let previous = self.header.session_id.clone();
         let new_writer = create_session_log(&header)?;
         write_successor_pointer(&previous, &id)?;
         *self = new_writer;
         Ok(())
+    }
+
+    pub fn set_reasoning_level(&mut self, level: Option<String>) {
+        self.header.reasoning_level = level;
     }
 }
 
@@ -1589,6 +1666,9 @@ pub fn delete_session_log(session_id: &str) -> Result<(), String> {
     }
     let _ = fs::remove_file(lock_path(session_id)?);
     let _ = fs::remove_file(successor_pointer_path(session_id)?);
+    if let Ok(path) = reasoning_sidecar_path(session_id) {
+        let _ = fs::remove_file(path);
+    }
     Ok(())
 }
 
@@ -2750,6 +2830,7 @@ mod tests {
             vault_path: None,
             vault_paths: Vec::new(),
             system_prompt: None,
+            reasoning_level: None,
         };
         let writer = create_session_log(&header).unwrap();
         drop(writer);
@@ -2771,6 +2852,7 @@ mod tests {
             vault_path: None,
             vault_paths: Vec::new(),
             system_prompt: None,
+            reasoning_level: None,
         };
         let first = create_session_log(&header).unwrap();
         let second = try_lock_session(&id);
@@ -2812,6 +2894,7 @@ mod tests {
             vault_path: None,
             vault_paths: Vec::new(),
             system_prompt: None,
+            reasoning_level: None,
         };
         let mut writer = create_session_log(&header).unwrap();
         let before = std::fs::metadata(writer.path()).unwrap().len();
@@ -2846,6 +2929,7 @@ mod tests {
             vault_path: None,
             vault_paths: Vec::new(),
             system_prompt: None,
+            reasoning_level: None,
         };
         let mut writer = create_session_log(&header).unwrap();
         writer.force_len(SESSION_SIZE_CAP);
@@ -2881,6 +2965,7 @@ mod tests {
             vault_path: None,
             vault_paths: Vec::new(),
             system_prompt: None,
+            reasoning_level: None,
         };
         let mut writer = create_session_log(&header).unwrap();
         writer.fail_next_io();
@@ -2915,6 +3000,7 @@ mod tests {
             vault_path: None,
             vault_paths: Vec::new(),
             system_prompt: None,
+            reasoning_level: None,
         };
         let mut writer = create_session_log(&header).unwrap();
         append_or_roll(
@@ -3065,6 +3151,7 @@ mod tests {
             vault_path: None,
             vault_paths: Vec::new(),
             system_prompt: None,
+            reasoning_level: None,
         };
         (id, create_session_log(&header).unwrap())
     }
@@ -3100,6 +3187,7 @@ mod tests {
             vault_path: None,
             vault_paths: Vec::new(),
             system_prompt: None,
+            reasoning_level: None,
         };
         let path = write_fixture(
             &header,
@@ -3146,6 +3234,7 @@ mod tests {
             vault_path: None,
             vault_paths: Vec::new(),
             system_prompt: None,
+            reasoning_level: None,
         };
         let path = write_fixture(&header, &[], &[]).unwrap();
         let mut bytes = std::fs::read(&path).unwrap();
@@ -3178,6 +3267,7 @@ mod tests {
             vault_path: None,
             vault_paths: Vec::new(),
             system_prompt: None,
+            reasoning_level: None,
         };
         let event = r#"{"User":{"text":"hi"}}"#;
         let checksum = checksum_event(5, event);
@@ -3194,5 +3284,76 @@ mod tests {
         assert!(opened.warning.is_some());
         assert!(opened.successor_id.is_some());
         assert_eq!(std::fs::read(&path).unwrap(), before);
+    }
+
+    #[test]
+    fn reasoning_level_is_saved_in_the_header_and_the_sidecar() {
+        let _home = temp_home();
+        let id = uuid::Uuid::new_v4().to_string();
+        let header = SessionHeader {
+            version: NATIVE_LOG_VERSION,
+            session_id: id.clone(),
+            created_at: "2026-10-10T00:00:00Z".into(),
+            target: "xai/grok-4.7".into(),
+            permission_mode: "safe".into(),
+            vault_path: None,
+            vault_paths: Vec::new(),
+            system_prompt: None,
+            reasoning_level: Some("high".into()),
+        };
+        write_session_events(&header, &[]).unwrap();
+        let opened = open_session_log(&id).unwrap();
+        assert_eq!(opened.header.reasoning_level.as_deref(), Some("high"));
+        let sidecar = std::fs::read_to_string(reasoning_sidecar_path(&id).unwrap()).unwrap();
+        assert_eq!(sidecar.trim(), "high");
+
+        write_reasoning_sidecar(&id, Some("low")).unwrap();
+        let reloaded = open_session_log(&id).unwrap();
+        assert_eq!(reloaded.header.reasoning_level.as_deref(), Some("low"));
+    }
+
+    #[test]
+    fn an_old_session_without_reasoning_level_still_opens() {
+        let _home = temp_home();
+        let id = uuid::Uuid::new_v4().to_string();
+        let dir = native_sessions_dir().unwrap();
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(format!("{id}.jsonl"));
+        std::fs::write(
+            &path,
+            format!(
+                "{{\"version\":1,\"session_id\":\"{id}\",\"created_at\":\"2026-10-10T00:00:00Z\",\"target\":\"openai/gpt-4o-mini\",\"permission_mode\":\"safe\"}}\n"
+            ),
+        )
+        .unwrap();
+        let opened = open_session_log(&id).unwrap();
+        assert_eq!(opened.header.reasoning_level, None);
+        assert!(!reasoning_sidecar_path(&id).unwrap().exists());
+    }
+
+    #[test]
+    fn a_bad_reasoning_sidecar_does_not_block_open() {
+        let _home = temp_home();
+        let id = uuid::Uuid::new_v4().to_string();
+        let header = SessionHeader {
+            version: NATIVE_LOG_VERSION,
+            session_id: id.clone(),
+            created_at: "2026-10-10T00:00:00Z".into(),
+            target: "xai/grok-4.7".into(),
+            permission_mode: "safe".into(),
+            vault_path: None,
+            vault_paths: Vec::new(),
+            system_prompt: None,
+            reasoning_level: Some("high".into()),
+        };
+        write_session_events(&header, &[]).unwrap();
+        let path = reasoning_sidecar_path(&id).unwrap();
+        std::fs::write(&path, [0xff, 0xfe]).unwrap();
+        let opened = open_session_log(&id).unwrap();
+        assert_eq!(opened.header.reasoning_level.as_deref(), Some("high"));
+
+        std::fs::write(&path, "x".repeat(REASONING_SIDECAR_CAP + 8)).unwrap();
+        let opened = open_session_log(&id).unwrap();
+        assert_eq!(opened.header.reasoning_level.as_deref(), Some("high"));
     }
 }

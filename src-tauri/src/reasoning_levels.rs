@@ -136,6 +136,10 @@ pub struct ReasoningResolution {
     /// Set when the requested level was moved to a weaker one. The UI shows
     /// this. A move with this field empty is not produced.
     pub downgraded_from: Option<String>,
+    /// Set when the provider maps the request to a different level that is
+    /// not weaker. DeepSeek maps `medium` to `high`. The chat emits
+    /// `adjusted` and keeps the saved level.
+    pub adjusted_from: Option<String>,
     /// `"Default"` unless the winning row names a default.
     pub default_label: String,
     /// The level id to send, after a visible downgrade. Empty when the caller
@@ -330,8 +334,8 @@ pub fn default_label_for(support: &ReasoningSupport) -> String {
 
 /// Reasoning state for one Taproot route. Uses the override table and, when
 /// present, the on-disk OpenRouter and models.dev caches. No network call.
-/// Lookups share one process cache. `reasoning_levels_for_target` is not in
-/// this PR; the chat request lands in PR 2.
+/// Lookups share one process cache. The chat turn calls
+/// [`reasoning_levels_for_target`], which uses this same cache.
 pub fn support_for_free_tier(
     provider_id: &str,
     base_url: &str,
@@ -730,7 +734,7 @@ fn from_probe(probe: LocalProbe) -> ReasoningSupport {
 fn map_known_level(
     requested: &str,
     levels: &ReasoningLevels,
-) -> Option<(Option<String>, Option<String>)> {
+) -> Option<(String, Option<String>, Option<String>)> {
     let ids: Vec<&str> = levels
         .levels
         .iter()
@@ -744,7 +748,7 @@ fn map_known_level(
             "on"
         };
         let notice = (selected != requested).then(|| requested.to_string());
-        return Some((Some(selected.to_string()), notice));
+        return Some((selected.to_string(), notice, None));
     }
     if matches!(levels.wire.send, WireSend::NimChatTemplate)
         && has("off")
@@ -758,7 +762,7 @@ fn map_known_level(
             _ => return None,
         };
         let notice = (selected != requested).then(|| requested.to_string());
-        return Some((Some(selected.to_string()), notice));
+        return Some((selected.to_string(), notice, None));
     }
     if matches!(levels.wire.send, WireSend::DeepSeekThinking) {
         let mapped = match requested {
@@ -779,21 +783,23 @@ fn map_known_level(
             (Some(requested_idx), Some(mapped_idx)) => mapped_idx < requested_idx,
             _ => false,
         };
-        let notice = weaker.then(|| requested.to_string());
-        return Some((Some(mapped.to_string()), notice));
+        let downgraded_from = weaker.then(|| requested.to_string());
+        let adjusted_from = (!weaker && mapped != requested).then(|| requested.to_string());
+        return Some((mapped.to_string(), downgraded_from, adjusted_from));
     }
     None
 }
 
 fn finish(support: ReasoningSupport, requested: Option<&str>) -> ReasoningResolution {
     let default_label = default_label_for(&support);
-    let (selected_level, downgraded_from) = match &support {
+    let (selected_level, downgraded_from, adjusted_from) = match &support {
         ReasoningSupport::Levels(levels) => select_level(requested, levels),
-        _ => (None, None),
+        _ => (None, None, None),
     };
     ReasoningResolution {
         support,
         downgraded_from,
+        adjusted_from,
         default_label,
         selected_level,
     }
@@ -802,19 +808,19 @@ fn finish(support: ReasoningSupport, requested: Option<&str>) -> ReasoningResolu
 fn select_level(
     requested: Option<&str>,
     levels: &ReasoningLevels,
-) -> (Option<String>, Option<String>) {
+) -> (Option<String>, Option<String>, Option<String>) {
     let Some(raw) = requested.map(str::trim).filter(|value| !value.is_empty()) else {
-        return (None, None);
+        return (None, None, None);
     };
     let requested = raw.to_lowercase();
     if let Some(level) = levels.levels.iter().find(|level| level.id == requested) {
-        return (Some(level.id.clone()), None);
+        return (Some(level.id.clone()), None, None);
     }
-    if let Some(mapped) = map_known_level(&requested, levels) {
-        return mapped;
+    if let Some((selected, downgraded_from, adjusted_from)) = map_known_level(&requested, levels) {
+        return (Some(selected), downgraded_from, adjusted_from);
     }
     if levels.levels.is_empty() {
-        return (None, None);
+        return (None, None, None);
     }
     let ids: Vec<&str> = levels
         .levels
@@ -825,7 +831,7 @@ fn select_level(
     if all_ladder {
         if let Some(clamped) = clamp_effort(Some(&requested), &ids, &[]) {
             if ids.contains(&clamped.as_str()) && clamped != requested {
-                return (Some(clamped), Some(requested));
+                return (Some(clamped), Some(requested), None);
             }
         }
     }
@@ -855,13 +861,13 @@ fn select_level(
                 .position(|id| *id == level.id)
                 .unwrap_or(0)
         }) {
-            return (Some(nearest.id.clone()), Some(requested));
+            return (Some(nearest.id.clone()), Some(requested), None);
         }
     }
     let weakest = pool
         .first()
         .expect("pool is non-empty when levels is non-empty");
-    (Some(weakest.id.clone()), Some(requested))
+    (Some(weakest.id.clone()), Some(requested), None)
 }
 
 fn is_openrouter(query: &ResolveQuery<'_>) -> bool {
@@ -1235,6 +1241,161 @@ fn write_json(path: &Path, value: &Value) -> Result<(), String> {
     let text = serde_json::to_string(value).map_err(|error| error.to_string())?;
     fs::write(path, text).map_err(|error| error.to_string())
 }
+
+/// Provider body fields for one user chat turn.
+///
+/// `body` is empty when the model is unknown, has no reasoning, or the
+/// caller did not ask for a level. The chat turn merges `body` and does not
+/// read catalog rows itself.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReasoningTargetRequest {
+    pub body: serde_json::Map<String, Value>,
+    /// Prepended to the system prompt when a row uses [`WireSend::SystemThinkToken`].
+    /// No checked row does. Gemma on NIM is unknown.
+    pub system_prefix: Option<String>,
+    pub selected_level: Option<String>,
+    pub downgraded_from: Option<String>,
+    pub adjusted_from: Option<String>,
+}
+
+/// Model plus level, as the provider request fields for one user chat turn.
+///
+/// This is the only function the chat turn calls. It uses [`resolve`] and
+/// the public wire shape on the winning row. Unknown support sends nothing.
+pub fn reasoning_levels_for_target(
+    provider: &str,
+    base_url: &str,
+    model_id: &str,
+    requested_level: Option<&str>,
+) -> ReasoningTargetRequest {
+    let query = ResolveQuery {
+        provider,
+        preset: None,
+        base_url,
+        model_id,
+        account: None,
+        api_key: None,
+        requested_level,
+        user_override: None,
+    };
+    let sources = DiskSources {
+        dir: reasoning_cache_dir(),
+    };
+    let mut cache = shared_lookup_cache()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let resolution = resolve(&query, &sources, &mut cache);
+    fields_for_resolution(&resolution)
+}
+
+fn fields_for_resolution(resolution: &ReasoningResolution) -> ReasoningTargetRequest {
+    let ReasoningSupport::Levels(levels) = &resolution.support else {
+        return empty_target();
+    };
+    let Some(selected) = resolution.selected_level.as_deref() else {
+        return empty_target();
+    };
+    let mut body = serde_json::Map::new();
+    let mut system_prefix = None;
+    match levels.wire.send {
+        WireSend::StringField => {
+            body.insert(levels.wire.name.clone(), json!(selected));
+        }
+        WireSend::NestedString => {
+            set_dotted(&mut body, &levels.wire.name, json!(selected));
+        }
+        WireSend::Boolean => {
+            let enabled = !matches!(selected, "off" | "none" | "false" | "disabled");
+            body.insert(levels.wire.name.clone(), json!(enabled));
+        }
+        WireSend::NimChatTemplate => {
+            let enabled = !matches!(selected, "off" | "none" | "false" | "disabled");
+            let mut kwargs = serde_json::Map::new();
+            kwargs.insert("enable_thinking".into(), json!(enabled));
+            if selected == "low" {
+                kwargs.insert("low_effort".into(), json!(true));
+            }
+            body.insert(levels.wire.name.clone(), Value::Object(kwargs));
+        }
+        WireSend::DeepSeekThinking => {
+            let enabled = !matches!(selected, "off" | "none" | "false" | "disabled");
+            body.insert(
+                "thinking".into(),
+                json!({ "type": if enabled { "enabled" } else { "disabled" } }),
+            );
+            if enabled {
+                body.insert("reasoning_effort".into(), json!(selected));
+            }
+        }
+        // No checked row uses this variant. Gemma on NIM stays unknown until
+        // a live NIM call confirms the `<|think|>` token.
+        WireSend::SystemThinkToken => {
+            if !matches!(selected, "off" | "none" | "false" | "disabled") {
+                system_prefix = Some("<|think|>".to_string());
+            }
+        }
+    }
+    ReasoningTargetRequest {
+        body,
+        system_prefix,
+        selected_level: Some(selected.to_string()),
+        downgraded_from: resolution.downgraded_from.clone(),
+        adjusted_from: resolution.adjusted_from.clone(),
+    }
+}
+
+fn empty_target() -> ReasoningTargetRequest {
+    ReasoningTargetRequest {
+        body: serde_json::Map::new(),
+        system_prefix: None,
+        selected_level: None,
+        downgraded_from: None,
+        adjusted_from: None,
+    }
+}
+
+fn set_dotted(body: &mut serde_json::Map<String, Value>, path: &str, value: Value) {
+    let mut parts = path.split('.').filter(|part| !part.is_empty()).peekable();
+    let Some(first) = parts.next() else {
+        return;
+    };
+    if parts.peek().is_none() {
+        body.insert(first.to_string(), value);
+        return;
+    }
+    let entry = body
+        .entry(first)
+        .or_insert_with(|| Value::Object(serde_json::Map::new()));
+    if !entry.is_object() {
+        *entry = Value::Object(serde_json::Map::new());
+    }
+    let mut cursor = entry.as_object_mut().expect("object");
+    while let Some(part) = parts.next() {
+        if parts.peek().is_none() {
+            cursor.insert(part.to_string(), value);
+            return;
+        }
+        let next = cursor
+            .entry(part)
+            .or_insert_with(|| Value::Object(serde_json::Map::new()));
+        if !next.is_object() {
+            *next = Value::Object(serde_json::Map::new());
+        }
+        cursor = next.as_object_mut().expect("object");
+    }
+}
+
+/// Notice the chat channel carries when a saved level cannot be sent as-is.
+/// The `code` is for the UI. This struct holds no display copy.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReasoningLevelNotice {
+    pub code: String,
+    pub from: Option<String>,
+    pub to: Option<String>,
+}
+
+/// Live level for one chat. `native_chat_send` updates it; the user turn reads it.
+pub type ReasoningLevelSlot = std::sync::Arc<std::sync::Mutex<Option<String>>>;
 
 #[cfg(test)]
 mod tests {
@@ -1979,7 +2140,7 @@ mod tests {
         let ReasoningSupport::Levels(toggle) = toggle else {
             panic!("levels");
         };
-        let (selected, from) = select_level(Some("max"), &toggle);
+        let (selected, from, _) = select_level(Some("max"), &toggle);
         assert_eq!(selected.as_deref(), Some("on"));
         assert_eq!(from.as_deref(), Some("max"));
 
@@ -2008,7 +2169,7 @@ mod tests {
     }
 
     #[test]
-    fn deepseek_medium_maps_up_to_high_without_a_downgrade_notice() {
+    fn deepseek_medium_maps_up_to_high_and_records_an_adjusted_notice() {
         let mut query = query(
             "deepseek",
             Some("deepseek"),
@@ -2019,6 +2180,7 @@ mod tests {
         let resolved = resolve(&query, &EmptySources, &mut ReasoningLookupCache::default());
         assert_eq!(resolved.selected_level.as_deref(), Some("high"));
         assert!(resolved.downgraded_from.is_none());
+        assert_eq!(resolved.adjusted_from.as_deref(), Some("medium"));
         match resolved.support {
             ReasoningSupport::Levels(levels) => {
                 assert_eq!(levels.wire.send, WireSend::DeepSeekThinking);
@@ -2114,7 +2276,8 @@ mod tests {
         );
         assert_eq!(first, ReasoningSupport::Unknown);
         assert_eq!(second, first);
-        reset_reasoning_state_for_test(None);
+        let _catalog = tempfile::tempdir().unwrap();
+        reset_reasoning_state_for_test(Some(_catalog.path().to_path_buf()));
     }
 
     #[test]
@@ -2146,5 +2309,119 @@ mod tests {
         let rendered = format!("{query:?}");
         assert!(rendered.contains("<redacted>"));
         assert!(!rendered.contains("sk-test-secret-value"));
+    }
+
+    #[test]
+    fn target_fields_follow_the_resolved_wire_shape() {
+        let _catalog = tempfile::tempdir().unwrap();
+        reset_reasoning_state_for_test(Some(_catalog.path().to_path_buf()));
+        let grok =
+            reasoning_levels_for_target("xai", "https://api.x.ai/v1", "grok-4.7", Some("high"));
+        assert_eq!(
+            grok.body.get("reasoning_effort").and_then(Value::as_str),
+            Some("high")
+        );
+        assert!(grok.body.get("max_tokens").is_none());
+        assert!(grok.body.get("max_completion_tokens").is_none());
+        assert!(grok.downgraded_from.is_none());
+
+        let gemini = reasoning_levels_for_target(
+            "gemini",
+            "https://generativelanguage.googleapis.com/v1beta/openai",
+            "gemini-3.8-flash",
+            Some("medium"),
+        );
+        assert_eq!(gemini.body.get("reasoning_effort"), Some(&json!("medium")));
+        assert!(gemini.body.get("generation_config").is_none());
+
+        let deepseek = reasoning_levels_for_target(
+            "deepseek",
+            "https://api.deepseek.com",
+            "deepseek-flash",
+            Some("low"),
+        );
+        assert_eq!(deepseek.body["thinking"]["type"], json!("enabled"));
+        assert_eq!(deepseek.body["reasoning_effort"], json!("low"));
+        let deepseek_medium = reasoning_levels_for_target(
+            "deepseek",
+            "https://api.deepseek.com",
+            "deepseek-flash",
+            Some("medium"),
+        );
+        assert_eq!(deepseek_medium.selected_level.as_deref(), Some("high"));
+        assert!(deepseek_medium.downgraded_from.is_none());
+        assert_eq!(deepseek_medium.adjusted_from.as_deref(), Some("medium"));
+        assert_eq!(deepseek_medium.body["reasoning_effort"], json!("high"));
+
+        let nemotron = reasoning_levels_for_target(
+            "nvidia",
+            "https://integrate.api.nvidia.com/v1",
+            "nvidia/nemotron-3-super-120b-a12b",
+            Some("low"),
+        );
+        assert_eq!(
+            nemotron.body["chat_template_kwargs"]["enable_thinking"],
+            json!(true)
+        );
+        assert_eq!(
+            nemotron.body["chat_template_kwargs"]["low_effort"],
+            json!(true)
+        );
+        let nemotron_high = reasoning_levels_for_target(
+            "nvidia",
+            "https://integrate.api.nvidia.com/v1",
+            "nvidia/nemotron-3-super-120b-a12b",
+            Some("high"),
+        );
+        assert_eq!(nemotron_high.selected_level.as_deref(), Some("on"));
+        assert_eq!(nemotron_high.downgraded_from.as_deref(), Some("high"));
+        assert_eq!(
+            nemotron_high.body["chat_template_kwargs"]["enable_thinking"],
+            json!(true)
+        );
+
+        let multi = reasoning_levels_for_target(
+            "xai",
+            "https://api.x.ai/v1",
+            "grok-4.20-multi-agent",
+            Some("high"),
+        );
+        assert!(multi.body.is_empty());
+        let gemma = reasoning_levels_for_target(
+            "nvidia",
+            "https://integrate.api.nvidia.com/v1",
+            "google/gemma-4-31b-it",
+            Some("on"),
+        );
+        assert!(gemma.body.is_empty());
+        assert!(gemma.system_prefix.is_none());
+    }
+
+    #[test]
+    fn an_unknown_model_sends_no_request_fields() {
+        let _catalog = tempfile::tempdir().unwrap();
+        reset_reasoning_state_for_test(Some(_catalog.path().to_path_buf()));
+        let unknown = reasoning_levels_for_target(
+            "llm7",
+            "https://api.llm7.io/v1",
+            "some-model",
+            Some("high"),
+        );
+        assert!(unknown.body.is_empty());
+        assert!(unknown.system_prefix.is_none());
+        assert!(unknown.selected_level.is_none());
+        assert!(unknown.adjusted_from.is_none());
+        assert!(unknown.downgraded_from.is_none());
+    }
+
+    #[test]
+    fn a_stronger_level_steps_down_and_names_the_old_one() {
+        let _catalog = tempfile::tempdir().unwrap();
+        reset_reasoning_state_for_test(Some(_catalog.path().to_path_buf()));
+        let stepped =
+            reasoning_levels_for_target("xai", "https://api.x.ai/v1", "grok-4.7", Some("max"));
+        assert_eq!(stepped.selected_level.as_deref(), Some("xhigh"));
+        assert_eq!(stepped.downgraded_from.as_deref(), Some("max"));
+        assert_eq!(stepped.body["reasoning_effort"], json!("xhigh"));
     }
 }

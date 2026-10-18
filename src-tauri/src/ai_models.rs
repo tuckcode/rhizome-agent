@@ -80,7 +80,24 @@ pub struct AiModelStreamRequest {
     pub api_key_override: Option<String>,
     #[serde(default)]
     pub event_name: Option<String>,
+    /// Set on the user chat turn. Background callers leave this empty, and
+    /// `complete_text` never turns it into request fields.
+    #[serde(default)]
+    pub reasoning_level: Option<String>,
+    /// Live value for an open chat. Wins over `reasoning_level` when set.
+    #[serde(skip)]
+    pub reasoning_slot: Option<crate::reasoning_levels::ReasoningLevelSlot>,
+    #[serde(skip)]
+    pub reasoning_notice_tx:
+        Option<std::sync::mpsc::Sender<crate::reasoning_levels::ReasoningLevelNotice>>,
+    /// Notices already emitted for this chat. Shared across turns and routes.
+    #[serde(skip)]
+    pub reasoning_notices_seen:
+        Option<std::sync::Arc<std::sync::Mutex<std::collections::HashSet<String>>>>,
 }
+
+/// Shown instead of a blank assistant bubble when a thinking level comes back empty.
+pub const REASONING_EMPTY_REPLY: &str = "The model spent this reply on reasoning and returned no text. Choose a lower reasoning level, or allow a longer reply.";
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct AiModelProviderTestRequest {
@@ -197,6 +214,10 @@ pub fn test_ai_model_provider(request: AiModelProviderTestRequest) -> Result<Str
         vault_paths: Vec::new(),
         api_key_override: normalize_optional_string(request.api_key_override),
         event_name: None,
+        reasoning_level: None,
+        reasoning_slot: None,
+        reasoning_notice_tx: None,
+        reasoning_notices_seen: None,
     };
     complete_text(&request)
 }
@@ -339,6 +360,10 @@ pub fn discover_ai_model_ids_with(
         vault_paths: Vec::new(),
         api_key_override: api_key_override.map(str::to_string),
         event_name: None,
+        reasoning_level: None,
+        reasoning_slot: None,
+        reasoning_notice_tx: None,
+        reasoning_notices_seen: None,
     };
     let endpoint = format!("{}/models", rejected_on_err(normalized_base_url(&request))?);
     let client = http_client(limits)?;
@@ -381,7 +406,29 @@ pub fn stream_chat_events_with(
     emit: &mut dyn FnMut(ModelEvent) -> bool,
 ) {
     let no_params = serde_json::Map::new();
-    stream_chat_events_with_params(request, messages, tools, &no_params, limits, emit);
+    stream_chat_events_with_params(
+        request,
+        messages,
+        tools,
+        &no_params,
+        &TurnExtras::default(),
+        limits,
+        emit,
+    );
+}
+
+pub struct TurnExtras {
+    pub body: serde_json::Map<String, serde_json::Value>,
+    pub system_prefix: Option<String>,
+}
+
+impl Default for TurnExtras {
+    fn default() -> Self {
+        Self {
+            body: serde_json::Map::new(),
+            system_prefix: None,
+        }
+    }
 }
 
 /// `stream_chat_events_with`, plus body fields that go out only when
@@ -392,6 +439,7 @@ pub fn stream_chat_events_with_params(
     messages: Vec<serde_json::Value>,
     tools: Vec<serde_json::Value>,
     tool_params: &serde_json::Map<String, serde_json::Value>,
+    extras: &TurnExtras,
     limits: HttpLimits,
     emit: &mut dyn FnMut(ModelEvent) -> bool,
 ) {
@@ -401,6 +449,12 @@ pub fn stream_chat_events_with_params(
         "model": request.model_id,
         "messages": system.into_iter().chain(messages).collect::<Vec<_>>(),
     });
+    if let Some(prefix) = extras.system_prefix.as_deref() {
+        apply_system_prefix(&mut payload, prefix);
+    }
+    for (key, value) in &extras.body {
+        payload[key] = value.clone();
+    }
     let reasoning = crate::ai_model_tools::chat_tools_reasoning(
         &request.provider.kind,
         request.provider.base_url.as_deref(),
@@ -422,13 +476,193 @@ pub fn stream_chat_events_with_params(
         for (key, value) in tool_params {
             payload[key] = value.clone();
         }
-        // After tool_params, so a caller's reasoning_effort cannot put this
-        // family back on medium.
+        // After the user level and tool_params. Chat Completions rejects
+        // tools on gpt-5.4 through gpt-5.6, gpt-6-sol, and gpt-6-luna unless
+        // reasoning_effort is none (#236). A Responses-API path (#225 G1)
+        // may lift this later. The saved level stays as the user set it.
         if reasoning == crate::ai_model_tools::ChatToolsReasoning::None {
+            notice_forced_off_for_tools(request);
             payload["reasoning_effort"] = serde_json::Value::String("none".into());
         }
     }
     stream_payload(request, payload, limits, emit);
+}
+
+fn apply_system_prefix(payload: &mut serde_json::Value, prefix: &str) {
+    let Some(messages) = payload
+        .get_mut("messages")
+        .and_then(|value| value.as_array_mut())
+    else {
+        return;
+    };
+    if let Some(first) = messages.first_mut() {
+        if first.get("role").and_then(|role| role.as_str()) == Some("system") {
+            let content = first
+                .get("content")
+                .and_then(|value| value.as_str())
+                .unwrap_or("");
+            let text = if content.is_empty() {
+                prefix.to_string()
+            } else {
+                format!("{prefix}\n{content}")
+            };
+            first["content"] = serde_json::Value::String(text);
+            return;
+        }
+    }
+    messages.insert(
+        0,
+        serde_json::json!({ "role": "system", "content": prefix }),
+    );
+}
+
+/// Body fields for the user chat turn. Empty unless this request carries a level.
+///
+/// A saved level that the model cannot use is stepped down or adjusted for
+/// this request only. The saved level stays. Unknown models send no fields.
+pub(crate) fn user_turn_reasoning(request: &AiModelStreamRequest) -> (TurnExtras, bool) {
+    let Some(level) = live_reasoning_level(request) else {
+        return (TurnExtras::default(), false);
+    };
+    let base = provider_base_url(&request.provider).unwrap_or_default();
+    let fields = crate::reasoning_levels::reasoning_levels_for_target(
+        &request.provider.id,
+        &base,
+        &request.model_id,
+        Some(&level),
+    );
+    if let (Some(from), Some(to)) = (
+        fields.downgraded_from.clone(),
+        fields.selected_level.clone(),
+    ) {
+        send_reasoning_notice(
+            request,
+            crate::reasoning_levels::ReasoningLevelNotice {
+                code: "downgraded".into(),
+                from: Some(from),
+                to: Some(to),
+            },
+        );
+    } else if let (Some(from), Some(to)) =
+        (fields.adjusted_from.clone(), fields.selected_level.clone())
+    {
+        send_reasoning_notice(
+            request,
+            crate::reasoning_levels::ReasoningLevelNotice {
+                code: "adjusted".into(),
+                from: Some(from),
+                to: Some(to),
+            },
+        );
+    } else if fields.selected_level.is_none() {
+        send_reasoning_notice(
+            request,
+            crate::reasoning_levels::ReasoningLevelNotice {
+                code: "unsupported".into(),
+                from: Some(level),
+                to: None,
+            },
+        );
+    }
+    let mut body = fields.body;
+    apply_configured_output_cap(request, &mut body);
+    let thinking = fields
+        .selected_level
+        .as_deref()
+        .is_some_and(|level| !matches!(level, "off" | "none" | "false" | "disabled"));
+    (
+        TurnExtras {
+            body,
+            system_prefix: fields.system_prefix,
+        },
+        thinking,
+    )
+}
+
+/// Send a token cap only when this model has one configured. Never invent or
+/// raise one. GPT-5 and later reject `max_tokens` on Chat Completions.
+fn apply_configured_output_cap(
+    request: &AiModelStreamRequest,
+    body: &mut serde_json::Map<String, serde_json::Value>,
+) {
+    let Some(limit) = request
+        .provider
+        .models
+        .iter()
+        .find(|model| model.id == request.model_id)
+        .and_then(|model| model.max_output_tokens)
+    else {
+        return;
+    };
+    let field = if openai_family_uses_completion_tokens(&request.model_id) {
+        "max_completion_tokens"
+    } else {
+        "max_tokens"
+    };
+    body.insert(field.to_string(), serde_json::json!(limit));
+}
+
+fn openai_family_uses_completion_tokens(model_id: &str) -> bool {
+    let bare = model_id
+        .rsplit('/')
+        .next()
+        .unwrap_or(model_id)
+        .trim()
+        .to_ascii_lowercase();
+    bare.starts_with("gpt-5")
+        || bare.starts_with("gpt-6")
+        || bare.starts_with("o1")
+        || bare.starts_with("o3")
+        || bare.starts_with("o4")
+}
+
+fn live_reasoning_level(request: &AiModelStreamRequest) -> Option<String> {
+    let raw = if let Some(slot) = &request.reasoning_slot {
+        slot.lock().expect("reasoning level").clone()
+    } else {
+        request.reasoning_level.clone()
+    };
+    raw.map(|level| level.trim().to_string())
+        .filter(|level| !level.is_empty())
+}
+
+fn notice_forced_off_for_tools(request: &AiModelStreamRequest) {
+    let Some(level) = live_reasoning_level(request) else {
+        return;
+    };
+    if matches!(level.as_str(), "none" | "off" | "false" | "disabled") {
+        return;
+    }
+    send_reasoning_notice(
+        request,
+        crate::reasoning_levels::ReasoningLevelNotice {
+            code: "forced_off_for_tools".into(),
+            from: Some(level),
+            to: Some("none".into()),
+        },
+    );
+}
+
+fn send_reasoning_notice(
+    request: &AiModelStreamRequest,
+    notice: crate::reasoning_levels::ReasoningLevelNotice,
+) {
+    if let Some(seen) = &request.reasoning_notices_seen {
+        let key = format!(
+            "{}|{}|{}|{}",
+            notice.code,
+            request.model_id,
+            notice.from.as_deref().unwrap_or(""),
+            notice.to.as_deref().unwrap_or("")
+        );
+        let mut seen = seen.lock().expect("reasoning notices");
+        if !seen.insert(key) {
+            return;
+        }
+    }
+    if let Some(tx) = &request.reasoning_notice_tx {
+        let _ = tx.send(notice);
+    }
 }
 
 fn open_model_event_stream(
@@ -887,6 +1121,10 @@ mod tests {
             vault_paths: Vec::new(),
             api_key_override: None,
             event_name: None,
+            reasoning_level: None,
+            reasoning_slot: None,
+            reasoning_notice_tx: None,
+            reasoning_notices_seen: None,
         }
     }
 
@@ -1198,6 +1436,7 @@ mod tests {
             user_message(&request),
             tools,
             &serde_json::Map::new(),
+            &TurnExtras::default(),
             TEST_LIMITS,
             &mut |event| {
                 events.push(event);
@@ -1337,6 +1576,7 @@ mod tests {
             user_message(&request),
             echo_tool(),
             &tool_params,
+            &TurnExtras::default(),
             TEST_LIMITS,
             &mut |_| true,
         );
