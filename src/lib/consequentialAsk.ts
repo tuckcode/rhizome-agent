@@ -246,13 +246,7 @@ function ghostGrammarAccepts(display: string, fullMessage?: string): boolean {
     ))
   }
   if (!GHOST_VERBS.has(verb)) return false
-  if (verb === 'makeanote' || verb === 'createanote') {
-    if (tokens.some((token) => token === 'it' || token === 'this' || token === 'that')) return false
-    if (index < tokens.length && (tokens[index] === 'dest' || tokens[index] === 'forme' || tokens[index] === 'destthis')) {
-      index += 1
-    }
-    return index === tokens.length
-  }
+  if (verb === 'makeanote' || verb === 'createanote') return false
   let determiner = ''
   if (GHOST_DETERMINERS.has(tokens[index] ?? '')) {
     determiner = tokens[index] ?? ''
