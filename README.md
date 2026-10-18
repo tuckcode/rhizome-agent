@@ -5,7 +5,7 @@
 
 A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own.
 
-This is a developer preview. There is no signed download. Chat runs on Rhizome's own engine (ADR-0187). Prime and Hermes are being removed. Hermes is not a usable engine in the app today. You read and diff notes in the app. The native engine can read, search, and edit vault files. It cannot search old Mycelium sessions.
+This is a developer preview. There is no signed download. Chat runs on Rhizome's own engine, the only chat engine. Prime and Hermes are removed from the app ([ADR-0189](docs/adr/0189-no-ties-to-outside-harnesses.md)). You read and diff notes in the app. The native engine can read, search, and edit vault files. It cannot search old Mycelium sessions.
 
 | | |
 |---|---|
@@ -21,11 +21,11 @@ cd rhizome-agent
 pnpm tauri dev
 ```
 
-`./install.sh` installs this repo and may fetch Prime Agent when that program is not already on the machine. Chat runs on Rhizome's own engine (ADR-0187). Native chat does not need Prime. The script may still download the Prime command-line tool for legacy optional-engine support.
+`./install.sh` installs this repo and may fetch Prime Agent when that program is not already on the machine. Chat runs on Rhizome's own engine (ADR-0187). Chat does not use Prime. That install step comes out with the leftover engine code.
 
 The full list of tools, the first minute in the app, and what to do when it fails: [Getting started](docs/start/README.md).
 
-`prime-agent` stops when that terminal closes. To leave it running (legacy Prime-locked chats or CLI use only):
+`prime-agent` stops when that terminal closes. To leave it running for CLI use outside Rhizome:
 
 ```bash
 (prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status
@@ -40,10 +40,10 @@ To look at the interface without a live engine: `pnpm dev`, then http://localhos
 1. The first launch may ask **Help improve Rhizome**. You can decline. Telemetry stays off until you accept, and a build without a Sentry or PostHog key sends nothing. Graphite is the default theme. Dark is Graphite, Light is Earth light, and System follows the OS between those two. Earth dark, Loam, and Mycelium are color skins.
 2. Chat opens. The sessions list opens with it on a first launch. The left rail holds sessions, Views (Research, Graph, Mycelium, History), and Settings. Changes sits next to Notes. Views use Ctrl+Cmd+1–4 on Mac and Ctrl+Shift+1–4 on Windows.
 3. Create a local vault, or open a folder you already have.
-4. Send one message. On Rhizome's engine you should get an answer, a notice if a non-fatal error occurred, or a clear failure (no provider key, for example). Prime-targeted chats still need Prime installed.
+4. Send one message. On Rhizome's engine you should get an answer, a notice if a non-fatal error occurred, or a clear failure (no provider key, for example).
 5. Show Notes (View menu, or Cmd+2). Save a note, quit, and reopen the same file.
 
-Notes live in the vault folder you opened. Native chat logs live in the app config folder (`com.rhizome.app/native-sessions`). Prime transcripts live under `~/.prime/agent/sessions/` when you use that engine.
+Notes live in the vault folder you opened. Native chat logs live in the app config folder (`com.rhizome.app/native-sessions`).
 
 Provider keys live in the system keychain. Do not edit a JSON key file.
 

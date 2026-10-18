@@ -29,7 +29,7 @@ If the vault is a Git repository, every change to it can be committed, including
 
 ## Rhizome runs its own loop
 
-An **agent loop** is the cycle that sends your message to a model, runs the tools the model asks for, and repeats until the answer is done. Rhizome has its own, and that is the only chat engine (ADR-0187). Prime and Hermes are being removed as chat engines. The vault, permissions, and memory stay with Rhizome.
+An **agent loop** is the cycle that sends your message to a model, runs the tools the model asks for, and repeats until the answer is done. Rhizome has its own, and that is the only chat engine (ADR-0187). Prime and Hermes are removed from the app (ADR-0189). The vault, permissions, and memory stay with Rhizome.
 
 Rhizome's engine can read, search, edit and create notes in the open vault. In Power User it can run one approved shell command in the vault folder. [Agents, engines and models](../concepts/ai.md)
 

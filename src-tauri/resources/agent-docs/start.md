@@ -41,7 +41,7 @@ Type a message and press Enter. You should get an answer, or a clear failure:
 |---|---|
 | No provider key | Add a key in Settings → AI Agents → API model, or turn on a free provider. See [Set up models and keys](../guides/configure-ai-models.md) |
 | Prime is installed, but Chat still says it's missing | Applies to Prime-locked chats only. Wait a few seconds. The check repeats |
-| The provider login expired (Prime) | Settings → AI Agents → Local agent → **Reconnect** on that provider, or run `prime-agent` and `/login` in a terminal |
+| The provider login expired (Prime) | Run `prime-agent` and `/login` in a terminal. Settings no longer has a Prime sign-in |
 
 More cases: [Chat doesn't answer](../troubleshooting/chat-doesnt-answer.md).
 
@@ -92,7 +92,7 @@ You need:
 4. Rust `1.77.2` or newer
 5. git
 
-Prime Agent is not required for Chat. Rhizome's own engine is the only chat engine (ADR-0187).
+Prime Agent is not required for Chat. Rhizome's own engine is the only chat engine. Prime and Hermes are removed from the app (ADR-0189).
 
 ## Build and run
 
@@ -103,15 +103,15 @@ cd rhizome-agent
 pnpm tauri dev
 ```
 
-`./install.sh` installs the project's dependencies. If Prime Agent isn't on the machine, it may still download Prime's command-line tool for legacy optional-engine support. Rhizome doesn't include a copy of Prime or Node. Chat runs on Rhizome's own engine.
+`./install.sh` installs the project's dependencies. If Prime Agent isn't on the machine, it may still download Prime's command-line tool. Chat doesn't use it (ADR-0189), and that step comes out with the leftover engine code. Rhizome doesn't include a copy of Prime or Node. Chat runs on Rhizome's own engine.
 
 `pnpm tauri dev` builds the app and opens it.
 
 ## Set up Prime (legacy)
 
-Skip this section unless you are reopening an older Prime-locked chat or using Prime from the CLI. New chats use Rhizome's own engine. Add a provider key or use **Taproot** in Settings → AI Agents. See [Set up models and keys](../guides/configure-ai-models.md).
+Skip this section unless you use Prime from the CLI. New chats use Rhizome's own engine. Add a provider key or use **Taproot** in Settings → AI Agents. See [Set up models and keys](../guides/configure-ai-models.md).
 
-The first time `prime-agent` runs in a terminal, it asks you to run `/login` and choose a model provider. You can also sign in from Settings → AI Agents → Local agent: each provider card has a **Sign in** button that runs Prime's login for you.
+The first time `prime-agent` runs in a terminal, it asks you to run `/login` and choose a model provider. Rhizome's Settings no longer has a Prime sign-in.
 
 Prime stops when the terminal that started it closes. To keep it running in the background:
 
@@ -210,7 +210,7 @@ If the vault is a Git repository, every change to it can be committed, including
 
 ## Rhizome runs its own loop
 
-An **agent loop** is the cycle that sends your message to a model, runs the tools the model asks for, and repeats until the answer is done. Rhizome has its own, and that is the only chat engine (ADR-0187). Prime and Hermes are being removed as chat engines. The vault, permissions, and memory stay with Rhizome.
+An **agent loop** is the cycle that sends your message to a model, runs the tools the model asks for, and repeats until the answer is done. Rhizome has its own, and that is the only chat engine (ADR-0187). Prime and Hermes are removed from the app (ADR-0189). The vault, permissions, and memory stay with Rhizome.
 
 Rhizome's engine can read, search, edit and create notes in the open vault. In Power User it can run one approved shell command in the vault folder. [Agents, engines and models](../concepts/ai.md)
 

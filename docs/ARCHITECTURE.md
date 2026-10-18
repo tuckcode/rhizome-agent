@@ -1,6 +1,6 @@
 # Architecture
 
-> This document describes Rhizome (`ai.rhizome.agent`, `tuckcode/rhizome-agent`) — a coding harness that runs its own agent loop (ADR-0180). Prime and Hermes are optional engines. Not Rhizome Desktop (`knispo/rhizome`). See `docs/IDENTITY.md`. "Tolaria" below is the pre-fork product name, not renamed on every line; treat it as a synonym for "the app," not evidence of the wrong product.
+> This document describes Rhizome (`ai.rhizome.agent`, `tuckcode/rhizome-agent`) — a coding harness that runs its own agent loop (ADR-0180). Rhizome's own engine is the only chat engine. Prime and Hermes are removed from the app ([ADR-0189](adr/0189-no-ties-to-outside-harnesses.md)); their leftover code comes out in follow-up PRs. Not Rhizome Desktop (`knispo/rhizome`). See `docs/IDENTITY.md`. "Tolaria" below is the pre-fork product name, not renamed on every line; treat it as a synonym for "the app," not evidence of the wrong product.
 
 Tolaria is a personal knowledge and life management desktop app. It reads a vault of markdown files with YAML frontmatter and presents them in a four-panel UI inspired by Bear Notes.
 
@@ -584,8 +584,9 @@ Root sandboxing still applies. When the toggle is off, `.git/config` is
 readable and can hold tokens in remote URLs.
 `rhizome_routing/` wraps it with free-tier fallback over a pinned OmniRoute
 catalog (ADR-0182). Anthropic models stay refused until step 6a.
-ADR-0168 (amended) is the borrow-care rule. Prime is an optional engine
-(ADR-0163). See `docs/design/harness-doctrine.md`.
+ADR-0168 (amended) is the borrow-care rule. Prime is no longer an engine
+(ADR-0189); ADR-0163 describes its leftover transport until that code is
+removed. See `docs/design/harness-doctrine.md`.
 
 #### The two modules, and why confusing them is the classic mistake
 
@@ -688,9 +689,10 @@ Each answers "nothing", which is true of a host with no session.
 Rhizome no longer exposes a composer control to pick Prime thinking levels
 (the old `PrimeThinkingToggle` and the `get/set_prime_thinking_*` Tauri
 commands are gone). Prime still reads each model's `thinkingLevelMap` in
-`~/.prime/agent/models.json` and clamps levels per model. Settings → **Add to
-Chat list** (`PrimeProviderStatusSection`) still writes those maps when Nous
-Portal (or similar) catalogs are merged into `models.json`; `merge_nous_portal`
+`~/.prime/agent/models.json` and clamps levels per model. **Add to Chat
+list** (`PrimeProviderStatusSection`, no longer shown in Settings since #218)
+wrote those maps when Nous Portal (or similar) catalogs were merged into
+`models.json`; `merge_nous_portal`
 replaces the whole provider entry, so dropping `thinkingLevelMap` on write
 would wipe user maps on the next click.
 
@@ -752,14 +754,17 @@ An open legacy Prime-locked chat may still list Prime's catalog
 a key stay out of the native list except the current pick, and the footer
 links to Settings.
 
-Prime still publishes its whole catalog to Settings regardless of auth state —
+The rest of this section describes the Prime catalog list that Settings
+showed before #218. The helpers stay until the Prime code is removed.
+
+Prime still publishes its whole catalog regardless of auth state —
 **501 models** on one measured machine, a fifth of them from a provider that
 account had never signed into — and exposes no price field. Four passes narrow
 that Settings list, in this order, and the order is load-bearing:
 
 1. **Curation** — `partitionModelsByAllowList` against the user's shortlist in
-   `settings.prime_model_allow_list` (`"provider/id"` keys, edited from the
-   picker or Settings → AI agents). Applied to the whole
+   `settings.prime_model_allow_list` (`"provider/id"` keys; Settings no longer
+   has an editor for it since #218). Applied to the whole
    catalog *before* the query, because the partition's stale-list refusal would
    otherwise read every narrow search as a stale list and drop the curation.
 2. **Free only** — `partitionModelsByFree`, a shared live preference on the
