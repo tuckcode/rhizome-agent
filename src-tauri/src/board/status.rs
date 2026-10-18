@@ -42,6 +42,17 @@ pub fn set_status(content: &str, status: &str) -> Result<StatusEdit, String> {
     })
 }
 
+/// The note's top-level `Status` value, if it has one.
+pub fn read_status(content: &str) -> Option<String> {
+    let body = content.strip_prefix(BOM).unwrap_or(content);
+    let lines = split_lines(body);
+    let close = frontmatter_end(&lines).ok()??;
+    let span = status_spans(&lines[1..close]).into_iter().next()?;
+    let (start, end) = (span.start + 1, span.end + 1);
+    let key = parse_key_line(lines[start].text)?;
+    read_value(&lines[start..=end], &key)
+}
+
 fn validate_status(status: &str) -> Result<&str, String> {
     let trimmed = status.trim();
     if trimmed.is_empty() {
@@ -103,10 +114,10 @@ fn frontmatter_end(lines: &[Line<'_>]) -> Result<Option<usize>, String> {
         .ok_or_else(|| "Frontmatter has no closing `---` line.".to_string())
 }
 
-/// Only `---` closes the block, the same as the vault's frontmatter
-/// parser. YAML's `...` document end does not.
+/// `---` closes the block, and so does YAML's `...` document end.
 fn is_close_fence(text: &str) -> bool {
-    text.trim_end() == FENCE
+    let text = text.trim_end();
+    text == FENCE || text == "..."
 }
 
 fn prepend_block(body: &str, status: &str) -> StatusEdit {

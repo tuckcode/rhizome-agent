@@ -115,7 +115,7 @@ describe('useAppSave', () => {
     })
 
     vi.mocked(invoke).mockImplementation(async (command: string, args?: Record<string, unknown>) => {
-      if (command === 'save_note_content') return undefined
+      if (command === 'save_note_content_checked') return undefined
       if (command === 'auto_rename_untitled') return options?.autoRenameResult ?? { new_path: newPath, updated_files: 0 }
       if (command === 'reload_vault_entry') return makeEntry(newPath, 'Fresh Title', 'fresh-title.md')
       if (command === 'get_note_content' && args?.path === newPath) return diskContent
@@ -185,7 +185,7 @@ describe('useAppSave', () => {
   }
 
   function expectNoSaveNoteContent() {
-    expect(vi.mocked(invoke)).not.toHaveBeenCalledWith('save_note_content', expect.anything())
+    expect(vi.mocked(invoke)).not.toHaveBeenCalledWith('save_note_content_checked', expect.anything())
     expect(deps.clearUnsaved).not.toHaveBeenCalled()
   }
 
@@ -386,7 +386,7 @@ describe('useAppSave', () => {
     vi.useFakeTimers()
     vi.mocked(isTauri).mockReturnValue(true)
     vi.mocked(invoke).mockImplementation(async (command: string, args?: Record<string, unknown>) => {
-      if (command === 'save_note_content') return undefined
+      if (command === 'save_note_content_checked') return undefined
       if (command === 'auto_rename_untitled') return { new_path: '/vault/fresh-title.md', updated_files: 0 }
       if (command === 'reload_vault_entry') return makeEntry('/vault/fresh-title.md', 'Fresh Title', 'fresh-title.md')
       if (command === 'get_note_content' && args?.path === '/vault/fresh-title.md') return '# Fresh Title\n\nBody'
@@ -459,10 +459,10 @@ describe('useAppSave', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS)
     })
-    expect(vi.mocked(invoke)).toHaveBeenCalledWith('save_note_content', {
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('save_note_content_checked', expect.objectContaining({
       path: oldPath,
       content: revisedTitleContent,
-    })
+    }))
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2_000)
@@ -475,7 +475,7 @@ describe('useAppSave', () => {
     vi.useFakeTimers()
     vi.mocked(isTauri).mockReturnValue(true)
     vi.mocked(invoke).mockImplementation(async (command: string) => {
-      if (command === 'save_note_content') return undefined
+      if (command === 'save_note_content_checked') return undefined
       if (command === 'auto_rename_untitled') {
         throw new Error('auto_rename_untitled should not run when disabled')
       }
@@ -529,7 +529,7 @@ describe('useAppSave', () => {
     vi.useFakeTimers()
     vi.mocked(isTauri).mockReturnValue(true)
     vi.mocked(invoke).mockImplementation(async (command: string) => {
-      if (command === 'save_note_content') return undefined
+      if (command === 'save_note_content_checked') return undefined
       if (command === 'auto_rename_untitled') return { new_path: '/vault/fresh-title.md', updated_files: 0 }
       return undefined
     })
@@ -573,14 +573,14 @@ describe('useAppSave', () => {
       await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS)
     })
 
-    const saveCalls = vi.mocked(invoke).mock.calls.filter(([command]) => command === 'save_note_content')
+    const saveCalls = vi.mocked(invoke).mock.calls.filter(([command]) => command === 'save_note_content_checked')
     expect(saveCalls.at(-1)).toEqual([
-      'save_note_content',
-      { path: newPath, content: '# Fresh Title\n\nBody\n\nMore text' },
+      'save_note_content_checked',
+      expect.objectContaining({ path: newPath, content: '# Fresh Title\n\nBody\n\nMore text' }),
     ])
     expect(saveCalls).not.toContainEqual([
-      'save_note_content',
-      { path: oldPath, content: '# Fresh Title\n\nBody\n\nMore text' },
+      'save_note_content_checked',
+      expect.objectContaining({ path: oldPath, content: '# Fresh Title\n\nBody\n\nMore text' }),
     ])
   })
 
@@ -593,7 +593,7 @@ describe('useAppSave', () => {
     const entry = makeEntry(oldPath, 'Fresh Title', 'fresh-title.md')
 
     vi.mocked(invoke).mockImplementation(async (command: string) => {
-      if (command === 'save_note_content') return undefined
+      if (command === 'save_note_content_checked') return undefined
       return undefined
     })
 
@@ -619,14 +619,14 @@ describe('useAppSave', () => {
       await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS)
     })
 
-    const saveCalls = vi.mocked(invoke).mock.calls.filter(([command]) => command === 'save_note_content')
+    const saveCalls = vi.mocked(invoke).mock.calls.filter(([command]) => command === 'save_note_content_checked')
     expect(saveCalls.at(-1)).toEqual([
-      'save_note_content',
-      { path: newPath, content: '# Fresh Title\n\nBody\n\nMore text' },
+      'save_note_content_checked',
+      expect.objectContaining({ path: newPath, content: '# Fresh Title\n\nBody\n\nMore text' }),
     ])
     expect(saveCalls).not.toContainEqual([
-      'save_note_content',
-      { path: oldPath, content: '# Fresh Title\n\nBody\n\nMore text' },
+      'save_note_content_checked',
+      expect.objectContaining({ path: oldPath, content: '# Fresh Title\n\nBody\n\nMore text' }),
     ])
     expect(deps.replaceEntry).toHaveBeenCalledWith(
       oldPath,
@@ -645,7 +645,7 @@ describe('useAppSave', () => {
     const entry = makeEntry(oldPath, 'Fresh Title', 'fresh-title.md')
 
     vi.mocked(invoke).mockImplementation(async (command: string) => {
-      if (command === 'save_note_content') return undefined
+      if (command === 'save_note_content_checked') return undefined
       return undefined
     })
 
@@ -672,14 +672,14 @@ describe('useAppSave', () => {
       await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS)
     })
 
-    const saveCalls = vi.mocked(invoke).mock.calls.filter(([command]) => command === 'save_note_content')
+    const saveCalls = vi.mocked(invoke).mock.calls.filter(([command]) => command === 'save_note_content_checked')
     expect(saveCalls.at(-1)).toEqual([
-      'save_note_content',
-      { path: newPath, content: '# Fresh Title\n\nBody\n\nAlias edit' },
+      'save_note_content_checked',
+      expect.objectContaining({ path: newPath, content: '# Fresh Title\n\nBody\n\nAlias edit' }),
     ])
     expect(saveCalls).not.toContainEqual([
-      'save_note_content',
-      { path: aliasOldPath, content: '# Fresh Title\n\nBody\n\nAlias edit' },
+      'save_note_content_checked',
+      expect.objectContaining({ path: aliasOldPath, content: '# Fresh Title\n\nBody\n\nAlias edit' }),
     ])
   })
 
@@ -805,10 +805,10 @@ describe('useAppSave', () => {
       await result.current.handleSave()
     })
 
-    expect(vi.mocked(invoke)).toHaveBeenCalledWith('save_note_content', {
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('save_note_content_checked', expect.objectContaining({
       path: viewPath,
       content: viewContent,
-    })
+    }))
     expect(deps.handleRenameNote).not.toHaveBeenCalled()
   })
 
@@ -829,10 +829,10 @@ describe('useAppSave', () => {
       await result.current.handleSave()
     })
 
-    expect(vi.mocked(invoke)).toHaveBeenCalledWith('save_note_content', {
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith('save_note_content_checked', expect.objectContaining({
       path: notePath,
       content: noteContent,
-    })
+    }))
     expect(deps.handleRenameNote).not.toHaveBeenCalled()
   })
 
@@ -859,14 +859,14 @@ describe('useAppSave', () => {
       await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS - 200)
     })
 
-    const saveCalls = vi.mocked(invoke).mock.calls.filter(([command]) => command === 'save_note_content')
+    const saveCalls = vi.mocked(invoke).mock.calls.filter(([command]) => command === 'save_note_content_checked')
     expect(saveCalls.at(-1)).toEqual([
-      'save_note_content',
-      { path: newPath, content: bufferedContent },
+      'save_note_content_checked',
+      expect.objectContaining({ path: newPath, content: bufferedContent }),
     ])
     expect(saveCalls).not.toContainEqual([
-      'save_note_content',
-      { path: oldPath, content: bufferedContent },
+      'save_note_content_checked',
+      expect.objectContaining({ path: oldPath, content: bufferedContent }),
     ])
   })
 
@@ -885,11 +885,11 @@ describe('useAppSave', () => {
       await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS + 2_500)
     })
 
-    const saveCallsBeforeRename = vi.mocked(invoke).mock.calls.filter(([command]) => command === 'save_note_content')
+    const saveCallsBeforeRename = vi.mocked(invoke).mock.calls.filter(([command]) => command === 'save_note_content_checked')
     expect(saveCallsBeforeRename).toHaveLength(1)
     expect(saveCallsBeforeRename[0]).toEqual([
-      'save_note_content',
-      { path: oldPath, content: initialContent },
+      'save_note_content_checked',
+      expect.objectContaining({ path: oldPath, content: initialContent }),
     ])
 
     await act(async () => {
@@ -897,7 +897,7 @@ describe('useAppSave', () => {
       await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS)
     })
 
-    const saveCallsWhileRenamePending = vi.mocked(invoke).mock.calls.filter(([command]) => command === 'save_note_content')
+    const saveCallsWhileRenamePending = vi.mocked(invoke).mock.calls.filter(([command]) => command === 'save_note_content_checked')
     expect(saveCallsWhileRenamePending).toHaveLength(1)
 
     await act(async () => {
@@ -906,14 +906,14 @@ describe('useAppSave', () => {
       await Promise.resolve()
     })
 
-    const finalSaveCalls = vi.mocked(invoke).mock.calls.filter(([command]) => command === 'save_note_content')
+    const finalSaveCalls = vi.mocked(invoke).mock.calls.filter(([command]) => command === 'save_note_content_checked')
     expect(finalSaveCalls.at(-1)).toEqual([
-      'save_note_content',
-      { path: newPath, content: bodyDuringRename },
+      'save_note_content_checked',
+      expect.objectContaining({ path: newPath, content: bodyDuringRename }),
     ])
     expect(finalSaveCalls).not.toContainEqual([
-      'save_note_content',
-      { path: oldPath, content: bodyDuringRename },
+      'save_note_content_checked',
+      expect.objectContaining({ path: oldPath, content: bodyDuringRename }),
     ])
   })
 

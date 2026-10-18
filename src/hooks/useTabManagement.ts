@@ -9,6 +9,8 @@ import {
 import {
   cacheNoteContent as cacheNoteContentInMemory,
   clearNoteContentCache,
+  clearSaveBaseline,
+  clearSaveBaselines,
   getCachedNoteContentEntry,
   hasResolvedCachedContent,
   isNoActiveVaultSelectedError,
@@ -19,6 +21,7 @@ import {
   NOTE_CONTENT_ENTRY_MAX_BYTES,
   NOTE_CONTENT_PREFETCH_CONCURRENCY,
   prefetchNoteContent as prefetchNoteContentInMemory,
+  setSaveBaseline,
   type NoteContentRequestOptions,
 } from './noteContentCache'
 import { clearParsedNoteBlockCache } from './editorParsedBlockCache'
@@ -48,6 +51,9 @@ export function cacheNoteContent(
   options?: NoteContentRequestOptions,
 ): void {
   cacheNoteContentInMemory(path, content, entry, options)
+  // Every caller hands over text the editor now holds or that was just
+  // written: a save, a property edit, a create. That is the save baseline.
+  setSaveBaseline(path, content)
 }
 
 /** Clear note-open caches. Call on vault reload to prevent stale content. */
@@ -105,6 +111,10 @@ function setSingleTab(
   setTabs: React.Dispatch<React.SetStateAction<Tab[]>>,
   nextTab: Tab,
 ) {
+  // Single-note model: opening another note closes the one before it.
+  for (const tab of tabsRef.current) {
+    if (!notePathsMatch(tab.entry.path, nextTab.entry.path)) clearSaveBaseline(tab.entry.path)
+  }
   tabsRef.current = [nextTab]
   setTabs([nextTab])
 }
@@ -113,6 +123,7 @@ function clearTabs(
   tabsRef: React.MutableRefObject<Tab[]>,
   setTabs: React.Dispatch<React.SetStateAction<Tab[]>>,
 ) {
+  clearSaveBaselines()
   tabsRef.current = []
   setTabs([])
 }
@@ -436,6 +447,7 @@ async function loadTextEntry(options: Required<Pick<NavigateToEntryOptions, 'for
       tabsRef,
       path: entry.path,
     })) return
+    setSaveBaseline(entry.path, content)
     setSingleTab(tabsRef, setTabs, { entry, content })
   } catch (err) {
     handleEntryLoadFailure({
@@ -585,8 +597,7 @@ export function useTabManagement(options: TabManagementOptions = {}) {
   const closeAllTabs = useCallback(() => {
     navSeqRef.current += 1
     beforeNavigateSeqRef.current += 1
-    tabsRef.current = []
-    setTabs([])
+    clearTabs(tabsRef, setTabs)
     requestedActiveTabPathRef.current = null
     syncActiveTabPath(activeTabPathRef, setActiveTabPath, null)
   }, [])

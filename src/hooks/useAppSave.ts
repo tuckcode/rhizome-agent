@@ -709,6 +709,7 @@ function useEditorPersistence({
   const {
     handleSave: handleSaveRaw,
     handleContentChange: handleContentChangeRaw,
+    holdPendingSave,
     savePendingForPath: savePendingForPathRaw,
     savePending,
   } = useEditorSaveWithLinks({
@@ -740,7 +741,7 @@ function useEditorPersistence({
       : Promise.resolve(false)
   }, [savePendingForPathRaw, persistenceScope, resolveCurrentPath])
 
-  return { handleSaveRaw, handleContentChange, savePendingForPath, savePending }
+  return { handleSaveRaw, handleContentChange, holdPendingSave, savePendingForPath, savePending }
 }
 
 function useReplaceRenamedEntry({
@@ -866,7 +867,7 @@ export function useAppSave({
     resolvedPath, tabsRef, activeTabPathRef, setTabs, handleSwitchTab,
     replaceEntry, loadModifiedFiles, onInternalVaultWrite, initialH1AutoRenameEnabled,
   })
-  const { handleSaveRaw, handleContentChange, savePendingForPath, savePending } = useEditorPersistence({
+  const { handleSaveRaw, handleContentChange, holdPendingSave, savePendingForPath, savePending } = useEditorPersistence({
     updateEntry, setTabs, setToastMessage, loadModifiedFiles, trackUnsaved,
     clearUnsaved, onInternalVaultWrite, reloadViews, refreshPendingUntitledRename, scheduleUntitledRename,
     resolveCurrentPath, resolvePathBeforeSave, canPersist,
@@ -884,6 +885,6 @@ export function useAppSave({
 
   return {
     contentChangeRef, handleContentChange, handleFilenameRename, handleSave,
-    handleTitleSync, savePending, savePendingForPath, trackRenamedPath: registerRenamedPath, flushBeforeAction,
+    handleTitleSync, holdPendingSave, savePending, savePendingForPath, trackRenamedPath: registerRenamedPath, flushBeforeAction,
   }
 }

@@ -56,6 +56,43 @@ const NOTE_CONTENT_LOAD_RETRY_DELAYS_MS = [120, 320, 800] as const
 
 let activePrefetchRequests = 0
 
+/**
+ * Save baselines: the note text the editor last read or wrote, one entry
+ * per path. A checked save sends it, so Rust can see a change on disk.
+ * The preload cache above drops and replaces text at any time (reload,
+ * eviction, a newer preload), so the baseline is kept apart from it.
+ * Open, load, save, property edit, create and rename set it. Close and
+ * vault switch clear it. A rename also refreshes every clean baseline,
+ * including notes that are not open, because a linked-note rewrite
+ * changes the bytes on disk.
+ */
+const saveBaselines = new Map<string, string>()
+
+export function setSaveBaseline(path: string, content: string): void {
+  saveBaselines.set(path, content)
+}
+
+export function getSaveBaseline(path: string): string | null {
+  return saveBaselines.get(path) ?? null
+}
+
+export function moveSaveBaseline(fromPath: string, toPath: string, content: string): void {
+  saveBaselines.delete(fromPath)
+  saveBaselines.set(toPath, content)
+}
+
+export function clearSaveBaseline(path: string): void {
+  saveBaselines.delete(path)
+}
+
+export function clearSaveBaselines(): void {
+  saveBaselines.clear()
+}
+
+export function saveBaselinePaths(): string[] {
+  return [...saveBaselines.keys()]
+}
+
 export function subscribeNoteContentResolved(listener: NoteContentResolvedListener): () => void {
   resolvedListeners.add(listener)
   return () => resolvedListeners.delete(listener)

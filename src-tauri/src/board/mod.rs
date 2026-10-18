@@ -5,9 +5,10 @@
 //! into the view's `presentation.columns`. A move rewrites the `Status`
 //! line of one note and nothing else.
 //!
-//! No Tauri command calls this module yet. A live move needs the
-//! conflict-checked save first, or the editor's autosave would write
-//! the old status back over it.
+//! The live move is the `move_board_card` command. The editor's save
+//! checks the disk against the text it last read or wrote
+//! (`vault::save_note_content_expecting`), and [`splice_disk_status`]
+//! lets an autosave keep a status the board wrote. Listing boards has no command yet.
 #![cfg_attr(not(test), allow(dead_code))]
 
 mod status;
@@ -28,6 +29,7 @@ use crate::rhizome_loop::{
 };
 use crate::vault::{evaluate_view, scan_vault_cached, scan_views, VaultEntry, ViewFile};
 
+use status::read_status;
 pub use status::set_status;
 
 /// Columns when a board view has no usable `presentation.columns`.
@@ -192,8 +194,7 @@ fn check_precondition(
     match expected {
         None => Ok(()),
         Some(Precondition::ContentHash(hash)) => {
-            let actual = format!("{:x}", Sha256::digest(before.as_bytes()));
-            if actual.eq_ignore_ascii_case(hash.trim()) {
+            if content_hash(before).eq_ignore_ascii_case(hash.trim()) {
                 Ok(())
             } else {
                 Err(format!(
@@ -202,6 +203,34 @@ fn check_precondition(
             }
         }
     }
+}
+
+/// SHA-256 of a note's bytes, lowercase hex. The editor's expected
+/// hash uses the same form.
+pub fn content_hash(text: &str) -> String {
+    format!("{:x}", Sha256::digest(text.as_bytes()))
+}
+
+/// When the only change on disk since `expected` is a `Status` write,
+/// returns `buffer` with the on-disk status. Any other change returns
+/// `None`, which the caller treats as a real conflict.
+///
+/// `expected` is the note as the editor last read or wrote it. The check
+/// replays the write: `expected` with the disk's status must equal `disk`
+/// byte for byte. A board move makes exactly that write, so list-form,
+/// empty and duplicate `Status` keys all replay the same way.
+pub fn splice_disk_status(disk: &str, buffer: &str, expected: &str) -> Option<String> {
+    let status = read_status(disk)?;
+    if set_status(expected, &status).ok()?.content != disk {
+        return None;
+    }
+    // Status changed in the editor as well, and not to the value on disk.
+    // Splicing would drop the user's value, so this is a conflict.
+    let buffer_status = read_status(buffer);
+    if buffer_status != read_status(expected) && buffer_status.as_deref() != Some(status.as_str()) {
+        return None;
+    }
+    set_status(buffer, &status).ok().map(|edit| edit.content)
 }
 
 fn find_board_view(vault: &Path, filename: &str) -> Result<(ViewFile, BoardConfig), String> {

@@ -164,6 +164,8 @@ import {
   vaultPathForEntry,
 } from './utils/workspaces'
 import { notePathsMatch } from './utils/notePathIdentity'
+import { clearStashedConflict, overwriteNoteContent, subscribeSaveConflicts } from './hooks/useSaveNote'
+import { finishConflictChoice, keepMineAfterHold } from './hooks/saveConflictChoice'
 import { activeGitRepositories } from './utils/gitRepositories'
 import { isMarkdownEntry } from './utils/typeDefinitions'
 import { resolveTypeDeleteRequest, typeDeleteBlockedMessageKey } from './utils/typeDeletion'
@@ -231,8 +233,17 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const { setInspectorCollapsed } = layout
   const visibleNotesRef = useRef<VaultEntry[]>([])
   const multiSelectionCommandRef = useRef<NoteListMultiSelectionCommands | null>(null)
-  const [toastMessage, setToastMessage] = useState<string | null>(null)
-  const [toastAction, setToastAction] = useState<{ label: string; onClick: () => void } | null>(null)
+  const [toastMessage, setToastMessageState] = useState<string | null>(null)
+  const [toastAction, setToastAction] = useState<{
+    label: string
+    onClick: () => void
+    secondary?: { label: string; onClick: () => void }
+    sticky?: boolean
+  } | null>(null)
+  const setToastMessage = useCallback((message: string | null) => {
+    setToastMessageState(message)
+    setToastAction(null)
+  }, [])
   // "Ask the agent about this note" — the vault pointing at the conversation.
   // `requestId` rather than a bare path so asking twice about the same note
   // reopens it after the user has closed the pane.
@@ -289,14 +300,14 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const handleGettingStartedVaultReady = useCallback((vaultPath: string) => {
     rememberVaultChoice(vaultPath)
     setToastMessage(`Rhizome Vault created and opened at ${vaultPath}`)
-  }, [rememberVaultChoice])
+  }, [rememberVaultChoice, setToastMessage])
 
   const handleOnboardingVaultReady = useCallback((vaultPath: string, source: 'template' | 'empty' | 'existing') => {
     rememberVaultChoice(vaultPath)
     if (source === 'template') {
       setToastMessage(`Rhizome Vault created and opened at ${vaultPath}`)
     }
-  }, [rememberVaultChoice])
+  }, [rememberVaultChoice, setToastMessage])
   const cloneGettingStartedVault = useGettingStartedClone({
     onError: (message) => setToastMessage(message),
     onSuccess: handleGettingStartedVaultReady,
@@ -767,6 +778,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   useEffect(() => {
     noteTabsRef.current = notes.tabs
   }, [notes.tabs])
+  const { clearUnsaved: clearVaultUnsaved } = vault
   const refocusActiveEditor = useCallback((path: string) => {
     window.dispatchEvent(new CustomEvent('laputa:focus-editor', { detail: { path } }))
   }, [])
@@ -959,6 +971,41 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   useEffect(() => {
     appSaveFlushBeforeActionRef.current = appSave.flushBeforeAction
   }, [appSave.flushBeforeAction])
+  const holdPendingSave = appSave.holdPendingSave
+  // A save conflict moved the editor's text to a "(conflict)" copy.
+  // Keep mine writes the editor text after any autosave in flight.
+  // Reload takes the note from disk only while that note is still active.
+  useEffect(() => subscribeSaveConflicts((conflict) => {
+    const fileName = (path: string) => path.split(/[\\/]/).pop() ?? path
+    const settle = () => {
+      finishConflictChoice({
+        activePath: notes.activeTabPathRef.current,
+        conflictPath: conflict.path,
+        clearStash: () => clearStashedConflict(conflict.path),
+        clearUnsaved: () => clearVaultUnsaved(conflict.path),
+        reloadActive: () => {
+          const tab = noteTabsRef.current.find((t) => notePathsMatch(t.entry.path, conflict.path))
+          if (tab) void handleReplaceActiveTab(tab.entry)
+        },
+      })
+    }
+    setToastMessage(`${fileName(conflict.path)} changed on disk. Your edits are in ${fileName(conflict.copyPath)}.`)
+    setToastAction({
+      label: 'Keep mine',
+      sticky: true,
+      onClick: () => {
+        void keepMineAfterHold({
+          hold: () => holdPendingSave(conflict.path),
+          readLive: () => noteTabsRef.current.find((t) => notePathsMatch(t.entry.path, conflict.path))?.content,
+          snapshot: conflict.content,
+          write: (content) => overwriteNoteContent(conflict.path, content),
+        }).then(settle, (error: unknown) => {
+          setToastMessage(`Could not keep your edits: ${error instanceof Error ? error.message : String(error)}`)
+        })
+      },
+      secondary: { label: 'Reload', onClick: settle },
+    })
+  }), [clearVaultUnsaved, handleReplaceActiveTab, holdPendingSave, notes, setToastMessage])
 
   const handleChangeWorkspace = useCallback(async (entry: VaultEntry, workspace: WorkspaceIdentity) => {
     const sourceVaultPath = vaultPathForEntry(entry, resolvedPath)
@@ -1002,6 +1049,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     notes,
     refreshGitModifiedFiles,
     resolvedPath,
+    setToastMessage,
     vault
   ])
 
@@ -1087,7 +1135,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       setToastMessage(`Failed to create folder: ${e}`)
       return false
     }
-  }, [resolvedPath, vault])
+  }, [resolvedPath, setToastMessage, vault])
 
   const folderActions = useFolderActions({
     vaultPath: resolvedPath,
@@ -1364,7 +1412,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
 
     trackEvent('sidebar_type_delete_requested')
     deleteActions.handleDeleteNote(request.typeEntry.path)
-  }, [appLocale, deleteActions, vault.entries])
+  }, [appLocale, deleteActions, setToastMessage, vault.entries])
 
   const shouldLoadGitHistory = !layout.inspectorCollapsed && !effectiveShowAIChat
   const gitHistory = useGitHistory(notes.activeTabPath, loadGitHistoryForPath, shouldLoadGitHistory, gitHistoryRefreshKey)
@@ -1475,7 +1523,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     } else {
       setToastMessage(result.message)
     }
-  }, [appLocale, settings.release_channel, updateActions, updateStatus.state])
+  }, [appLocale, setToastMessage, settings.release_channel, updateActions, updateStatus.state])
 
   const handleRepairVault = useCallback(async () => {
     if (!resolvedPath) return
@@ -1488,7 +1536,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     } catch (err) {
       setToastMessage(`Failed to repair vault: ${err}`)
     }
-  }, [refreshVaultAiGuidance, resolvedPath, vault])
+  }, [refreshVaultAiGuidance, resolvedPath, setToastMessage, vault])
 
   const handleAdoptPortentTypes = useCallback(async () => {
     if (!resolvedPath) return
@@ -1504,7 +1552,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     } catch (err) {
       setToastMessage(`Failed to adopt Portent types: ${err}`)
     }
-  }, [resolvedPath, vault])
+  }, [resolvedPath, setToastMessage, vault])
 
   const restoreVaultAiGuidance = useCallback(async (successToast: string | null = 'Rhizome AI guidance restored') => {
     if (!resolvedPath) return
@@ -1517,7 +1565,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     } catch (err) {
       setToastMessage(`Failed to restore Rhizome AI guidance: ${err}`)
     }
-  }, [refreshVaultAiGuidance, resolvedPath, vault])
+  }, [refreshVaultAiGuidance, resolvedPath, setToastMessage, vault])
 
   const activeCommandEntry = useMemo(() => {
     if (!notes.activeTabPath) return null
@@ -1651,7 +1699,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     const entries = await reloadVaultForCommand()
     setToastMessage(`Vault reloaded (${entries.length} ${entries.length === 1 ? 'entry' : 'entries'})`)
     return entries
-  }, [reloadVaultForCommand])
+  }, [reloadVaultForCommand, setToastMessage])
 
   const {
     activeTab,
@@ -2051,7 +2099,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       }))
       return false
     }
-  }, [activeEditorVaultPath, appLocale, vaultBridge])
+  }, [activeEditorVaultPath, appLocale, setToastMessage, vaultBridge])
 
   const aiWorkspaceSurface = (
     <AppAiWorkspaceSurface
@@ -2624,6 +2672,9 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           message={toastMessage}
           actionLabel={toastAction?.label}
           onAction={toastAction?.onClick}
+          secondaryActionLabel={toastAction?.secondary?.label}
+          onSecondaryAction={toastAction?.secondary?.onClick}
+          sticky={toastAction?.sticky}
           onDismiss={() => {
             setToastMessage(null)
             setToastAction(null)

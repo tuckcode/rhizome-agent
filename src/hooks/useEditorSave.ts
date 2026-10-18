@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, type MutableRefObject } from 'react'
 import type { SetStateAction } from 'react'
-import { useSaveNote } from './useSaveNote'
+import { stashSaveConflict, subscribeSaveConflicts, useSaveNote } from './useSaveNote'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import { canWritePathToVault } from '../utils/vaultPathContainment'
+import { setSaveBaseline } from './noteContentCache'
 
 interface Tab {
   entry: { path: string }
@@ -45,6 +46,10 @@ interface PendingContent {
   content: string
 }
 
+/** Saves a note. Returns the text now on disk when it differs from the buffer (a spliced Status). */
+type SaveNote = (path: string, content: string) => Promise<string | void>
+type ApplyPersistedContent = (path: string, content: string) => void
+
 interface InFlightPendingSave {
   pending: PendingContent
   promise: Promise<boolean>
@@ -53,7 +58,8 @@ interface InFlightPendingSave {
 interface PersistPendingContentParams {
   pending: PendingContent
   pendingContentRef: MutableRefObject<PendingContent | null>
-  saveNote: (path: string, content: string) => Promise<void>
+  saveNote: SaveNote
+  applySplicedContent: ApplyPersistedContent
   onBeforePersist?: EditorSaveConfig['onBeforePersist']
   onNotePersisted?: EditorSaveConfig['onNotePersisted']
   resolvePath?: EditorSaveConfig['resolvePath']
@@ -69,11 +75,12 @@ interface ReusableInFlightSaveParams {
 }
 
 interface EditorSaveCommandsParams {
+  applySplicedContent: ApplyPersistedContent
   pendingContentRef: MutableRefObject<PendingContent | null>
   autoSaveTimerRef: MutableRefObject<ReturnType<typeof setTimeout> | null>
   setTabs: EditorSaveConfig['setTabs']
   setToastMessage: EditorSaveConfig['setToastMessage']
-  saveNote: (path: string, content: string) => Promise<void>
+  saveNote: SaveNote
   onAfterSave: () => void
   onAfterSaveRef: MutableRefObject<() => void>
   onBeforePersist?: EditorSaveConfig['onBeforePersist']
@@ -176,17 +183,48 @@ async function persistResolvedContent({
 }: {
   path: string
   content: string
-  saveNote: (path: string, content: string) => Promise<void>
+  saveNote: SaveNote
   onBeforePersist?: EditorSaveConfig['onBeforePersist']
   resolvePath?: EditorSaveConfig['resolvePath']
   resolvePathBeforeSave?: EditorSaveConfig['resolvePathBeforeSave']
   persistenceScopeRef: MutableRefObject<string | readonly string[] | undefined>
-}): Promise<string | null> {
+}): Promise<{ targetPath: string, saved: string } | null> {
   const targetPath = await resolvePersistPath(path, resolvePath, resolvePathBeforeSave)
   if (!canWritePathToVault(targetPath, persistenceScopeRef.current ?? '')) return null
   onBeforePersist?.(targetPath)
-  await saveNote(targetPath, content)
-  return targetPath
+  const saved = await saveNote(targetPath, content)
+  return { targetPath, saved: typeof saved === 'string' ? saved : content }
+}
+
+/**
+ * A board moved the card while the editor had unsaved edits, so the save
+ * wrote the buffer with the on-disk Status. With no newer edits, the
+ * editor takes that text. Edits typed during the save were built on the
+ * text from before the splice, so that text stays their baseline. Their
+ * next save then shows Rust the same Status-only change, and Rust splices
+ * the Status value into them. Nothing else in the newer edits changes.
+ */
+function reconcileSplicedSave({
+  applySplicedContent,
+  pending,
+  pendingContentRef,
+  resolvePath,
+  saved,
+  targetPath,
+}: {
+  applySplicedContent: ApplyPersistedContent
+  pending: PendingContent
+  pendingContentRef: MutableRefObject<PendingContent | null>
+  resolvePath?: EditorSaveConfig['resolvePath']
+  saved: string
+  targetPath: string
+}): void {
+  const current = pendingContentRef.current
+  if (!current || current === pending || !matchesPendingPath(current, targetPath, resolvePath)) {
+    applySplicedContent(targetPath, saved)
+    return
+  }
+  setSaveBaseline(targetPath, pending.content)
 }
 
 function applyTabContent(
@@ -215,26 +253,43 @@ async function persistPendingContent({
   resolvePath,
   resolvePathBeforeSave,
   persistenceScopeRef,
+  applySplicedContent,
 }: PersistPendingContentParams): Promise<boolean> {
   const { path, content } = pending
-  const targetPath = await persistResolvedContent({
-    path,
-    content,
-    saveNote,
-    onBeforePersist,
-    resolvePath,
-    resolvePathBeforeSave,
-    persistenceScopeRef,
-  })
-  if (targetPath === null) {
+  let result: Awaited<ReturnType<typeof persistResolvedContent>>
+  try {
+    result = await persistResolvedContent({
+      path,
+      content,
+      saveNote,
+      onBeforePersist,
+      resolvePath,
+      resolvePathBeforeSave,
+      persistenceScopeRef,
+    })
+  } catch (error) {
+    // Stash the newest text for this note, typed during the save or not.
+    const current = pendingContentRef.current
+    const latest = current && current.path === path ? current : pending
+    await stashSaveConflict(error, resolvePath?.(path) ?? path, latest.content)
+    if (pendingContentRef.current === latest || pendingContentRef.current === pending) {
+      pendingContentRef.current = null
+    }
+    return false
+  }
+  if (result === null) {
     if (pendingContentRef.current === pending) pendingContentRef.current = null
     return false
+  }
+  const { targetPath, saved } = result
+  if (saved !== content) {
+    reconcileSplicedSave({ applySplicedContent, pending, pendingContentRef, resolvePath, saved, targetPath })
   }
   if (!matchesPendingContent(pendingContentRef.current, targetPath, content, resolvePath)) {
     return false
   }
   pendingContentRef.current = null
-  onNotePersisted?.(targetPath, content)
+  onNotePersisted?.(targetPath, saved)
   return true
 }
 
@@ -270,6 +325,8 @@ function useOnAfterSaveRef(onAfterSave: () => void) {
 }
 
 function usePendingContentFlush({
+  applySplicedContent,
+  inFlightSaveRef,
   pendingContentRef,
   saveNote,
   onBeforePersist,
@@ -279,8 +336,10 @@ function usePendingContentFlush({
   canPersistRef,
   persistenceScopeRef,
 }: {
+  applySplicedContent: ApplyPersistedContent
+  inFlightSaveRef: MutableRefObject<InFlightPendingSave | null>
   pendingContentRef: MutableRefObject<PendingContent | null>
-  saveNote: (path: string, content: string) => Promise<void>
+  saveNote: SaveNote
   onBeforePersist?: EditorSaveConfig['onBeforePersist']
   onNotePersisted?: EditorSaveConfig['onNotePersisted']
   resolvePath?: EditorSaveConfig['resolvePath']
@@ -288,8 +347,6 @@ function usePendingContentFlush({
   canPersistRef: MutableRefObject<boolean>
   persistenceScopeRef: MutableRefObject<string | readonly string[] | undefined>
 }) {
-  const inFlightSaveRef = useRef<InFlightPendingSave | null>(null)
-
   return useCallback(async (pathFilter?: string): Promise<boolean> => {
     const pending = pendingContentRef.current
     if (!matchesPendingPath(pending, pathFilter, resolvePath)) return false
@@ -304,6 +361,7 @@ function usePendingContentFlush({
     if (inFlightSave) return inFlightSave
 
     const promise = persistPendingContent({
+      applySplicedContent,
       pending,
       pendingContentRef,
       saveNote,
@@ -322,7 +380,36 @@ function usePendingContentFlush({
         inFlightSaveRef.current = null
       }
     }
-  }, [canPersistRef, onBeforePersist, onNotePersisted, pendingContentRef, persistenceScopeRef, resolvePath, resolvePathBeforeSave, saveNote])
+  }, [applySplicedContent, canPersistRef, inFlightSaveRef, onBeforePersist, onNotePersisted, pendingContentRef, persistenceScopeRef, resolvePath, resolvePathBeforeSave, saveNote])
+}
+
+/**
+ * Keep mine is about to write. Wait for an in-flight autosave, then drop
+ * the scheduled one, so neither writes over the text Keep mine sends.
+ * Returns the pending buffer when the note has one.
+ */
+function useHoldPendingSave({
+  cancelAutoSave,
+  inFlightSaveRef,
+  pendingContentRef,
+  resolvePath,
+}: {
+  cancelAutoSave: () => void
+  inFlightSaveRef: MutableRefObject<InFlightPendingSave | null>
+  pendingContentRef: MutableRefObject<PendingContent | null>
+  resolvePath?: EditorSaveConfig['resolvePath']
+}) {
+  return useCallback(async (path: string): Promise<string | null> => {
+    const pending = pendingContentRef.current
+    const live = matchesPendingPath(pending, path, resolvePath) ? pending.content : null
+    cancelAutoSave()
+    const inFlight = inFlightSaveRef.current
+    if (inFlight && matchesPendingPath(inFlight.pending, path, resolvePath)) {
+      await inFlight.promise.catch(() => undefined)
+    }
+    if (pending && pendingContentRef.current === pending) pendingContentRef.current = null
+    return live
+  }, [cancelAutoSave, inFlightSaveRef, pendingContentRef, resolvePath])
 }
 
 function useCancelAutoSave(autoSaveTimerRef: MutableRefObject<ReturnType<typeof setTimeout> | null>) {
@@ -365,7 +452,7 @@ async function persistUnsavedFallback({
   persistenceScopeRef,
 }: {
   unsavedFallback?: { path: string; content: string }
-  saveNote: (path: string, content: string) => Promise<void>
+  saveNote: SaveNote
   onBeforePersist?: EditorSaveConfig['onBeforePersist']
   onNotePersisted?: EditorSaveConfig['onNotePersisted']
   resolvePath?: EditorSaveConfig['resolvePath']
@@ -373,17 +460,23 @@ async function persistUnsavedFallback({
   persistenceScopeRef: MutableRefObject<string | readonly string[] | undefined>
 }): Promise<boolean> {
   if (!unsavedFallback) return false
-  const targetPath = await persistResolvedContent({
-    path: unsavedFallback.path,
-    content: unsavedFallback.content,
-    saveNote,
-    onBeforePersist,
-    resolvePath,
-    resolvePathBeforeSave,
-    persistenceScopeRef,
-  })
-  if (targetPath === null) return false
-  onNotePersisted?.(targetPath, unsavedFallback.content)
+  let result: Awaited<ReturnType<typeof persistResolvedContent>>
+  try {
+    result = await persistResolvedContent({
+      path: unsavedFallback.path,
+      content: unsavedFallback.content,
+      saveNote,
+      onBeforePersist,
+      resolvePath,
+      resolvePathBeforeSave,
+      persistenceScopeRef,
+    })
+  } catch (error) {
+    await stashSaveConflict(error, resolvePath?.(unsavedFallback.path) ?? unsavedFallback.path, unsavedFallback.content)
+    return false
+  }
+  if (result === null) return false
+  onNotePersisted?.(result.targetPath, result.saved)
   return true
 }
 
@@ -423,7 +516,7 @@ async function persistImmediateSave({
 }: {
   unsavedFallback?: { path: string; content: string }
   flushPending: (pathFilter?: string) => Promise<boolean>
-  saveNote: (path: string, content: string) => Promise<void>
+  saveNote: SaveNote
   onBeforePersist?: EditorSaveConfig['onBeforePersist']
   onNotePersisted?: EditorSaveConfig['onNotePersisted']
   resolvePath?: EditorSaveConfig['resolvePath']
@@ -433,9 +526,12 @@ async function persistImmediateSave({
   onAfterSave: () => void
   t: Translator
 }): Promise<boolean> {
+  // A conflict has its own toast (Keep mine / Reload). Do not replace it.
+  let conflicted = false
+  const unsubscribe = subscribeSaveConflicts(() => { conflicted = true })
   try {
     const saved = await flushPending()
-    const savedFallback = !saved && await persistUnsavedFallback({
+    const savedFallback = !saved && !conflicted && await persistUnsavedFallback({
       unsavedFallback,
       saveNote,
       onBeforePersist,
@@ -444,6 +540,7 @@ async function persistImmediateSave({
       resolvePathBeforeSave,
       persistenceScopeRef,
     })
+    if (conflicted) return false
     setToastMessage(saved || savedFallback ? t('save.toast.saved') : t('save.toast.nothingToSave'))
     onAfterSave()
     return true
@@ -451,6 +548,8 @@ async function persistImmediateSave({
     console.error('Save failed:', err)
     setToastMessage(formatSaveFailureMessage(err, t))
     return false
+  } finally {
+    unsubscribe()
   }
 }
 
@@ -475,7 +574,7 @@ function useImmediateSaveCommands({
   flushPending: (pathFilter?: string) => Promise<boolean>
   setToastMessage: EditorSaveConfig['setToastMessage']
   onAfterSave: () => void
-  saveNote: (path: string, content: string) => Promise<void>
+  saveNote: SaveNote
   onBeforePersist?: EditorSaveConfig['onBeforePersist']
   onNotePersisted?: EditorSaveConfig['onNotePersisted']
   resolvePath?: EditorSaveConfig['resolvePath']
@@ -564,6 +663,7 @@ function useContentChangeCommand({
 }
 
 function useEditorSaveCommands({
+  applySplicedContent,
   pendingContentRef,
   autoSaveTimerRef,
   setTabs,
@@ -581,7 +681,10 @@ function useEditorSaveCommands({
   disabledSaveMessage,
   t,
 }: EditorSaveCommandsParams) {
+  const inFlightSaveRef = useRef<InFlightPendingSave | null>(null)
   const flushPending = usePendingContentFlush({
+    applySplicedContent,
+    inFlightSaveRef,
     pendingContentRef,
     saveNote,
     onBeforePersist,
@@ -592,6 +695,12 @@ function useEditorSaveCommands({
     persistenceScopeRef,
   })
   const cancelAutoSave = useCancelAutoSave(autoSaveTimerRef)
+  const holdPendingSave = useHoldPendingSave({
+    cancelAutoSave,
+    inFlightSaveRef,
+    pendingContentRef,
+    resolvePath,
+  })
   usePendingContentScopeReset({ cancelAutoSave, pendingContentRef, persistenceScope })
   const { handleSave, savePendingForPath, savePending } = useImmediateSaveCommands({
     pendingContentRef,
@@ -623,7 +732,7 @@ function useEditorSaveCommands({
     t,
   })
 
-  return { handleSave, handleContentChange, savePendingForPath, savePending }
+  return { handleSave, handleContentChange, holdPendingSave, savePendingForPath, savePending }
 }
 
 export function useEditorSave({
@@ -658,10 +767,18 @@ export function useEditorSave({
     applyTabContent(setTabs, path, content)
   }, [resolvePath, updateVaultContent, setTabs])
 
+  // A spliced save changes the text the editor holds, so it skips the
+  // pending-content guard in updateTabAndContent.
+  const applySplicedContent = useCallback((path: string, content: string) => {
+    updateVaultContent(path, content)
+    applyTabContent(setTabs, path, content)
+  }, [setTabs, updateVaultContent])
+
   const { saveNote } = useSaveNote(updateTabAndContent)
   const onAfterSaveRef = useOnAfterSaveRef(onAfterSave)
 
   return useEditorSaveCommands({
+    applySplicedContent,
     pendingContentRef,
     autoSaveTimerRef,
     setTabs,
