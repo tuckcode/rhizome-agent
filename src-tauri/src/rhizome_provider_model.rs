@@ -63,6 +63,16 @@ impl Model for ProviderModel {
             base_url: self.request.provider.base_url.as_deref(),
             replay_session: &self.replay_session,
         };
+        if crate::chat_images::ledger_has_images()
+            && !crate::ai_models::model_accepts_images(&self.request)
+        {
+            emit(ModelEvent::Error(crate::model_events::ModelError {
+                kind: crate::model_events::ModelErrorKind::Rejected,
+                status: None,
+                message: crate::chat_images::VISION_REFUSAL.into(),
+            }));
+            return true;
+        }
         let messages = openai_messages_for(view, view.turn_start, &wire);
         let tools = tool_definitions(&view.offered_tools);
         // The loop calls this from inside a tokio runtime, and reqwest's
@@ -253,6 +263,14 @@ fn openai_messages_for(view: &ModelView, turn_start: usize, wire: &OutboundWire<
     };
     let mut text_cursor = 0usize;
 
+    let user_count = items
+        .iter()
+        .filter(|item| matches!(item, HistoryItem::User { .. }))
+        .count();
+    let user_images =
+        crate::chat_images::image_sets_for_users(user_count, &crate::chat_images::current_ledger());
+    let mut user_index = 0usize;
+
     let mut messages = Vec::new();
     let mut unanswered: Vec<String> = Vec::new();
     for item in items {
@@ -265,7 +283,15 @@ fn openai_messages_for(view: &ModelView, turn_start: usize, wire: &OutboundWire<
         }
         match item {
             HistoryItem::User { text } => {
-                messages.push(json!({ "role": "user", "content": text }));
+                let images = user_images
+                    .get(user_index)
+                    .map(Vec::as_slice)
+                    .unwrap_or(&[]);
+                user_index += 1;
+                messages.push(json!({
+                    "role": "user",
+                    "content": crate::chat_images::openai_user_content(text, images)
+                }));
             }
             HistoryItem::Assistant { text, tool_calls } => {
                 let mut message = json!({
@@ -1428,5 +1454,67 @@ mod tests {
             .filter(|notice| notice.code == "forced_off_for_tools")
             .collect();
         assert_eq!(notices.len(), 1);
+    }
+
+    fn tiny_png() -> crate::chat_images::ChatImage {
+        use base64::Engine;
+        crate::chat_images::ChatImage {
+            mime_type: "image/png".into(),
+            data: base64::engine::general_purpose::STANDARD.encode(b"png"),
+        }
+    }
+
+    #[test]
+    fn a_vision_model_gets_an_openai_image_part() {
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"a cat"},"finish_reason":"stop"}]}"#,
+            "[DONE]",
+        ])]);
+        let mut request = request(&server.base_url);
+        request.provider.models[0].capabilities.vision = true;
+        let image = tiny_png();
+        let _ledger = crate::chat_images::TestLedger::set("vision-turn", vec![vec![image.clone()]]);
+        let mut model = ProviderModel::new(request, TEST_LIMITS);
+        let mut events = Vec::new();
+        model.complete(&view("what is this", vec![]), &mut |event| {
+            events.push(event);
+            true
+        });
+        let body: serde_json::Value =
+            serde_json::from_str(&server.requests.lock().unwrap()[0].1).unwrap();
+        assert_eq!(body["messages"][0]["content"][0]["text"], "what is this");
+        assert_eq!(body["messages"][0]["content"][1]["type"], "image_url");
+        assert!(body["messages"][0]["content"][1]["image_url"]["url"]
+            .as_str()
+            .unwrap()
+            .starts_with("data:image/png;base64,"));
+        assert!(events.iter().any(|event| matches!(
+            event,
+            crate::model_events::ModelEvent::TextDelta { text } if text == "a cat"
+        )));
+    }
+
+    #[test]
+    fn a_text_only_model_does_not_receive_stripped_text() {
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"should not run"},"finish_reason":"stop"}]}"#,
+            "[DONE]",
+        ])]);
+        let request = request(&server.base_url);
+        assert!(!request.provider.models[0].capabilities.vision);
+        let _ledger = crate::chat_images::TestLedger::set("text-only-turn", vec![vec![tiny_png()]]);
+        let mut model = ProviderModel::new(request, TEST_LIMITS);
+        let mut events = Vec::new();
+        model.complete(&view("what is this", vec![]), &mut |event| {
+            events.push(event);
+            true
+        });
+        assert!(server.requests.lock().unwrap().is_empty());
+        match events.last() {
+            Some(crate::model_events::ModelEvent::Error(error)) => {
+                assert_eq!(error.message, crate::chat_images::VISION_REFUSAL);
+            }
+            other => panic!("expected a vision refusal, got {other:?}"),
+        }
     }
 }

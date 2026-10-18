@@ -169,6 +169,11 @@ impl NativeChats {
                 worker_busy.store(false, Ordering::SeqCst);
                 return;
             }
+            if let Err(error) = crate::chat_images::load_ledger(&index_id) {
+                (emit.lock().expect("native sink"))(EngineEvent::error(error, true));
+                worker_busy.store(false, Ordering::SeqCst);
+                return;
+            }
             while let Ok(op) = op_rx.recv() {
                 match op {
                     ChatOp::Turn(prompt) => {
@@ -236,7 +241,7 @@ impl NativeChats {
 
     #[cfg(test)]
     pub fn send(&self, session_id: &str, text: &str) -> Result<(), String> {
-        self.send_with_reasoning(session_id, text, ReasoningLevelUpdate::Keep)
+        self.send_with_reasoning(session_id, text, ReasoningLevelUpdate::Keep, &[])
     }
 
     pub fn send_with_reasoning(
@@ -244,6 +249,7 @@ impl NativeChats {
         session_id: &str,
         text: &str,
         reasoning_level: ReasoningLevelUpdate,
+        images: &[crate::chat_images::ChatImage],
     ) -> Result<(), String> {
         if self
             .read_only
@@ -291,6 +297,10 @@ impl NativeChats {
                 );
             }
         }
+        let target = crate::engines::native_log::open_session_log(session_id)?
+            .header
+            .target;
+        accept_turn_images(session_id, &target, images)?;
         claim_turn(&session.turn_busy)?;
         if session.ops.send(ChatOp::Turn(text.to_string())).is_err() {
             session.turn_busy.store(false, Ordering::SeqCst);
@@ -332,6 +342,11 @@ impl NativeChats {
         let worker = thread::spawn(move || {
             let mut engine = engine;
             if let Err(error) = engine.ensure_log(&index_id) {
+                (emit.lock().expect("native sink"))(EngineEvent::error(error, true));
+                worker_busy.store(false, Ordering::SeqCst);
+                return;
+            }
+            if let Err(error) = crate::chat_images::load_ledger(&index_id) {
                 (emit.lock().expect("native sink"))(EngineEvent::error(error, true));
                 worker_busy.store(false, Ordering::SeqCst);
                 return;
@@ -608,6 +623,9 @@ pub struct NativeChatStartRequest {
     pub permission_mode: AiAgentPermissionMode,
     #[serde(default)]
     pub reasoning_level: Option<String>,
+    /// Composer images for this turn. Missing on older clients.
+    #[serde(default)]
+    pub images: Vec<crate::chat_images::ChatImage>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -784,6 +802,93 @@ fn user_reasoning(chats: &NativeChats, session_id: &str, level: Option<String>) 
     }
 }
 
+fn stamp_model_vision(stream: &mut AiModelStreamRequest) {
+    let base = crate::ai_models::provider_base_url(&stream.provider).unwrap_or_default();
+    let saved = stream
+        .provider
+        .models
+        .iter()
+        .find(|model| model.id == stream.model_id)
+        .is_some_and(|model| model.capabilities.vision);
+    let vision = crate::chat_images::catalog_target_allows_images(
+        &stream.provider.id,
+        &base,
+        &stream.model_id,
+        saved,
+    );
+    if let Some(model) = stream
+        .provider
+        .models
+        .iter_mut()
+        .find(|model| model.id == stream.model_id)
+    {
+        model.capabilities.vision = vision;
+    }
+}
+
+/// Checks caps and vision, then records the turn beside the session log.
+/// A refusal happens before the turn starts, so the text is not sent alone.
+fn accept_turn_images(
+    session_id: &str,
+    target: &str,
+    images: &[crate::chat_images::ChatImage],
+) -> Result<(), String> {
+    crate::chat_images::validate(images)?;
+    if !images.is_empty() {
+        match resolve_native_target(target)? {
+            NativeChatTarget::FreeTier => {}
+            NativeChatTarget::Catalog {
+                provider_kind,
+                provider_id,
+                model_id,
+            } => {
+                let provider = catalog_provider(provider_kind, &provider_id)?;
+                let base = crate::ai_models::provider_base_url(&provider).unwrap_or_default();
+                let saved = provider
+                    .models
+                    .iter()
+                    .find(|model| model.id == model_id)
+                    .is_some_and(|model| model.capabilities.vision);
+                if !crate::chat_images::catalog_target_allows_images(
+                    &provider_id,
+                    &base,
+                    &model_id,
+                    saved,
+                ) {
+                    return Err(crate::chat_images::VISION_REFUSAL.into());
+                }
+            }
+        }
+    }
+    crate::chat_images::push_turn(session_id, images.to_vec())
+}
+
+/// `native_chat_send` images. A missing key is an empty list.
+pub struct NativeChatImages(pub Vec<crate::chat_images::ChatImage>);
+
+impl<'de, R: tauri::Runtime> tauri::ipc::CommandArg<'de, R> for NativeChatImages {
+    fn from_command(
+        command: tauri::ipc::CommandItem<'de, R>,
+    ) -> Result<Self, tauri::ipc::InvokeError> {
+        let tauri::ipc::InvokeBody::Json(payload) = command.message.payload() else {
+            return Ok(Self(Vec::new()));
+        };
+        match payload.get(command.key) {
+            None | Some(serde_json::Value::Null) => Ok(Self(Vec::new())),
+            Some(value) => serde_json::from_value(value.clone())
+                .map(Self)
+                .map_err(|error| {
+                    tauri::Error::InvalidArgs(
+                        command.name,
+                        command.key,
+                        serde::de::Error::custom(error),
+                    )
+                    .into()
+                }),
+        }
+    }
+}
+
 fn apply_catalog_reasoning(stream: &mut AiModelStreamRequest, reasoning: &UserReasoning) {
     stream.reasoning_level = reasoning.level.clone();
     stream.reasoning_slot = Some(Arc::clone(&reasoning.slot));
@@ -838,6 +943,7 @@ fn start_named_request(
     request: NativeChatStartRequest,
     emit: impl FnMut(EngineEvent) + Send + 'static,
 ) -> Result<String, String> {
+    accept_turn_images(&id, &request.target, &request.images)?;
     let target = resolve_native_target(&request.target)?;
     let system = composed_system_prompt(request.system_prompt.as_deref());
     let vault_path = request
@@ -894,6 +1000,7 @@ fn start_named_request(
                 reasoning_notices_seen: None,
             };
             apply_catalog_reasoning(&mut stream, &reasoning);
+            stamp_model_vision(&mut stream);
             let mut engine = NativeEngine::new(ProviderModel::new(stream, HttpLimits::STREAM));
             engine.set_vault(vault_path.clone(), vault_paths.clone());
             engine.set_permission_mode(mode);
@@ -919,8 +1026,9 @@ pub fn native_chat_send(
     session_id: String,
     text: String,
     reasoning_level: ReasoningLevelUpdate,
+    images: NativeChatImages,
 ) -> Result<(), String> {
-    chats.send_with_reasoning(&session_id, &text, reasoning_level)
+    chats.send_with_reasoning(&session_id, &text, reasoning_level, &images.0)
 }
 
 #[cfg(desktop)]
@@ -1052,6 +1160,7 @@ where
             _ => AiAgentPermissionMode::Safe,
         },
         reasoning_level: None,
+        images: Vec::new(),
     };
     let target = match resolve_native_target(&request.target) {
         Ok(target) => target,
@@ -1125,6 +1234,7 @@ where
                 reasoning_notices_seen: None,
             };
             apply_catalog_reasoning(&mut stream, &reasoning);
+            stamp_model_vision(&mut stream);
             let mut engine =
                 NativeEngine::from_parts(agent, ProviderModel::new(stream, HttpLimits::STREAM));
             engine.set_vault(request.vault_path.clone(), request.vault_paths.clone());
@@ -1251,6 +1361,7 @@ mod tests {
                 vault_paths: Vec::new(),
                 permission_mode: AiAgentPermissionMode::default(),
                 reasoning_level: None,
+                images: Vec::new(),
             };
             let expected = composed_system_prompt(request.system_prompt.as_deref());
             assert!(

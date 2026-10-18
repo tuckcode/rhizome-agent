@@ -213,6 +213,7 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
         let started = clock.now_ms();
         let mut tried = 0;
         let mut keyed = false;
+        let mut skipped_vision = false;
         let mut reopens_at: Option<Millis> = None;
         let mut last_error: Option<ModelError> = None;
         let mut keychain_error: Option<String> = None;
@@ -248,15 +249,22 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
             if tried >= 2 && now.saturating_sub(started) >= *budget && !provider.user_supplied {
                 continue;
             }
-            tried += 1;
 
             let provider_id = provider.id.clone();
             let model_id = target.model.clone();
+            let mut request =
+                provider_request(provider, &target.model, base_url.clone(), credential);
+            if crate::chat_images::ledger_has_images()
+                && !crate::ai_models::model_accepts_images(&request)
+            {
+                skipped_vision = true;
+                continue;
+            }
+            tried += 1;
             report(ProviderAttempt::Trying {
                 provider_id: provider_id.clone(),
                 model_id: model_id.clone(),
             });
-            let mut request = provider_request(provider, &target.model, base_url, credential);
             request.system_prompt = system_prompt.clone();
             request.reasoning_slot = reasoning_slot.clone();
             request.reasoning_notice_tx = reasoning_notice_tx.clone();
@@ -296,6 +304,14 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
             }
         }
 
+        if skipped_vision && tried == 0 && last_error.is_none() {
+            emit(ModelEvent::Error(crate::model_events::ModelError {
+                kind: crate::model_events::ModelErrorKind::Rejected,
+                status: None,
+                message: crate::chat_images::VISION_REFUSAL.into(),
+            }));
+            return true;
+        }
         let error = exhausted(
             last_error,
             reopens_at,
@@ -494,7 +510,7 @@ fn provider_request(
                 "capabilities": {
                     "streaming": true,
                     "tools": true,
-                    "vision": false,
+                    "vision": crate::reasoning_levels::vision_from_catalog(&provider.id, &base_url, model).unwrap_or(false),
                     "json_mode": false,
                     "reasoning": crate::reasoning_levels::support_for_free_tier(&provider.id, &base_url, model)
                 }
@@ -513,6 +529,7 @@ mod tests {
     use crate::ai_models::test_server::{http_response, serve, sse, TEST_LIMITS};
     use crate::model_events::FinishReason;
     use crate::rhizome_loop::{AgentLoop, DurableEvent};
+    use base64::Engine;
     use serde_json::Value;
     use std::collections::HashMap;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -549,6 +566,83 @@ mod tests {
         let _keep_off_the_user_cache = tempfile::tempdir().expect("temp");
         crate::reasoning_levels::reset_reasoning_state_for_test(Some(
             _keep_off_the_user_cache.path().to_path_buf(),
+        ));
+    }
+
+    #[test]
+    fn images_skip_a_text_model_and_reach_a_vision_model() {
+        let dir = tempfile::tempdir().expect("temp");
+        std::fs::write(
+            dir.path().join("models-dev.json"),
+            r#"{
+              "openai": {"models": {"openai-model": {"modalities": {"input": ["text"]}}}},
+              "google": {"models": {"google-model": {"modalities": {"input": ["text", "image"]}}}}
+            }"#,
+        )
+        .unwrap();
+        std::fs::write(dir.path().join("openrouter-models.json"), r#"{"data":[]}"#).unwrap();
+        crate::reasoning_levels::reset_reasoning_state_for_test(Some(dir.path().to_path_buf()));
+
+        let text = serve(vec![reply("nope")]);
+        let vision = serve(vec![reply("seen")]);
+        let mut router = RoutingModel::new(
+            catalog(&[("openai", &text.base_url), ("google", &vision.base_url)]),
+            keys(&["openai", "google"]),
+            FakeClock::at(T0),
+            TEST_LIMITS,
+        );
+        let image = crate::chat_images::ChatImage {
+            mime_type: "image/png".into(),
+            data: base64::engine::general_purpose::STANDARD.encode(b"png"),
+        };
+        let _ledger = crate::chat_images::TestLedger::set("route-images", vec![vec![image]]);
+        assert_eq!(run(&mut router), done("seen"));
+        assert!(text.requests.lock().unwrap().is_empty());
+        let body: Value = serde_json::from_str(&vision.requests.lock().unwrap()[0].1).unwrap();
+        assert_eq!(body["messages"][0]["content"][1]["type"], "image_url");
+
+        let _restore = tempfile::tempdir().expect("temp");
+        crate::reasoning_levels::reset_reasoning_state_for_test(Some(
+            _restore.path().to_path_buf(),
+        ));
+    }
+
+    #[test]
+    fn images_are_refused_when_no_routed_model_accepts_them() {
+        let dir = tempfile::tempdir().expect("temp");
+        std::fs::write(
+            dir.path().join("models-dev.json"),
+            r#"{"openai": {"models": {"openai-model": {"modalities": {"input": ["text"]}}}}}"#,
+        )
+        .unwrap();
+        std::fs::write(dir.path().join("openrouter-models.json"), r#"{"data":[]}"#).unwrap();
+        crate::reasoning_levels::reset_reasoning_state_for_test(Some(dir.path().to_path_buf()));
+
+        let text = serve(vec![reply("nope")]);
+        let mut router = RoutingModel::new(
+            catalog(&[("openai", &text.base_url)]),
+            keys(&["openai"]),
+            FakeClock::at(T0),
+            TEST_LIMITS,
+        );
+        let _ledger = crate::chat_images::TestLedger::set(
+            "route-text-only",
+            vec![vec![crate::chat_images::ChatImage {
+                mime_type: "image/jpeg".into(),
+                data: base64::engine::general_purpose::STANDARD.encode(b"jpg"),
+            }]],
+        );
+        let events = run(&mut router);
+        match events.last() {
+            Some(ModelEvent::Error(error)) => {
+                assert_eq!(error.message, crate::chat_images::VISION_REFUSAL);
+            }
+            other => panic!("expected a vision refusal, got {other:?}"),
+        }
+        assert!(text.requests.lock().unwrap().is_empty());
+        let _restore = tempfile::tempdir().expect("temp");
+        crate::reasoning_levels::reset_reasoning_state_for_test(Some(
+            _restore.path().to_path_buf(),
         ));
     }
 

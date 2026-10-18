@@ -847,12 +847,26 @@ where
     extract_openai_text(&json)
 }
 
+/// The selected model row says it accepts images. Unknown and text-only
+/// are both false: an image is refused rather than stripped.
+pub(crate) fn model_accepts_images(request: &AiModelStreamRequest) -> bool {
+    request
+        .provider
+        .models
+        .iter()
+        .any(|model| model.id == request.model_id && model.capabilities.vision)
+}
+
 fn send_anthropic_message(request: &AiModelStreamRequest) -> Result<String, String> {
     let endpoint = format!("{}/messages", normalized_base_url(request)?);
+    let content = crate::chat_images::anthropic_user_content(
+        &request.message,
+        &crate::chat_images::current_turn_images(),
+    );
     let mut payload = serde_json::json!({
         "model": request.model_id,
         "max_tokens": selected_max_tokens(request),
-        "messages": [{ "role": "user", "content": request.message }]
+        "messages": [{ "role": "user", "content": content }]
     });
 
     if let Some(system_prompt) = non_empty_option(request.system_prompt.as_deref()) {

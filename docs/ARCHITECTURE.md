@@ -515,7 +515,13 @@ with a 2s bound. Native transcripts use `rhizome-native:<uuid>` and never
 write under `~/.prime`. Step 2c stores one append-only JSONL log per
 session at `<app config dir>/native-sessions/<id>.jsonl` (ADR-0183): flush
 every line, 100 MiB / 1 MiB caps, owner-only file, known-credential
-scrub, reopen as cancelled with no restored grants. The id is a UUID.
+scrub, reopen as cancelled with no restored grants. The id is a UUID. Pasted and attached images are not stored in that
+JSONL. They are written beside it as `{id}.images.json` plus
+`{id}-images/` (ADR-0190), capped at 4 images and 5 MB each, PNG JPEG
+GIF or WebP. A log from before that file still opens. The next turn
+sends the saved images again. A text-only model, or a model whose
+vision support is not in the catalog, refuses the turn instead of
+dropping the image.
 An OS file lock covers a second process and dies with it. Both windows
 may display a chat; only one turn runs. Damage and a full log keep the
 original and continue in a new session. New native chats call

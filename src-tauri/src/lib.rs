@@ -69,6 +69,7 @@ pub mod engines;
 pub mod rhizome_loop;
 // Provider adapter and free-tier routing. They compile now. Chat must not
 // call them until Phase 6.
+pub mod chat_images;
 pub mod hermes_reasoning;
 pub mod provider_keys;
 #[cfg(test)]

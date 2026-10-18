@@ -237,6 +237,10 @@ impl<M: Model> Engine for NativeEngine<M> {
         prompt: &str,
         sink: Box<dyn FnMut(EngineEvent) + Send>,
     ) -> Result<(), String> {
+        let _image_session = self
+            .log_meta
+            .as_ref()
+            .map(|meta| crate::chat_images::SessionBind::new(&meta.session_id));
         self.events.clear();
         let collected = Arc::new(Mutex::new(Vec::new()));
         let emit_live = Arc::new(Mutex::new(sink));

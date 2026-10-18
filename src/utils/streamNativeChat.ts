@@ -1,3 +1,4 @@
+import type { PrimeImageContent } from '../lib/composerAttachments'
 import { isTauri } from '../mock-tauri'
 import type { AiAgentPermissionMode } from '../lib/aiAgentPermissionMode'
 import { normalizeAiAgentPermissionMode } from '../lib/aiAgentPermissionMode'
@@ -39,6 +40,8 @@ export interface StreamNativeChatRequest {
   sessionId?: string | null
   /** Saved on this chat and sent on the user turn. Omitted keeps the saved level. */
   reasoningLevel?: string | null
+  /** Staged composer images. Omitted on a text turn so the invoke stays the old shape. */
+  images?: PrimeImageContent[] | null
   callbacks: AgentStreamCallbacks
   signal?: AbortSignal
 }
@@ -130,7 +133,9 @@ export async function streamNativeChat(request: StreamNativeChatRequest): Promis
     return
   }
   if (!isTauri()) {
-    request.callbacks.onText(`[mock-native] You said: "${request.message}"`)
+    const imageCount = request.images?.length ?? 0
+    const imageNote = imageCount > 0 ? ` (${imageCount} image${imageCount === 1 ? '' : 's'})` : ''
+    request.callbacks.onText(`[mock-native] You said: "${request.message}"${imageNote}`)
     request.callbacks.onDone()
     return
   }
@@ -149,15 +154,24 @@ export async function streamNativeChat(request: StreamNativeChatRequest): Promis
           vaultPaths: request.vaultPaths ?? [],
           permissionMode: normalizeAiAgentPermissionMode(request.permissionMode),
           reasoningLevel: request.reasoningLevel || null,
+          ...(request.images && request.images.length > 0 ? { images: request.images } : {}),
         },
       })
     if (request.sessionId) {
-      const send: { sessionId: string; text: string; reasoningLevel?: string | null } = {
+      const send: {
+        sessionId: string
+        text: string
+        reasoningLevel?: string | null
+        images?: PrimeImageContent[]
+      } = {
         sessionId,
         text: request.message,
       }
       if (request.reasoningLevel !== undefined) {
         send.reasoningLevel = request.reasoningLevel
+      }
+      if (request.images && request.images.length > 0) {
+        send.images = request.images
       }
       await invoke('native_chat_send', send)
     }

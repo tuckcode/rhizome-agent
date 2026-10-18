@@ -359,4 +359,47 @@ describe('native stream listen', () => {
       reasoningLevel: null,
     })
   })
+
+  it('sends composer images on native start and on the next turn', async () => {
+    const next = callbacks()
+    listenMock.mockImplementation(async (_name: string, handler: (event: { payload: unknown }) => void) => {
+      queueMicrotask(() => {
+        handler({ payload: { kind: 'turn_end' } })
+      })
+      return vi.fn()
+    })
+    invokeMock.mockResolvedValue('new-id')
+    const images = [{ type: 'image' as const, data: 'aaaa', mimeType: 'image/png' }]
+
+    await streamNativeChat({
+      target: 'openai/gpt-4o',
+      message: 'what is this',
+      vaultPath: '/vault',
+      images,
+      callbacks: next,
+    })
+
+    expect(invokeMock).toHaveBeenCalledWith('native_chat_start', expect.objectContaining({
+      request: expect.objectContaining({
+        prompt: 'what is this',
+        images,
+      }),
+    }))
+
+    invokeMock.mockClear()
+    await streamNativeChat({
+      target: 'openai/gpt-4o',
+      message: 'and this',
+      vaultPath: '/vault',
+      sessionId: 'already-open',
+      images,
+      callbacks: callbacks(),
+    })
+
+    expect(invokeMock).toHaveBeenCalledWith('native_chat_send', {
+      sessionId: 'already-open',
+      text: 'and this',
+      images,
+    })
+  })
 })

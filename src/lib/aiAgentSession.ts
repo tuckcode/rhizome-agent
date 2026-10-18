@@ -57,7 +57,7 @@ interface SelectedTargetStreamRequest {
   context: AgentExecutionContext
   formattedMessage: string
   systemPrompt: string
-  /** Only Prime takes these; `api_model` targets are text-only for now. */
+  /** Prime and native both take these. A text-only native model refuses the turn. */
   images?: PrimeImageContent[]
   callbacks: ReturnType<typeof createStreamCallbacks>
   signal?: AbortSignal
@@ -126,6 +126,7 @@ async function streamWithSelectedTarget({
       vaultPaths: context.vaultPaths,
       permissionMode: context.permissionMode,
       sessionId: context.nativeSessionId,
+      images,
       callbacks,
       signal,
     })

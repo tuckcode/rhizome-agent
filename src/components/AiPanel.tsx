@@ -350,7 +350,7 @@ export function AiPanelView({
   const { attachments, attachImages, removeAttachment, clearAttachments } = useAiPanelAttachments({
     locale,
     onUnsupportedAiPaste,
-    modelAcceptsImages: primeHost.modelAcceptsImages,
+    modelAcceptsImages: chatEngine === 'prime' ? primeHost.modelAcceptsImages : null,
     modelName: primeHost.modelName,
     modelId: primeHost.modelId,
   })
