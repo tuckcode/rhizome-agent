@@ -400,6 +400,7 @@ describe('native stream listen', () => {
       sessionId: 'already-open',
       text: 'and this',
       images,
+      sendAnyway: false,
     })
   })
 })

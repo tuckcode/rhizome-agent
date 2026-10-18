@@ -113,6 +113,7 @@ pub struct NativeChats {
     sessions: Mutex<HashMap<String, LiveNativeChat>>,
     read_only: Mutex<HashMap<String, ()>>,
     reasoning_slots: Mutex<HashMap<String, crate::reasoning_levels::ReasoningLevelSlot>>,
+    targets: Mutex<HashMap<String, String>>,
 }
 
 struct LiveNativeChat {
@@ -143,13 +144,14 @@ impl NativeChats {
         engine: NativeEngine<M>,
         emit: impl FnMut(EngineEvent) + Send + 'static,
     ) -> Result<String, String> {
-        self.start_named(uuid::Uuid::new_v4().to_string(), prompt, engine, emit)
+        self.start_named(uuid::Uuid::new_v4().to_string(), prompt, &[], engine, emit)
     }
 
     pub fn start_named<M: Model + Send + 'static>(
         &self,
         id: String,
         prompt: &str,
+        images: &[crate::chat_images::ChatImage],
         engine: NativeEngine<M>,
         emit: impl FnMut(EngineEvent) + Send + 'static,
     ) -> Result<String, String> {
@@ -222,7 +224,12 @@ impl NativeChats {
             }
         });
         claim_turn(&turn_busy)?;
+        if let Err(error) = crate::chat_images::push_turn(&id, images.to_vec()) {
+            turn_busy.store(false, Ordering::SeqCst);
+            return Err(error);
+        }
         if ops.send(ChatOp::Turn(prompt.to_string())).is_err() {
+            let _ = crate::chat_images::rollback_turn(&id);
             turn_busy.store(false, Ordering::SeqCst);
             return Err("native chat worker closed".into());
         }
@@ -241,7 +248,7 @@ impl NativeChats {
 
     #[cfg(test)]
     pub fn send(&self, session_id: &str, text: &str) -> Result<(), String> {
-        self.send_with_reasoning(session_id, text, ReasoningLevelUpdate::Keep, &[])
+        self.send_with_reasoning(session_id, text, ReasoningLevelUpdate::Keep, &[], false)
     }
 
     pub fn send_with_reasoning(
@@ -250,6 +257,7 @@ impl NativeChats {
         text: &str,
         reasoning_level: ReasoningLevelUpdate,
         images: &[crate::chat_images::ChatImage],
+        send_anyway: bool,
     ) -> Result<(), String> {
         if self
             .read_only
@@ -268,44 +276,27 @@ impl NativeChats {
         if session.read_only {
             return Err("native session is read-only".into());
         }
-        match reasoning_level {
-            ReasoningLevelUpdate::Keep => {}
-            ReasoningLevelUpdate::Clear => {
-                if let Some(slot) = self
-                    .reasoning_slots
-                    .lock()
-                    .expect("reasoning slots")
-                    .get(session_id)
-                {
-                    *slot.lock().expect("reasoning level") = None;
-                }
-                let _ = crate::engines::native_log::write_reasoning_sidecar(session_id, None);
-            }
-            ReasoningLevelUpdate::Set(level) => {
-                let normalized = normalize_reasoning_level(Some(level));
-                if let Some(slot) = self
-                    .reasoning_slots
-                    .lock()
-                    .expect("reasoning slots")
-                    .get(session_id)
-                {
-                    *slot.lock().expect("reasoning level") = normalized.clone();
-                }
-                let _ = crate::engines::native_log::write_reasoning_sidecar(
-                    session_id,
-                    normalized.as_deref(),
-                );
-            }
+        if !images.is_empty() {
+            let target = self
+                .targets
+                .lock()
+                .expect("native targets")
+                .get(session_id)
+                .cloned()
+                .ok_or_else(|| format!("unknown native session {session_id}"))?;
+            gate_images(&target, images, send_anyway)?;
         }
-        let target = crate::engines::native_log::open_session_log(session_id)?
-            .header
-            .target;
-        accept_turn_images(session_id, &target, images)?;
         claim_turn(&session.turn_busy)?;
+        if let Err(error) = crate::chat_images::push_turn(session_id, images.to_vec()) {
+            session.turn_busy.store(false, Ordering::SeqCst);
+            return Err(error);
+        }
         if session.ops.send(ChatOp::Turn(text.to_string())).is_err() {
+            let _ = crate::chat_images::rollback_turn(session_id);
             session.turn_busy.store(false, Ordering::SeqCst);
             return Err("native chat worker closed".into());
         }
+        persist_reasoning(self, session_id, reasoning_level);
         Ok(())
     }
 
@@ -474,20 +465,22 @@ impl NativeChats {
         if let Some(worker) = session.worker.take() {
             join_with_bound(worker, NATIVE_QUIT_BOUND);
         }
+        crate::chat_images::drop_ledger(session_id);
         Ok(())
     }
 
     pub fn settle_all(&self, bound: Duration) {
-        let sessions: Vec<LiveNativeChat> = {
+        let sessions: Vec<(String, LiveNativeChat)> = {
             let mut guard = self.sessions.lock().expect("native chats");
-            guard.drain().map(|(_, session)| session).collect()
+            guard.drain().collect()
         };
-        for mut session in sessions {
+        for (id, mut session) in sessions {
             session.control.settle_on_quit();
             let _ = session.ops.send(ChatOp::End);
             if let Some(worker) = session.worker.take() {
                 join_with_bound(worker, bound);
             }
+            crate::chat_images::drop_ledger(&id);
         }
     }
 
@@ -626,6 +619,9 @@ pub struct NativeChatStartRequest {
     /// Composer images for this turn. Missing on older clients.
     #[serde(default)]
     pub images: Vec<crate::chat_images::ChatImage>,
+    /// The user confirmed an unknown vision model.
+    #[serde(default)]
+    pub send_anyway: bool,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -639,6 +635,8 @@ pub struct NativeChatForkRequest {
     pub vault_paths: Vec<String>,
     #[serde(default)]
     pub permission_mode: AiAgentPermissionMode,
+    #[serde(default)]
+    pub source_session_id: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -661,6 +659,8 @@ pub struct NativeChatOpenResult {
     pub read_only: bool,
     pub error: Option<String>,
     pub successor_id: Option<String>,
+    #[serde(default)]
+    pub images: Vec<Vec<crate::chat_images::ChatImage>>,
 }
 
 pub fn list_native_sessions() -> Result<Vec<NativeChatListItem>, String> {
@@ -743,6 +743,7 @@ pub fn open_native_session_record(session_id: &str) -> Result<NativeChatOpenResu
         read_only: opened.read_only || error.is_some(),
         error,
         successor_id: opened.successor_id,
+        images: crate::chat_images::read_turns(session_id).unwrap_or_default(),
     })
 }
 
@@ -810,57 +811,113 @@ fn stamp_model_vision(stream: &mut AiModelStreamRequest) {
         .iter()
         .find(|model| model.id == stream.model_id)
         .is_some_and(|model| model.capabilities.vision);
-    let vision = crate::chat_images::catalog_target_allows_images(
-        &stream.provider.id,
-        &base,
-        &stream.model_id,
-        saved,
-    );
+    let state =
+        crate::chat_images::vision_state(&stream.provider.id, &base, &stream.model_id, saved);
+    stream.vision_state = state;
     if let Some(model) = stream
         .provider
         .models
         .iter_mut()
         .find(|model| model.id == stream.model_id)
     {
-        model.capabilities.vision = vision;
+        model.capabilities.vision = state == crate::chat_images::VisionState::Yes;
     }
 }
 
-/// Checks caps and vision, then records the turn beside the session log.
-/// A refusal happens before the turn starts, so the text is not sent alone.
-fn accept_turn_images(
-    session_id: &str,
+fn persist_reasoning(chats: &NativeChats, session_id: &str, reasoning_level: ReasoningLevelUpdate) {
+    match reasoning_level {
+        ReasoningLevelUpdate::Keep => {}
+        ReasoningLevelUpdate::Clear => {
+            if let Some(slot) = chats
+                .reasoning_slots
+                .lock()
+                .expect("reasoning slots")
+                .get(session_id)
+            {
+                *slot.lock().expect("reasoning level") = None;
+            }
+            let _ = crate::engines::native_log::write_reasoning_sidecar(session_id, None);
+        }
+        ReasoningLevelUpdate::Set(level) => {
+            let normalized = normalize_reasoning_level(Some(level));
+            if let Some(slot) = chats
+                .reasoning_slots
+                .lock()
+                .expect("reasoning slots")
+                .get(session_id)
+            {
+                *slot.lock().expect("reasoning level") = normalized.clone();
+            }
+            let _ = crate::engines::native_log::write_reasoning_sidecar(
+                session_id,
+                normalized.as_deref(),
+            );
+        }
+    }
+}
+
+/// Refuses a new image before the turn is logged.
+fn gate_images(
     target: &str,
     images: &[crate::chat_images::ChatImage],
+    send_anyway: bool,
 ) -> Result<(), String> {
+    if images.is_empty() {
+        return Ok(());
+    }
     crate::chat_images::validate(images)?;
-    if !images.is_empty() {
-        match resolve_native_target(target)? {
-            NativeChatTarget::FreeTier => {}
-            NativeChatTarget::Catalog {
-                provider_kind,
-                provider_id,
-                model_id,
-            } => {
-                let provider = catalog_provider(provider_kind, &provider_id)?;
-                let base = crate::ai_models::provider_base_url(&provider).unwrap_or_default();
-                let saved = provider
-                    .models
-                    .iter()
-                    .find(|model| model.id == model_id)
-                    .is_some_and(|model| model.capabilities.vision);
-                if !crate::chat_images::catalog_target_allows_images(
-                    &provider_id,
-                    &base,
-                    &model_id,
-                    saved,
-                ) {
-                    return Err(crate::chat_images::VISION_REFUSAL.into());
+    let model_label = target.rsplit('/').next().unwrap_or(target);
+    match resolve_native_target(target)? {
+        NativeChatTarget::FreeTier => {
+            let catalog = crate::rhizome_routing::Catalog::pinned();
+            let mut any_yes = false;
+            let mut any_unknown = false;
+            for provider in &catalog.providers {
+                for model in &provider.models {
+                    match crate::chat_images::vision_state(
+                        &provider.id,
+                        &provider.base_url,
+                        &model.id,
+                        false,
+                    ) {
+                        crate::chat_images::VisionState::Yes => any_yes = true,
+                        crate::chat_images::VisionState::Unknown => any_unknown = true,
+                        crate::chat_images::VisionState::No => {}
+                    }
+                }
+            }
+            if any_yes || (any_unknown && send_anyway) {
+                return Ok(());
+            }
+            if any_unknown {
+                return Err(crate::chat_images::unknown_vision_note("the free tier"));
+            }
+            Err(crate::chat_images::text_only_refusal("the free tier"))
+        }
+        NativeChatTarget::Catalog {
+            provider_kind,
+            provider_id,
+            model_id,
+        } => {
+            let provider = catalog_provider(provider_kind, &provider_id)?;
+            let base = crate::ai_models::provider_base_url(&provider).unwrap_or_default();
+            let saved = provider
+                .models
+                .iter()
+                .find(|model| model.id == model_id)
+                .is_some_and(|model| model.capabilities.vision);
+            match crate::chat_images::vision_state(&provider_id, &base, &model_id, saved) {
+                crate::chat_images::VisionState::Yes => Ok(()),
+                crate::chat_images::VisionState::No => {
+                    Err(crate::chat_images::text_only_refusal(model_label))
+                }
+                crate::chat_images::VisionState::Unknown if send_anyway => Ok(()),
+                crate::chat_images::VisionState::Unknown => {
+                    Err(crate::chat_images::unknown_vision_note(model_label))
                 }
             }
         }
     }
-    crate::chat_images::push_turn(session_id, images.to_vec())
 }
 
 /// `native_chat_send` images. A missing key is an empty list.
@@ -943,7 +1000,12 @@ fn start_named_request(
     request: NativeChatStartRequest,
     emit: impl FnMut(EngineEvent) + Send + 'static,
 ) -> Result<String, String> {
-    accept_turn_images(&id, &request.target, &request.images)?;
+    gate_images(&request.target, &request.images, request.send_anyway)?;
+    chats
+        .targets
+        .lock()
+        .expect("native targets")
+        .insert(id.clone(), request.target.clone());
     let target = resolve_native_target(&request.target)?;
     let system = composed_system_prompt(request.system_prompt.as_deref());
     let vault_path = request
@@ -978,7 +1040,7 @@ fn start_named_request(
                 system.clone(),
             );
             engine.set_saved_reasoning_level(reasoning.level);
-            chats.start_named(id, &request.prompt, engine, emit)
+            chats.start_named(id, &request.prompt, &request.images, engine, emit)
         }
         NativeChatTarget::Catalog {
             provider_kind,
@@ -998,6 +1060,8 @@ fn start_named_request(
                 reasoning_slot: None,
                 reasoning_notice_tx: None,
                 reasoning_notices_seen: None,
+                chat_images: Vec::new(),
+                vision_state: crate::chat_images::VisionState::Unknown,
             };
             apply_catalog_reasoning(&mut stream, &reasoning);
             stamp_model_vision(&mut stream);
@@ -1014,7 +1078,7 @@ fn start_named_request(
                 system.clone(),
             );
             engine.set_saved_reasoning_level(reasoning.level);
-            chats.start_named(id, &request.prompt, engine, emit)
+            chats.start_named(id, &request.prompt, &request.images, engine, emit)
         }
     }
 }
@@ -1027,8 +1091,15 @@ pub fn native_chat_send(
     text: String,
     reasoning_level: ReasoningLevelUpdate,
     images: NativeChatImages,
+    send_anyway: Option<bool>,
 ) -> Result<(), String> {
-    chats.send_with_reasoning(&session_id, &text, reasoning_level, &images.0)
+    chats.send_with_reasoning(
+        &session_id,
+        &text,
+        reasoning_level,
+        &images.0,
+        send_anyway.unwrap_or(false),
+    )
 }
 
 #[cfg(desktop)]
@@ -1063,6 +1134,36 @@ pub fn native_chat_list() -> Result<Vec<NativeChatListItem>, String> {
     list_native_sessions()
 }
 
+/// `yes`, `no`, or `unknown` for the composer. Unknown is not text-only.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn native_model_vision(target: String) -> Result<String, String> {
+    let resolved = resolve_native_target(&target)?;
+    let state = match resolved {
+        NativeChatTarget::FreeTier => crate::chat_images::VisionState::Unknown,
+        NativeChatTarget::Catalog {
+            provider_kind,
+            provider_id,
+            model_id,
+        } => {
+            let provider = catalog_provider(provider_kind, &provider_id)?;
+            let base = crate::ai_models::provider_base_url(&provider).unwrap_or_default();
+            let saved = provider
+                .models
+                .iter()
+                .find(|model| model.id == model_id)
+                .is_some_and(|model| model.capabilities.vision);
+            crate::chat_images::vision_state(&provider_id, &base, &model_id, saved)
+        }
+    };
+    Ok(match state {
+        crate::chat_images::VisionState::Yes => "yes",
+        crate::chat_images::VisionState::No => "no",
+        crate::chat_images::VisionState::Unknown => "unknown",
+    }
+    .to_string())
+}
+
 /// Persist kept turns as a new native session. A fork of an archived chat
 /// gets a new id, so it is not archived.
 pub fn fork_native_session(request: NativeChatForkRequest) -> Result<String, String> {
@@ -1079,6 +1180,16 @@ pub fn fork_native_session(request: NativeChatForkRequest) -> Result<String, Str
         reasoning_level: None,
     };
     crate::engines::native_log::write_session_events(&header, &request.events)?;
+    if let Some(source) = request.source_session_id.as_deref() {
+        let user_turns = request
+            .events
+            .iter()
+            .filter(|event| matches!(event, crate::rhizome_loop::DurableEvent::User { .. }))
+            .count();
+        if let Err(error) = crate::chat_images::copy_session_images(source, &id, user_turns) {
+            log::warn!("forked chat did not copy images: {error}");
+        }
+    }
     Ok(id)
 }
 
@@ -1161,6 +1272,7 @@ where
         },
         reasoning_level: None,
         images: Vec::new(),
+        send_anyway: false,
     };
     let target = match resolve_native_target(&request.target) {
         Ok(target) => target,
@@ -1232,6 +1344,8 @@ where
                 reasoning_slot: None,
                 reasoning_notice_tx: None,
                 reasoning_notices_seen: None,
+                chat_images: Vec::new(),
+                vision_state: crate::chat_images::VisionState::Unknown,
             };
             apply_catalog_reasoning(&mut stream, &reasoning);
             stamp_model_vision(&mut stream);
@@ -1362,6 +1476,7 @@ mod tests {
                 permission_mode: AiAgentPermissionMode::default(),
                 reasoning_level: None,
                 images: Vec::new(),
+                send_anyway: false,
             };
             let expected = composed_system_prompt(request.system_prompt.as_deref());
             assert!(
@@ -1687,6 +1802,7 @@ mod tests {
             vault_path: Some("/vault".into()),
             vault_paths: Vec::new(),
             permission_mode: AiAgentPermissionMode::Safe,
+            source_session_id: None,
         }
     }
 
@@ -2494,10 +2610,11 @@ mod tests {
             let _ = hold_tx.send(());
             let _ = wait_for_turn_end(&rx);
             assert!(
-                result.as_ref().err().is_none_or(|error| {
-                    !error.to_lowercase().contains("already running")
-                }),
-                "an immediate resend after a fatal no-key error must not say already running: {result:?}"
+                result
+                    .as_ref()
+                    .err()
+                    .is_none_or(|error| { !error.to_lowercase().contains("already running") }),
+                "an immediate resend after a fatal no-key error must not say already running"
             );
             result.expect("send after fatal no-key");
         });

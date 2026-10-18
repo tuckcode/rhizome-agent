@@ -387,7 +387,7 @@ pub fn vision_from_catalog(provider_id: &str, base_url: &str, model_id: &str) ->
                 }
             }
         }
-        for family in models_dev_families(&query) {
+        for family in vision_families(&query) {
             if let Some(item) = sources.models_dev_model(&family, &id) {
                 if let Some(answer) = vision_from_models_dev(&item) {
                     return Some(answer);
@@ -412,7 +412,7 @@ fn pinned_vision() -> &'static HashMap<String, HashMap<String, bool>> {
 fn pinned_vision_answer(query: &ResolveQuery<'_>) -> Option<bool> {
     let pin = pinned_vision();
     for id in catalog_model_keys(query.model_id) {
-        for family in models_dev_families(query) {
+        for family in vision_families(query) {
             if let Some(answer) = pin.get(&family).and_then(|models| models.get(&id)) {
                 return Some(*answer);
             }
@@ -426,15 +426,62 @@ fn pinned_vision_answer(query: &ResolveQuery<'_>) -> Option<bool> {
 /// Free-tier rows use `openai/gpt-oss-120b`. models.dev stores `gpt-oss-120b`
 /// under the `openai` provider. Both keys are looked up. The name itself
 /// never decides vision.
+fn push_key(keys: &mut Vec<String>, key: &str) {
+    let key = key.trim();
+    if !key.is_empty() && !keys.iter().any(|seen| seen == key) {
+        keys.push(key.to_string());
+    }
+}
+
 fn catalog_model_keys(model_id: &str) -> Vec<String> {
-    let trimmed = model_id.trim();
-    let mut keys = vec![trimmed.to_string()];
+    let trimmed = model_id.trim().trim_end_matches(':').trim();
+    let mut keys = Vec::new();
+    push_key(&mut keys, trimmed);
+    if let Some((name, _tag)) = trimmed.split_once(':') {
+        push_key(&mut keys, name);
+    }
     if let Some((_, suffix)) = trimmed.rsplit_once('/') {
-        if !suffix.is_empty() && !keys.iter().any(|key| key == suffix) {
-            keys.push(suffix.to_string());
+        push_key(&mut keys, suffix);
+        if let Some((name, _tag)) = suffix.split_once(':') {
+            push_key(&mut keys, name);
+        }
+    }
+    let snapshot = keys.clone();
+    for key in snapshot {
+        push_key(&mut keys, &key.replace('.', "-"));
+        push_key(&mut keys, &dash_versions_to_dots(&key));
+        if let Some(stem) = key.strip_suffix("-latest") {
+            push_key(&mut keys, stem);
+            push_key(&mut keys, &stem.replace('.', "-"));
+            push_key(&mut keys, &dash_versions_to_dots(stem));
+        }
+        if key == "chatgpt-4o-latest" {
+            push_key(&mut keys, "gpt-4o");
+        }
+        if key == "claude-3-5-sonnet-latest" || key == "claude-3.5-sonnet-latest" {
+            push_key(&mut keys, "claude-3-5-sonnet");
+            push_key(&mut keys, "claude-3.5-sonnet");
         }
     }
     keys
+}
+
+/// `claude-sonnet-5-5` and `claude-sonnet-5.5` are the same catalog id.
+fn dash_versions_to_dots(key: &str) -> String {
+    let chars: Vec<char> = key.chars().collect();
+    let mut out = String::new();
+    for (index, ch) in chars.iter().enumerate() {
+        let digit_neighbors = index > 0
+            && index + 1 < chars.len()
+            && chars[index - 1].is_ascii_digit()
+            && chars[index + 1].is_ascii_digit();
+        if *ch == '-' && digit_neighbors {
+            out.push('.');
+        } else {
+            out.push(*ch);
+        }
+    }
+    out
 }
 
 fn vision_from_openrouter(item: &Value) -> Option<bool> {
@@ -755,6 +802,22 @@ fn toggle_wire(family: &str) -> Option<(&'static str, WireSend)> {
         "ollama" => Some(("think", WireSend::Boolean)),
         _ => None,
     }
+}
+
+fn vision_families(query: &ResolveQuery<'_>) -> Vec<String> {
+    let mut families = models_dev_families(query);
+    let provider = query.provider.trim().to_lowercase().replace('-', "_");
+    let extra: &[&str] = match provider.as_str() {
+        "lmstudio" | "lm_studio" => &["lmstudio"],
+        "ollama" | "ollama_cloud" => &["ollama-cloud", "ollama"],
+        _ => &[],
+    };
+    for family in extra {
+        if !families.iter().any(|seen| seen == family) {
+            families.push((*family).to_string());
+        }
+    }
+    families
 }
 
 fn models_dev_families(query: &ResolveQuery<'_>) -> Vec<String> {

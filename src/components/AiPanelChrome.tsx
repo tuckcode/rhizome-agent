@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { ImageSquare, PaperPlaneRight, Plugs, Plus, Sparkle, Stop, X } from '@phosphor-icons/react'
+import { ImageSquare, PaperPlaneRight, Plugs, Plus, Sparkle, Stop, Warning, X } from '@phosphor-icons/react'
 import { AiMessage } from './AiMessage'
 import { Button } from '@/components/ui/button'
 import {
@@ -149,6 +149,14 @@ interface AiPanelComposerProps {
   onPickSkill?: (slash: string) => void
   onOpenGoal?: () => void
   onOpenSchedule?: () => void
+  /** Catalog vision for the selected model. Unknown asks before sending. */
+  vision?: 'yes' | 'no' | 'unknown'
+  modelLabel?: string
+  /** Remembered "Send anyway" for this model. */
+  visionSendAnyway?: boolean
+  onVisionSendAnyway?: () => void
+  /** Size, type, or count rejection, shown with the chips. */
+  attachmentNotice?: string | null
 }
 
 function getComposerPlaceholder(
@@ -1037,6 +1045,11 @@ export function AiPanelComposer({
   onPickSkill,
   onOpenGoal,
   onOpenSchedule,
+  vision = 'yes',
+  modelLabel = 'This model',
+  visionSendAnyway = false,
+  onVisionSendAnyway,
+  attachmentNotice = null,
 }: AiPanelComposerProps) {
   const t = createTranslator(locale)
   const { recordSent, browse } = useComposerPromptHistory(onChange)
@@ -1078,6 +1091,7 @@ export function AiPanelComposer({
   }, [completionText, lastAgentMessage])
 
   const handleSend = useCallback((text: string, references: NoteReference[]) => {
+    if (attachments.length > 0 && (vision === 'no' || (vision === 'unknown' && !visionSendAnyway))) return
     const outgoing = expandReplyQuotes(text)
     // Mid-turn Enter with no steer handler is ignored by the send policy.
     // Do not push that keystroke into prompt history.
@@ -1085,7 +1099,7 @@ export function AiPanelComposer({
       recordSent(outgoing)
     }
     onSend(outgoing, references)
-  }, [isActive, onSend, onSteer, recordSent])
+  }, [attachments.length, isActive, onSend, onSteer, recordSent, vision, visionSendAnyway])
   const handleSteer = useCallback((text: string, references: NoteReference[]) => {
     if (!onSteer) return
     const outgoing = expandReplyQuotes(text)
@@ -1101,7 +1115,9 @@ export function AiPanelComposer({
   // An attachment is a message. Pasting a screenshot and asking nothing is
   // the ordinary case for "what is this?", so it must be sendable alone.
   const hasPayload = hasInput || attachments.length > 0
-  const canSend = !composerDisabled && hasPayload
+  const imageBlocked = attachments.length > 0 && vision === 'no'
+  const imageNeedsConfirm = attachments.length > 0 && vision === 'unknown' && !visionSendAnyway
+  const canSend = !composerDisabled && hasPayload && !imageBlocked && !imageNeedsConfirm
   const placeholder = getComposerPlaceholder(agentLabel, agentReadiness, t)
   const boxRef = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
@@ -1243,6 +1259,68 @@ export function AiPanelComposer({
             </li>
           ))}
         </ul>
+      ) : null}
+      {attachmentNotice ? (
+        <p
+          className="mb-1.5 flex items-start gap-1.5 rounded-md border px-2 py-1.5 text-[12px]"
+          style={{
+            color: 'var(--feedback-warning-text)',
+            background: 'var(--feedback-warning-bg)',
+            borderColor: 'var(--feedback-warning-border)',
+          }}
+          data-testid="composer-attachment-notice"
+        >
+          <Warning size={14} weight="fill" aria-hidden="true" className="mt-0.5 shrink-0" />
+          <span>{attachmentNotice}</span>
+        </p>
+      ) : null}
+      {imageBlocked ? (
+        <p
+          className="mb-1.5 flex items-start gap-1.5 rounded-md border px-2 py-1.5 text-[12px]"
+          style={{
+            color: 'var(--feedback-warning-text)',
+            background: 'var(--feedback-warning-bg)',
+            borderColor: 'var(--feedback-warning-border)',
+          }}
+          data-testid="composer-vision-note"
+        >
+          <Warning size={14} weight="fill" aria-hidden="true" className="mt-0.5 shrink-0" />
+          <span>
+            {modelLabel} can&apos;t read images. Remove the image or{' '}
+            <button
+              type="button"
+              className="underline"
+              data-testid="composer-switch-model"
+              onClick={() => window.dispatchEvent(new Event('rhizome-open-model-picker'))}
+            >
+              switch to a model
+            </button>
+            {' '}that can.
+          </span>
+        </p>
+      ) : null}
+      {imageNeedsConfirm ? (
+        <p
+          className="mb-1.5 flex flex-wrap items-center gap-1.5 rounded-md border px-2 py-1.5 text-[12px]"
+          style={{
+            color: 'var(--feedback-warning-text)',
+            background: 'var(--feedback-warning-bg)',
+            borderColor: 'var(--feedback-warning-border)',
+          }}
+          data-testid="composer-vision-unknown"
+        >
+          <Warning size={14} weight="fill" aria-hidden="true" className="shrink-0" />
+          <span>Rhizome doesn&apos;t know if {modelLabel} can read images.</span>
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            data-testid="composer-send-anyway"
+            onClick={() => onVisionSendAnyway?.()}
+          >
+            Send anyway
+          </Button>
+        </p>
       ) : null}
       <div
         ref={boxRef}

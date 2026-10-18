@@ -10,4 +10,7 @@ use crate::model_events::ModelEvent;
 /// after a terminal event or when `emit` returns false.
 pub trait Model: Send {
     fn complete(&mut self, view: &ModelView, emit: &mut dyn FnMut(ModelEvent) -> bool) -> bool;
+
+    /// Images for this request. A model that ignores them sends text only.
+    fn set_chat_images(&mut self, _images: Vec<Vec<crate::chat_images::ChatImage>>) {}
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, type MutableRefObject, type ReactNode, type RefObject } from 'react'
+import { useEffect, useRef, useState, type MutableRefObject, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { aiPanelFrameStyle } from './aiPanelPulse'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
@@ -30,6 +30,8 @@ import {
 } from '../lib/aiAgents'
 import { chatEngineAllowsSendWithoutPrime } from '../lib/chatEngine'
 import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
+import { nativeModelVision, type NativeVision } from '../lib/nativeVision'
+import { rememberVisionSendAnyway, visionSendAnywayFor } from '../lib/visionChoice'
 import type { AiTarget } from '../lib/aiTargets'
 import type { AppLocale } from '../lib/i18n'
 import { type NoteListItem } from '../utils/ai-context'
@@ -347,9 +349,31 @@ export function AiPanelView({
   // 180–420: narrower and a session title is a truncation, wider and the
   // transcript starts losing the room the design gives it.
   const sessionsWidth = usePanelWidth(APP_STORAGE_KEYS.chatSessionsWidth, 228, 180, 420)
+  const [vision, setVision] = useState<NativeVision>('unknown')
+  const [visionSendAnyway, setVisionSendAnyway] = useState(false)
+  const [attachmentNotice, setAttachmentNotice] = useState<string | null>(null)
+  const modelTarget = nativeTarget ?? ''
+  useEffect(() => {
+    let cancelled = false
+    setVisionSendAnyway(visionSendAnywayFor(modelTarget))
+    if (!modelTarget) {
+      setVision('unknown')
+      return
+    }
+    void nativeModelVision(modelTarget).then((next) => {
+      if (!cancelled) setVision(next)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [modelTarget])
+  const reportAttachment = (message: string) => {
+    setAttachmentNotice(message)
+    onUnsupportedAiPaste?.(message)
+  }
   const { attachments, attachImages, removeAttachment, clearAttachments } = useAiPanelAttachments({
     locale,
-    onUnsupportedAiPaste,
+    onUnsupportedAiPaste: reportAttachment,
     modelAcceptsImages: chatEngine === 'prime' ? primeHost.modelAcceptsImages : null,
     modelName: primeHost.modelName,
     modelId: primeHost.modelId,
@@ -430,6 +454,7 @@ export function AiPanelView({
         target: resolveNativeChatTarget(nativeTarget),
         vaultPath,
         permissionMode,
+        sourceSessionId: nativeSessionId,
       })
       await pickSession({
         id: sessionId,
@@ -612,7 +637,15 @@ export function AiPanelView({
         queue={isPrimeTarget ? queue : undefined}
         onClearQueue={isPrimeTarget ? () => void clearQueue() : undefined}
         onStop={handleStop}
-        onUnsupportedAiPaste={onUnsupportedAiPaste}
+        onUnsupportedAiPaste={reportAttachment}
+        vision={vision}
+        modelLabel={modelTarget.split('/').pop() || 'This model'}
+        visionSendAnyway={visionSendAnyway}
+        onVisionSendAnyway={() => {
+          rememberVisionSendAnyway(modelTarget)
+          setVisionSendAnyway(true)
+        }}
+        attachmentNotice={attachmentNotice}
         attachments={attachments}
         onAttachImages={attachImages}
         onRemoveAttachment={removeAttachment}

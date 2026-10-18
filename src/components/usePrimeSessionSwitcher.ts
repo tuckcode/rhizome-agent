@@ -187,7 +187,7 @@ export function usePrimeSessionSwitcher({
         }
         agent.setNativeSession(opened.successorId || opened.sessionId || session.id, readOnly)
         startTransition(() => {
-          agent.replaceMessages(nativeEventsToConversation(opened.events))
+          agent.replaceMessages(nativeEventsToConversation(opened.events, opened.images))
           setTranscriptState('ready')
           if (typeof options?.messageIndex === 'number') {
             setFocusedTranscriptIndex(options.messageIndex)

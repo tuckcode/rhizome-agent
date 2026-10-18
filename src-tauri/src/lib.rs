@@ -816,6 +816,7 @@ macro_rules! app_invoke_handler {
             commands::stream_ai_model,
             commands::native_chat_start,
             commands::native_chat_send,
+            commands::native_model_vision,
             commands::native_chat_cancel,
             commands::native_chat_approval_reply,
             commands::native_chat_end,

@@ -24,6 +24,7 @@ export interface NativeChatOpenResult {
   readOnly?: boolean
   error?: string | null
   successorId?: string | null
+  images?: Array<Array<{ mimeType?: string; data?: string }>>
 }
 
 export type NativeDurableEvent =
@@ -56,6 +57,7 @@ export interface PersistNativeForkRequest {
   vaultPaths?: string[]
   permissionMode?: AiAgentPermissionMode
   systemPrompt?: string | null
+  sourceSessionId?: string | null
 }
 
 /**
@@ -166,6 +168,7 @@ export async function persistNativeFork(request: PersistNativeForkRequest): Prom
       vaultPath: request.vaultPath ?? null,
       vaultPaths: request.vaultPaths ?? [],
       permissionMode: request.permissionMode ?? 'safe',
+      sourceSessionId: request.sourceSessionId ?? null,
     },
   })
   trackEvent('chat_native_forked', { engine: 'native' })
@@ -265,7 +268,10 @@ type NativeEventObject = Record<string, { text?: string; id?: string; name?: str
  * Fold a native session log into the panel's turn shape so a restored or
  * archived native chat still shows the transcript it carried.
  */
-export function nativeEventsToConversation(events: unknown[] | undefined): AiAgentMessage[] {
+export function nativeEventsToConversation(
+  events: unknown[] | undefined,
+  images?: Array<Array<{ mimeType?: string; data?: string }>>,
+): AiAgentMessage[] {
   const messages: AiAgentMessage[] = []
   let current: AiAgentMessage | null = null
   let pendingAssistant = ''
@@ -280,6 +286,7 @@ export function nativeEventsToConversation(events: unknown[] | undefined): AiAge
     current = null
   }
 
+  let userIndex = 0
   for (const event of events ?? []) {
     if (event === 'TurnEnd') {
       flush()
@@ -289,10 +296,19 @@ export function nativeEventsToConversation(events: unknown[] | undefined): AiAge
     const record = event as NativeEventObject
     if (record.User) {
       flush()
+      const turnImages = images?.[userIndex] ?? []
+      userIndex += 1
       current = {
         id: nextMessageId(),
         userMessage: String(record.User.text ?? ''),
         actions: [],
+        images: turnImages
+          .filter((image) => image.data && image.mimeType)
+          .map((image) => ({
+            type: 'image' as const,
+            data: String(image.data),
+            mimeType: String(image.mimeType),
+          })),
       }
       continue
     }

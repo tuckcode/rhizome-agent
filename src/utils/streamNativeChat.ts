@@ -1,4 +1,5 @@
 import type { PrimeImageContent } from '../lib/composerAttachments'
+import { visionSendAnywayFor } from '../lib/visionChoice'
 import { isTauri } from '../mock-tauri'
 import type { AiAgentPermissionMode } from '../lib/aiAgentPermissionMode'
 import { normalizeAiAgentPermissionMode } from '../lib/aiAgentPermissionMode'
@@ -154,7 +155,9 @@ export async function streamNativeChat(request: StreamNativeChatRequest): Promis
           vaultPaths: request.vaultPaths ?? [],
           permissionMode: normalizeAiAgentPermissionMode(request.permissionMode),
           reasoningLevel: request.reasoningLevel || null,
-          ...(request.images && request.images.length > 0 ? { images: request.images } : {}),
+          ...(request.images && request.images.length > 0
+            ? { images: request.images, sendAnyway: visionSendAnywayFor(request.target) }
+            : {}),
         },
       })
     if (request.sessionId) {
@@ -163,6 +166,7 @@ export async function streamNativeChat(request: StreamNativeChatRequest): Promis
         text: string
         reasoningLevel?: string | null
         images?: PrimeImageContent[]
+        sendAnyway?: boolean
       } = {
         sessionId,
         text: request.message,
@@ -172,6 +176,7 @@ export async function streamNativeChat(request: StreamNativeChatRequest): Promis
       }
       if (request.images && request.images.length > 0) {
         send.images = request.images
+        send.sendAnyway = visionSendAnywayFor(request.target)
       }
       await invoke('native_chat_send', send)
     }

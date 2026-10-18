@@ -31,7 +31,8 @@ export type ReasoningSupport =
 export interface AiModelCapabilities {
   streaming: boolean
   tools: boolean
-  vision: boolean
+  /** `null` means the catalog has not said. That is not text-only. */
+  vision: boolean | null
   json_mode: boolean
   reasoning: ReasoningSupport
 }
@@ -87,7 +88,7 @@ export const LOCAL_AI_PROVIDER_KINDS: readonly AiModelProviderKind[] = AI_MODEL_
 export const DEFAULT_MODEL_CAPABILITIES: AiModelCapabilities = {
   streaming: false,
   tools: false,
-  vision: false,
+  vision: null,
   json_mode: false,
   reasoning: { state: 'unknown' as const },
 }

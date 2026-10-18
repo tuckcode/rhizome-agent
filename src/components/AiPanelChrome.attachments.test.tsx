@@ -150,4 +150,40 @@ describe('AiPanelComposer attachments', () => {
     expect(onAttachImages).toHaveBeenCalledTimes(1)
     expect(onAttachImages.mock.calls[0][0].map((f: File) => f.name)).toEqual(['shot.png'])
   })
+
+  it('disables send and names a text-only model', () => {
+    const { onSend } = renderComposer({
+      attachments: [attachment()],
+      input: 'look',
+      vision: 'no',
+      modelLabel: 'gpt-3.5-turbo',
+    })
+    expect(screen.getByTestId('composer-vision-note')).toHaveTextContent("gpt-3.5-turbo can't read images")
+    expect(screen.getByTestId('agent-send')).toBeDisabled()
+    fireEvent.click(screen.getByTestId('composer-switch-model'))
+    expect(onSend).not.toHaveBeenCalled()
+  })
+
+  it('asks before sending to a model with unknown vision', () => {
+    const onVisionSendAnyway = vi.fn()
+    renderComposer({
+      attachments: [attachment()],
+      input: 'look',
+      vision: 'unknown',
+      modelLabel: 'llava',
+      onVisionSendAnyway,
+    })
+    expect(screen.getByTestId('composer-vision-unknown')).toHaveTextContent("Rhizome doesn't know if llava can read images")
+    expect(screen.getByTestId('agent-send')).toBeDisabled()
+    fireEvent.click(screen.getByTestId('composer-send-anyway'))
+    expect(onVisionSendAnyway).toHaveBeenCalled()
+  })
+
+  it('shows a size or type rejection next to the chips', () => {
+    renderComposer({
+      attachments: [attachment()],
+      attachmentNotice: 'shot.bmp was not attached: only PNG, JPEG, GIF and WebP images can be attached',
+    })
+    expect(screen.getByTestId('composer-attachment-notice')).toHaveTextContent('only PNG, JPEG, GIF and WebP')
+  })
 })

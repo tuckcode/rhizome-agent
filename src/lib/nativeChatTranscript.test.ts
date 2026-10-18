@@ -274,6 +274,10 @@ describe('conversationToNativeEvents', () => {
       'TurnEnd',
     ])
     const reloaded = nativeEventsToConversation(events)
+    expect(nativeEventsToConversation(
+      [{ User: { text: 'See' } }, 'TurnEnd'],
+      [[{ mimeType: 'image/png', data: 'aaaa' }]],
+    )[0]?.images).toEqual([{ type: 'image', data: 'aaaa', mimeType: 'image/png' }])
     expect(reloaded[0]?.actions).toEqual([
       expect.objectContaining({ toolId: 'pending-1', status: 'error', output: CANCELLED_NATIVE_TOOL_REASON }),
       expect.objectContaining({ toolId: 'err-1', status: 'error', output: 'disk full' }),
@@ -313,6 +317,7 @@ describe('persistNativeFork', () => {
         vaultPath: '/vault',
         vaultPaths: [],
         permissionMode: 'safe',
+        sourceSessionId: null,
       },
     })
   })

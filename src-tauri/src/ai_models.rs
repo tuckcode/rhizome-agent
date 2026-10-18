@@ -39,6 +39,7 @@ pub enum AiModelApiKeyStorage {
 pub struct AiModelCapabilities {
     pub streaming: bool,
     pub tools: bool,
+    #[serde(deserialize_with = "flexible_vision")]
     pub vision: bool,
     pub json_mode: bool,
     /// Unknown, no, or a level list. A legacy bool loads as unknown.
@@ -94,6 +95,11 @@ pub struct AiModelStreamRequest {
     #[serde(skip)]
     pub reasoning_notices_seen:
         Option<std::sync::Arc<std::sync::Mutex<std::collections::HashSet<String>>>>,
+    /// Images for each user turn, oldest first. Empty on calls that are not a chat turn.
+    #[serde(skip, default)]
+    pub chat_images: Vec<Vec<crate::chat_images::ChatImage>>,
+    #[serde(skip, default)]
+    pub vision_state: crate::chat_images::VisionState,
 }
 
 /// Shown instead of a blank assistant bubble when a thinking level comes back empty.
@@ -218,6 +224,8 @@ pub fn test_ai_model_provider(request: AiModelProviderTestRequest) -> Result<Str
         reasoning_slot: None,
         reasoning_notice_tx: None,
         reasoning_notices_seen: None,
+        chat_images: Vec::new(),
+        vision_state: crate::chat_images::VisionState::Unknown,
     };
     complete_text(&request)
 }
@@ -364,6 +372,8 @@ pub fn discover_ai_model_ids_with(
         reasoning_slot: None,
         reasoning_notice_tx: None,
         reasoning_notices_seen: None,
+        chat_images: Vec::new(),
+        vision_state: crate::chat_images::VisionState::Unknown,
     };
     let endpoint = format!("{}/models", rejected_on_err(normalized_base_url(&request))?);
     let client = http_client(limits)?;
@@ -847,22 +857,18 @@ where
     extract_openai_text(&json)
 }
 
-/// The selected model row says it accepts images. Unknown and text-only
-/// are both false: an image is refused rather than stripped.
-pub(crate) fn model_accepts_images(request: &AiModelStreamRequest) -> bool {
-    request
-        .provider
-        .models
-        .iter()
-        .any(|model| model.id == request.model_id && model.capabilities.vision)
-}
-
 fn send_anthropic_message(request: &AiModelStreamRequest) -> Result<String, String> {
     let endpoint = format!("{}/messages", normalized_base_url(request)?);
-    let content = crate::chat_images::anthropic_user_content(
-        &request.message,
-        &crate::chat_images::current_turn_images(),
-    );
+    let accepts = request.vision_state == crate::chat_images::VisionState::Yes;
+    let budgeted = crate::chat_images::budget_turns(&request.chat_images, accepts);
+    let turn = budgeted
+        .last()
+        .cloned()
+        .unwrap_or(crate::chat_images::BudgetedTurn {
+            images: Vec::new(),
+            omitted: false,
+        });
+    let content = crate::chat_images::anthropic_turn_content(&request.message, &turn);
     let mut payload = serde_json::json!({
         "model": request.model_id,
         "max_tokens": selected_max_tokens(request),
@@ -1070,6 +1076,14 @@ fn extract_anthropic_text(json: &serde_json::Value) -> Result<String, String> {
     }
 }
 
+fn flexible_vision<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = Option::<bool>::deserialize(deserializer)?;
+    Ok(value.unwrap_or(false))
+}
+
 fn non_empty_option(value: Option<&str>) -> Option<&str> {
     value.map(str::trim).filter(|value| !value.is_empty())
 }
@@ -1139,6 +1153,8 @@ mod tests {
             reasoning_slot: None,
             reasoning_notice_tx: None,
             reasoning_notices_seen: None,
+            chat_images: Vec::new(),
+            vision_state: crate::chat_images::VisionState::Unknown,
         }
     }
 

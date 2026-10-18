@@ -120,6 +120,7 @@ pub struct RoutingModel<K: KeyStore, C: Clock> {
         Option<std::sync::mpsc::Sender<crate::reasoning_levels::ReasoningLevelNotice>>,
     reasoning_notices_seen:
         Option<std::sync::Arc<std::sync::Mutex<std::collections::HashSet<String>>>>,
+    chat_images: Vec<Vec<crate::chat_images::ChatImage>>,
 }
 
 impl<K: KeyStore, C: Clock> RoutingModel<K, C> {
@@ -138,7 +139,13 @@ impl<K: KeyStore, C: Clock> RoutingModel<K, C> {
             reasoning_slot: None,
             reasoning_notice_tx: None,
             reasoning_notices_seen: None,
+            chat_images: Vec::new(),
         }
+    }
+
+    pub fn with_chat_images(mut self, images: Vec<Vec<crate::chat_images::ChatImage>>) -> Self {
+        self.chat_images = images;
+        self
     }
 
     /// Attach the open chat's reasoning level. Routing health checks that
@@ -189,6 +196,10 @@ impl<K: KeyStore, C: Clock> RoutingModel<K, C> {
 }
 
 impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
+    fn set_chat_images(&mut self, images: Vec<Vec<crate::chat_images::ChatImage>>) {
+        self.chat_images = images;
+    }
+
     fn complete(&mut self, view: &ModelView, emit: &mut dyn FnMut(ModelEvent) -> bool) -> bool {
         let Self {
             catalog,
@@ -204,6 +215,7 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
             reasoning_slot,
             reasoning_notice_tx,
             reasoning_notices_seen,
+            chat_images,
         } = self;
         let mut report = |attempt: ProviderAttempt| {
             if let Some(observer) = observer.as_mut() {
@@ -254,12 +266,12 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
             let model_id = target.model.clone();
             let mut request =
                 provider_request(provider, &target.model, base_url.clone(), credential);
-            if crate::chat_images::ledger_has_images()
-                && !crate::ai_models::model_accepts_images(&request)
-            {
+            let current_images = chat_images.last().is_some_and(|turn| !turn.is_empty());
+            if current_images && request.vision_state == crate::chat_images::VisionState::No {
                 skipped_vision = true;
                 continue;
             }
+            request.chat_images = chat_images.clone();
             tried += 1;
             report(ProviderAttempt::Trying {
                 provider_id: provider_id.clone(),
@@ -308,7 +320,7 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
             emit(ModelEvent::Error(crate::model_events::ModelError {
                 kind: crate::model_events::ModelErrorKind::Rejected,
                 status: None,
-                message: crate::chat_images::VISION_REFUSAL.into(),
+                message: crate::chat_images::text_only_refusal("This model"),
             }));
             return true;
         }
@@ -497,7 +509,9 @@ fn provider_request(
     base_url: String,
     credential: Option<Credential>,
 ) -> AiModelStreamRequest {
-    serde_json::from_value(json!({
+    let vision: crate::chat_images::VisionState =
+        crate::chat_images::vision_state(&provider.id, &base_url, model, false);
+    let mut request: AiModelStreamRequest = serde_json::from_value(json!({
         "provider": {
             "id": provider.id,
             "name": provider.name,
@@ -510,7 +524,7 @@ fn provider_request(
                 "capabilities": {
                     "streaming": true,
                     "tools": true,
-                    "vision": crate::reasoning_levels::vision_from_catalog(&provider.id, &base_url, model).unwrap_or(false),
+                    "vision": vision == crate::chat_images::VisionState::Yes,
                     "json_mode": false,
                     "reasoning": crate::reasoning_levels::support_for_free_tier(&provider.id, &base_url, model)
                 }
@@ -520,7 +534,9 @@ fn provider_request(
         "message": "",
         "api_key_override": credential.map(|credential| credential.api_key),
     }))
-    .expect("a catalog provider request must deserialize")
+    .expect("a catalog provider request must deserialize");
+    request.vision_state = vision;
+    request
 }
 
 #[cfg(test)]
@@ -595,7 +611,7 @@ mod tests {
             mime_type: "image/png".into(),
             data: base64::engine::general_purpose::STANDARD.encode(b"png"),
         };
-        let _ledger = crate::chat_images::TestLedger::set("route-images", vec![vec![image]]);
+        router = router.with_chat_images(vec![vec![image]]);
         assert_eq!(run(&mut router), done("seen"));
         assert!(text.requests.lock().unwrap().is_empty());
         let body: Value = serde_json::from_str(&vision.requests.lock().unwrap()[0].1).unwrap();
@@ -625,17 +641,14 @@ mod tests {
             FakeClock::at(T0),
             TEST_LIMITS,
         );
-        let _ledger = crate::chat_images::TestLedger::set(
-            "route-text-only",
-            vec![vec![crate::chat_images::ChatImage {
-                mime_type: "image/jpeg".into(),
-                data: base64::engine::general_purpose::STANDARD.encode(b"jpg"),
-            }]],
-        );
+        router = router.with_chat_images(vec![vec![crate::chat_images::ChatImage {
+            mime_type: "image/jpeg".into(),
+            data: base64::engine::general_purpose::STANDARD.encode(b"jpg"),
+        }]]);
         let events = run(&mut router);
         match events.last() {
             Some(ModelEvent::Error(error)) => {
-                assert_eq!(error.message, crate::chat_images::VISION_REFUSAL);
+                assert!(error.message.contains("can't read images"));
             }
             other => panic!("expected a vision refusal, got {other:?}"),
         }
