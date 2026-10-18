@@ -97,19 +97,19 @@ describe('mockHandlers coverage', () => {
     const { mockHandlers } = await loadHandlers()
 
     mockHandlers.save_note_content({
-      path: '/Users/luca/Laputa/26q1-laputa-app.md',
+      path: '/Users/mock/Vault/26q1-rhizome-app.md',
       content: '# Updated project note',
     })
     mockHandlers.save_note_content({
-      path: '/Users/luca/Laputa/new-note.md',
+      path: '/Users/mock/Vault/new-note.md',
       content: '# New note',
     })
 
     const modifiedBeforeCommit = mockHandlers.get_modified_files(undefined)
-    const basePathCount = modifiedBeforeCommit.filter((entry: ModifiedFile) => entry.path === '/Users/luca/Laputa/26q1-laputa-app.md').length
+    const basePathCount = modifiedBeforeCommit.filter((entry: ModifiedFile) => entry.path === '/Users/mock/Vault/26q1-rhizome-app.md').length
 
     expect(basePathCount).toBe(1)
-    expect(modifiedBeforeCommit.some((entry: ModifiedFile) => entry.path === '/Users/luca/Laputa/new-note.md')).toBe(true)
+    expect(modifiedBeforeCommit.some((entry: ModifiedFile) => entry.path === '/Users/mock/Vault/new-note.md')).toBe(true)
 
     expect(mockHandlers.git_commit({ message: 'Save everything' })).toContain('6 files changed')
     expect(mockHandlers.get_modified_files(undefined)).toEqual([])
@@ -117,7 +117,7 @@ describe('mockHandlers coverage', () => {
 
   it('searches mock content and slices pulse results to the requested limit', async () => {
     const { mockHandlers } = await loadHandlers()
-    const projectPath = '/Users/luca/Laputa/26q1-laputa-app.md'
+    const projectPath = '/Users/mock/Vault/26q1-rhizome-app.md'
 
     mockHandlers.save_note_content({
       path: projectPath,
@@ -131,7 +131,7 @@ describe('mockHandlers coverage', () => {
     expect(search.results).toEqual([
       expect.objectContaining({
         path: projectPath,
-        title: 'Build Laputa App',
+        title: 'Build Rhizome App',
       }),
     ])
     expect(pulse).toHaveLength(2)
@@ -186,11 +186,14 @@ describe('mockHandlers coverage', () => {
       ai_model_providers: null,
       ai_workspace_conversations: null,
       hide_gitignored_files: null,
+      block_secret_files: null,
       all_notes_show_pdfs: null,
       all_notes_show_images: null,
       all_notes_show_unsupported: null,
       multi_workspace_enabled: null,
       agent_profile: null,
+      chat_engine: null,
+      native_chat_target: null,
     })
 
     const list = {

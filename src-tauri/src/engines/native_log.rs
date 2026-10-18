@@ -6,7 +6,7 @@
 
 use std::collections::HashSet;
 use std::fs::{self, File, OpenOptions};
-use std::io::Write;
+use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -20,11 +20,17 @@ pub const NATIVE_LOG_VERSION: u32 = 1;
 pub const SESSION_SIZE_CAP: u64 = 100 * 1024 * 1024;
 /// 1 MiB per single tool result, counted in bytes.
 pub const TOOL_RESULT_CAP: usize = 1024 * 1024;
+/// One assignment value read. A longer unquoted secret is finished by
+/// `token_end`, so the cap does not leave a tail in the clear.
+const ASSIGNMENT_VALUE_CAP: usize = 512;
 /// Reserved so a full session can still record cancel/completion.
 const COMPLETION_RESERVE: u64 = 4096;
 /// User-facing notice when a mid-turn log append fails. The turn continues.
 pub const LOG_SAVE_NOTICE: &str =
     "This part of the chat couldn't be saved, so it won't be there after a restart.";
+/// Shown once when the writer can no longer append at all.
+pub const LOG_SAVE_STOPPED: &str =
+    "Saving has stopped for this chat, so later messages won't be there after a restart.";
 
 /// ADR-0183 reopen warning, exact wording.
 pub const REOPEN_WARNING: &str =
@@ -54,6 +60,10 @@ pub struct SessionHeader {
     pub vault_paths: Vec<String>,
     #[serde(default)]
     pub system_prompt: Option<String>,
+    /// Saved reasoning level for this chat. Missing on logs written before
+    /// the field existed.
+    #[serde(default)]
+    pub reasoning_level: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -110,6 +120,16 @@ pub struct NativeSessionWriter {
     len: u64,
     header: SessionHeader,
     fail_io: bool,
+    /// Truncate, rewind, or sync failed. Later appends must not write.
+    poisoned: bool,
+    /// The user has already been told that saving stopped.
+    stop_announced: bool,
+    /// Test hook: write this many bytes of the next line, then fail.
+    #[cfg(test)]
+    partial_write_limit: Option<usize>,
+    /// Test hook: 1 = truncate fails, 2 = rewind fails, 3 = sync fails.
+    #[cfg(test)]
+    repair_fault: u8,
     _lock: SessionLock,
 }
 
@@ -132,6 +152,65 @@ pub fn native_sessions_dir() -> Result<PathBuf, String> {
 pub fn session_log_path(session_id: &str) -> Result<PathBuf, String> {
     validate_session_id(session_id)?;
     Ok(native_sessions_dir()?.join(format!("{session_id}.jsonl")))
+}
+
+pub fn reasoning_sidecar_path(session_id: &str) -> Result<PathBuf, String> {
+    validate_session_id(session_id)?;
+    Ok(native_sessions_dir()?.join(format!("{session_id}.reasoning")))
+}
+
+/// A level id is a short word. Anything longer is not a saved level.
+const REASONING_SIDECAR_CAP: usize = 64;
+
+/// `Ok(None)` when the sidecar was never written, cannot be read, or is not
+/// a short level id. `Ok(Some(None))` when it was cleared. The sidecar wins
+/// over the header on open. A bad sidecar does not make the chat unopenable.
+pub fn read_reasoning_sidecar(session_id: &str) -> Result<Option<Option<String>>, String> {
+    let path = reasoning_sidecar_path(session_id)?;
+    if !path.exists() {
+        return Ok(None);
+    }
+    let Ok(bytes) = fs::read(&path) else {
+        return Ok(None);
+    };
+    if bytes.len() > REASONING_SIDECAR_CAP {
+        return Ok(None);
+    }
+    let Ok(text) = String::from_utf8(bytes) else {
+        return Ok(None);
+    };
+    let level = text.trim();
+    if level.is_empty() {
+        Ok(Some(None))
+    } else if level.len() > REASONING_SIDECAR_CAP {
+        Ok(None)
+    } else {
+        Ok(Some(Some(level.to_string())))
+    }
+}
+
+pub fn write_reasoning_sidecar(session_id: &str, level: Option<&str>) -> Result<(), String> {
+    let path = reasoning_sidecar_path(session_id)?;
+    match level.map(str::trim).filter(|level| !level.is_empty()) {
+        Some(level) => {
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent)
+                    .map_err(|error| format!("create native-sessions dir: {error}"))?;
+            }
+            let tmp = PathBuf::from(format!("{}.tmp", path.display()));
+            fs::write(&tmp, format!("{level}\n"))
+                .map_err(|error| format!("write reasoning sidecar: {error}"))?;
+            set_owner_only(&tmp)?;
+            fs::rename(&tmp, &path).map_err(|error| format!("write reasoning sidecar: {error}"))
+        }
+        None => {
+            if path.exists() {
+                fs::remove_file(&path)
+                    .map_err(|error| format!("clear reasoning sidecar: {error}"))?;
+            }
+            Ok(())
+        }
+    }
 }
 
 fn lock_path(session_id: &str) -> Result<PathBuf, String> {
@@ -163,29 +242,748 @@ fn checksum_value(seq: u64, value: &serde_json::Value) -> String {
         .collect()
 }
 
+/// One read of saved provider keys, reused across every string in a call.
+pub(crate) struct SecretScrub {
+    values: Vec<String>,
+}
+
+impl SecretScrub {
+    pub(crate) fn capture() -> Self {
+        Self {
+            values: saved_secret_values(),
+        }
+    }
+
+    pub(crate) fn apply(&self, text: &str) -> String {
+        apply_scrub(text, &self.values)
+    }
+}
+
 pub fn scrub_secrets(text: &str) -> String {
+    SecretScrub::capture().apply(text)
+}
+
+fn apply_scrub(text: &str, saved: &[String]) -> String {
     let mut out = text.to_string();
-    for secret in saved_secret_values() {
+    for secret in saved {
         if secret.len() >= 8 {
-            out = out.replace(&secret, "[redacted]");
+            out = out.replace(secret, "[redacted]");
         }
     }
-    let patterns = [
-        r"(?:sk-proj-|sk-or-v1-|sk-ant-|gsk_)[A-Za-z0-9_-]{8,}",
-        r"(?:sk_live_|sk_test_|sk-|ghp_|gho_|ghs_|ghu_|ghr_|github_pat_|glpat-|gsk_|npm_|xox[abprse]-)[A-Za-z0-9_-]{20,}",
-        r"hf_[A-Za-z0-9]{20,}",
-        r"xai-[A-Za-z0-9]{20,}",
-        r"AKIA[0-9A-Z]{16}",
-        r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----",
-        r"(?i)bearer\s+[A-Za-z0-9._\-+/=]+",
-        r#"(?i)"api_key"\s*:\s*"[^"]+""#,
-        r"(?i)\bapi_key\s*=\s*\S+",
-    ];
-    for pattern in patterns {
-        if let Ok(regex) = regex::Regex::new(pattern) {
-            out = regex.replace_all(&out, "[redacted]").into_owned();
+    let scrubbers = scrub_regexes();
+    // PEM runs first. An assignment cap would keep only the opening banner
+    // and the later pattern would no longer see a whole key.
+    out = scrub_private_keys(&out, scrubbers);
+    out = scrub_assignments(&out, scrubbers);
+    out = scrub_bearer(&out, scrubbers);
+    for pattern in &scrubbers.patterns {
+        out = pattern.replace_all(&out, "[redacted]").into_owned();
+    }
+    scrub_bare_mistral_keys(&out, scrubbers)
+}
+
+struct ScrubRegexes {
+    assignment: regex::Regex,
+    api_key_name: regex::Regex,
+    env_name: regex::Regex,
+    quoted_env_name: regex::Regex,
+    prefixed_key_name: regex::Regex,
+    bearer: regex::Regex,
+    pem: regex::Regex,
+    patterns: Vec<regex::Regex>,
+    mistral_context: regex::Regex,
+    mistral_key: regex::Regex,
+}
+
+fn scrub_regexes() -> &'static ScrubRegexes {
+    // OnceLock, not LazyLock: LazyLock needs Rust 1.80 and this crate's MSRV is 1.77.2.
+    static SCRUBBERS: std::sync::OnceLock<ScrubRegexes> = std::sync::OnceLock::new();
+    SCRUBBERS.get_or_init(|| {
+        // `_` is part of the name, so `SORT_KEY` is not a bare `KEY`.
+        // `=` is not `==`. The value is checked in `scrub_assignments`.
+        // The value width matches ASSIGNMENT_VALUE_CAP. An unbounded value
+        // makes the rescan after a skipped `=` or `:` reread the rest of the token.
+        let assignment = regex::Regex::new(
+            r#"(?P<pre>(?:^|[^A-Za-z0-9_])(?:(?:export|set)[ \t]+)?)(?P<quote>["']?)(?P<name>[A-Za-z][A-Za-z0-9_]*)["']?[ \t]*(?P<sep>[=:])[ \t]*(?P<value>"[^"\r\n]{0,512}"|'[^'\r\n]{0,512}'|[^[:space:]#]{1,512})"#,
+        )
+        .expect("assignment scrubber");
+        let api_key_name = regex::Regex::new(
+            r"(?i)^(?:[a-z][a-z0-9]*_?)*api_?key(?:_[a-z0-9]+)*$",
+        )
+        .expect("api_key name");
+        let env_name = regex::Regex::new(
+            r"^(?:[A-Z][A-Z0-9]*_)*(?:TOKEN|SECRET|PASSWORD)(?:_[A-Z0-9]+)*$",
+        )
+        .expect("env secret name");
+        let quoted_env_name = regex::Regex::new(
+            r"(?i)^(?:[A-Z][A-Z0-9]*_)*(?:TOKEN|SECRET|PASSWORD)(?:_[A-Z0-9]+)*$",
+        )
+        .expect("quoted env secret name");
+        let prefixed_key_name = regex::Regex::new(r"^(?:[A-Z][A-Z0-9]*_)+KEY(?:_[A-Z0-9]+)*$")
+            .expect("prefixed key name");
+        let bearer = regex::Regex::new(r"(?i)bearer\s+(?P<token>[A-Za-z0-9._\-+/=]{8,})")
+            .expect("bearer token");
+        // `[\s\S]` matches a real newline and each character of a `\n` escape.
+        let pem = regex::Regex::new(
+            r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----",
+        )
+        .expect("pem block");
+        let patterns = [
+            r"(?:sk-proj-|sk-or-v1-|sk-ant-|gsk_)[A-Za-z0-9_-]{8,}",
+            r"(?:sk_live_|sk_test_|sk-|ghp_|gho_|ghs_|ghu_|ghr_|github_pat_|glpat-|gsk_|npm_|xox[abprse]-)[A-Za-z0-9_-]{20,}",
+            r"hf_[A-Za-z0-9]{20,}",
+            r"xai-[A-Za-z0-9]{20,}",
+            r"nvapi-[A-Za-z0-9_-]{20,}",
+            r"\bAIza[0-9A-Za-z_-]{35}\b",
+            r"pplx-[A-Za-z0-9_-]{20,}",
+            r"AKIA[0-9A-Z]{16}",
+            r"SG\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}",
+            r"\beyJ[A-Za-z0-9_-]{7,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b",
+            r#"(?i)"api_key"\s*:\s*"[^"]+""#,
+        ]
+        .into_iter()
+        .map(|pattern| regex::Regex::new(pattern).expect(pattern))
+        .collect();
+        ScrubRegexes {
+            assignment,
+            api_key_name,
+            env_name,
+            quoted_env_name,
+            prefixed_key_name,
+            bearer,
+            pem,
+            patterns,
+            mistral_context: regex::Regex::new(r"(?i)mistral|api\.mistral\.ai")
+                .expect("mistral context"),
+            mistral_key: regex::Regex::new(r"\b[A-Za-z0-9]{32}\b").expect("mistral key"),
+        }
+    })
+}
+
+/// `apiKey` / `api_key` match in any case. Unquoted `TOKEN`, `SECRET`,
+/// `PASSWORD`, and a prefixed `_KEY` match only as uppercase env names.
+/// A quoted name matches those words in any case. After a name that is not
+/// a secret, scanning resumes just after its `=` or `:` so `api_key` inside
+/// a URL is still found. `==` is not an assignment.
+fn scrub_assignments(text: &str, scrubbers: &ScrubRegexes) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut copied = 0;
+    let mut search_from = 0;
+    while search_from < text.len() {
+        let Some(caps) = scrubbers.assignment.captures_at(text, search_from) else {
+            break;
+        };
+        let Some(whole) = caps.get(0) else {
+            break;
+        };
+        let Some(name) = caps.name("name") else {
+            break;
+        };
+        let Some(value) = caps.name("value") else {
+            break;
+        };
+        let Some(sep) = caps.name("sep") else {
+            break;
+        };
+        let quoted = caps
+            .name("quote")
+            .is_some_and(|quote| !quote.as_str().is_empty());
+        let comparison = sep.as_str() == "=" && text.as_bytes().get(sep.end()) == Some(&b'=');
+        // The regex stops at an escaped quote, at 512, or at the first space
+        // of an unclosed quote. The secret check uses the real quoted span.
+        let checked = value_text_for_secret_check(text, value.as_str(), value.start());
+        let redact = !comparison
+            && assignment_name_is_secret(name.as_str(), quoted, scrubbers)
+            && assignment_value_is_secret(checked, name.as_str(), scrubbers);
+        if redact {
+            let end = secret_span_end(text, value.start(), value.end());
+            out.push_str(&text[copied..value.start()]);
+            out.push_str("[redacted]");
+            copied = end;
+            search_from = end;
+        } else {
+            search_from = sep.end();
+            // A capped value has already been read. Jump across it so the
+            // next separator does not reread those bytes. A secret name
+            // inside the window restarts at that assignment. A name that
+            // straddles the cap is kept by rewinding one character.
+            if unquoted_value_hit_cap(value.as_str()) {
+                let jumped = capped_window_restart(text, value.start(), value.end(), scrubbers);
+                if jumped > search_from {
+                    search_from = jumped;
+                }
+            }
+        }
+        if search_from <= whole.start() {
+            search_from = char_after(text, whole.start());
         }
     }
+    out.push_str(&text[copied..]);
+    out
+}
+
+/// The unquoted alternative stops at `ASSIGNMENT_VALUE_CAP` characters.
+/// A finished quoted value is not extended.
+fn unquoted_value_hit_cap(value: &str) -> bool {
+    value.chars().count() == ASSIGNMENT_VALUE_CAP && !value_is_finished_quote(value)
+}
+
+fn value_is_finished_quote(value: &str) -> bool {
+    let mut chars = value.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    (first == '"' || first == '\'') && chars.next_back() == Some(first)
+}
+
+/// Where to resume after a capped value. A secret whose value might still
+/// be sensitive restarts at that name. Otherwise resume at the cap, rewound
+/// so a name split by the cap is still visible.
+fn capped_window_restart(
+    text: &str,
+    value_start: usize,
+    value_end: usize,
+    scrubbers: &ScrubRegexes,
+) -> usize {
+    if let Some(restart) = first_secret_value_restart(text, value_start, value_end, scrubbers) {
+        return restart;
+    }
+    rewind_to_name_start(text, value_end)
+}
+
+fn first_secret_value_restart(
+    text: &str,
+    value_start: usize,
+    value_end: usize,
+    scrubbers: &ScrubRegexes,
+) -> Option<usize> {
+    let window = text.get(value_start..value_end)?;
+    let bytes = window.as_bytes();
+    for index in 0..bytes.len() {
+        let sep = bytes[index];
+        if sep != b'=' && sep != b':' {
+            continue;
+        }
+        if sep == b'=' && bytes.get(index + 1) == Some(&b'=') {
+            continue;
+        }
+        let Some((name, mut quoted, name_start)) = name_touching_separator(window, index) else {
+            continue;
+        };
+        if !assignment_name_is_secret(name, quoted, scrubbers) {
+            // `"MY_KEY=` inside another value is a quoted name here, and a
+            // quoted `*_KEY` is not a secret. The quote is only the left
+            // boundary, so try the name again as unquoted.
+            if !(quoted && assignment_name_is_secret(name, false, scrubbers)) {
+                continue;
+            }
+            quoted = false;
+        }
+        if secret_value_needs_rescan(window, index + 1, name, scrubbers) {
+            let name_abs = value_start + name_start;
+            // Land before an opening quote. Starting on the quote makes it
+            // the left boundary, so the name is seen as unquoted.
+            let mut restart = char_before(text, name_abs);
+            if quoted {
+                restart = char_before(text, restart);
+            }
+            return Some(restart);
+        }
+    }
+    None
+}
+
+/// True when this assignment must be handled by the main scan. A value that
+/// starts with `$`, `{`, `<`, or `[` is not a secret even if the cap cut it.
+/// A short prefix that runs into the cap might grow into one. A quoted value
+/// is judged on its own span, so compact JSON like `"token":"$"` does not
+/// look like one long spaceless token and force a rescan of every field.
+fn secret_value_needs_rescan(
+    window: &str,
+    value_rel: usize,
+    name: &str,
+    scrubbers: &ScrubRegexes,
+) -> bool {
+    let Some(rest) = window.get(value_rel..) else {
+        return true;
+    };
+    let Some(first) = rest.chars().next() else {
+        return true;
+    };
+    if matches!(first, '{' | '$' | '<' | '[') {
+        return false;
+    }
+    if first == '"' || first == '\'' {
+        let (end, closed) = quoted_span(rest, 0, first);
+        let span = rest.get(..end).unwrap_or(rest);
+        if assignment_value_is_secret(span, name, scrubbers) {
+            return true;
+        }
+        if closed {
+            return false;
+        }
+        let inner = span.get(first.len_utf8()..).unwrap_or("");
+        return !value_rejected_by_first_char(inner);
+    }
+    let mut end = rest.len();
+    for (offset, ch) in rest.char_indices() {
+        if ch.is_whitespace() || ch == '#' {
+            end = offset;
+            break;
+        }
+    }
+    let visible = &rest[..end];
+    let hits_window_end = end == rest.len();
+    if assignment_value_is_secret(visible, name, scrubbers) {
+        return true;
+    }
+    hits_window_end && !value_rejected_by_first_char(visible)
+}
+
+fn value_rejected_by_first_char(value: &str) -> bool {
+    matches!(value.chars().next(), Some('{' | '$' | '<' | '['))
+}
+
+fn name_touching_separator(value: &str, sep: usize) -> Option<(&str, bool, usize)> {
+    let bytes = value.as_bytes();
+    let mut end = sep;
+    // Quotes and the name body are ASCII, so one byte is one character.
+    if end > 0 && (bytes[end - 1] == b'"' || bytes[end - 1] == b'\'') {
+        end -= 1;
+    }
+    let mut start = end;
+    while start > 0 {
+        let byte = bytes[start - 1];
+        if byte.is_ascii_alphanumeric() || byte == b'_' {
+            start -= 1;
+        } else {
+            break;
+        }
+    }
+    if start == end || !bytes[start].is_ascii_alphabetic() {
+        return None;
+    }
+    let quoted = start > 0 && (bytes[start - 1] == b'"' || bytes[start - 1] == b'\'');
+    Some((&value[start..end], quoted, start))
+}
+
+fn rewind_to_name_start(text: &str, index: usize) -> usize {
+    let bytes = text.as_bytes();
+    let mut start = index.min(bytes.len());
+    // The cap can land on the closing quote of a quoted name. Skip that
+    // quote before walking the letters, or the restart sits on the last
+    // letter and the name never matches.
+    if start > 0 && (bytes[start - 1] == b'"' || bytes[start - 1] == b'\'') {
+        start -= 1;
+    }
+    while start > 0 && (bytes[start - 1].is_ascii_alphanumeric() || bytes[start - 1] == b'_') {
+        start -= 1;
+    }
+    if start > 0 && (bytes[start - 1] == b'"' || bytes[start - 1] == b'\'') {
+        start -= 1;
+    }
+    // The assignment pattern consumes the boundary before the name.
+    // Step back one character, not one byte: `é` is two bytes.
+    char_before(text, start)
+}
+
+fn char_before(text: &str, index: usize) -> usize {
+    let index = index.min(text.len());
+    text[..index]
+        .chars()
+        .next_back()
+        .map_or(0, |ch| index - ch.len_utf8())
+}
+
+fn char_after(text: &str, index: usize) -> usize {
+    text.get(index..)
+        .and_then(|rest| rest.chars().next())
+        .map(|ch| index + ch.len_utf8())
+        .unwrap_or(text.len())
+}
+
+fn scrub_private_keys(text: &str, scrubbers: &ScrubRegexes) -> String {
+    scrubbers.pem.replace_all(text, "[redacted]").into_owned()
+}
+
+/// A quoted secret runs to its closing quote, or to the end of the line when
+/// the quote never closes. An unquoted secret past the cap runs to whitespace
+/// or `#`. `&`, `,`, and `}` stop it only when a new field follows.
+fn secret_span_end(text: &str, value_start: usize, value_end: usize) -> usize {
+    let Some(rest) = text.get(value_start..) else {
+        return value_end;
+    };
+    let Some(first) = rest.chars().next() else {
+        return value_end;
+    };
+    if first == '"' || first == '\'' {
+        return quoted_value_end(text, value_start, first);
+    }
+    let matched_len = value_end.saturating_sub(value_start);
+    let matched = rest.get(..matched_len).unwrap_or("");
+    if unquoted_value_hit_cap(matched) {
+        return unquoted_value_end(text, value_end);
+    }
+    value_end
+}
+
+fn quoted_value_end(text: &str, value_start: usize, quote: char) -> usize {
+    quoted_span(text, value_start, quote).0
+}
+
+/// `(end, closed)`. A quote ends at its closer. An unclosed quote ends at
+/// the newline or at the end of the text, and `closed` is false.
+fn quoted_span(text: &str, value_start: usize, quote: char) -> (usize, bool) {
+    let Some(rest) = text.get(value_start..) else {
+        return (text.len(), false);
+    };
+    let mut chars = rest.char_indices();
+    if chars.next().is_none() {
+        return (text.len(), false);
+    }
+    let mut escaped = false;
+    for (offset, ch) in chars {
+        if escaped {
+            escaped = false;
+            continue;
+        }
+        if ch == '\\' {
+            escaped = true;
+            continue;
+        }
+        if ch == '\n' || ch == '\r' {
+            return (value_start + offset, false);
+        }
+        if ch == quote {
+            return (value_start + offset + ch.len_utf8(), true);
+        }
+    }
+    (text.len(), false)
+}
+
+fn value_text_for_secret_check<'a>(text: &'a str, matched: &'a str, value_start: usize) -> &'a str {
+    let Some(first) = matched.chars().next() else {
+        return matched;
+    };
+    if first != '"' && first != '\'' {
+        return matched;
+    }
+    let end = quoted_value_end(text, value_start, first);
+    text.get(value_start..end).unwrap_or(matched)
+}
+
+/// `&`, `,`, and `}` stop a capped value only when a new field follows.
+/// A tail that looks like a field is kept on purpose: `API_KEY=<secret>&x=TAIL`
+/// leaves `&x=TAIL`. A tail that is not a field stays inside the redaction.
+fn unquoted_value_end(text: &str, from: usize) -> usize {
+    let Some(rest) = text.get(from..) else {
+        return text.len();
+    };
+    for (offset, ch) in rest.char_indices() {
+        if ch.is_whitespace() || ch == '#' {
+            return from + offset;
+        }
+        if matches!(ch, '&' | ',' | '}') {
+            let after = from + offset + ch.len_utf8();
+            if new_field_follows(text, ch, after) {
+                return from + offset;
+            }
+        }
+    }
+    text.len()
+}
+
+fn new_field_follows(text: &str, stop: char, after: usize) -> bool {
+    let Some(rest) = text.get(after..) else {
+        return false;
+    };
+    match stop {
+        '&' => query_name_follows(rest),
+        ',' => json_or_yaml_field_follows(rest),
+        '}' => {
+            let rest = rest.trim_start_matches([' ', '\t']);
+            if let Some(stripped) = rest.strip_prefix(',') {
+                json_or_yaml_field_follows(stripped)
+            } else if let Some(stripped) = rest.strip_prefix('&') {
+                query_name_follows(stripped)
+            } else {
+                false
+            }
+        }
+        _ => false,
+    }
+}
+
+fn query_name_follows(text: &str) -> bool {
+    let mut chars = text.chars();
+    match chars.next() {
+        Some(ch) if ch.is_ascii_alphabetic() => {}
+        _ => return false,
+    }
+    for ch in chars {
+        if ch.is_ascii_alphanumeric() || ch == '_' {
+            continue;
+        }
+        return ch == '=';
+    }
+    false
+}
+
+fn json_or_yaml_field_follows(text: &str) -> bool {
+    let text = text.trim_start_matches([' ', '\t']);
+    let mut chars = text.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if first == '"' || first == '\'' {
+        let mut closed = false;
+        for ch in chars {
+            if !closed {
+                if ch == first {
+                    closed = true;
+                    continue;
+                }
+                if ch.is_ascii_alphanumeric() || ch == '_' {
+                    continue;
+                }
+                return false;
+            }
+            if ch == ' ' || ch == '\t' {
+                continue;
+            }
+            return ch == ':';
+        }
+        return false;
+    }
+    if !first.is_ascii_alphabetic() {
+        return false;
+    }
+    for ch in chars {
+        if ch.is_ascii_alphanumeric() || ch == '_' || ch == ' ' || ch == '\t' {
+            continue;
+        }
+        return ch == ':';
+    }
+    false
+}
+
+fn assignment_name_is_secret(name: &str, quoted: bool, scrubbers: &ScrubRegexes) -> bool {
+    if scrubbers.api_key_name.is_match(name) {
+        return true;
+    }
+    if quoted {
+        return scrubbers.quoted_env_name.is_match(name);
+    }
+    scrubbers.env_name.is_match(name) || scrubbers.prefixed_key_name.is_match(name)
+}
+
+/// Quoted values and unquoted uppercase `*PASSWORD` / `*SECRET` / `*TOKEN` /
+/// `*API_KEY` values are secrets at 6 characters. Other unquoted values need 8.
+/// A JWT is always a secret. `process.env` and the other env readers are always
+/// code. An uppercase env name has no further code exemption. A lowercase or
+/// camelCase name may be a call, an index, or a field read.
+fn assignment_value_is_secret(raw: &str, name: &str, scrubbers: &ScrubRegexes) -> bool {
+    // An opening quote is enough. The span may be unclosed, or longer than
+    // the regex match because of an escaped quote.
+    let opening = raw.chars().next().filter(|ch| *ch == '"' || *ch == '\'');
+    let quoted = opening.is_some();
+    let (inner, closed) = if let Some(quote) = opening {
+        let body = &raw[quote.len_utf8()..];
+        let close: &str = if quote == '"' { "\"" } else { "'" };
+        match body.strip_suffix(close) {
+            Some(inner) => (inner, true),
+            None => (body, false),
+        }
+    } else {
+        (raw, false)
+    };
+    // `set PASSWORD=" and then press enter` is prose. An unclosed quote
+    // whose first character is a space has no secret token.
+    if quoted && !closed && inner.chars().next().is_some_and(char::is_whitespace) {
+        return false;
+    }
+    let value = inner.trim_end_matches(['}', ']', ')', ',', ';']);
+    if is_strict_jwt(value) {
+        return true;
+    }
+    if !quoted && is_env_accessor(value) {
+        return false;
+    }
+    if !quoted && !name_is_uppercase_env(name) && is_camel_case_code(value) {
+        return false;
+    }
+    let mut chars = inner.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    // A quoted passphrase may contain spaces. An unquoted value with a space
+    // is still prose or a command, not a single token.
+    if matches!(first, '{' | '$' | '<' | '[') || (!quoted && inner.chars().any(char::is_whitespace))
+    {
+        return false;
+    }
+    let uppercase_api_key = scrubbers.api_key_name.is_match(name)
+        && name.chars().all(|ch| ch.is_ascii_uppercase() || ch == '_');
+    let short_ok = quoted || scrubbers.env_name.is_match(name) || uppercase_api_key;
+    let min = if short_ok { 6 } else { 8 };
+    inner.chars().count() >= min
+}
+
+/// Three base64url parts, the first starting with `eyJ`, each at least 10 characters.
+fn is_strict_jwt(value: &str) -> bool {
+    let mut parts = value.split('.');
+    let Some(header) = parts.next() else {
+        return false;
+    };
+    let Some(payload) = parts.next() else {
+        return false;
+    };
+    let Some(signature) = parts.next() else {
+        return false;
+    };
+    if parts.next().is_some() {
+        return false;
+    }
+    header.starts_with("eyJ")
+        && is_base64url(header)
+        && is_base64url(payload)
+        && is_base64url(signature)
+}
+
+fn is_base64url(part: &str) -> bool {
+    part.len() >= 10
+        && part
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '='))
+}
+
+fn is_env_accessor(value: &str) -> bool {
+    value.starts_with("process.env.")
+        || value.starts_with("import.meta.env.")
+        || value.starts_with("os.environ")
+        || value.starts_with("os.getenv")
+}
+
+fn name_is_uppercase_env(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .chars()
+            .all(|ch| ch.is_ascii_uppercase() || ch.is_ascii_digit() || ch == '_')
+}
+
+/// A call, an index, or two or more identifiers split on `.` or `?.`.
+/// Each identifier has fewer than 3 digits, so `abc123.def456` stays a secret.
+fn is_camel_case_code(value: &str) -> bool {
+    if value.contains('(') || value.contains('[') {
+        return true;
+    }
+    let parts = field_parts(value);
+    parts.len() >= 2 && parts.iter().all(|part| is_field_ident(part))
+}
+
+fn field_parts(value: &str) -> Vec<&str> {
+    let mut parts = Vec::new();
+    let bytes = value.as_bytes();
+    let mut start = 0;
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'?' && bytes.get(index + 1) == Some(&b'.') {
+            parts.push(&value[start..index]);
+            index += 2;
+            start = index;
+        } else if bytes[index] == b'.' {
+            parts.push(&value[start..index]);
+            index += 1;
+            start = index;
+        } else {
+            index += 1;
+        }
+    }
+    parts.push(&value[start..]);
+    parts
+}
+
+fn is_field_ident(part: &str) -> bool {
+    let mut chars = part.chars();
+    match chars.next() {
+        Some(ch) if ch.is_ascii_alphabetic() || ch == '_' => {}
+        _ => return false,
+    }
+    let mut digits = 0;
+    for ch in chars {
+        if ch.is_ascii_digit() {
+            digits += 1;
+            if digits >= 3 {
+                return false;
+            }
+        } else if !(ch.is_ascii_alphabetic() || ch == '_') {
+            return false;
+        }
+    }
+    true
+}
+
+/// `Bearer authentication` is a sentence. A token needs a digit or `. _ - / + =`.
+fn scrub_bearer(text: &str, scrubbers: &ScrubRegexes) -> String {
+    scrubbers
+        .bearer
+        .replace_all(text, |caps: &regex::Captures| {
+            let token = caps
+                .name("token")
+                .map(|matched| matched.as_str())
+                .unwrap_or("");
+            if token
+                .chars()
+                .any(|ch| ch.is_ascii_digit() || matches!(ch, '.' | '_' | '-' | '/' | '+' | '='))
+            {
+                "[redacted]".to_string()
+            } else {
+                caps.get(0)
+                    .map(|matched| matched.as_str().to_string())
+                    .unwrap_or_default()
+            }
+        })
+        .into_owned()
+}
+
+/// A bare Mistral key is 32 letters and digits with both cases, and only
+/// when `mistral` is within 200 bytes. An MD5, a dashless UUID, and a
+/// 40-hex SHA stay.
+fn scrub_bare_mistral_keys(text: &str, scrubbers: &ScrubRegexes) -> String {
+    let contexts: Vec<(usize, usize)> = scrubbers
+        .mistral_context
+        .find_iter(text)
+        .map(|matched| (matched.start(), matched.end()))
+        .collect();
+    if contexts.is_empty() {
+        return text.to_string();
+    }
+    let mut out = String::with_capacity(text.len());
+    let mut last = 0;
+    for matched in scrubbers.mistral_key.find_iter(text) {
+        let token = matched.as_str();
+        let mixed_case = token.chars().any(|ch| ch.is_ascii_uppercase())
+            && token.chars().any(|ch| ch.is_ascii_lowercase());
+        if !mixed_case {
+            continue;
+        }
+        let near = contexts.iter().any(|&(start, end)| {
+            let gap = if matched.end() < start {
+                start - matched.end()
+            } else if end < matched.start() {
+                matched.start() - end
+            } else {
+                0
+            };
+            gap <= 200
+        });
+        if near {
+            out.push_str(&text[last..matched.start()]);
+            out.push_str("[redacted]");
+            last = matched.end();
+        }
+    }
+    out.push_str(&text[last..]);
     out
 }
 
@@ -216,30 +1014,31 @@ fn saved_secret_values() -> Vec<String> {
 }
 
 fn scrub_event(event: &DurableEvent) -> DurableEvent {
+    let scrub = SecretScrub::capture();
     match event.clone() {
         DurableEvent::User { text } => DurableEvent::User {
-            text: scrub_secrets(&text),
+            text: scrub.apply(&text),
         },
         DurableEvent::Assistant { text } => DurableEvent::Assistant {
-            text: scrub_secrets(&text),
+            text: scrub.apply(&text),
         },
         DurableEvent::ToolCall { id, name, args } => DurableEvent::ToolCall {
             id,
             name,
-            args: scrub_secrets(&args),
+            args: scrub.apply(&args),
         },
         DurableEvent::ToolResult { id, name, output } => DurableEvent::ToolResult {
             id,
             name,
-            output: cap_tool_result(scrub_secrets(&output)),
+            output: cap_tool_result(scrub.apply(&cap_tool_result(output))),
         },
         DurableEvent::ToolDenied { id, name, reason } => DurableEvent::ToolDenied {
             id,
             name,
-            reason: scrub_secrets(&reason),
+            reason: scrub.apply(&reason),
         },
         DurableEvent::ModelFailed { message } => DurableEvent::ModelFailed {
-            message: scrub_secrets(&message),
+            message: scrub.apply(&message),
         },
         other => other,
     }
@@ -252,16 +1051,24 @@ fn cap_tool_result(output: String) -> String {
     }
     let marker = "\n[truncated: tool result exceeded 1 MiB]";
     let keep = TOOL_RESULT_CAP.saturating_sub(marker.len());
-    let mut end = keep.min(bytes.len());
-    while end > 0 && (bytes[end] & 0b1100_0000) == 0b1000_0000 {
-        end -= 1;
-    }
+    let end = floor_char_boundary(output.as_str(), keep);
     let mut trimmed = String::from_utf8_lossy(&bytes[..end]).into_owned();
     trimmed.push_str(marker);
     if trimmed.len() > TOOL_RESULT_CAP {
-        trimmed.truncate(TOOL_RESULT_CAP);
+        let end = floor_char_boundary(&trimmed, TOOL_RESULT_CAP);
+        trimmed.truncate(end);
     }
     trimmed
+}
+
+/// Largest index `<= end` that is a character boundary.
+fn floor_char_boundary(text: &str, end: usize) -> usize {
+    let bytes = text.as_bytes();
+    let mut end = end.min(bytes.len());
+    while end > 0 && end < bytes.len() && (bytes[end] & 0b1100_0000) == 0b1000_0000 {
+        end -= 1;
+    }
+    end
 }
 
 fn set_owner_only(path: &Path) -> Result<(), String> {
@@ -408,7 +1215,10 @@ pub fn open_session_log(session_id: &str) -> Result<OpenedNativeLog, String> {
     if !is_header_line(&header_value) {
         return Err("native session log is missing a header".into());
     }
-    let header = parse_header(&header_value)?;
+    let mut header = parse_header(&header_value)?;
+    if let Some(level) = read_reasoning_sidecar(session_id)? {
+        header.reasoning_level = level;
+    }
     let unknown_version = header.version != NATIVE_LOG_VERSION;
     let writer_is_live = write_lock_is_held(session_id);
 
@@ -416,9 +1226,6 @@ pub fn open_session_log(session_id: &str) -> Result<OpenedNativeLog, String> {
     let mut expected_seq = 1u64;
     let mut saw_damage = false;
     for line in lines {
-        if saw_damage {
-            continue;
-        }
         let Ok(text) = line else {
             saw_damage = true;
             continue;
@@ -431,6 +1238,8 @@ pub fn open_session_log(session_id: &str) -> Result<OpenedNativeLog, String> {
                 events.push(event);
                 expected_seq += 1;
             }
+            // A torn line must not hide a later line that still has the
+            // next sequence number.
             _ => saw_damage = true,
         }
     }
@@ -509,6 +1318,7 @@ fn create_successor(header: &SessionHeader, events: &[DurableEvent]) -> Result<S
         vault_path: header.vault_path.clone(),
         vault_paths: header.vault_paths.clone(),
         system_prompt: header.system_prompt.clone(),
+        reasoning_level: header.reasoning_level.clone(),
     };
     write_session_events(&successor_header, events)?;
     Ok(id)
@@ -541,6 +1351,11 @@ pub fn create_session_log(header: &SessionHeader) -> Result<NativeSessionWriter,
     let header_json = serde_json::to_string(header)
         .map_err(|error| format!("serialize native session header: {error}"))?;
     write_line(&mut file, &header_json)?;
+    if let Err(error) =
+        write_reasoning_sidecar(&header.session_id, header.reasoning_level.as_deref())
+    {
+        log::warn!("reasoning level was not saved beside the chat log: {error}");
+    }
     let len = file.metadata().map(|meta| meta.len()).unwrap_or(0);
     Ok(NativeSessionWriter {
         file,
@@ -549,6 +1364,12 @@ pub fn create_session_log(header: &SessionHeader) -> Result<NativeSessionWriter,
         len,
         header: header.clone(),
         fail_io: false,
+        poisoned: false,
+        stop_announced: false,
+        #[cfg(test)]
+        partial_write_limit: None,
+        #[cfg(test)]
+        repair_fault: 0,
         _lock: lock,
     })
 }
@@ -571,11 +1392,82 @@ pub fn open_session_writer(session_id: &str, next_seq: u64) -> Result<NativeSess
         len,
         header,
         fail_io: false,
+        poisoned: false,
+        stop_announced: false,
+        #[cfg(test)]
+        partial_write_limit: None,
+        #[cfg(test)]
+        repair_fault: 0,
         _lock: lock,
     })
 }
 
+struct WriteLineError {
+    message: String,
+    /// Truncate, rewind, or sync failed. The writer must not append again.
+    poison: bool,
+}
+
 fn write_line(file: &mut File, line: &str) -> Result<(), String> {
+    let good_len = file.metadata().ok().map(|meta| meta.len());
+    write_line_from(file, line, good_len, None, 0).map_err(|error| error.message)
+}
+
+/// Writes one JSONL line. On any write error the file is truncated back to
+/// `good_len` and that length is synced. A failed repair is returned so the
+/// writer can stop; a later line must not be glued onto the torn bytes.
+fn write_line_from(
+    file: &mut File,
+    line: &str,
+    good_len: Option<u64>,
+    partial_limit: Option<usize>,
+    repair_fault: u8,
+) -> Result<(), WriteLineError> {
+    let outcome = write_payload(file, line, partial_limit);
+    if let Err(write_error) = outcome {
+        if let Some(good_len) = good_len {
+            if let Err(repair) = repair_short_write(file, good_len, repair_fault) {
+                return Err(WriteLineError {
+                    message: format!("{write_error}; {repair}"),
+                    poison: true,
+                });
+            }
+        }
+        return Err(WriteLineError {
+            message: write_error,
+            poison: false,
+        });
+    }
+    Ok(())
+}
+
+/// Drops a short write and makes that shorter length durable.
+fn repair_short_write(file: &mut File, good_len: u64, fault: u8) -> Result<(), String> {
+    if fault == 1 {
+        return Err("truncate native session log: simulated failure".into());
+    }
+    file.set_len(good_len)
+        .map_err(|error| format!("truncate native session log: {error}"))?;
+    if fault == 2 {
+        return Err("rewind native session log: simulated failure".into());
+    }
+    file.seek(SeekFrom::Start(good_len))
+        .map_err(|error| format!("rewind native session log: {error}"))?;
+    if fault == 3 {
+        return Err("sync native session log: simulated failure".into());
+    }
+    file.sync_all()
+        .map_err(|error| format!("sync native session log: {error}"))
+}
+
+fn write_payload(file: &mut File, line: &str, partial_limit: Option<usize>) -> Result<(), String> {
+    if let Some(limit) = partial_limit {
+        let bytes = line.as_bytes();
+        let count = limit.min(bytes.len());
+        file.write_all(&bytes[..count])
+            .map_err(|error| format!("flush native session line: {error}"))?;
+        return Err("flush native session line: short write".into());
+    }
     file.write_all(line.as_bytes())
         .and_then(|_| file.write_all(b"\n"))
         .and_then(|_| file.flush())
@@ -602,7 +1494,24 @@ impl NativeSessionWriter {
         self.fail_io = true;
     }
 
+    /// The next append writes `bytes` of the line, then fails and truncates.
+    #[cfg(test)]
+    pub fn fail_after_partial_write(&mut self, bytes: usize) {
+        self.partial_write_limit = Some(bytes);
+    }
+
+    /// The next short-write repair fails at truncate (1), rewind (2), or sync (3).
+    #[cfg(test)]
+    pub fn fail_repair(&mut self, fault: u8) {
+        self.repair_fault = fault;
+    }
+
     pub fn append(&mut self, event: &DurableEvent) -> Result<(), AppendError> {
+        if self.poisoned {
+            return Err(AppendError::Io(
+                "native session log writer is unusable after a failed repair".into(),
+            ));
+        }
         if self.fail_io {
             self.fail_io = false;
             return Err(AppendError::Io(
@@ -628,7 +1537,22 @@ impl NativeSessionWriter {
         if self.len + add + reserve > SESSION_SIZE_CAP {
             return Err(AppendError::Full);
         }
-        write_line(&mut self.file, &encoded).map_err(AppendError::Io)?;
+        #[cfg(test)]
+        let partial = self.partial_write_limit.take();
+        #[cfg(not(test))]
+        let partial = None;
+        #[cfg(test)]
+        let fault = std::mem::take(&mut self.repair_fault);
+        #[cfg(not(test))]
+        let fault = 0;
+        if let Err(error) =
+            write_line_from(&mut self.file, &encoded, Some(self.len), partial, fault)
+        {
+            if error.poison {
+                self.poisoned = true;
+            }
+            return Err(AppendError::Io(error.message));
+        }
         self.len += add;
         self.next_seq += 1;
         Ok(())
@@ -645,12 +1569,17 @@ impl NativeSessionWriter {
             vault_path: self.header.vault_path.clone(),
             vault_paths: self.header.vault_paths.clone(),
             system_prompt: self.header.system_prompt.clone(),
+            reasoning_level: self.header.reasoning_level.clone(),
         };
         let previous = self.header.session_id.clone();
         let new_writer = create_session_log(&header)?;
         write_successor_pointer(&previous, &id)?;
         *self = new_writer;
         Ok(())
+    }
+
+    pub fn set_reasoning_level(&mut self, level: Option<String>) {
+        self.header.reasoning_level = level;
     }
 }
 
@@ -671,7 +1600,18 @@ pub fn append_or_roll(
                 "This chat reached its 100 MiB log. Rhizome continued in a new session.".into(),
             ))
         }
-        Err(AppendError::Io(_)) => Err(LOG_SAVE_NOTICE.to_string()),
+        Err(AppendError::Io(detail)) => {
+            if writer.poisoned {
+                if writer.stop_announced {
+                    return Ok(None);
+                }
+                writer.stop_announced = true;
+                log::warn!("Native session log saving stopped: {detail}");
+                return Err(LOG_SAVE_STOPPED.to_string());
+            }
+            log::warn!("Native session log save failed: {detail}");
+            Err(LOG_SAVE_NOTICE.to_string())
+        }
     }
 }
 
@@ -726,6 +1666,12 @@ pub fn delete_session_log(session_id: &str) -> Result<(), String> {
     }
     let _ = fs::remove_file(lock_path(session_id)?);
     let _ = fs::remove_file(successor_pointer_path(session_id)?);
+    if let Ok(path) = reasoning_sidecar_path(session_id) {
+        let _ = fs::remove_file(path);
+    }
+    if let Err(error) = crate::chat_images::delete_session_images(session_id) {
+        log::warn!("image files were not removed with the chat: {error}");
+    }
     Ok(())
 }
 
@@ -839,6 +1785,897 @@ mod tests {
         assert!(!json.contains("super-secret-value"));
     }
 
+    /// 32 alphanumeric characters, split in source so push protection does
+    /// not treat the fixture as a live Mistral key.
+    fn bare_mistral_sample() -> String {
+        let key = format!("{}{}", "AbcdEf0123456789", "ZyXwVu9876543210");
+        assert_eq!(key.len(), 32);
+        key
+    }
+
+    fn sample_aiza() -> String {
+        // Built in pieces so the source has no contiguous Google key.
+        let body = format!("{}{}", "SyABCDEFGHIJKLMNOP", "QRSTUVWXYZ1234567");
+        let key = format!("AIza{body}");
+        assert_eq!(key.len(), 39);
+        key
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_env_assignments_and_provider_prefixes() {
+        let mistral = bare_mistral_sample();
+        let aiza = sample_aiza();
+        let mistral_assigned = format!("MISTRAL_API_KEY={mistral}");
+        let mistral_bare = format!("mistral key {mistral}");
+        let gemini_assigned = format!("GEMINI_API_KEY={aiza}");
+        let cases = [
+            (
+                "NVIDIA_API_KEY=nvapi-abcdefghijklmnopqrstuvwxyz012345",
+                "nvapi-abcdefghijklmnopqrstuvwxyz012345",
+            ),
+            (gemini_assigned.as_str(), aiza.as_str()),
+            (aiza.as_str(), aiza.as_str()),
+            (
+                "OPENAI_API_KEY=sk-proj-abcdefghijklmnopqrstuvwxyz",
+                "sk-proj-abcdefghijklmnopqrstuvwxyz",
+            ),
+            (mistral_assigned.as_str(), mistral.as_str()),
+            (mistral_bare.as_str(), mistral.as_str()),
+            (
+                "export HF_TOKEN=hf_abcdefghijklmnopqrstuvwxyz",
+                "hf_abcdefghijklmnopqrstuvwxyz",
+            ),
+            (
+                "pplx-abcd_efgh-ijklmnopqrstuvwx",
+                "pplx-abcd_efgh-ijklmnopqrstuvwx",
+            ),
+        ];
+        for (input, secret) in cases {
+            let scrubbed = scrub_secrets(input);
+            assert!(!scrubbed.contains(secret), "secret must be removed");
+            assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
+        }
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_api_key_assignment() {
+        assert_redacted("API_KEY=supersecret", "supersecret");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_exported_api_key_assignment() {
+        assert_redacted("export API_KEY=supersecret", "supersecret");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_mixed_case_api_key_assignment() {
+        assert_redacted("Api_Key=supersecret", "supersecret");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_token_assignment() {
+        assert_redacted("TOKEN=supersecret", "supersecret");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_secret_assignment() {
+        assert_redacted("SECRET=supersecret", "supersecret");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_secret_key_base_assignment() {
+        assert_redacted("SECRET_KEY_BASE=supersecret", "supersecret");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_openai_key_assignment() {
+        assert_redacted("OPENAI_KEY=supersecret", "supersecret");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_db_password_assignment() {
+        assert_redacted("DB_PASSWORD=supersecret", "supersecret");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_yaml_api_key() {
+        assert_redacted("X_API_KEY: supersecret", "supersecret");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_json_api_key() {
+        assert_redacted(r#""X_API_KEY": "supersecret""#, "supersecret");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_camel_case_api_key() {
+        assert_redacted(r#"apiKey: "hunter2""#, "hunter2");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_quoted_password() {
+        assert_redacted(r#""password": "hunter2""#, "hunter2");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_quoted_password_in_single_quotes() {
+        assert_redacted("'password': 'hunter2'", "hunter2");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_quoted_token() {
+        assert_redacted(r#""token": "hunter2""#, "hunter2");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_quoted_secret() {
+        assert_redacted(r#""secret": "hunter2""#, "hunter2");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_quoted_client_secret() {
+        assert_redacted(r#""client_secret": "hunter2""#, "hunter2");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_exported_github_token() {
+        let value = format!("{}{}", "abcd", "efghij");
+        assert_redacted(&format!("export GITHUB_TOKEN={value}"), &value);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_aws_secret_access_key() {
+        let value = format!("{}{}", "abcd", "efghij");
+        assert_redacted(&format!("AWS_SECRET_ACCESS_KEY={value}"), &value);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_bearer_token() {
+        let token = format!("{}{}", "abcd", "12xy");
+        assert_eq!(token.len(), 8);
+        assert_redacted(&format!("Authorization: Bearer {token}"), &token);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_bearer_tokens_with_marks() {
+        for mark in ['.', '_', '-', '/', '+', '='] {
+            let token = format!("abcd{mark}wxy");
+            assert_eq!(token.len(), 8);
+            assert_redacted(&format!("Authorization: Bearer {token}"), &token);
+        }
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_bearer_authentication_prose() {
+        assert_unchanged("uses Bearer authentication");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_slack_bot_token() {
+        let token = format!("xoxb-{}", "ab".repeat(10));
+        assert_redacted(&token, &token);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_an_aws_access_key_id() {
+        let key = format!("AKIA{}{}", "ABCD1234", "WXYZ5678");
+        assert_eq!(key.len(), 20);
+        assert_redacted(&format!("id {key}"), &key);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_pem_block() {
+        let pem = format!(
+            "{}{}\n{}\n{}{}",
+            "-----BEGIN ", "PRIVATE KEY-----", "abcd", "-----END ", "PRIVATE KEY-----",
+        );
+        assert_redacted(&pem, "abcd");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_long_escaped_private_key() {
+        let begin = format!("{}{}", "-----BEGIN ", "PRIVATE KEY-----");
+        let end = format!("{}{}", "-----END ", "PRIVATE KEY-----");
+        let body = "abcd".repeat(400);
+        let escaped = format!("FIREBASE_PRIVATE_KEY=\"{begin}\\n{body}\\n{end}\\n\"");
+        let scrubbed = scrub_secrets(&escaped);
+        assert!(
+            !scrubbed.contains(&body),
+            "escaped private key must be removed"
+        );
+        assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
+
+        let multiline = format!("GOOGLE_PRIVATE_KEY=\"{begin}\n{body}\n{end}\"");
+        let scrubbed = scrub_secrets(&multiline);
+        assert!(
+            !scrubbed.contains(&body),
+            "multiline private key must be removed"
+        );
+        assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_api_key_inside_a_url() {
+        let value = format!("{}{}", "super", "secret");
+        assert_redacted(&format!("curl https://x.test/?api_key={value}"), &value);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_api_key_inside_a_url_assignment() {
+        let value = format!("{}{}", "super", "secret");
+        assert_redacted(&format!("url=https://x.test/?API_KEY={value}"), &value);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_api_key_after_another_assignment() {
+        let value = format!("{}{}", "super", "secret");
+        assert_redacted(&format!("X=1;API_KEY={value}"), &value);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_short_db_password() {
+        assert_redacted("DB_PASSWORD=hunter2", "hunter2");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_lowercase_api_key_suffix() {
+        let value = format!("{}{}", "super", "secret");
+        assert_redacted(&format!("api_key_prod={value}"), &value);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_an_uppercase_api_key_suffix() {
+        let value = format!("{}{}", "super", "secret");
+        assert_redacted(&format!("API_KEY_PROD={value}"), &value);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_multiword_secret_names() {
+        let value = format!("{}{}", "super", "secret");
+        for name in [
+            "GOOGLE_MAPS_API_KEY",
+            "AZURE_OPENAI_API_KEY",
+            "azure_openai_api_key",
+            "AZURE_CLIENT_SECRET",
+            "GITHUB_APP_TOKEN",
+            "MY_SERVICE_KEY",
+            "MY_APP_PASSWORD",
+            "STRIPE_LIVE_SECRET",
+        ] {
+            assert_redacted(&format!("{name}={value}"), &value);
+        }
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_s3_secret_with_a_dot() {
+        let value = format!("{}.{}", "abcdef", "ghijkl");
+        assert_redacted(&format!("S3_SECRET={value}"), &value);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_aws_s3_secret_with_a_dot() {
+        let value = format!("{}.{}", "abcdef", "ghijkl");
+        assert_redacted(&format!("AWS_S3_SECRET={value}"), &value);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_jwt_after_api_key() {
+        let header = format!("eyJ{}", "aaaaaaa");
+        let jwt = format!("{header}.{}.{}", "bbbbbbbbbb", "cccccccccc");
+        assert!(header.len() >= 10);
+        assert_redacted(&format!("apiKey: {jwt}"), &jwt);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_bare_jwt() {
+        let header = format!("eyJ{}", "aaaaaaa");
+        let jwt = format!("{header}.{}.{}", "bbbbbbbbbb", "cccccccccc");
+        assert_redacted(&format!("see {jwt} later"), &jwt);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_vault_token() {
+        let value = format!("hvs.{}{}", "CAESI", "abc123XYZdefGHI456");
+        assert_redacted(&format!("VAULT_TOKEN={value}"), &value);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_sendgrid_key() {
+        let key = format!("SG.{}.{}", "abcdefghijABCDEF", "klmnopqrstUVWXYZ");
+        assert_redacted(&key, &key);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_dotted_lowercase_api_key() {
+        let value = format!("{}.{}", "abc123", "def456ghi789");
+        assert_redacted(&format!("api_key={value}"), &value);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_an_uppercase_api_key_call() {
+        let value = format!("abc({}{})xyz", "12", "3");
+        assert_redacted(&format!("API_KEY={value}"), &value);
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_an_api_key_read_from_process_env() {
+        assert_unchanged("apiKey: process.env.OPENAI_API_KEY");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_an_api_key_field_read() {
+        assert_unchanged("{ apiKey: settings.apiKey }");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_a_longer_api_key_field_chain() {
+        assert_unchanged("apiKey: config.auth.apiKey");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_a_this_config_field_read() {
+        assert_unchanged("apiKey: this.config.key");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_an_optional_api_key_field_read() {
+        assert_unchanged("apiKey: settings?.apiKey");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_an_import_meta_env_read() {
+        assert_unchanged("apiKey: import.meta.env.X");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_an_os_getenv_call() {
+        assert_unchanged(r#"apiKey: os.getenv("X")"#);
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_an_api_key_function_call() {
+        assert_unchanged("const apiKey = getKey()");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_an_api_key_read_from_os_environ() {
+        assert_unchanged(r#"api_key=os.environ["OPENAI_API_KEY"]"#);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_quoted_passphrase() {
+        assert_redacted(
+            "PASSWORD=\"correct horse battery staple\"",
+            "correct horse battery staple",
+        );
+        assert_redacted(
+            r#""password": "correct horse battery staple""#,
+            "correct horse battery staple",
+        );
+        assert_redacted(r#""secret": "sauce recipe""#, "sauce recipe");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_an_empty_quoted_password() {
+        assert_unchanged(r#""password": """#);
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_an_api_key_label() {
+        assert_unchanged(r#""apiKeyLabel": "Enter key""#);
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_max_tokens() {
+        assert_unchanged("max_tokens: 512");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_an_equality() {
+        assert_unchanged("a == b");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_a_bare_key_assignment() {
+        assert_unchanged("KEY=1");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_password_field() {
+        assert_unchanged("passwordField: input");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_an_object_key() {
+        assert_unchanged("{ key: item.id }");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_a_jsx_key() {
+        assert_unchanged("<Row key={item.id} />");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_a_json_key_field() {
+        assert_unchanged(r#""key": "en.greeting""#);
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_a_type_token_field() {
+        assert_unchanged("type User = { token: string }");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_primary_key() {
+        assert_unchanged("primary_key: id");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_max_token() {
+        assert_unchanged("max_token: 5");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_sort_key() {
+        assert_unchanged("SORT_KEY=name");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_token_count() {
+        assert_unchanged("token_count=12");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_prose_about_a_token() {
+        assert_unchanged("the token: is");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_prose_about_a_secret() {
+        assert_unchanged("secret: we should");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_prose_about_a_key() {
+        assert_unchanged("Key: the thing");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_a_url_query_key() {
+        assert_unchanged("https://example.test/search?key=ordinary-value");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_a_command_substitution() {
+        assert_unchanged("SECRET_KEY_BASE=$(rails secret)");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_an_equality_comparison() {
+        assert_unchanged("if MY_TOKEN == other");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_bearer_of_bad_news() {
+        assert_unchanged("bearer of bad news");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_aiza_after_a_boundary_only() {
+        let key = sample_aiza();
+        assert_redacted(&format!("?key={key}"), &key);
+        let glued = format!("thin{key}");
+        assert_eq!(scrub_secrets(&glued), glued);
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_mistral_model_names_md5_and_shas() {
+        assert_eq!(scrub_secrets("mistral-large-2411"), "mistral-large-2411");
+        let md5 = format!("{}{}", "d41d8cd98f00b204", "e9800998ecf8427e");
+        let near_md5 = format!("mistral commit {md5}");
+        assert_eq!(scrub_secrets(&near_md5), near_md5);
+        let sha = "0123456789abcdef0123456789abcdef01234567";
+        assert_eq!(sha.len(), 40);
+        let near_sha = format!("mistral {sha}");
+        assert_eq!(scrub_secrets(&near_sha), near_sha);
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_long_unquoted_secret() {
+        let body = "ab".repeat(300);
+        assert_eq!(body.len(), 600);
+        let input = format!("API_KEY={body} kept");
+        let scrubbed = scrub_secrets(&input);
+        assert!(
+            scrubbed.starts_with("API_KEY=[redacted]"),
+            "long secret must be redacted"
+        );
+        assert!(scrubbed.ends_with(" kept"), "text after the secret stays");
+        assert!(!scrubbed.contains(body.as_str()), "secret must be removed");
+        assert_eq!(
+            scrubbed.len(),
+            "API_KEY=[redacted] kept".len(),
+            "long secret must be fully redacted"
+        );
+    }
+
+    #[test]
+    fn scrub_secrets_still_finds_a_secret_inside_a_long_token() {
+        let filler = "a=".repeat(200);
+        let input = format!("{filler}api_key=abcdefghijklmnop tail");
+        let scrubbed = scrub_secrets(&input);
+        assert!(
+            scrubbed.contains("api_key=[redacted]"),
+            "a nested secret must be redacted"
+        );
+        assert!(
+            !scrubbed.contains("abcdefghijklmnop"),
+            "secret must be removed"
+        );
+        assert!(scrubbed.ends_with(" tail"), "text after the secret stays");
+
+        let pad = "b".repeat(508);
+        let straddling = format!("foo={pad}&api_key=abcdefghijklmnop tail");
+        let scrubbed = scrub_secrets(&straddling);
+        assert!(
+            scrubbed.contains("api_key=[redacted]"),
+            "a secret that straddles the value cap must be redacted"
+        );
+        assert!(
+            !scrubbed.contains("abcdefghijklmnop"),
+            "secret must be removed"
+        );
+    }
+
+    #[test]
+    fn scrub_secrets_finds_a_name_after_a_multibyte_character() {
+        let secret = "supersecretvalue";
+        for pad in ["a".repeat(505), "a".repeat(510)] {
+            let input = format!("x={pad}éapi_key={secret} kept");
+            let scrubbed = scrub_secrets(&input);
+            assert!(
+                scrubbed.contains("api_key=[redacted]"),
+                "a multibyte character before the name must not hide it"
+            );
+            assert!(!scrubbed.contains(secret), "secret must be removed");
+            assert!(scrubbed.ends_with(" kept"), "text after the secret stays");
+        }
+        let pad = "é".repeat(505);
+        let input = format!("x={pad}api_key={secret} kept");
+        let scrubbed = scrub_secrets(&input);
+        assert!(
+            scrubbed.contains("api_key=[redacted]"),
+            "a multibyte pad must not hide the name"
+        );
+        assert!(!scrubbed.contains(secret), "secret must be removed");
+        assert!(scrubbed.ends_with(" kept"), "text after the secret stays");
+    }
+
+    #[test]
+    fn scrub_secrets_stops_a_long_value_before_the_next_field() {
+        let body = "ab".repeat(260);
+        assert_eq!(body.len(), 520);
+        let query = format!("API_KEY={body}&user=bob");
+        let scrubbed = scrub_secrets(&query);
+        assert!(
+            scrubbed.starts_with("API_KEY=[redacted]&user=bob"),
+            "a following query field stays"
+        );
+        assert!(!scrubbed.contains(body.as_str()), "secret must be removed");
+
+        let json_field = format!("API_KEY={body},\"user\":\"bob\"");
+        let scrubbed = scrub_secrets(&json_field);
+        assert!(
+            scrubbed.contains("\"user\":\"bob\""),
+            "a following json field stays"
+        );
+        assert!(!scrubbed.contains(body.as_str()), "secret must be removed");
+
+        let yaml_field = format!("API_KEY={body}, user:bob");
+        let scrubbed = scrub_secrets(&yaml_field);
+        assert!(
+            scrubbed.contains(", user:bob"),
+            "a following yaml field stays"
+        );
+        assert!(!scrubbed.contains(body.as_str()), "secret must be removed");
+
+        let quoted = format!("{{\"API_KEY\":\"{body}\",\"user\":\"bob\"}}");
+        let scrubbed = scrub_secrets(&quoted);
+        assert!(
+            scrubbed.contains("\"user\":\"bob\""),
+            "later json fields stay"
+        );
+        assert!(!scrubbed.contains(body.as_str()), "secret must be removed");
+    }
+
+    #[test]
+    fn scrub_secrets_keeps_a_long_secret_tail_that_is_not_a_field() {
+        let body = "ab".repeat(260);
+        for tail in [";TAILVALUE", "&TAILVALUE", ",TAILVALUE", "}TAILVALUE"] {
+            let input = format!("API_KEY={body}{tail}");
+            let scrubbed = scrub_secrets(&input);
+            assert!(
+                !scrubbed.contains("TAILVALUE"),
+                "a tail that is not a new field must be redacted"
+            );
+            assert!(!scrubbed.contains(body.as_str()), "secret must be removed");
+            assert_eq!(
+                scrubbed.len(),
+                "API_KEY=[redacted]".len(),
+                "the whole token is redacted"
+            );
+            assert!(
+                scrubbed.starts_with("API_KEY=[redacted]"),
+                "the whole token is redacted"
+            );
+        }
+        let quoted = format!("PASSWORD=\"{body},TAILVALUE\"");
+        let scrubbed = scrub_secrets(&quoted);
+        assert!(
+            !scrubbed.contains("TAILVALUE"),
+            "a quoted tail must be redacted"
+        );
+        assert!(scrubbed.starts_with("PASSWORD=[redacted]"), "quoted secret");
+        let json = format!("\"password\":\"{body};TAILVALUE\"");
+        let scrubbed = scrub_secrets(&json);
+        assert!(
+            !scrubbed.contains("TAILVALUE"),
+            "a json string tail must be redacted"
+        );
+        assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_dotted_secret_past_a_code_looking_prefix() {
+        let dotted = "abcdef.".repeat(16);
+        let marker = "x9y8z7w6";
+        let tail = "Q".repeat(520);
+        let input = format!("x=\",{{=é中api_key=Zqabc.def.ghi.{dotted}{marker}{tail}}}");
+        let scrubbed = scrub_secrets(&input);
+        assert!(
+            !scrubbed.contains(marker),
+            "a dotted secret past a code-looking prefix must be redacted"
+        );
+        assert!(
+            !scrubbed.contains(tail.as_str()),
+            "the tail past the code-looking prefix must be redacted"
+        );
+        assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_an_unquoted_key_inside_a_quoted_window() {
+        let marker = "Zq9AB12Xv7";
+        let tail = "Q".repeat(500);
+        let input = format!("a=\"MY_KEY={marker}{tail}");
+        let scrubbed = scrub_secrets(&input);
+        assert!(
+            !scrubbed.contains(marker),
+            "an unquoted key inside a quoted window must be redacted"
+        );
+        assert!(
+            !scrubbed.contains(tail.as_str()),
+            "the key value must be redacted"
+        );
+        assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
+    }
+
+    #[test]
+    fn scrub_secrets_leaves_prose_after_an_empty_unclosed_quote() {
+        assert_unchanged("set PASSWORD=\" and then press enter");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_quoted_name_when_the_cap_lands_on_its_closing_quote() {
+        let secret = "hunter2hunter2";
+        for name in ["password", "token", "client_secret"] {
+            for quote in ['"', '\''] {
+                let head = "1,\"name\":\"";
+                let tail = format!("\",{quote}{name}{quote}");
+                let pad = "p".repeat(512 - head.len() - tail.len());
+                let value = format!("{head}{pad}{tail}");
+                assert_eq!(value.len(), 512, "the id value is the assignment cap");
+                assert!(
+                    value.ends_with(quote),
+                    "the cap lands on the name's closing quote"
+                );
+                let input = format!(
+                    "{{\"id\":{value}:{quote}{secret}{quote},\"items\":[{}]}}",
+                    "1,".repeat(40)
+                );
+                let scrubbed = scrub_secrets(&input);
+                assert!(
+                    !scrubbed.contains(secret),
+                    "a quoted name whose closing quote is the cap must be redacted"
+                );
+                assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
+                assert!(scrubbed.contains("\"items\""), "later fields stay");
+            }
+        }
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_quoted_value_with_an_escaped_quote() {
+        let input = r#""password":"ab\"cdefgh ijk""#;
+        let scrubbed = scrub_secrets(input);
+        assert!(
+            !scrubbed.contains("cdefgh"),
+            "text after an escaped quote must be redacted"
+        );
+        assert!(
+            !scrubbed.contains("ijk"),
+            "the rest of the quote must be redacted"
+        );
+        assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_an_unclosed_quoted_secret() {
+        let input = "API_KEY=\"abc defghij";
+        let scrubbed = scrub_secrets(input);
+        assert!(
+            !scrubbed.contains("defghij"),
+            "an unclosed quoted secret must be redacted"
+        );
+        assert!(
+            scrubbed.starts_with("API_KEY=[redacted]"),
+            "the assignment is redacted"
+        );
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_long_quoted_secret_with_a_short_first_word() {
+        let tail = "Q".repeat(520);
+        let input = format!("PASSWORD=\"ab {tail}\"");
+        let scrubbed = scrub_secrets(&input);
+        assert!(
+            !scrubbed.contains(tail.as_str()),
+            "a long quoted secret must be redacted past its short first word"
+        );
+        assert!(
+            scrubbed.starts_with("PASSWORD=[redacted]"),
+            "the assignment is redacted"
+        );
+        let json = format!("\"password\":\"hi {tail}\"");
+        let scrubbed = scrub_secrets(&json);
+        assert!(
+            !scrubbed.contains(tail.as_str()),
+            "a long json string must be redacted past its short first word"
+        );
+        assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
+    }
+
+    #[test]
+    fn scrub_secrets_redacts_a_quoted_name_inside_compact_json() {
+        let items = "1,".repeat(800);
+        let secret = "hunter2hunter2";
+        for key in ["password", "token", "client_secret"] {
+            let input = format!(
+                "{{\"id\":42,\"name\":\"svc\",\"{key}\":\"{secret}\",\"items\":[{items}]}}"
+            );
+            let scrubbed = scrub_secrets(&input);
+            assert!(!scrubbed.contains(secret), "secret must be removed");
+            assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
+            assert!(scrubbed.contains("\"name\":\"svc\""), "other fields stay");
+        }
+        let input = format!("[{{\"id\":42,\"password\":\"{secret}\",\"items\":[{items}]}}]");
+        let scrubbed = scrub_secrets(&input);
+        assert!(!scrubbed.contains(secret), "secret must be removed");
+        assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
+        assert!(scrubbed.contains("\"id\":42"), "other fields stay");
+    }
+
+    #[test]
+    fn scrub_assignments_scales_linearly() {
+        assert_scrub_scales("a=", "a=");
+        assert_scrub_scales("API_KEY=$", "API_KEY=$");
+        assert_scrub_scales(
+            "compact-json",
+            r#"{"id":42,"name":"svc","token":"$","items":[1]}"#,
+        );
+    }
+
+    fn assert_scrub_scales(label: &str, piece: &str) {
+        let small_reps = (100 * 1024) / piece.len();
+        let small = piece.repeat(small_reps);
+        let big = piece.repeat(small_reps * 8);
+        let _ = scrub_secrets(&small);
+        let (small_time, big_time) = best_alternating_scrub(&small, &big);
+        let ratio = big_time.as_secs_f64() / small_time.as_secs_f64().max(1e-9);
+        eprintln!(
+            "scrub scale {label}: 100KB {} ms, 800KB {} ms, ratio {ratio:.2}",
+            small_time.as_millis(),
+            big_time.as_millis()
+        );
+        assert!(
+            ratio < 24.0,
+            "800 KB scrub was 24x or more the 100 KB scrub"
+        );
+        assert!(
+            big_time < scrub_absolute_limit(),
+            "800 KB scrub took too long"
+        );
+    }
+
+    fn best_alternating_scrub(
+        small: &str,
+        big: &str,
+    ) -> (std::time::Duration, std::time::Duration) {
+        let mut best_small = std::time::Duration::from_secs(60);
+        let mut best_big = std::time::Duration::from_secs(60);
+        for round in 0..5 {
+            if round % 2 == 0 {
+                best_small = best_small.min(scrub_once(small));
+                best_big = best_big.min(scrub_once(big));
+            } else {
+                best_big = best_big.min(scrub_once(big));
+                best_small = best_small.min(scrub_once(small));
+            }
+        }
+        (best_small, best_big)
+    }
+
+    fn scrub_once(input: &str) -> std::time::Duration {
+        let started = std::time::Instant::now();
+        let _ = scrub_secrets(input);
+        started.elapsed()
+    }
+
+    fn scrub_absolute_limit() -> std::time::Duration {
+        if cfg!(debug_assertions) {
+            std::time::Duration::from_secs(5)
+        } else {
+            std::time::Duration::from_millis(500)
+        }
+    }
+
+    fn assert_redacted(input: &str, secret: &str) {
+        let scrubbed = scrub_secrets(input);
+        assert!(!scrubbed.contains(secret), "secret must be removed");
+        assert!(scrubbed.contains("[redacted]"), "redaction marker missing");
+    }
+
+    fn assert_unchanged(input: &str) {
+        assert_eq!(scrub_secrets(input), input);
+    }
+
+    #[test]
+    fn scrub_secrets_keeps_ordinary_text_and_redacts_dotenv_output() {
+        let mistral = bare_mistral_sample();
+        let checksum = format!("checksum {mistral} stays");
+        let ordinary = [
+            "The garden needs water before noon.",
+            "use hf_hub_download to fetch the file",
+            "Set the token in the settings screen.",
+            "the secret sauce is a recipe",
+            "OPENAI_API_KEY is the variable name",
+            "The word AIza appears in a short note.",
+            "PATH=/usr/bin",
+            checksum.as_str(),
+        ];
+        for text in ordinary {
+            assert_eq!(scrub_secrets(text), text, "{text}");
+        }
+        let far = format!("mistral\n{}\n{mistral}", "x".repeat(400));
+        let far_scrubbed = scrub_secrets(&far);
+        assert!(
+            far_scrubbed.contains(&mistral),
+            "a bare key far from the word mistral must stay"
+        );
+
+        let aiza = sample_aiza();
+        let dotenv = format!(
+            "# local secrets\nOPENAI_API_KEY=sk-proj-abcdefghijklmnopqrstuvwxyz\nNVIDIA_API_KEY=nvapi-abcdefghijklmnopqrstuvwxyz012345\nGEMINI_API_KEY=\"{aiza}\"\nMISTRAL_API_KEY={mistral}\nPATH=/usr/bin\n"
+        );
+        let scrubbed = scrub_secrets(&dotenv);
+        assert!(scrubbed.contains("PATH=/usr/bin"));
+        assert!(scrubbed.contains("# local secrets"));
+        assert!(!scrubbed.contains("sk-proj-abcdefghijklmnopqrstuvwxyz"));
+        assert!(!scrubbed.contains("nvapi-abcdefghijklmnopqrstuvwxyz012345"));
+        assert!(!scrubbed.contains(&aiza));
+        assert!(!scrubbed.contains(&mistral));
+    }
+
     #[test]
     fn scrub_secrets_leaves_code_names_and_redacts_long_tokens() {
         let code = scrub_secrets("use hf_hub_download to fetch the file");
@@ -905,6 +2742,68 @@ mod tests {
     }
 
     #[test]
+    fn scrub_event_caps_tool_result_before_scrubbing() {
+        let secret = "ab".repeat(300);
+        let mut output = format!("API_KEY={secret} ");
+        output.push_str(&"z".repeat(TOOL_RESULT_CAP));
+        assert!(output.len() > TOOL_RESULT_CAP);
+        let event = DurableEvent::ToolResult {
+            id: "1".into(),
+            name: "tool".into(),
+            output,
+        };
+        let DurableEvent::ToolResult {
+            output: scrubbed, ..
+        } = scrub_event(&event)
+        else {
+            panic!("tool result");
+        };
+        assert!(
+            scrubbed.contains("[truncated: tool result exceeded 1 MiB]"),
+            "the cap is applied before redaction shortens the text"
+        );
+        assert!(
+            scrubbed.contains("API_KEY=[redacted]"),
+            "kept prefix is scrubbed"
+        );
+        assert!(
+            !scrubbed.contains(secret.as_str()),
+            "secret must be removed"
+        );
+        assert!(
+            scrubbed.len() <= TOOL_RESULT_CAP,
+            "tool result stays within the cap"
+        );
+    }
+
+    #[test]
+    fn scrub_event_retruncates_after_scrubbing_grows_the_text() {
+        let unit = "TOKEN=hunter2 ";
+        let output = unit.repeat((TOOL_RESULT_CAP / unit.len()) + 8);
+        assert!(output.len() > TOOL_RESULT_CAP);
+        let event = DurableEvent::ToolResult {
+            id: "1".into(),
+            name: "tool".into(),
+            output,
+        };
+        let DurableEvent::ToolResult {
+            output: scrubbed, ..
+        } = scrub_event(&event)
+        else {
+            panic!("tool result");
+        };
+        assert!(
+            scrubbed.len() <= TOOL_RESULT_CAP,
+            "scrubbed tool result stays within the cap"
+        );
+        assert!(
+            scrubbed.contains("[redacted]"),
+            "short secrets are scrubbed"
+        );
+        assert!(!scrubbed.contains("hunter2"), "secret must be removed");
+    }
+
+    #[test]
     fn tool_result_over_cap_is_marked() {
         let huge = "x".repeat(TOOL_RESULT_CAP + 8);
         let capped = cap_tool_result(huge);
@@ -934,6 +2833,7 @@ mod tests {
             vault_path: None,
             vault_paths: Vec::new(),
             system_prompt: None,
+            reasoning_level: None,
         };
         let writer = create_session_log(&header).unwrap();
         drop(writer);
@@ -955,6 +2855,7 @@ mod tests {
             vault_path: None,
             vault_paths: Vec::new(),
             system_prompt: None,
+            reasoning_level: None,
         };
         let first = create_session_log(&header).unwrap();
         let second = try_lock_session(&id);
@@ -996,6 +2897,7 @@ mod tests {
             vault_path: None,
             vault_paths: Vec::new(),
             system_prompt: None,
+            reasoning_level: None,
         };
         let mut writer = create_session_log(&header).unwrap();
         let before = std::fs::metadata(writer.path()).unwrap().len();
@@ -1030,6 +2932,7 @@ mod tests {
             vault_path: None,
             vault_paths: Vec::new(),
             system_prompt: None,
+            reasoning_level: None,
         };
         let mut writer = create_session_log(&header).unwrap();
         writer.force_len(SESSION_SIZE_CAP);
@@ -1065,6 +2968,7 @@ mod tests {
             vault_path: None,
             vault_paths: Vec::new(),
             system_prompt: None,
+            reasoning_level: None,
         };
         let mut writer = create_session_log(&header).unwrap();
         writer.fail_next_io();
@@ -1087,6 +2991,240 @@ mod tests {
     }
 
     #[test]
+    fn a_partial_write_is_truncated_so_later_events_reopen() {
+        let _home = temp_home();
+        let id = uuid::Uuid::new_v4().to_string();
+        let header = SessionHeader {
+            version: NATIVE_LOG_VERSION,
+            session_id: id.clone(),
+            created_at: "2026-10-10T00:00:00Z".into(),
+            target: "openai/gpt-4o-mini".into(),
+            permission_mode: "safe".into(),
+            vault_path: None,
+            vault_paths: Vec::new(),
+            system_prompt: None,
+            reasoning_level: None,
+        };
+        let mut writer = create_session_log(&header).unwrap();
+        append_or_roll(
+            &mut writer,
+            &DurableEvent::User {
+                text: "first".into(),
+            },
+        )
+        .unwrap();
+        let good_len = std::fs::metadata(writer.path()).unwrap().len();
+        writer.fail_after_partial_write(8);
+        let error = append_or_roll(
+            &mut writer,
+            &DurableEvent::User {
+                text: "torn-secret".into(),
+            },
+        )
+        .expect_err("short write");
+        assert_eq!(error, LOG_SAVE_NOTICE);
+        assert_eq!(
+            std::fs::metadata(writer.path()).unwrap().len(),
+            good_len,
+            "a short write must be truncated back to the last good line"
+        );
+        let bytes = std::fs::read(writer.path()).unwrap();
+        assert!(
+            !bytes.windows(8).any(|window| window == b"torn-sec"),
+            "the torn text must not remain in the log"
+        );
+        append_or_roll(
+            &mut writer,
+            &DurableEvent::User {
+                text: "second".into(),
+            },
+        )
+        .unwrap();
+        drop(writer);
+
+        let opened = open_session_log(&id).unwrap();
+        let texts: Vec<_> = opened
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                DurableEvent::User { text } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(texts, ["first", "second"]);
+        assert_eq!(opened.warning, None);
+    }
+
+    #[test]
+    fn a_failed_truncate_poisons_the_writer() {
+        let _home = temp_home();
+        let (id, mut writer) = open_test_writer();
+        append_or_roll(&mut writer, &user_event("a")).unwrap();
+        writer.fail_after_partial_write(1);
+        writer.fail_repair(1);
+        let first = append_or_roll(&mut writer, &user_event("torn")).expect_err("short write");
+        assert_eq!(first, LOG_SAVE_STOPPED);
+        assert_eq!(
+            append_or_roll(&mut writer, &user_event("after")).unwrap(),
+            None,
+            "a poisoned writer announces the stop once"
+        );
+        let bytes = std::fs::read(writer.path()).unwrap();
+        assert!(
+            !bytes.windows(5).any(|window| window == b"after"),
+            "a poisoned writer must not append the next event"
+        );
+        drop(writer);
+        assert_eq!(user_texts(&id), ["a"]);
+    }
+
+    #[test]
+    fn a_failed_rewind_poisons_the_writer() {
+        let _home = temp_home();
+        let (id, mut writer) = open_test_writer();
+        append_or_roll(&mut writer, &user_event("a")).unwrap();
+        let good_len = std::fs::metadata(writer.path()).unwrap().len();
+        writer.fail_after_partial_write(1);
+        writer.fail_repair(2);
+        assert_eq!(
+            append_or_roll(&mut writer, &user_event("torn")).unwrap_err(),
+            LOG_SAVE_STOPPED
+        );
+        assert_eq!(
+            std::fs::metadata(writer.path()).unwrap().len(),
+            good_len,
+            "truncate already succeeded"
+        );
+        assert_eq!(
+            append_or_roll(&mut writer, &user_event("after")).unwrap(),
+            None
+        );
+        assert_eq!(
+            std::fs::metadata(writer.path()).unwrap().len(),
+            good_len,
+            "a failed rewind must not leave a hole for the next write"
+        );
+        drop(writer);
+        assert_eq!(user_texts(&id), ["a"]);
+    }
+
+    #[test]
+    fn a_failed_sync_after_truncate_poisons_the_writer() {
+        let _home = temp_home();
+        let (id, mut writer) = open_test_writer();
+        append_or_roll(&mut writer, &user_event("a")).unwrap();
+        writer.fail_after_partial_write(1);
+        writer.fail_repair(3);
+        assert_eq!(
+            append_or_roll(&mut writer, &user_event("torn")).unwrap_err(),
+            LOG_SAVE_STOPPED
+        );
+        assert_eq!(
+            append_or_roll(&mut writer, &user_event("after")).unwrap(),
+            None
+        );
+        drop(writer);
+        assert_eq!(user_texts(&id), ["a"]);
+    }
+
+    #[test]
+    fn a_truncated_prefix_is_what_a_reopen_reads() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("session.jsonl");
+        let mut file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&path)
+            .unwrap();
+        file.write_all(b"good\nTORN").unwrap();
+        repair_short_write(&mut file, 5, 0).unwrap();
+        drop(file);
+        assert_eq!(std::fs::read(&path).unwrap(), b"good\n");
+    }
+
+    fn open_test_writer() -> (String, NativeSessionWriter) {
+        let id = uuid::Uuid::new_v4().to_string();
+        let header = SessionHeader {
+            version: NATIVE_LOG_VERSION,
+            session_id: id.clone(),
+            created_at: "2026-10-10T00:00:00Z".into(),
+            target: "openai/gpt-4o-mini".into(),
+            permission_mode: "safe".into(),
+            vault_path: None,
+            vault_paths: Vec::new(),
+            system_prompt: None,
+            reasoning_level: None,
+        };
+        (id, create_session_log(&header).unwrap())
+    }
+
+    fn user_event(text: &str) -> DurableEvent {
+        DurableEvent::User {
+            text: text.to_string(),
+        }
+    }
+
+    fn user_texts(id: &str) -> Vec<String> {
+        open_session_log(id)
+            .unwrap()
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                DurableEvent::User { text } => Some(text.clone()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_torn_line_does_not_hide_a_later_good_line() {
+        let _home = temp_home();
+        let id = uuid::Uuid::new_v4().to_string();
+        let header = SessionHeader {
+            version: NATIVE_LOG_VERSION,
+            session_id: id.clone(),
+            created_at: "2026-10-10T00:00:00Z".into(),
+            target: "openai/gpt-4o-mini".into(),
+            permission_mode: "safe".into(),
+            vault_path: None,
+            vault_paths: Vec::new(),
+            system_prompt: None,
+            reasoning_level: None,
+        };
+        let path = write_fixture(
+            &header,
+            &[
+                DurableEvent::User {
+                    text: "before".into(),
+                },
+                DurableEvent::User {
+                    text: "after".into(),
+                },
+            ],
+            &[],
+        )
+        .unwrap();
+        let raw = std::fs::read_to_string(&path).unwrap();
+        let mut lines: Vec<&str> = raw.lines().collect();
+        assert!(lines.len() >= 3, "header plus two events: {raw}");
+        lines.insert(2, "{\"seq\":2,\"checksum\":\"dead\",\"event\":");
+        std::fs::write(&path, format!("{}\n", lines.join("\n"))).unwrap();
+
+        let opened = open_session_log(&id).unwrap();
+        let texts: Vec<_> = opened
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                DurableEvent::User { text } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(texts, ["before", "after"]);
+        assert!(opened.warning.is_some());
+    }
+
+    #[test]
     fn bad_bytes_are_damage_and_the_header_still_lists() {
         let _home = temp_home();
         let id = uuid::Uuid::new_v4().to_string();
@@ -1099,6 +3237,7 @@ mod tests {
             vault_path: None,
             vault_paths: Vec::new(),
             system_prompt: None,
+            reasoning_level: None,
         };
         let path = write_fixture(&header, &[], &[]).unwrap();
         let mut bytes = std::fs::read(&path).unwrap();
@@ -1131,6 +3270,7 @@ mod tests {
             vault_path: None,
             vault_paths: Vec::new(),
             system_prompt: None,
+            reasoning_level: None,
         };
         let event = r#"{"User":{"text":"hi"}}"#;
         let checksum = checksum_event(5, event);
@@ -1147,5 +3287,76 @@ mod tests {
         assert!(opened.warning.is_some());
         assert!(opened.successor_id.is_some());
         assert_eq!(std::fs::read(&path).unwrap(), before);
+    }
+
+    #[test]
+    fn reasoning_level_is_saved_in_the_header_and_the_sidecar() {
+        let _home = temp_home();
+        let id = uuid::Uuid::new_v4().to_string();
+        let header = SessionHeader {
+            version: NATIVE_LOG_VERSION,
+            session_id: id.clone(),
+            created_at: "2026-10-10T00:00:00Z".into(),
+            target: "xai/grok-4.7".into(),
+            permission_mode: "safe".into(),
+            vault_path: None,
+            vault_paths: Vec::new(),
+            system_prompt: None,
+            reasoning_level: Some("high".into()),
+        };
+        write_session_events(&header, &[]).unwrap();
+        let opened = open_session_log(&id).unwrap();
+        assert_eq!(opened.header.reasoning_level.as_deref(), Some("high"));
+        let sidecar = std::fs::read_to_string(reasoning_sidecar_path(&id).unwrap()).unwrap();
+        assert_eq!(sidecar.trim(), "high");
+
+        write_reasoning_sidecar(&id, Some("low")).unwrap();
+        let reloaded = open_session_log(&id).unwrap();
+        assert_eq!(reloaded.header.reasoning_level.as_deref(), Some("low"));
+    }
+
+    #[test]
+    fn an_old_session_without_reasoning_level_still_opens() {
+        let _home = temp_home();
+        let id = uuid::Uuid::new_v4().to_string();
+        let dir = native_sessions_dir().unwrap();
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(format!("{id}.jsonl"));
+        std::fs::write(
+            &path,
+            format!(
+                "{{\"version\":1,\"session_id\":\"{id}\",\"created_at\":\"2026-10-10T00:00:00Z\",\"target\":\"openai/gpt-4o-mini\",\"permission_mode\":\"safe\"}}\n"
+            ),
+        )
+        .unwrap();
+        let opened = open_session_log(&id).unwrap();
+        assert_eq!(opened.header.reasoning_level, None);
+        assert!(!reasoning_sidecar_path(&id).unwrap().exists());
+    }
+
+    #[test]
+    fn a_bad_reasoning_sidecar_does_not_block_open() {
+        let _home = temp_home();
+        let id = uuid::Uuid::new_v4().to_string();
+        let header = SessionHeader {
+            version: NATIVE_LOG_VERSION,
+            session_id: id.clone(),
+            created_at: "2026-10-10T00:00:00Z".into(),
+            target: "xai/grok-4.7".into(),
+            permission_mode: "safe".into(),
+            vault_path: None,
+            vault_paths: Vec::new(),
+            system_prompt: None,
+            reasoning_level: Some("high".into()),
+        };
+        write_session_events(&header, &[]).unwrap();
+        let path = reasoning_sidecar_path(&id).unwrap();
+        std::fs::write(&path, [0xff, 0xfe]).unwrap();
+        let opened = open_session_log(&id).unwrap();
+        assert_eq!(opened.header.reasoning_level.as_deref(), Some("high"));
+
+        std::fs::write(&path, "x".repeat(REASONING_SIDECAR_CAP + 8)).unwrap();
+        let opened = open_session_log(&id).unwrap();
+        assert_eq!(opened.header.reasoning_level.as_deref(), Some("high"));
     }
 }

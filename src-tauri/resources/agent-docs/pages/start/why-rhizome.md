@@ -3,7 +3,7 @@
 Source: start/why-rhizome.md
 URL: /start/why-rhizome
 
-Rhizome gives an AI agent a memory you can see. The things worth keeping become notes in a folder you own, and you can check what the agent did to your files after the fact.
+A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own. You can check what the agent did to your files after the fact.
 
 ## The problem it solves
 
@@ -25,13 +25,13 @@ If the vault is a Git repository, every change to it can be committed, including
 
 ## Free models, routed for you
 
-**Free tier (auto)** sends a chat to free hosted models (Groq, Mistral, LLM7, OpenRouter's free models, NVIDIA NIM) in a fixed order. When one fails or runs out of free use, Rhizome moves to the next. Models whose free tier trains on your prompts are left out. You can add your own endpoint as the last stop. It builds on two open-source projects, OmniRoute and freellmapi. [Free models and routing](../concepts/free-models-and-routing.md)
+**Taproot**, Rhizome's free automatic router, sends a chat to free hosted models (Groq, Mistral, LLM7, OpenRouter's free models, NVIDIA NIM) in a fixed order. When one fails or runs out of free use, Rhizome moves to the next. Models whose free tier trains on your prompts are left out. You can add your own endpoint as the last stop. It builds on two open-source projects, OmniRoute and freellmapi. [Free models and routing](../concepts/free-models-and-routing.md)
 
 ## Rhizome runs its own loop
 
-An **agent loop** is the cycle that sends your message to a model, runs the tools the model asks for, and repeats until the answer is done. Rhizome has its own. You can also use an **engine**: another harness that runs the loop instead. Prime Agent is the default engine today. The vault, the permissions and the memory stay with Rhizome whichever one runs.
+An **agent loop** is the cycle that sends your message to a model, runs the tools the model asks for, and repeats until the answer is done. Rhizome has its own, and that is the only chat engine (ADR-0187). Prime and Hermes are no longer chat engines (ADR-0189); leftover code is still in the repo until the follow-up PRs. The vault, permissions, and memory stay with Rhizome.
 
-Rhizome's own engine is new. Today it can create notes, and not much else. It can't read, search or edit files yet, and it can't search the vault. [Agents, engines and models](../concepts/ai.md)
+Rhizome's engine can read, search, edit and create notes in the open vault. In Power User it can run one approved shell command in the vault folder. [Agents, engines and models](../concepts/ai.md)
 
 ## What will feel familiar
 
@@ -39,13 +39,13 @@ If you've used Claude Code, Hermes Agent, Cursor or Prime, most of the basics ca
 
 | You know | In Rhizome |
 |---|---|
-| Sessions you can resume | Saved chats with automatic titles; Prime's session list when Prime is the engine |
+| Sessions you can resume | Saved native chats with automatic titles |
 | Tool approval | Permission modes: **Limited tools** and **Power User** |
 | Bring your own model | Hosted providers, local models (Ollama, LM Studio), any OpenAI-compatible endpoint; keys in the system keychain |
 | `CLAUDE.md` / `AGENTS.md` | A vault `AGENTS.md`, with `CLAUDE.md` kept as a compatibility file |
 | MCP | Rhizome runs an MCP server, so other apps can read and write your vault |
 | Past chat history | Import Claude Code chats into the vault |
-| Extensions | Prime packages from Settings → Packages when Prime is the engine. Rhizome's own plugin system is planned |
+| Extensions | Rhizome's own plugin system is planned |
 | An editor | A rich Markdown editor with a raw mode, plus PDF and image previews, sheets, diagrams and whiteboards |
 | A graph | The Wiki Graph: notes as nodes, links as edges |
 
@@ -53,4 +53,4 @@ If you've used Claude Code, Hermes Agent, Cursor or Prime, most of the basics ca
 
 ## What it isn't yet
 
-Rhizome is a macOS developer preview. You build it from source; there is no signed download or in-app updater. The install script fetches Prime Agent because Prime is still the default engine, but Rhizome's own engine works without it.
+Rhizome is a macOS developer preview. You build it from source; there is no signed download or in-app updater. Chat runs on Rhizome's own engine and does not need Prime.

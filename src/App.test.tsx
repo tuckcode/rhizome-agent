@@ -1,4 +1,5 @@
 import { act, render as testingLibraryRender, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { ReactElement, ReactNode } from 'react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { DEFAULT_VAULTS } from './hooks/useVaultSwitcher'
@@ -297,9 +298,22 @@ function getHeaderForNoteList(noteListContainer: HTMLElement) {
   return within(noteListContainer.parentElement as HTMLElement).getByRole('heading', { level: 3 })
 }
 
+async function openNotesPanelFromRail() {
+  if (screen.queryByTestId('vault-panel')) return
+  pressViewShortcut('2')
+  await screen.findByTestId('vault-panel')
+}
+
+async function collapseNotesPanelToRail() {
+  pressViewShortcut('1')
+  await waitFor(() => {
+    expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
+  })
+}
+
 async function selectFilterInVaultPanel(label: 'Inbox') {
   if (!screen.queryByTestId('vault-panel')) {
-    fireEvent.click(await screen.findByTestId('vault-panel-restore'))
+    await openNotesPanelFromRail()
   }
   if (!screen.queryByTestId('vault-panel-navigation')) {
     fireEvent.click(await screen.findByTestId('vault-panel-browse-toggle'))
@@ -403,6 +417,10 @@ vi.mock('./mock-tauri', () => ({
 
 vi.mock('./utils/streamAiAgent', () => ({
   streamAiAgent: vi.fn(async () => {}),
+}))
+
+vi.mock('./utils/streamNativeChat', () => ({
+  streamNativeChat: vi.fn(async () => undefined),
 }))
 
 vi.mock('./hooks/useUpdater', async () => {
@@ -517,7 +535,10 @@ import { useUpdater } from './hooks/useUpdater'
 import { isTauri, mockInvoke } from './mock-tauri'
 import { resetPrimeHostStatus } from './hooks/usePrimeHostStatus'
 import { streamAiAgent } from './utils/streamAiAgent'
+import { streamNativeChat } from './utils/streamNativeChat'
 import { panePresetStorageKey } from './lib/panePresetStorage'
+import { notesPanelModeStorageKey } from './lib/notesPanelMode'
+import { viewShortcutEventModifiers } from './lib/railViewShortcuts'
 
 const AI_AGENTS_ONBOARDING_DISMISSED_STORAGE_NAME = 'rhizome:ai-agents-onboarding-dismissed'
 const CLAUDE_CODE_ONBOARDING_DISMISSED_STORAGE_NAME = 'tolaria:claude-code-onboarding-dismissed'
@@ -747,7 +768,7 @@ describe('App', () => {
     expect(screen.getByTestId('chat-center')).toHaveStyle({ display: 'none' })
   })
 
-  it('opens the session-footprint chip into Connections, not the full-page Mycelium destination', async () => {
+  it('does not keep a Prime session footprint after leftover prime engine migrates', async () => {
     localStorage.setItem('rhizome:command-rail-expanded', '1')
     mockCommandResults.get_prime_session_host_status = {
       installed: true,
@@ -763,12 +784,10 @@ describe('App', () => {
     }
     mockCommandResults.list_prime_sessions = [{ path: '/prime/sessions/session-1.jsonl', name: 'session-1' }]
     mockCommandResults.read_prime_session_transcript = []
+    mockCommandResults.get_settings = createSettings({ chat_engine: 'prime' })
     render(<App />)
-    fireEvent.click(await screen.findByTestId('prime-session-footprint'))
-    expect(await screen.findByTestId('connections-panel')).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Mycelium', selected: true })).toBeInTheDocument()
-    expect(screen.queryByText('No saved sessions')).not.toBeInTheDocument()
-    expect(await screen.findByLabelText('Activity session')).toHaveValue('/prime/sessions/session-1.jsonl')
+    expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(screen.queryByTestId('prime-session-footprint')).not.toBeInTheDocument()
   })
 
   it('keeps Graph and Mycelium out of the Notes column until an icon opens them', async () => {
@@ -816,7 +835,7 @@ describe('App', () => {
     expect(pane).toHaveTextContent('Test Project')
   })
 
-  it('opens Notes and Mycelium from the session-footprint chip when Notes is closed', async () => {
+  it('does not open Notes from a Prime session footprint when leftover prime migrates', async () => {
     setPanePreset('chat')
     localStorage.setItem('rhizome:command-rail-expanded', '1')
     mockCommandResults.get_prime_session_host_status = {
@@ -833,13 +852,11 @@ describe('App', () => {
     }
     mockCommandResults.list_prime_sessions = [{ path: '/prime/sessions/session-1.jsonl', name: 'session-1' }]
     mockCommandResults.read_prime_session_transcript = []
+    mockCommandResults.get_settings = createSettings({ chat_engine: 'prime' })
     render(<App />)
     expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
     expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
-    fireEvent.click(await screen.findByTestId('prime-session-footprint'))
-    expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
-    expect(await screen.findByTestId('connections-panel')).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: 'Mycelium', selected: true })).toBeInTheDocument()
+    expect(screen.queryByTestId('prime-session-footprint')).not.toBeInTheDocument()
   })
 
   it('starts with Chat and the restore strip when no view preference is stored', async () => {
@@ -852,7 +869,40 @@ describe('App', () => {
     expect(screen.queryByTestId('command-rail-changes')).not.toBeInTheDocument()
     expect(screen.getByTestId('command-rail-history')).toBeInTheDocument()
     expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
-    expect(screen.getByTestId('vault-panel-restore')).toBeVisible()
+    expect(screen.getByTestId('notes-panel-rail')).toBeVisible()
+    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Open')
+  })
+
+  it('opens History from the view button and its shortcut when Notes is closed', async () => {
+    localStorage.setItem(notesPanelModeStorageKey('main'), 'rail')
+    render(<App />)
+    expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('command-rail-history'))
+    expect(await screen.findByTestId('pulse-header')).toBeInTheDocument()
+    expect(screen.getByTestId('vault-panel')).toBeInTheDocument()
+  })
+
+  it('opens History from its shortcut when Notes is closed', async () => {
+    localStorage.setItem(notesPanelModeStorageKey('main'), 'rail')
+    render(<App />)
+    expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
+    const mods = viewShortcutEventModifiers()
+    fireEvent.keyDown(window, { key: '4', code: 'Digit4', ...mods })
+    expect(await screen.findByTestId('pulse-header')).toBeInTheDocument()
+  })
+
+  it('keeps a saved Auto or Rail mode when a view switch opens the panel', async () => {
+    localStorage.setItem(notesPanelModeStorageKey('main'), 'rail')
+    render(<App />)
+    expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
+    expect(localStorage.getItem(notesPanelModeStorageKey('main'))).toBe('rail')
+
+    pressViewShortcut('2')
+    expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
+    expect(localStorage.getItem(notesPanelModeStorageKey('main'))).toBe('rail')
+    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Rail (open for now)')
   })
 
   it('keeps Chat as the canvas while Notes is open, and Inbox only opens the list', async () => {
@@ -866,16 +916,16 @@ describe('App', () => {
       expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
     })
     expect(screen.getByTestId('chat-center')).not.toHaveStyle({ display: 'none' })
-    expect(screen.getByTestId('vault-panel-restore')).toHaveAccessibleName('Show Notes')
+    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Open')
 
-    fireEvent.click(screen.getByTestId('vault-panel-restore'))
+    await openNotesPanelFromRail()
     expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
     expect(screen.queryByTestId('vault-panel-navigation')).not.toBeInTheDocument()
     expect(screen.getByTestId('chat-center')).not.toHaveStyle({ display: 'none' })
 
-    fireEvent.click(await screen.findByTestId('vault-panel-collapse'))
+    await collapseNotesPanelToRail()
     expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByTestId('vault-panel-restore'))
+    await openNotesPanelFromRail()
     expect(screen.getByTestId('vault-panel')).toBeInTheDocument()
   })
 
@@ -1056,7 +1106,6 @@ describe('App', () => {
       claude_code: { installed: true, version: '2.1.90' },
       codex: { installed: true, version: '0.122.0-alpha.1' },
       opencode: { installed: false, version: null },
-      pi: { installed: false, version: null },
       antigravity: { installed: false, version: null },
     }
     mockCommandResults.check_mcp_status = 'installed'
@@ -1097,13 +1146,13 @@ describe('App', () => {
     mockCommandResults.get_settings = createSettings({
       auto_advance_inbox_after_organize: null,
       default_ai_agent: 'prime',
+      chat_engine: 'prime',
     })
     mockCommandResults.get_ai_agents_status = {
       prime: { installed: true, version: 'mock' },
       claude_code: { installed: true, version: '2.1.90' },
       codex: { installed: true, version: '0.122.0-alpha.1' },
       opencode: { installed: false, version: null },
-      pi: { installed: false, version: null },
       antigravity: { installed: false, version: null },
     }
 
@@ -1114,10 +1163,10 @@ describe('App', () => {
 
     const input = await screen.findByTestId('agent-input')
     await waitFor(() => {
-      expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime Agent')
+      expect(input).toHaveAttribute('aria-placeholder', 'Ask Rhizome')
     })
     await waitFor(() => {
-      expect(screen.getByTestId('prime-model-chip')).toBeInTheDocument()
+      expect(screen.getByTestId('native-chat-model-picker')).toBeInTheDocument()
     })
 
     input.textContent = 'Summarize the active vault'
@@ -1125,13 +1174,12 @@ describe('App', () => {
     fireEvent.click(screen.getByTestId('agent-send'))
 
     await waitFor(() => {
-      expect(streamAiAgent).toHaveBeenCalledWith(expect.objectContaining({
-        agent: 'prime',
-      }))
+      expect(streamNativeChat).toHaveBeenCalled()
     })
+    expect(streamAiAgent).not.toHaveBeenCalled()
   })
 
-  it('still sends Prime-targeted messages through Prime when the host is installed but not running', async () => {
+  it('still sends leftover Prime-targeted messages through native when the host is installed but not running', async () => {
     mockCommandResults.get_prime_session_host_status = {
       installed: true,
       version: 'mock',
@@ -1146,13 +1194,13 @@ describe('App', () => {
     mockCommandResults.get_settings = createSettings({
       auto_advance_inbox_after_organize: null,
       default_ai_agent: 'prime',
+      chat_engine: 'prime',
     })
     mockCommandResults.get_ai_agents_status = {
       prime: { installed: true, version: 'mock' },
       claude_code: { installed: true, version: '2.1.90' },
       codex: { installed: true, version: '0.122.0-alpha.1' },
       opencode: { installed: false, version: null },
-      pi: { installed: false, version: null },
       antigravity: { installed: false, version: null },
     }
 
@@ -1163,17 +1211,204 @@ describe('App', () => {
 
     const input = await screen.findByTestId('agent-input')
     await waitFor(() => {
-      expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime Agent')
+      expect(input).toHaveAttribute('aria-placeholder', 'Ask Rhizome')
     })
     input.textContent = 'Summarize the active vault'
     fireEvent.input(input)
     fireEvent.click(screen.getByTestId('agent-send'))
 
     await waitFor(() => {
-      expect(streamAiAgent).toHaveBeenCalledWith(expect.objectContaining({
-        agent: 'prime',
-      }))
+      expect(streamNativeChat).toHaveBeenCalled()
     })
+    expect(streamAiAgent).not.toHaveBeenCalled()
+  })
+
+  it('persists Use Rhizome instead across workspace close and a settings reload', async () => {
+    // Classic shell mounts the AI workspace inside Editor. The chat-centered
+    // graph overlay path hits a Radix ScrollArea update loop in jsdom.
+    localStorage.setItem('ff_shell_command_rail', 'false')
+    let settingsStore = createSettings({
+      auto_advance_inbox_after_organize: null,
+      default_ai_agent: 'prime',
+      default_ai_target: null,
+      chat_engine: 'native',
+      ai_workspace_conversations: [
+        { id: 'codex-chat', title: 'Codex notes', target_id: 'agent:codex', archived: false },
+      ],
+    })
+    mockCommandResults.get_settings = () => settingsStore
+    mockCommandResults.save_settings = (args: unknown) => {
+      const payload = args as { settings?: Settings }
+      if (payload?.settings) settingsStore = payload.settings
+      return null
+    }
+    mockCommandResults.get_prime_session_host_status = {
+      installed: true,
+      version: 'mock',
+      running: true,
+      sessionId: 'sess-1',
+      isStreaming: false,
+      binaryPath: '/mock/prime-agent',
+      modelProvider: 'xai',
+      modelId: 'grok-4.5',
+      modelName: 'Grok 4.5',
+    }
+    mockCommandResults.get_ai_agents_status = {
+      prime: { installed: true, version: 'mock' },
+      claude_code: { installed: true, version: '2.1.90' },
+      codex: { installed: false, version: null },
+      opencode: { installed: false, version: null },
+      antigravity: { installed: false, version: null },
+      kiro: { installed: false, version: null },
+      hermes: { installed: false, version: null },
+    }
+
+    const { unmount } = render(<App />)
+    await screen.findByText('All Notes')
+    await waitFor(() => {
+      expect(typeof window.__rhizomeTest?.dispatchBrowserMenuCommand).toBe('function')
+    })
+    blurTypingSurface()
+    fireEvent.keyDown(window, { key: 'l', code: 'KeyL', metaKey: true, shiftKey: true })
+    await screen.findByTestId('ai-workspace', {}, { timeout: 5000 })
+    await waitFor(() => {
+      expect(screen.getByText('Codex notes')).toBeInTheDocument()
+    })
+
+    blurTypingSurface()
+    act(() => {
+      window.__rhizomeTest?.dispatchBrowserMenuCommand?.('view-command-palette')
+    })
+    const user = userEvent.setup()
+    await user.type(await screen.findByPlaceholderText('Type a command...'), ' ')
+    expect(screen.getByText('Codex is not available on this machine.')).toBeInTheDocument()
+
+    const editor = await screen.findByTestId('command-palette-ai-input')
+    expect(editor).toHaveAttribute('contenteditable', 'true')
+    await user.type(editor, 'summarize the vault')
+    await user.click(screen.getByTestId('command-palette-use-rhizome'))
+
+    await waitFor(() => {
+      expect(settingsStore.default_ai_target).toBe('agent:prime')
+    })
+    expect(settingsStore.default_ai_agent).toBe('prime')
+    expect(settingsStore.ai_workspace_conversations?.find((conversation) => conversation.id === 'codex-chat')?.target_id)
+      .toBe('agent:prime')
+    expect(screen.getByTestId('ai-workspace')).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(streamNativeChat).toHaveBeenCalledTimes(1)
+    }, { timeout: 5000 })
+    expect(streamAiAgent).not.toHaveBeenCalled()
+    const streamed = vi.mocked(streamNativeChat).mock.calls[0]?.[0] as { message?: string } | undefined
+    expect(streamed?.message).toMatch(/summarize the vault/)
+
+    blurTypingSurface()
+    fireEvent.keyDown(window, { key: 'l', code: 'KeyL', metaKey: true, shiftKey: true })
+    await waitFor(() => {
+      expect(screen.queryByTestId('ai-workspace')).not.toBeInTheDocument()
+    })
+    fireEvent.keyDown(window, { key: 'l', code: 'KeyL', metaKey: true, shiftKey: true })
+    await screen.findByTestId('ai-workspace')
+
+    blurTypingSurface()
+    act(() => {
+      window.__rhizomeTest?.dispatchBrowserMenuCommand?.('view-command-palette')
+    })
+    fireEvent.change(await screen.findByPlaceholderText('Type a command...'), { target: { value: ' ' } })
+    expect(screen.getAllByText('Ask Rhizome').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Codex is not available on this machine.')).not.toBeInTheDocument()
+
+    unmount()
+    localStorage.setItem('ff_shell_command_rail', 'false')
+    sessionStorage.setItem(AGENT_CHAT_OPENED_SESSION_KEY, '1')
+    render(<App />)
+    await screen.findByText('All Notes')
+    await waitFor(() => {
+      expect(typeof window.__rhizomeTest?.dispatchBrowserMenuCommand).toBe('function')
+    })
+    blurTypingSurface()
+    fireEvent.keyDown(window, { key: 'l', code: 'KeyL', metaKey: true, shiftKey: true })
+    await screen.findByTestId('ai-workspace', {}, { timeout: 5000 })
+    blurTypingSurface()
+    act(() => {
+      window.__rhizomeTest?.dispatchBrowserMenuCommand?.('view-command-palette')
+    })
+    fireEvent.change(await screen.findByPlaceholderText('Type a command...'), { target: { value: ' ' } })
+    expect(screen.getAllByText('Ask Rhizome').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Codex is not available on this machine.')).not.toBeInTheDocument()
+  })
+
+  it('keeps Cmd+K open in Rhizome mode when Use Rhizome has no prompt', async () => {
+    localStorage.setItem('ff_shell_command_rail', 'false')
+    let settingsStore = createSettings({
+      auto_advance_inbox_after_organize: null,
+      default_ai_agent: 'prime',
+      default_ai_target: null,
+      chat_engine: 'native',
+      ai_workspace_conversations: [
+        { id: 'codex-chat', title: 'Codex notes', target_id: 'agent:codex', archived: false },
+      ],
+    })
+    mockCommandResults.get_settings = () => settingsStore
+    mockCommandResults.save_settings = (args: unknown) => {
+      const payload = args as { settings?: Settings }
+      if (payload?.settings) settingsStore = payload.settings
+      return null
+    }
+    mockCommandResults.get_prime_session_host_status = {
+      installed: true,
+      version: 'mock',
+      running: true,
+      sessionId: 'sess-1',
+      isStreaming: false,
+      binaryPath: '/mock/prime-agent',
+      modelProvider: 'xai',
+      modelId: 'grok-4.5',
+      modelName: 'Grok 4.5',
+    }
+    mockCommandResults.get_ai_agents_status = {
+      prime: { installed: true, version: 'mock' },
+      claude_code: { installed: true, version: '2.1.90' },
+      codex: { installed: false, version: null },
+      opencode: { installed: false, version: null },
+      antigravity: { installed: false, version: null },
+      kiro: { installed: false, version: null },
+      hermes: { installed: false, version: null },
+    }
+
+    render(<App />)
+    await screen.findByText('All Notes')
+    await waitFor(() => {
+      expect(typeof window.__rhizomeTest?.dispatchBrowserMenuCommand).toBe('function')
+    })
+    blurTypingSurface()
+    fireEvent.keyDown(window, { key: 'l', code: 'KeyL', metaKey: true, shiftKey: true })
+    await screen.findByTestId('ai-workspace', {}, { timeout: 5000 })
+    await waitFor(() => {
+      expect(screen.getByText('Codex notes')).toBeInTheDocument()
+    })
+
+    blurTypingSurface()
+    act(() => {
+      window.__rhizomeTest?.dispatchBrowserMenuCommand?.('view-command-palette')
+    })
+    const user = userEvent.setup()
+    await user.type(await screen.findByPlaceholderText('Type a command...'), ' ')
+    expect(screen.getByText('Codex is not available on this machine.')).toBeInTheDocument()
+    await user.click(screen.getByTestId('command-palette-use-rhizome'))
+
+    await waitFor(() => {
+      expect(settingsStore.default_ai_target).toBe('agent:prime')
+    })
+    expect(screen.getByTestId('command-palette-ai-input')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getAllByText('Ask Rhizome').length).toBeGreaterThan(0)
+    })
+    expect(screen.queryByText('Codex is not available on this machine.')).not.toBeInTheDocument()
+    expect(screen.getByTestId('command-palette-ai-input')).toHaveFocus()
+    expect(streamNativeChat).not.toHaveBeenCalled()
+    expect(streamAiAgent).not.toHaveBeenCalled()
   })
 
   it('waits for saved AI agent settings before sending right-panel messages', async () => {
@@ -1197,7 +1432,6 @@ describe('App', () => {
       claude_code: { installed: true, version: '2.1.90' },
       codex: { installed: true, version: '0.122.0-alpha.1' },
       opencode: { installed: false, version: null },
-      pi: { installed: false, version: null },
       antigravity: { installed: false, version: null },
     }
 
@@ -1218,14 +1452,15 @@ describe('App', () => {
       resolveSettings?.(createSettings({
         auto_advance_inbox_after_organize: null,
         default_ai_agent: 'prime',
+        chat_engine: 'prime',
       }))
     })
 
     await waitFor(() => {
-      expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime Agent')
+      expect(input).toHaveAttribute('aria-placeholder', 'Ask Rhizome')
     })
     await waitFor(() => {
-      expect(screen.getByTestId('prime-model-chip')).toBeInTheDocument()
+      expect(screen.getByTestId('native-chat-model-picker')).toBeInTheDocument()
     })
 
     input.textContent = 'Summarize the active vault'
@@ -1233,10 +1468,67 @@ describe('App', () => {
     fireEvent.click(screen.getByTestId('agent-send'))
 
     await waitFor(() => {
-      expect(streamAiAgent).toHaveBeenCalledWith(expect.objectContaining({
-        agent: 'prime',
+      expect(streamNativeChat).toHaveBeenCalled()
+    })
+    expect(streamAiAgent).not.toHaveBeenCalled()
+  })
+
+  it('does not write settings when get_settings throws and No thanks is clicked', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    mockCommandResults.get_settings = () => Promise.reject(new Error('disk'))
+
+    render(<App />)
+
+    await screen.findByText('All Notes', {}, { timeout: SLOW_APP_READY_TIMEOUT_MS })
+    // A failed load used to show this button and save the empty settings.
+    // The prompt now waits for a successful load, so the click cannot wipe the file.
+    const decline = screen.queryByTestId('telemetry-decline')
+    if (decline) fireEvent.click(decline)
+
+    expect(decline).not.toBeInTheDocument()
+    expect(vi.mocked(invoke).mock.calls.filter((call) => call[0] === 'save_settings')).toHaveLength(0)
+    warnSpy.mockRestore()
+  })
+
+  it('merges a chat target change onto disk after a failed load retries', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    sessionStorage.removeItem(AGENT_CHAT_OPENED_SESSION_KEY)
+    let reads = 0
+    const stored = createSettings({
+      telemetry_consent: true,
+      theme_mode: 'dark',
+      chat_engine: 'native',
+      native_chat_target: 'openai/gpt-4.1-mini',
+      auto_pull_interval_minutes: 15,
+    })
+    mockCommandResults.get_settings = () => {
+      reads += 1
+      if (reads === 1) return Promise.reject(new Error('disk'))
+      return stored
+    }
+
+    render(<App />)
+
+    fireEvent.pointerDown(
+      await screen.findByTestId('native-chat-model-trigger', {}, { timeout: SLOW_APP_READY_TIMEOUT_MS }),
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+    fireEvent.click(await screen.findByTestId('native-chat-model-free_tier_auto'))
+
+    await waitFor(() => {
+      const saves = vi.mocked(invoke).mock.calls.filter((call) => call[0] === 'save_settings')
+      expect(saves).toHaveLength(1)
+      expect(saves[0]?.[1]).toEqual(expect.objectContaining({
+        settings: expect.objectContaining({
+          native_chat_target: 'free_tier_auto',
+          theme_mode: 'dark',
+          telemetry_consent: true,
+          auto_pull_interval_minutes: 15,
+          chat_engine: 'native',
+        }),
       }))
     })
+    warnSpy.mockRestore()
   })
 
   it('shows onboarding after telemetry consent when no active vault is configured', async () => {
@@ -1731,7 +2023,7 @@ describe('App', () => {
     const noteList = await screen.findByTestId('note-list-container')
     await clickNoteListItem(noteList, 'Test Project')
     fireEvent.click(screen.getByRole('radio', { name: 'Note beside Chat' }))
-    fireEvent.click(await screen.findByTestId('vault-panel-restore'))
+    await openNotesPanelFromRail()
     const vaultPanel = document.querySelector('.app__vault-panel') as HTMLElement
     expect(vaultPanel).toBeInTheDocument()
     expect(vaultPanel).not.toHaveClass('app__vault-panel--overlay')
@@ -1763,14 +2055,10 @@ describe('App', () => {
     await waitFor(() => {
       expect(document.querySelector('.app__vault-panel')).not.toBeInTheDocument()
     })
-    const restore = await screen.findByTestId('vault-panel-restore')
-    expect(restore).toBeVisible()
-    expect(restore.closest('.app__notes-rail')).toHaveStyle({
-      width: '46px',
-      minWidth: '46px',
-      maxWidth: '46px',
-    })
-    fireEvent.click(restore)
+    const rail = await screen.findByTestId('notes-panel-rail')
+    expect(rail).toBeVisible()
+    expect(rail).toHaveStyle({ width: '46px' })
+    await openNotesPanelFromRail()
     await waitFor(() => {
       expect(document.querySelector('.app__vault-panel')).toBeInTheDocument()
     })
@@ -1830,6 +2118,7 @@ describe('App', () => {
 
   it('updates the main-window size constraints when the view mode changes', async () => {
     const { invoke } = await import('@tauri-apps/api/core') as { invoke: ReturnType<typeof vi.fn> }
+    vi.mocked(isTauri).mockReturnValue(true)
 
     render(<App />)
     await waitFor(() => {
@@ -1861,6 +2150,7 @@ describe('App', () => {
 
   it('does not ask Windows to grow the native window when toggling Properties', async () => {
     const { invoke } = await import('@tauri-apps/api/core') as { invoke: ReturnType<typeof vi.fn> }
+    vi.mocked(isTauri).mockReturnValue(true)
     const originalUserAgent = navigator.userAgent
     Object.defineProperty(window.navigator, 'userAgent', {
       configurable: true,

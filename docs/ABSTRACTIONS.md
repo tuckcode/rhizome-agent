@@ -1,6 +1,6 @@
 # Abstractions
 
-> This document describes Rhizome Agent — see `docs/IDENTITY.md`. "Tolaria" is the pre-fork product name and appears below unchanged; it is not evidence this is Rhizome Desktop.
+> This document describes Rhizome — see `docs/IDENTITY.md`. "Tolaria" is the pre-fork product name and appears below unchanged; it is not evidence this is Rhizome Desktop.
 
 Key abstractions and domain models in Tolaria.
 
@@ -1063,8 +1063,8 @@ Schedules: see/pause/cancel already lived on the activity band (#14). Create is
 `heartbeat_set` / `cron_add` from `PrimeScheduleDialog` next to Goal — not on
 the idle strip, which must stay quiet when nothing is scheduled.
 
-**Origin:** Prime Session body is older; reply / packages / hide notes
-added 2026-09-13 against `replySuggestions.ts`, `prime_packages.rs`,
+**Origin:** Prime Session body is older; reply / hide notes
+added 2026-09-13 against `replySuggestions.ts`
 and `lib.rs::release_helpers_for_hidden_window`.
 
 ### Reply suggestions
@@ -1084,13 +1084,6 @@ CodeMirror read-only (`EditorContentLayout.test.tsx`). Not vault
 `editor_mode`. Sheet lock is out of scope.
 
 **Origin:** Cursor Grok 4.6 · 2026-09-14 14:08 · leftover stamp.
-
-### Packages
-
-Installed packages are Prime settings (`list_prime_packages`). The
-catalog is the public npm `pi-package` index. Install is a CLI spawn
-(`install_prime_package`), then `reload` on the attached session. The
-daemon has no package-install verb.
 
 ### Hide vs quit
 
@@ -1132,18 +1125,19 @@ interface Settings {
   sidebar_type_pluralization_enabled: boolean | null // null = default true
   ai_features_enabled: boolean | null // null = default true
   git_enabled: boolean | null // null = default true
-  default_ai_agent: 'claude_code' | 'codex' | 'opencode' | 'pi' | 'antigravity' | 'kiro' | 'hermes' | null
+  default_ai_agent: 'prime' | 'claude_code' | 'codex' | 'opencode' | 'antigravity' | 'kiro' | 'hermes' | null
   default_ai_target: string | null // "agent:codex" or "model:<provider>/<model>"
   ai_model_providers: AiModelProvider[] | null
   ai_workspace_conversations: AiWorkspaceConversationSetting[] | null
   hide_gitignored_files: boolean | null // null = default true
+  block_secret_files: boolean | null // null = default true; native read-tool denylist
   all_notes_show_pdfs: boolean | null // null = default false
   all_notes_show_images: boolean | null // null = default false
   all_notes_show_unsupported: boolean | null // null = default false
 }
 ```
 
-Managed by `useSettings` hook and `SettingsPanel` component. `theme_mode` is installation-local because it controls device comfort rather than vault structure; the Settings panel and command-palette Light/Dark/System actions both update that same value. `system` remains a stored preference, while the runtime resolves it to `light` or `dark` for `data-theme` and app consumers. `ui_language` is also installation-local: `null` follows the supported system language with English fallback, while explicit values pin the UI language for this installation. Stored legacy aliases such as `zh-Hans` are normalized to canonical locale codes before the setting reaches React state. `date_display_format` is installation-local and controls rendered dates in note rows, property chips/cells, note info, table-of-contents metadata, and search result subtitles; `AppPreferencesProvider` owns the UI-level value so rendering surfaces can consume it without prop forwarding, while date picker text input remains ISO for predictable manual entry and storage. `note_width_mode` is the installation-local default for rich-editor note width; individual notes can override it with `_width` when they already have frontmatter. `sidebar_type_pluralization_enabled` is installation-local and defaults to `true`; when false, type rows use exact type names unless the type document defines an explicit `sidebar_label` override. `automatic_update_checks_enabled` is installation-local and defaults to `true`; when false, `useUpdater` skips the startup/background update probe while the status-bar/manual "Check for updates" action remains available. `ai_features_enabled` is installation-local and defaults to `true`; when false, Tolaria hides AI panel controls, status bar AI indicators, command-palette AI mode, and missing-agent prompts while leaving Settings as the re-enable path. `git_enabled` is also installation-local and defaults to `true`; when false, Tolaria hides Git status-bar entries and command-palette actions, disables AutoGit controls, and avoids background Git refresh/sync work while leaving Settings as the re-enable path. `default_ai_agent` remains the legacy installation-local CLI fallback. `default_ai_target` is the active AI target used by the AI panel and status bar; it can point at a coding agent or a configured direct model. `ai_model_providers` stores non-secret provider metadata for local/API model targets, while hosted API keys live in Tolaria's local app-data secrets file or user-managed environment variables instead of being persisted in app settings; env-backed keys can come from the app process or exported zsh/bash startup values on Unix. Direct OpenAI-compatible model streams receive the active vault root and may execute Tolaria's native create-only `create_note` tool, but they do not receive shell access or general file-write tools. `ai_workspace_conversations` stores installation-local AI chat sidebar metadata only: conversation ids, titles, archive state, and explicit target overrides. It does not store vault content, prompts, transcripts, or model credentials. Provider defaults and local/API grouping come from the shared `src/shared/aiModelProviderCatalog.json` catalog used by both renderer settings and the Tauri direct-model runtime. `hide_gitignored_files` is also installation-local and defaults to `true`; changing it reloads entries, search, saved views, and folders without restarting. The `all_notes_show_pdfs`, `all_notes_show_images`, and `all_notes_show_unsupported` flags are installation-local All Notes category toggles that default off and update the list/counts without changing vault files. The AutoGit fields are also installation-local: `useAutoGit` consumes them to schedule automatic checkpoints, while `useCommitFlow` and the status bar quick action reuse the same checkpoint runner and deterministic automatic commit message generation.
+Managed by `useSettings` hook and `SettingsPanel` component. `theme_mode` is installation-local because it controls device comfort rather than vault structure; the Settings panel and command-palette Light/Dark/System actions both update that same value. `system` remains a stored preference, while the runtime resolves it to `light` or `dark` for `data-theme` and app consumers. `ui_language` is also installation-local: `null` follows the supported system language with English fallback, while explicit values pin the UI language for this installation. Stored legacy aliases such as `zh-Hans` are normalized to canonical locale codes before the setting reaches React state. `date_display_format` is installation-local and controls rendered dates in note rows, property chips/cells, note info, table-of-contents metadata, and search result subtitles; `AppPreferencesProvider` owns the UI-level value so rendering surfaces can consume it without prop forwarding, while date picker text input remains ISO for predictable manual entry and storage. `note_width_mode` is the installation-local default for rich-editor note width; individual notes can override it with `_width` when they already have frontmatter. `sidebar_type_pluralization_enabled` is installation-local and defaults to `true`; when false, type rows use exact type names unless the type document defines an explicit `sidebar_label` override. `automatic_update_checks_enabled` is installation-local and defaults to `true`; when false, `useUpdater` skips the startup/background update probe while the status-bar/manual "Check for updates" action remains available. `ai_features_enabled` is installation-local and defaults to `true`; when false, Tolaria hides AI panel controls, status bar AI indicators, command-palette AI mode, and missing-agent prompts while leaving Settings as the re-enable path. `git_enabled` is also installation-local and defaults to `true`; when false, Tolaria hides Git status-bar entries and command-palette actions, disables AutoGit controls, and avoids background Git refresh/sync work while leaving Settings as the re-enable path. `default_ai_agent` remains the legacy installation-local CLI fallback. `default_ai_target` is the active AI target used by the AI panel and status bar; it can point at a coding agent or a configured direct model. `ai_model_providers` stores non-secret provider metadata for local/API model targets, while hosted API keys live in Tolaria's local app-data secrets file or user-managed environment variables instead of being persisted in app settings; env-backed keys can come from the app process or exported zsh/bash startup values on Unix. Direct OpenAI-compatible model streams receive the active vault root and may execute Tolaria's native create-only `create_note` tool, but they do not receive shell access or general file-write tools. `ai_workspace_conversations` stores installation-local AI chat sidebar metadata only: conversation ids, titles, archive state, and explicit target overrides. It does not store vault content, prompts, transcripts, or model credentials. Provider defaults and local/API grouping come from the shared `src/shared/aiModelProviderCatalog.json` catalog used by both renderer settings and the Tauri direct-model runtime. Popular hosted-provider names, default base URLs, official key-page URLs, and per-vendor API-key env vars live in `src/lib/providerPresets.ts` and only prefill that same Settings form. `hide_gitignored_files` is also installation-local and defaults to `true`; changing it reloads entries, search, saved views, and folders without restarting. `block_secret_files` is installation-local and defaults to `true`: native `read_file` / `list_dir` / `grep` / `glob` skip private-key basenames and backups, `.env*` except `.env.example`, `.git/`, and `*.pem` / `*.key` / `*.p12` / `*.pfx` including backup suffixes. That denylist is a safety net, not a wall: it covers those file tools only, and a future shell tool will not be covered. Off disables the denylist for **reads** only; write tools always apply it. When off, `.git/config` is readable and can hold tokens in remote URLs. Vault/workspace root sandboxing still applies. The `all_notes_show_pdfs`, `all_notes_show_images`, and `all_notes_show_unsupported` flags are installation-local All Notes category toggles that default off and update the list/counts without changing vault files. The AutoGit fields are also installation-local: `useAutoGit` consumes them to schedule automatic checkpoints, while `useCommitFlow` and the status bar quick action reuse the same checkpoint runner and deterministic automatic commit message generation.
 
 ## Telemetry
 
@@ -1184,7 +1178,7 @@ Managed by `useSettings` hook and `SettingsPanel` component. `theme_mode` is ins
 - **`src/lib/appUpdater.ts`** — Thin wrapper around the Tauri updater commands. Keeps the React hook free of endpoint-selection details.
 
 ### Rust
-- **`src-tauri/src/app_updater.rs`** — Chooses the correct update endpoint and adapts Tauri updater results into frontend-friendly payloads. Stable uses the public `stable/latest.json` feed. Alpha first resolves the newest non-draft `alpha-vYYYY.M.D-alpha.NNNN` GitHub Release asset named `alpha-latest.json`, then falls back to the public `alpha/latest.json` feed if the release lookup is unavailable.
+- **`src-tauri/src/app_updater.rs`** — Checks the Tauri updater plugin and adapts the result for `useUpdater`. Alpha uses the moving `alpha-latest` tag asset `alpha-latest.json`. Stable uses the moving `stable-latest` tag asset `stable-latest.json`. Neither URL is `releases/latest/download`, because alpha releases are prereleases. Install stays on the existing banner. A placeholder, empty, or whitespace-only pubkey returns before any network call. HTTP 404 and 204 mean there is no update. The moving feed is republished only when every platform entry has a signature.
 - **`src-tauri/src/commands/version.rs`** — Formats app build/version labels for the status bar, including calendar alpha labels and legacy release compatibility.
 
 ### Tauri Commands

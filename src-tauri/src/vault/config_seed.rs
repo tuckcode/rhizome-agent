@@ -587,13 +587,13 @@ mod tests {
     fn assert_preserves_edited_default_agents(run: VaultOperation) {
         let edited_agents = AGENTS_MD.replacen(
             "Store note type in the `type:` frontmatter field.",
-            "`type:` is the preferred type field. Tolaria still understands legacy aliases such as `Is A`.",
+            "`type:` is the preferred type field. Rhizome still understands legacy aliases such as `Is A`.",
             1,
         );
         let (_dir, vault) = run_with_agents(run, Some(&edited_agents), None);
 
         let content = read_root_agents(&vault);
-        assert!(content.contains("Tolaria still understands legacy aliases such as `Is A`."));
+        assert!(content.contains("Rhizome still understands legacy aliases such as `Is A`."));
         assert!(!content.contains("Store note type in the `type:` frontmatter field."));
     }
 
@@ -680,7 +680,7 @@ mod tests {
         let (_dir, vault) = create_vault();
         write_root_agents(
             &vault,
-            "# AGENTS.md — Tolaria Vault\n\n- The first H1 in the body is the note title. Do not add `title:` frontmatter.\n",
+            "# AGENTS.md — Rhizome Vault\n\n- The first H1 in the body is the note title. Do not add `title:` frontmatter.\n",
         );
 
         seed_config_files(vault.to_str().unwrap());

@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render as rtlRender, screen, fireEvent, waitFor } from '@testing-library/react'
 import { PulseView } from './PulseView'
+import { TooltipProvider } from './ui/tooltip'
 import type { PulseCommit } from '../types'
+
+const render = (ui: Parameters<typeof rtlRender>[0]) => rtlRender(ui, { wrapper: TooltipProvider })
 
 const openExternalUrl = vi.fn()
 const mockCommits: PulseCommit[] = [
@@ -158,12 +161,9 @@ describe('PulseView', () => {
 
     render(<PulseView vaultPath="/test/vault" />)
 
-    // Files are collapsed by default — expand all commit cards first
-    await waitFor(() => {
-      expect(screen.getAllByLabelText('Expand files').length).toBeGreaterThan(0)
-    })
-    screen.getAllByLabelText('Expand files').forEach((btn) => {
-      fireEvent.click(btn)
+    const commitRows = await screen.findAllByRole('button', { expanded: false })
+    commitRows.forEach((row) => {
+      fireEvent.click(row)
     })
 
     await waitFor(() => {
@@ -192,9 +192,7 @@ describe('PulseView', () => {
 
     render(<PulseView vaultPath="/test/vault" onOpenNote={onOpenNote} />)
 
-    await waitFor(() => {
-      expect(screen.getAllByLabelText('Expand files').length).toBeGreaterThan(0)
-    })
+    await screen.findByRole('button', { name: /Update project notes/i })
     rowLabels.forEach((rowLabel) => {
       fireEvent.click(screen.getByText(rowLabel))
     })
@@ -253,10 +251,7 @@ describe('PulseView', () => {
 
     render(<PulseView vaultPath="/test/vault" />)
 
-    // Files are collapsed by default
-    await waitFor(() => {
-      expect(screen.getAllByLabelText('Expand files').length).toBeGreaterThan(0)
-    })
+    await screen.findByRole('button', { name: /Update project notes/i, expanded: false })
     expect(screen.queryByText('my project')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByText('Update project notes'))
@@ -276,18 +271,30 @@ describe('PulseView', () => {
     render(<PulseView vaultPath="/test/vault" />)
 
     const commitRow = await screen.findByRole('button', { name: /Update project notes/i })
+    const surface = commitRow.parentElement?.parentElement
     const hasExpandedBackground = (className: string) => /(^|\s)bg-accent\/40(\s|$)/.test(className)
+    const hashLink = screen.getByRole('link', { name: /abc123d/ })
 
-    expect(commitRow.className).toContain('-mx-4')
-    expect(commitRow.className).toContain('px-4')
-    expect(commitRow.className).toContain('rounded-none')
-    expect(commitRow.className).toContain('hover:bg-accent/40')
-    expect(commitRow.className).toContain('focus-visible:bg-accent/40')
-    expect(hasExpandedBackground(commitRow.className)).toBe(false)
-
-    fireEvent.click(commitRow)
-
-    expect(hasExpandedBackground(commitRow.className)).toBe(true)
+    expect(surface).not.toBeNull()
+    expect(surface?.className).toContain('hover:bg-accent/40')
+    expect(surface?.className).toContain('focus-within:bg-accent/40')
+    expect(hasExpandedBackground(surface?.className ?? '')).toBe(false)
+    expect(commitRow.className).toContain('-mx-1.5')
+    expect(commitRow.className).toContain('px-1.5')
+    expect(commitRow.className).toContain('rounded-sm')
+    expect(commitRow.className).toContain('focus-visible:ring-2')
+    expect(commitRow.className).toContain('focus-visible:ring-inset')
+    expect(commitRow.className).toContain('focus-visible:ring-[var(--state-focus-ring)]')
+    expect(commitRow).toHaveAttribute('aria-expanded', 'false')
+    expect(surface).toContainElement(hashLink)
+    expect(commitRow).not.toContainElement(hashLink)
+    const chevron = surface?.querySelector('button[aria-hidden="true"]')
+    expect(chevron).toHaveAttribute('tabindex', '-1')
+    fireEvent.mouseDown(chevron!)
+    expect(chevron).not.toHaveFocus()
+    fireEvent.click(chevron!)
+    expect(commitRow).toHaveAttribute('aria-expanded', 'true')
+    expect(hasExpandedBackground(surface?.className ?? '')).toBe(true)
   })
 
   it('supports keyboard activation for commit rows and file rows', async () => {
@@ -305,6 +312,46 @@ describe('PulseView', () => {
     fireEvent.keyDown(fileButton, { key: 'Enter' })
 
     expect(onOpenNote).toHaveBeenCalledWith('project/my-project.md', 'abc123def456')
+  })
+
+  it('exposes a truncated commit subject on hover, focus, and to assistive tech', async () => {
+    const longSubject = 'Update project notes and add a very long experiment title that must stay readable'
+    mockInvokeFn.mockResolvedValue([
+      {
+        ...mockCommits[0],
+        message: `${longSubject}\n\nBody that belongs below the subject.`,
+      },
+    ])
+
+    render(
+      <TooltipProvider>
+        <PulseView vaultPath="/test/vault" />
+      </TooltipProvider>,
+    )
+
+    const row = await screen.findByRole('button', { name: new RegExp(longSubject) })
+    const title = row.querySelector('.truncate')
+
+    expect(title).not.toBeNull()
+    expect(title).toHaveClass('truncate')
+    expect(title).toHaveTextContent(longSubject)
+    expect(row).not.toHaveAttribute('aria-label')
+    expect(row).toHaveAccessibleName(new RegExp(`${longSubject}[\\s\\S]*1h ago[\\s\\S]*\\+1[\\s\\S]*~1`))
+
+    fireEvent.focus(row)
+    const focusedTip = await screen.findByRole('tooltip')
+    const bubble = document.querySelector('[data-slot="tooltip-content"]')
+    expect(focusedTip).toHaveTextContent(longSubject)
+    expect(bubble).toHaveClass('break-words')
+    expect(bubble?.querySelector('[aria-hidden="true"]')).toHaveTextContent(longSubject)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => {
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    })
+
+    fireEvent.blur(row)
+    fireEvent.pointerMove(row)
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(longSubject)
   })
 
   it('renders History header', async () => {

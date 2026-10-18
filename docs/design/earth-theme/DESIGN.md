@@ -10,7 +10,7 @@
 
 ## 1. Product Context
 
-**Rhizome** is a desktop agent harness built around a vault. It runs its **own agent loop** (ADR-0180): chat, tools, approvals and run state belong to Rhizome. **Prime Agent and Hermes are optional engines** that can be attached; if one fails, the product falls back to the bare Rhizome loop instead of going down with it.
+**Rhizome** is a desktop agent harness built around a vault. It runs its **own agent loop** (ADR-0180): chat, tools, approvals and run state belong to Rhizome. Rhizome's own engine is the only chat engine; Prime Agent and Hermes are no longer chat engines (ADR-0189).
 
 The center of gravity is **the vault**: a local, git-backed folder of Markdown notes that is the agent's durable memory and the single source of truth. The loop is chat → agent works through visible tools → the user **promotes** what's worth keeping into notes (an explicit, reviewable change, never auto-wiki from every turn) → the next session searches those notes and shows "From your vault" provenance. Conversation owns the room; tools appear as structured in-thread cards, not a terminal dump.
 
@@ -277,7 +277,7 @@ Hover never reduces text contrast. Focus-visible always shows the ring.
 ## 8. Voice & Brand
 
 - Product name: **Rhizome** (formerly Rhizome Agent; the repo is still `rhizome-agent`). In the UI wordmark: lowercase "rhizome", JetBrains Mono 600.
-- Agent: the Rhizome loop by default. Name an optional engine (Prime, Hermes) only where it matters, e.g. the engine picker or a provenance line ("Written with Prime").
+- Agent: the Rhizome loop. There is no engine picker (#218) and no optional engine (ADR-0189).
 - Tone: precise operator prose. Short, concrete, tool-aware.
 - Capitalization: sentence case UI; mono kickers UPPERCASE
 - Terminology: vault, note, promote, skills, session, tools (`search_notes`, `get_note`), Changes, History, Graph, Mycelium. Use one verb for keeping something; "Save to vault" in the UI, "promote" in docs and tool names.

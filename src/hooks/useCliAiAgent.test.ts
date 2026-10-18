@@ -8,7 +8,7 @@ import {
   cloneAiWorkspaceSessionUntilMessage,
   resetAiWorkspaceSessionStoreForTests,
 } from '../lib/aiWorkspaceSessionStore'
-import { resetNativeLiveSessions } from '../lib/nativeChatTranscript'
+import { countNativeLiveSlots, resetNativeLiveSessions } from '../lib/nativeChatTranscript'
 
 vi.mock('../utils/streamAiAgent', () => ({
   streamAiAgent: vi.fn(),
@@ -25,7 +25,7 @@ vi.mock('../lib/agentDocsPath', () => ({
 const mockStreamAiAgent = vi.mocked(streamAiAgent)
 const mockBuildAgentSystemPrompt = vi.mocked(buildAgentSystemPrompt)
 const mockGetAgentDocsPath = vi.mocked(getAgentDocsPath)
-const VAULT = '/Users/luca/Laputa'
+const VAULT = '/Users/mock/Vault'
 
 function renderAgent(
   contextPrompt: string | undefined = undefined,
@@ -210,6 +210,7 @@ describe('useCliAiAgent', () => {
       agent: 'codex',
       agentReady: false,
       permissionMode: 'safe',
+      chatEngine: 'prime',
     }))
 
     await act(async () => {
@@ -236,14 +237,29 @@ describe('useCliAiAgent', () => {
     expect(second.result.current.getNativeSession()).toEqual({ sessionId: 'n2', readOnly: true })
   })
 
-  it('shares a native live session across remounts of the same workspace chat', () => {
+  it('drops a panel native session when that Chat panel unmounts', () => {
+    const panel = renderAgent()
+    act(() => {
+      panel.result.current.setNativeSession('n1')
+    })
+    expect(countNativeLiveSlots()).toBe(1)
+    panel.unmount()
+    expect(countNativeLiveSlots()).toBe(0)
+  })
+
+  it('keeps a shared workspace native session until the last viewer closes', () => {
     const first = renderAgent(undefined, 'safe', 'chat-1')
+    const second = renderAgent(undefined, 'safe', 'chat-1')
     act(() => {
       first.result.current.setNativeSession('n1', true)
     })
+    expect(countNativeLiveSlots()).toBe(1)
     first.unmount()
-    const second = renderAgent(undefined, 'safe', 'chat-1')
     expect(second.result.current.getNativeSession()).toEqual({ sessionId: 'n1', readOnly: true })
+    second.unmount()
+    expect(countNativeLiveSlots()).toBe(0)
+    const remount = renderAgent(undefined, 'safe', 'chat-1')
+    expect(remount.result.current.getNativeSession()).toEqual({ sessionId: null, readOnly: false })
   })
 
   it('clears only this panel native session on a new chat', () => {

@@ -1,13 +1,20 @@
 import type { Dispatch, MutableRefObject, SetStateAction } from 'react'
 import { appendLocalMarker, type AgentStatus, type AiAgentMessage } from './aiAgentConversation'
 import { detectFileOperation, type AgentFileCallbacks } from './aiAgentFileOperations'
+import type { NativeApprovalPrompt } from './nativeToolApproval'
+import {
+  approvalCallId,
+  isBashTool,
+  matchPendingApprovalAction,
+  pathFromToolArgs,
+} from './nativeToolApproval'
 import {
   markReasoningDone,
   updateMessage,
   updateToolAction,
   type ToolInvocation,
 } from './aiAgentMessageState'
-import { getAiAgentDefinition, type AiAgentId } from './aiAgents'
+import { composerAgentLabel, type AiAgentId } from './aiAgents'
 import {
   trackAiAgentResponseCompleted,
   trackAiAgentResponseFailed,
@@ -104,7 +111,7 @@ function finalResponseText(response: AssistantResponseText, agent: AiAgentId): A
     ].join(' ')
   }
 
-  return `${getAiAgentDefinition(agent).label} finished without returning a reply.`
+  return `${composerAgentLabel({ agent })} finished without returning a reply.`
 }
 
 function retainedToolOutput({ output }: ToolOutputInspection): ToolOutputText | undefined {
@@ -140,9 +147,18 @@ function toolOutputIndicatesFailure({ output }: ToolOutputInspection): boolean {
 }
 
 function sealPendingActions(message: AiAgentMessage): AiAgentMessage['actions'] {
-  return message.actions.map((action) => (
-    action.status === 'pending' ? { ...action, status: 'done' as const } : action
-  ))
+  return message.actions.map((action) => {
+    if (action.status !== 'pending') return action
+    if (action.approval) {
+      return {
+        ...action,
+        status: 'error' as const,
+        output: action.output ?? 'approval cancelled',
+        approval: undefined,
+      }
+    }
+    return { ...action, status: 'done' as const }
+  })
 }
 
 function findQueuedFollowUpId(
@@ -182,6 +198,10 @@ export function createStreamCallbacks(context: StreamMutationContext) {
   // own bubble instead of merging into the first turn's reply.
   let activeMessageId = messageId
   let sealedByTurnBoundary = false
+  // Index into responseAccRef: beforeText for a tool is the slice since the
+  // previous tool start. The accumulator itself is never cleared here — the
+  // panel renders message.response, not action.beforeText.
+  let responseMark = 0
 
   function sealActiveTurn(): void {
     const sealedText = finalResponseText(responseAccRef.current, agent)
@@ -241,6 +261,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
     }
 
     responseAccRef.current = ''
+    responseMark = 0
     toolInputMapRef.current = new Map()
     failureTracked = false
     if (retarget.id) {
@@ -276,7 +297,13 @@ export function createStreamCallbacks(context: StreamMutationContext) {
       const previous = toolInputMapRef.current.get(toolId)
       toolInputMapRef.current.set(toolId, { tool: toolName, input: input ?? previous?.input })
 
-      updateMessage(setMessages, activeMessageId, (message) => updateToolAction(message, toolName, toolId, input))
+      const acc = responseAccRef.current
+      const beforeText = acc.slice(responseMark)
+      responseMark = acc.length
+
+      updateMessage(setMessages, activeMessageId, (message) => (
+        updateToolAction(message, toolName, toolId, input, beforeText || undefined)
+      ))
     },
 
     onToolDone: (toolId: ToolInvocationId, output?: ToolOutputText) => {
@@ -298,7 +325,120 @@ export function createStreamCallbacks(context: StreamMutationContext) {
         ...message,
         actions: message.actions.map((action) => (
           action.toolId === toolId
-            ? { ...action, status: failed ? 'error' as const : 'done' as const, output: retainedToolOutput(toolOutput) }
+            ? {
+                ...action,
+                status: failed ? 'error' as const : 'done' as const,
+                output: retainedToolOutput(toolOutput),
+                approval: undefined,
+              }
+            : action
+        )),
+      }))
+    },
+
+    onToolDenied: (toolId: ToolInvocationId, reason: string) => {
+      if (abortRef.current.aborted) return
+      updateMessage(setMessages, activeMessageId, (message) => ({
+        ...message,
+        actions: message.actions.map((action) => (
+          action.toolId === toolId
+            ? {
+                ...action,
+                status: 'error' as const,
+                denied: true,
+                output: reason,
+                approval: undefined,
+              }
+            : action
+        )),
+      }))
+    },
+
+    onApprovalRequested: (prompt: NativeApprovalPrompt) => {
+      if (abortRef.current.aborted) return
+      setStatus('tool-executing')
+      updateMessage(setMessages, activeMessageId, (message) => {
+        const path = prompt.path || pathFromToolArgs(prompt.args)
+        const match = matchPendingApprovalAction(message.actions, prompt)
+        const callId = approvalCallId(prompt)
+        const approval = {
+          promptId: prompt.promptId,
+          options: prompt.options,
+          args: prompt.args,
+          preview: prompt.preview,
+          notes: prompt.notes,
+          capped: prompt.capped,
+          path,
+          created: prompt.created,
+          overwrite: prompt.overwrite,
+          callId: prompt.callId,
+          onReply: (choice: Parameters<NativeApprovalPrompt['reply']>[0]) => {
+            updateMessage(setMessages, activeMessageId, (current) => ({
+              ...current,
+              actions: current.actions.map((action) => (
+                action.approval?.promptId === prompt.promptId
+                  ? { ...action, approval: { ...action.approval, busy: true } }
+                  : action
+              )),
+            }))
+            prompt.reply(choice)
+          },
+        }
+        const command = isBashTool(prompt.tool) ? prompt.args : undefined
+        if (!match) {
+          const settled = callId
+            ? message.actions.map((action) => (
+              action.status === 'pending' && action.tool === prompt.tool && !action.approval
+                ? { ...action, status: 'error' as const, superseded: true }
+                : action
+            ))
+            : message.actions
+          return {
+            ...message,
+            actions: [
+              ...settled,
+              {
+                tool: prompt.tool,
+                toolId: callId ?? prompt.promptId,
+                label: prompt.tool,
+                path,
+                status: 'pending' as const,
+                input: prompt.args,
+                command,
+                approval,
+              },
+            ],
+          }
+        }
+        return {
+          ...message,
+          actions: message.actions.map((action) => (
+            action.toolId === match.toolId
+              ? {
+                  ...action,
+                  path: path ?? action.path,
+                  command: command ?? action.command,
+                  approval,
+                }
+              : action
+          )),
+        }
+      })
+    },
+
+    onApprovalDismissed: (promptId: string) => {
+      if (abortRef.current.aborted) return
+      updateMessage(setMessages, activeMessageId, (message) => ({
+        ...message,
+        actions: message.actions.map((action) => (
+          action.approval?.promptId === promptId
+            ? {
+                ...action,
+                status: 'error' as const,
+                denied: true,
+                output: action.output ?? 'approval cancelled',
+                approval: undefined,
+              }
             : action
         )),
       }))

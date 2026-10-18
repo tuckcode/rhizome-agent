@@ -1,22 +1,46 @@
 import { useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { renderUpdaterUserMessage, shouldLinkUpdaterReleasesPage } from '../lib/updaterUserMessages'
 
 interface ToastProps {
   message: string | null
   onDismiss: () => void
   actionLabel?: string
   onAction?: () => void
+  secondaryActionLabel?: string
+  onSecondaryAction?: () => void
+  /** Save-conflict only. Other toasts, including ones with a button, dismiss on their own. */
+  sticky?: boolean
 }
 
-export function Toast({ message, onDismiss, actionLabel, onAction }: ToastProps) {
-  const hasAction = Boolean(actionLabel && onAction)
+function ToastAction({ label, onClick, onDismiss }: { label: string; onClick: () => void; onDismiss: () => void }) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="h-7 px-2"
+      onClick={() => {
+        onClick()
+        onDismiss()
+      }}
+    >
+      {label}
+    </Button>
+  )
+}
+
+export function Toast({ message, onDismiss, actionLabel, onAction, secondaryActionLabel, onSecondaryAction, sticky = false }: ToastProps) {
+  const hasPrimary = Boolean(actionLabel && onAction)
+  const hasSecondary = Boolean(secondaryActionLabel && onSecondaryAction)
+  const hasAction = hasPrimary || hasSecondary
 
   useEffect(() => {
-    if (!message) return
+    if (!message || sticky) return
     const timer = setTimeout(onDismiss, hasAction ? 6000 : 2000)
     return () => clearTimeout(timer)
-  }, [hasAction, message, onDismiss])
+  }, [hasAction, message, onDismiss, sticky])
 
   if (!message) return null
 
@@ -31,20 +55,12 @@ export function Toast({ message, onDismiss, actionLabel, onAction }: ToastProps)
         "animate-in slide-in-from-bottom-2 fade-in duration-200",
       )}
     >
-      <span>{message}</span>
-      {hasAction ? (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="h-7 px-2"
-          onClick={() => {
-            onAction?.()
-            onDismiss()
-          }}
-        >
-          {actionLabel}
-        </Button>
+      <span>{renderUpdaterUserMessage(message, { linkReleasesPage: shouldLinkUpdaterReleasesPage(message) })}</span>
+      {hasPrimary && actionLabel && onAction ? (
+        <ToastAction label={actionLabel} onClick={onAction} onDismiss={onDismiss} />
+      ) : null}
+      {hasSecondary && secondaryActionLabel && onSecondaryAction ? (
+        <ToastAction label={secondaryActionLabel} onClick={onSecondaryAction} onDismiss={onDismiss} />
       ) : null}
     </div>
   )

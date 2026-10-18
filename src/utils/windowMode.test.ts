@@ -228,10 +228,10 @@ describe('windowMode', () => {
     it('returns direct and vault-expanded path candidates', () => {
       expect(getNoteWindowPathCandidates({
         notePath: 'demo-vault-v2/untitled-note-29.md',
-        vaultPath: '/Volumes/Jupiter/Workspace/laputa-app/demo-vault-v2',
+        vaultPath: '/Volumes/Jupiter/Workspace/rhizome-app/demo-vault-v2',
       })).toEqual([
         'demo-vault-v2/untitled-note-29.md',
-        '/Volumes/Jupiter/Workspace/laputa-app/demo-vault-v2/untitled-note-29.md',
+        '/Volumes/Jupiter/Workspace/rhizome-app/demo-vault-v2/untitled-note-29.md',
         'untitled-note-29.md',
       ])
     })
@@ -240,26 +240,26 @@ describe('windowMode', () => {
       const entry = makeEntry('demo-vault-v2/untitled-note-29.md')
 
       expect(findNoteWindowEntry([entry], {
-        notePath: '/Volumes/Jupiter/Workspace/laputa-app/demo-vault-v2/untitled-note-29.md',
+        notePath: '/Volumes/Jupiter/Workspace/rhizome-app/demo-vault-v2/untitled-note-29.md',
         vaultPath: 'demo-vault-v2',
       })).toBe(entry)
     })
 
     it('matches a vault-relative note path against absolute entries', () => {
-      const entry = makeEntry('/Volumes/Jupiter/Workspace/laputa-app/demo-vault-v2/untitled-note-29.md')
+      const entry = makeEntry('/Volumes/Jupiter/Workspace/rhizome-app/demo-vault-v2/untitled-note-29.md')
 
       expect(findNoteWindowEntry([entry], {
         notePath: 'demo-vault-v2/untitled-note-29.md',
-        vaultPath: '/Volumes/Jupiter/Workspace/laputa-app/demo-vault-v2',
+        vaultPath: '/Volumes/Jupiter/Workspace/rhizome-app/demo-vault-v2',
       })).toBe(entry)
     })
 
     it('returns undefined when the target note is absent', () => {
-      const entry = makeEntry('/Volumes/Jupiter/Workspace/laputa-app/demo-vault-v2/other-note.md')
+      const entry = makeEntry('/Volumes/Jupiter/Workspace/rhizome-app/demo-vault-v2/other-note.md')
 
       expect(findNoteWindowEntry([entry], {
-        notePath: '/Volumes/Jupiter/Workspace/laputa-app/demo-vault-v2/untitled-note-29.md',
-        vaultPath: '/Volumes/Jupiter/Workspace/laputa-app/demo-vault-v2',
+        notePath: '/Volumes/Jupiter/Workspace/rhizome-app/demo-vault-v2/untitled-note-29.md',
+        vaultPath: '/Volumes/Jupiter/Workspace/rhizome-app/demo-vault-v2',
       })).toBeUndefined()
     })
 

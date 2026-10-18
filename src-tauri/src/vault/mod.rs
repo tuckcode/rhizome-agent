@@ -32,7 +32,10 @@ pub use config_seed::{
     seed_portent_type_definitions, AiGuidanceFileState, VaultAiGuidanceStatus,
 };
 pub use entry::{FolderNode, VaultEntry};
-pub use file::{create_note_content, get_note_content, note_content_matches, save_note_content};
+pub use file::{
+    create_note_content, get_note_content, note_content_matches, save_note_content,
+    save_note_content_expecting, SaveOutcome,
+};
 pub use folders::{delete_folder, rename_folder, FolderRenameResult};
 pub use getting_started::{
     create_getting_started_vault, default_vault_path, refresh_agents_md_if_stale, vault_exists,

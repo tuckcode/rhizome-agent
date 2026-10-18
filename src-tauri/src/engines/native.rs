@@ -6,7 +6,9 @@ use std::time::{Duration, Instant};
 
 use crate::ai_agents::AiAgentPermissionMode;
 use crate::engines::native_log::{self, SharedWriter};
-use crate::rhizome_loop::{approval_options, AgentLoop, ApprovalReply, DurableEvent, Model};
+use crate::rhizome_loop::{
+    approval_options, require_mutate_card, AgentLoop, ApprovalReply, DurableEvent, Model,
+};
 use crate::rhizome_routing::ProviderAttempt;
 
 use super::{Engine, EngineEvent};
@@ -33,6 +35,8 @@ pub struct NativeEngine<M: Model> {
     events: Vec<EngineEvent>,
     session_log: Option<SharedWriter>,
     log_meta: Option<native_log::SessionHeader>,
+    reasoning_notice_rx:
+        Option<Arc<Mutex<mpsc::Receiver<crate::reasoning_levels::ReasoningLevelNotice>>>>,
 }
 
 #[cfg(test)]
@@ -84,7 +88,15 @@ impl<M: Model> NativeEngine<M> {
             events: Vec::new(),
             session_log: None,
             log_meta: None,
+            reasoning_notice_rx: None,
         }
+    }
+
+    pub fn set_reasoning_notice_rx(
+        &mut self,
+        rx: mpsc::Receiver<crate::reasoning_levels::ReasoningLevelNotice>,
+    ) {
+        self.reasoning_notice_rx = Some(Arc::new(Mutex::new(rx)));
     }
 
     pub fn set_log_meta(
@@ -105,7 +117,14 @@ impl<M: Model> NativeEngine<M> {
             vault_path,
             vault_paths,
             system_prompt,
+            reasoning_level: None,
         });
+    }
+
+    pub fn set_saved_reasoning_level(&mut self, level: Option<String>) {
+        if let Some(meta) = &mut self.log_meta {
+            meta.reasoning_level = level;
+        }
     }
 
     #[cfg(test)]
@@ -131,6 +150,7 @@ impl<M: Model> NativeEngine<M> {
                 vault_path: self.vault_path.clone(),
                 vault_paths: self.vault_paths.clone(),
                 system_prompt: None,
+                reasoning_level: None,
             });
         let path = native_log::session_log_path(session_id)?;
         let writer = if path.exists() {
@@ -217,6 +237,14 @@ impl<M: Model> Engine for NativeEngine<M> {
         prompt: &str,
         sink: Box<dyn FnMut(EngineEvent) + Send>,
     ) -> Result<(), String> {
+        if let Some(meta) = &self.log_meta {
+            let send_anyway = crate::chat_images::noted_send_anyway(&meta.session_id);
+            crate::chat_images::arm_image_turn(&meta.session_id, send_anyway);
+            if let Ok(images) = crate::chat_images::read_turns(&meta.session_id) {
+                self.model.set_chat_images(images);
+            }
+            crate::chat_images::clear_armed_image_turn();
+        }
         self.events.clear();
         let collected = Arc::new(Mutex::new(Vec::new()));
         let emit_live = Arc::new(Mutex::new(sink));
@@ -253,11 +281,25 @@ impl<M: Model> Engine for NativeEngine<M> {
         let stop_drain = Arc::new(AtomicBool::new(false));
         let drain_flag = Arc::clone(&stop_drain);
         let drain_rx = Arc::clone(&self.provider_rx);
+        let notice_rx = self.reasoning_notice_rx.clone();
         let drain_emit = emit.clone();
+        let notice_emit = drain_emit.clone();
         let drain = thread::spawn(move || {
+            let emit_notice = move |notice: crate::reasoning_levels::ReasoningLevelNotice| {
+                notice_emit(EngineEvent::ReasoningLevelNotice {
+                    code: notice.code,
+                    from: notice.from,
+                    to: notice.to,
+                });
+            };
             loop {
                 if drain_flag.load(Ordering::SeqCst) {
                     break;
+                }
+                if let Some(rx) = &notice_rx {
+                    while let Ok(notice) = rx.lock().expect("reasoning notice").try_recv() {
+                        emit_notice(notice);
+                    }
                 }
                 let attempt = drain_rx
                     .lock()
@@ -273,6 +315,11 @@ impl<M: Model> Engine for NativeEngine<M> {
             while let Ok(attempt) = rx.try_recv() {
                 drain_emit(EngineEvent::Provider(attempt));
             }
+            if let Some(rx) = &notice_rx {
+                while let Ok(notice) = rx.lock().expect("reasoning notice").try_recv() {
+                    emit_notice(notice);
+                }
+            }
         });
 
         let (approval_tx, approval_rx) = mpsc::channel();
@@ -284,32 +331,68 @@ impl<M: Model> Engine for NativeEngine<M> {
         let prompt_seq = Arc::clone(&self.prompt_seq);
         let emit_for_wait = emit.clone();
         let wait_prompt = Arc::clone(&live_prompt);
-        self.agent.set_approval_waiter(move |name, args| {
-            let id = format!("prompt_{}", prompt_seq.fetch_add(1, Ordering::SeqCst) + 1);
-            *wait_prompt.lock().expect("live prompt") = Some(id.clone());
-            emit_for_wait(EngineEvent::ApprovalRequested {
-                prompt_id: id.clone(),
-                tool: name.to_string(),
-                args: args.to_string(),
-                options: approval_options(mode, name),
-            });
-            let deadline = Instant::now() + timeout;
-            let reply = loop {
-                let left = deadline.saturating_duration_since(Instant::now());
-                if left.is_zero() {
-                    break ApprovalReply::Cancelled;
+        self.agent
+            .set_approval_waiter_preview(move |name, args, prepared, call_id| {
+                let id = format!("prompt_{}", prompt_seq.fetch_add(1, Ordering::SeqCst) + 1);
+                *wait_prompt.lock().expect("live prompt") = Some(id.clone());
+                if matches!(name, "edit_file" | "write_file") {
+                    match require_mutate_card(name, prepared.cloned().map(Ok)) {
+                        Ok(card) => {
+                            emit_for_wait(EngineEvent::ApprovalRequested {
+                                prompt_id: id.clone(),
+                                tool: name.to_string(),
+                                args: args.to_string(),
+                                options: approval_options(mode, name),
+                                path: Some(card.path),
+                                preview: Some(card.diff),
+                                created: Some(card.created),
+                                overwrite: Some(card.overwrite),
+                                notes: if card.notes.is_empty() {
+                                    None
+                                } else {
+                                    Some(card.notes)
+                                },
+                                capped: if card.capped { Some(true) } else { None },
+                                call_id: call_id.to_string(),
+                            });
+                        }
+                        Err(_) => {
+                            release_live_prompt(&wait_prompt, &id);
+                            return ApprovalReply::Deny;
+                        }
+                    }
+                } else {
+                    emit_for_wait(EngineEvent::ApprovalRequested {
+                        prompt_id: id.clone(),
+                        tool: name.to_string(),
+                        args: args.to_string(),
+                        options: approval_options(mode, name),
+                        path: None,
+                        preview: None,
+                        created: None,
+                        overwrite: None,
+                        notes: None,
+                        capped: None,
+                        call_id: call_id.to_string(),
+                    });
                 }
-                match approval_rx.lock().expect("approval rx").recv_timeout(left) {
-                    Ok((reply_id, reply)) if reply_id == id => break reply,
-                    Ok(_) => {}
-                    Err(RecvTimeoutError::Timeout) | Err(RecvTimeoutError::Disconnected) => {
+                let deadline = Instant::now() + timeout;
+                let reply = loop {
+                    let left = deadline.saturating_duration_since(Instant::now());
+                    if left.is_zero() {
                         break ApprovalReply::Cancelled;
                     }
-                }
-            };
-            release_live_prompt(&wait_prompt, &id);
-            reply
-        });
+                    match approval_rx.lock().expect("approval rx").recv_timeout(left) {
+                        Ok((reply_id, reply)) if reply_id == id => break reply,
+                        Ok(_) => {}
+                        Err(RecvTimeoutError::Timeout) | Err(RecvTimeoutError::Disconnected) => {
+                            break ApprovalReply::Cancelled;
+                        }
+                    }
+                };
+                release_live_prompt(&wait_prompt, &id);
+                reply
+            });
         let dismiss_prompt = Arc::clone(&live_prompt);
         let emit_dismiss = emit;
         self.agent.set_approval_dismiss(move || {

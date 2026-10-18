@@ -48,7 +48,7 @@ const provider: AiModelProvider = {
 const model: AiModelDefinition = {
   id: 'model',
   display_name: 'Model',
-  capabilities: { streaming: true, tools: false, vision: false, json_mode: false, reasoning: false },
+  capabilities: { streaming: true, tools: false, vision: false, json_mode: false, reasoning: { state: 'unknown' as const } },
 }
 
 describe('streamAiModel', () => {

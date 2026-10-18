@@ -13,24 +13,25 @@ import {
 } from './nativeChatTargets'
 
 describe('chat engine setting', () => {
-  it('reads prime when the value is absent', () => {
-    expect(readChatEngine(undefined)).toBe('prime')
-    expect(readChatEngine(null)).toBe('prime')
-    expect(readChatEngine('prime')).toBe('prime')
-    expect(chatEngineFromSettings({})).toBe('prime')
-    expect(chatEngineForSave('prime')).toBeNull()
-  })
-
-  it('lets native send without a Prime install and keeps Prime-targeted chats gated', () => {
-    expect(chatEngineAllowsSendWithoutPrime('native')).toBe(true)
-    expect(chatEngineAllowsSendWithoutPrime('prime')).toBe(false)
-    expect(chatEngineAllowsSendWithoutPrime(undefined)).toBe(false)
-  })
-
-  it('persists native and reads it back', () => {
+  it('reads native for every stored value, including leftover engines', () => {
+    expect(readChatEngine(undefined)).toBe('native')
+    expect(readChatEngine(null)).toBe('native')
+    expect(readChatEngine('')).toBe('native')
+    expect(readChatEngine('native')).toBe('native')
+    expect(readChatEngine('prime')).toBe('native')
+    expect(readChatEngine('hermes')).toBe('native')
+    expect(readChatEngine('bogus')).toBe('native')
+    expect(chatEngineFromSettings({})).toBe('native')
+    expect(chatEngineFromSettings(null)).toBe('native')
+    expect(chatEngineFromSettings({ chat_engine: 'prime' })).toBe('native')
     expect(chatEngineForSave('native')).toBe('native')
-    expect(chatEngineFromSettings({ chat_engine: 'native' })).toBe('native')
-    expect(chatEngineFromSettings({ chat_engine: chatEngineForSave('native') })).toBe('native')
+    expect(chatEngineForSave('prime')).toBe('native')
+  })
+
+  it('lets only a resolved native engine send without a Prime install', () => {
+    expect(chatEngineAllowsSendWithoutPrime('native')).toBe(true)
+    expect(chatEngineAllowsSendWithoutPrime(undefined)).toBe(false)
+    expect(chatEngineAllowsSendWithoutPrime('prime')).toBe(false)
   })
 })
 
@@ -62,7 +63,7 @@ describe('native chat picker', () => {
               tools: true,
               vision: true,
               json_mode: true,
-              reasoning: false,
+              reasoning: { state: 'unknown' as const },
             },
           },
         ],
@@ -90,7 +91,7 @@ describe('native chat picker', () => {
             tools: true,
             vision: true,
             json_mode: true,
-            reasoning: false,
+            reasoning: { state: 'unknown' as const },
           },
         },
       ],

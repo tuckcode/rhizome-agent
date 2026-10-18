@@ -27,8 +27,9 @@ pub fn native_chat_channel(session_id: &str) -> String {
     format!("native-chat:{session_id}")
 }
 
-/// Target string for "Free tier (auto)" (decision D2).
+/// Stored target id for Taproot (decision D2).
 pub const FREE_TIER_TARGET: &str = "free_tier_auto";
+/// Legacy display label; still accepted so older saved chat targets keep working.
 pub const FREE_TIER_LABEL: &str = "Free tier (auto)";
 
 /// Native sessions use a Rhizome-owned transcript path. Nothing under `~/.prime`.
@@ -54,6 +55,7 @@ enum ChatOp {
 
 pub fn resolve_native_target(target: &str) -> Result<NativeChatTarget, String> {
     let trimmed = target.trim();
+    // FREE_TIER_LABEL matches the old UI name on purpose (saved settings).
     if trimmed.eq_ignore_ascii_case(FREE_TIER_TARGET)
         || trimmed.eq_ignore_ascii_case(FREE_TIER_LABEL)
     {
@@ -110,6 +112,8 @@ const REMOVED_PROVIDER: &str = "This model's provider was removed. Pick another 
 pub struct NativeChats {
     sessions: Mutex<HashMap<String, LiveNativeChat>>,
     read_only: Mutex<HashMap<String, ()>>,
+    reasoning_slots: Mutex<HashMap<String, crate::reasoning_levels::ReasoningLevelSlot>>,
+    targets: Mutex<HashMap<String, String>>,
 }
 
 struct LiveNativeChat {
@@ -140,13 +144,22 @@ impl NativeChats {
         engine: NativeEngine<M>,
         emit: impl FnMut(EngineEvent) + Send + 'static,
     ) -> Result<String, String> {
-        self.start_named(uuid::Uuid::new_v4().to_string(), prompt, engine, emit)
+        self.start_named(
+            uuid::Uuid::new_v4().to_string(),
+            prompt,
+            &[],
+            false,
+            engine,
+            emit,
+        )
     }
 
     pub fn start_named<M: Model + Send + 'static>(
         &self,
         id: String,
         prompt: &str,
+        images: &[crate::chat_images::ChatImage],
+        send_anyway: bool,
         engine: NativeEngine<M>,
         emit: impl FnMut(EngineEvent) + Send + 'static,
     ) -> Result<String, String> {
@@ -162,6 +175,11 @@ impl NativeChats {
         let worker = thread::spawn(move || {
             let mut engine = engine;
             if let Err(error) = engine.ensure_log(&index_id) {
+                (emit.lock().expect("native sink"))(EngineEvent::error(error, true));
+                worker_busy.store(false, Ordering::SeqCst);
+                return;
+            }
+            if let Err(error) = crate::chat_images::load_ledger(&index_id) {
                 (emit.lock().expect("native sink"))(EngineEvent::error(error, true));
                 worker_busy.store(false, Ordering::SeqCst);
                 return;
@@ -214,7 +232,13 @@ impl NativeChats {
             }
         });
         claim_turn(&turn_busy)?;
+        crate::chat_images::note_send_anyway(&id, send_anyway);
+        if let Err(error) = crate::chat_images::push_turn(&id, images.to_vec()) {
+            turn_busy.store(false, Ordering::SeqCst);
+            return Err(error);
+        }
         if ops.send(ChatOp::Turn(prompt.to_string())).is_err() {
+            let _ = crate::chat_images::rollback_turn(&id);
             turn_busy.store(false, Ordering::SeqCst);
             return Err("native chat worker closed".into());
         }
@@ -231,7 +255,19 @@ impl NativeChats {
         Ok(id)
     }
 
+    #[cfg(test)]
     pub fn send(&self, session_id: &str, text: &str) -> Result<(), String> {
+        self.send_with_reasoning(session_id, text, ReasoningLevelUpdate::Keep, &[], false)
+    }
+
+    pub fn send_with_reasoning(
+        &self,
+        session_id: &str,
+        text: &str,
+        reasoning_level: ReasoningLevelUpdate,
+        images: &[crate::chat_images::ChatImage],
+        send_anyway: bool,
+    ) -> Result<(), String> {
         if self
             .read_only
             .lock()
@@ -249,11 +285,22 @@ impl NativeChats {
         if session.read_only {
             return Err("native session is read-only".into());
         }
+        if !images.is_empty() {
+            let target = self.target_for(session_id)?;
+            gate_images(&target, images, send_anyway)?;
+        }
         claim_turn(&session.turn_busy)?;
+        crate::chat_images::note_send_anyway(session_id, send_anyway);
+        if let Err(error) = crate::chat_images::push_turn(session_id, images.to_vec()) {
+            session.turn_busy.store(false, Ordering::SeqCst);
+            return Err(error);
+        }
         if session.ops.send(ChatOp::Turn(text.to_string())).is_err() {
+            let _ = crate::chat_images::rollback_turn(session_id);
             session.turn_busy.store(false, Ordering::SeqCst);
             return Err("native chat worker closed".into());
         }
+        persist_reasoning(self, session_id, reasoning_level);
         Ok(())
     }
 
@@ -271,6 +318,7 @@ impl NativeChats {
         emit: impl FnMut(EngineEvent) + Send + 'static,
     ) -> Result<String, String> {
         if self.is_live(&id) {
+            self.remember_logged_target(&id);
             return Ok(id);
         }
         let opened = crate::engines::native_log::open_session_log(&id)?;
@@ -290,6 +338,11 @@ impl NativeChats {
         let worker = thread::spawn(move || {
             let mut engine = engine;
             if let Err(error) = engine.ensure_log(&index_id) {
+                (emit.lock().expect("native sink"))(EngineEvent::error(error, true));
+                worker_busy.store(false, Ordering::SeqCst);
+                return;
+            }
+            if let Err(error) = crate::chat_images::load_ledger(&index_id) {
                 (emit.lock().expect("native sink"))(EngineEvent::error(error, true));
                 worker_busy.store(false, Ordering::SeqCst);
                 return;
@@ -351,7 +404,59 @@ impl NativeChats {
                 turn_busy,
             },
         );
+        self.remember_logged_target(&id);
         Ok(id)
+    }
+
+    fn remember_target(&self, session_id: &str, target: &str) {
+        if session_id.is_empty() || target.trim().is_empty() {
+            return;
+        }
+        self.targets
+            .lock()
+            .expect("native targets")
+            .insert(session_id.to_string(), target.to_string());
+    }
+
+    fn remember_logged_target(&self, session_id: &str) {
+        if self
+            .targets
+            .lock()
+            .expect("native targets")
+            .get(session_id)
+            .is_some_and(|target| !target.is_empty())
+        {
+            return;
+        }
+        if let Ok(opened) = crate::engines::native_log::open_session_log(session_id) {
+            self.remember_target(session_id, &opened.header.target);
+            if let Some(successor) = opened.successor_id.as_deref() {
+                if let Ok(next) = crate::engines::native_log::open_session_log(successor) {
+                    self.remember_target(successor, &next.header.target);
+                }
+            }
+        }
+    }
+
+    fn target_for(&self, session_id: &str) -> Result<String, String> {
+        if let Some(target) = self
+            .targets
+            .lock()
+            .expect("native targets")
+            .get(session_id)
+            .cloned()
+            .filter(|target| !target.is_empty())
+        {
+            return Ok(target);
+        }
+        self.remember_logged_target(session_id);
+        self.targets
+            .lock()
+            .expect("native targets")
+            .get(session_id)
+            .cloned()
+            .filter(|target| !target.is_empty())
+            .ok_or_else(|| format!("unknown native session {session_id}"))
     }
 
     pub fn note_read_only(&self, session_id: &str) {
@@ -417,20 +522,30 @@ impl NativeChats {
         if let Some(worker) = session.worker.take() {
             join_with_bound(worker, NATIVE_QUIT_BOUND);
         }
+        crate::chat_images::drop_ledger(session_id);
+        self.targets
+            .lock()
+            .expect("native targets")
+            .remove(session_id);
+        self.reasoning_slots
+            .lock()
+            .expect("reasoning slots")
+            .remove(session_id);
         Ok(())
     }
 
     pub fn settle_all(&self, bound: Duration) {
-        let sessions: Vec<LiveNativeChat> = {
+        let sessions: Vec<(String, LiveNativeChat)> = {
             let mut guard = self.sessions.lock().expect("native chats");
-            guard.drain().map(|(_, session)| session).collect()
+            guard.drain().collect()
         };
-        for mut session in sessions {
+        for (id, mut session) in sessions {
             session.control.settle_on_quit();
             let _ = session.ops.send(ChatOp::End);
             if let Some(worker) = session.worker.take() {
                 join_with_bound(worker, bound);
             }
+            crate::chat_images::drop_ledger(&id);
         }
     }
 
@@ -463,7 +578,7 @@ fn index_native_turn(
             text: assistant,
         },
     ];
-    let _ = match index_file {
+    let indexed = match index_file {
         Some(file) => session_transcript_index::append_native_turns_to(
             file,
             session_path,
@@ -478,6 +593,9 @@ fn index_native_turn(
             turns,
         ),
     };
+    if let Err(error) = indexed {
+        log::warn!("session transcript index update failed: {error}");
+    }
 }
 
 fn join_with_bound(worker: thread::JoinHandle<()>, bound: Duration) -> bool {
@@ -561,6 +679,14 @@ pub struct NativeChatStartRequest {
     pub vault_paths: Vec<String>,
     #[serde(default)]
     pub permission_mode: AiAgentPermissionMode,
+    #[serde(default)]
+    pub reasoning_level: Option<String>,
+    /// Composer images for this turn. Missing on older clients.
+    #[serde(default)]
+    pub images: Vec<crate::chat_images::ChatImage>,
+    /// The user confirmed an unknown vision model.
+    #[serde(default)]
+    pub send_anyway: bool,
 }
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -574,6 +700,8 @@ pub struct NativeChatForkRequest {
     pub vault_paths: Vec<String>,
     #[serde(default)]
     pub permission_mode: AiAgentPermissionMode,
+    #[serde(default)]
+    pub source_session_id: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -596,6 +724,12 @@ pub struct NativeChatOpenResult {
     pub read_only: bool,
     pub error: Option<String>,
     pub successor_id: Option<String>,
+    #[serde(default)]
+    pub images: Vec<Vec<crate::chat_images::ChatImage>>,
+    /// Model the session log was started with. The composer uses this until
+    /// the picker changes.
+    #[serde(default)]
+    pub target: String,
 }
 
 pub fn list_native_sessions() -> Result<Vec<NativeChatListItem>, String> {
@@ -678,10 +812,13 @@ pub fn open_native_session_record(session_id: &str) -> Result<NativeChatOpenResu
         read_only: opened.read_only || error.is_some(),
         error,
         successor_id: opened.successor_id,
+        images: crate::chat_images::read_turns(session_id).unwrap_or_default(),
+        target: opened.header.target,
     })
 }
 
 pub fn delete_native_session(chats: &NativeChats, session_id: &str) -> Result<(), String> {
+    crate::engines::native_log::validate_session_id(session_id)?;
     let _ = chats.end(session_id);
     let path = format!("{NATIVE_SESSION_PREFIX}{session_id}");
     session_transcript_index::remove_session(&path)?;
@@ -704,12 +841,251 @@ pub fn native_chat_start(
     })
 }
 
+fn normalize_reasoning_level(level: Option<String>) -> Option<String> {
+    level
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+}
+
+struct UserReasoning {
+    level: Option<String>,
+    slot: crate::reasoning_levels::ReasoningLevelSlot,
+    notices_seen: std::sync::Arc<std::sync::Mutex<std::collections::HashSet<String>>>,
+    notice_tx: mpsc::Sender<crate::reasoning_levels::ReasoningLevelNotice>,
+    notice_rx: mpsc::Receiver<crate::reasoning_levels::ReasoningLevelNotice>,
+}
+
+fn user_reasoning(chats: &NativeChats, session_id: &str, level: Option<String>) -> UserReasoning {
+    let level = normalize_reasoning_level(level);
+    let slot = Arc::new(Mutex::new(level.clone()));
+    chats
+        .reasoning_slots
+        .lock()
+        .expect("reasoning slots")
+        .insert(session_id.to_string(), Arc::clone(&slot));
+    let (notice_tx, notice_rx) = mpsc::channel();
+    UserReasoning {
+        level,
+        slot,
+        notices_seen: Arc::new(Mutex::new(std::collections::HashSet::new())),
+        notice_tx,
+        notice_rx,
+    }
+}
+
+fn stamp_model_vision(stream: &mut AiModelStreamRequest) {
+    let base = crate::ai_models::provider_base_url(&stream.provider).unwrap_or_default();
+    let saved = stream
+        .provider
+        .models
+        .iter()
+        .find(|model| model.id == stream.model_id)
+        .is_some_and(|model| model.capabilities.vision);
+    let state =
+        crate::chat_images::vision_state(&stream.provider.id, &base, &stream.model_id, saved);
+    stream.vision_state = state;
+    if let Some(model) = stream
+        .provider
+        .models
+        .iter_mut()
+        .find(|model| model.id == stream.model_id)
+    {
+        model.capabilities.vision = state == crate::chat_images::VisionState::Yes;
+    }
+}
+
+fn persist_reasoning(chats: &NativeChats, session_id: &str, reasoning_level: ReasoningLevelUpdate) {
+    match reasoning_level {
+        ReasoningLevelUpdate::Keep => {}
+        ReasoningLevelUpdate::Clear => {
+            if let Some(slot) = chats
+                .reasoning_slots
+                .lock()
+                .expect("reasoning slots")
+                .get(session_id)
+            {
+                *slot.lock().expect("reasoning level") = None;
+            }
+            let _ = crate::engines::native_log::write_reasoning_sidecar(session_id, None);
+        }
+        ReasoningLevelUpdate::Set(level) => {
+            let normalized = normalize_reasoning_level(Some(level));
+            if let Some(slot) = chats
+                .reasoning_slots
+                .lock()
+                .expect("reasoning slots")
+                .get(session_id)
+            {
+                *slot.lock().expect("reasoning level") = normalized.clone();
+            }
+            let _ = crate::engines::native_log::write_reasoning_sidecar(
+                session_id,
+                normalized.as_deref(),
+            );
+        }
+    }
+}
+
+fn free_tier_vision_state() -> crate::chat_images::VisionState {
+    let catalog = crate::rhizome_routing::Catalog::pinned();
+    crate::chat_images::vision_for_free_tier(catalog.providers.iter().flat_map(|provider| {
+        provider.models.iter().map(|model| {
+            crate::chat_images::vision_state(&provider.id, &provider.base_url, &model.id, false)
+        })
+    }))
+}
+
+/// Refuses a new image before the turn is logged.
+fn gate_images(
+    target: &str,
+    images: &[crate::chat_images::ChatImage],
+    send_anyway: bool,
+) -> Result<(), String> {
+    if images.is_empty() {
+        return Ok(());
+    }
+    crate::chat_images::validate(images)?;
+    crate::chat_images::ensure_current_turn_fits(images)?;
+    let model_label = target.rsplit('/').next().unwrap_or(target);
+    match resolve_native_target(target)? {
+        NativeChatTarget::FreeTier => {
+            let catalog = crate::rhizome_routing::Catalog::pinned();
+            let mut any_yes = false;
+            let mut any_unknown = false;
+            for provider in &catalog.providers {
+                for model in &provider.models {
+                    match crate::chat_images::vision_state(
+                        &provider.id,
+                        &provider.base_url,
+                        &model.id,
+                        false,
+                    ) {
+                        crate::chat_images::VisionState::Yes => any_yes = true,
+                        crate::chat_images::VisionState::Unknown => any_unknown = true,
+                        crate::chat_images::VisionState::No => {}
+                    }
+                }
+            }
+            if any_yes || (any_unknown && send_anyway) {
+                return Ok(());
+            }
+            if any_unknown {
+                return Err(crate::chat_images::unknown_vision_note("the free tier"));
+            }
+            Err(crate::chat_images::text_only_refusal("the free tier"))
+        }
+        NativeChatTarget::Catalog {
+            provider_kind,
+            provider_id,
+            model_id,
+        } => {
+            let provider = catalog_provider(provider_kind, &provider_id)?;
+            let base = crate::ai_models::provider_base_url(&provider).unwrap_or_default();
+            let saved = provider
+                .models
+                .iter()
+                .find(|model| model.id == model_id)
+                .is_some_and(|model| model.capabilities.vision);
+            match crate::chat_images::vision_state(&provider_id, &base, &model_id, saved) {
+                crate::chat_images::VisionState::Yes => Ok(()),
+                crate::chat_images::VisionState::No => {
+                    Err(crate::chat_images::text_only_refusal(model_label))
+                }
+                crate::chat_images::VisionState::Unknown if send_anyway => Ok(()),
+                crate::chat_images::VisionState::Unknown => {
+                    Err(crate::chat_images::unknown_vision_note(model_label))
+                }
+            }
+        }
+    }
+}
+
+/// `native_chat_send` images. A missing key is an empty list.
+pub struct NativeChatImages(pub Vec<crate::chat_images::ChatImage>);
+
+impl<'de, R: tauri::Runtime> tauri::ipc::CommandArg<'de, R> for NativeChatImages {
+    fn from_command(
+        command: tauri::ipc::CommandItem<'de, R>,
+    ) -> Result<Self, tauri::ipc::InvokeError> {
+        let tauri::ipc::InvokeBody::Json(payload) = command.message.payload() else {
+            return Ok(Self(Vec::new()));
+        };
+        match payload.get(command.key) {
+            None | Some(serde_json::Value::Null) => Ok(Self(Vec::new())),
+            Some(value) => serde_json::from_value(value.clone())
+                .map(Self)
+                .map_err(|error| {
+                    tauri::Error::InvalidArgs(
+                        command.name,
+                        command.key,
+                        serde::de::Error::custom(error),
+                    )
+                    .into()
+                }),
+        }
+    }
+}
+
+fn apply_catalog_reasoning(stream: &mut AiModelStreamRequest, reasoning: &UserReasoning) {
+    stream.reasoning_level = reasoning.level.clone();
+    stream.reasoning_slot = Some(Arc::clone(&reasoning.slot));
+    stream.reasoning_notice_tx = Some(reasoning.notice_tx.clone());
+    stream.reasoning_notices_seen = Some(Arc::clone(&reasoning.notices_seen));
+}
+
+/// `native_chat_send`'s reasoning argument. A missing key keeps the saved
+/// level. JSON null clears it. A string sets it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReasoningLevelUpdate {
+    Keep,
+    Clear,
+    Set(String),
+}
+
+impl<'de, R: tauri::Runtime> tauri::ipc::CommandArg<'de, R> for ReasoningLevelUpdate {
+    fn from_command(
+        command: tauri::ipc::CommandItem<'de, R>,
+    ) -> Result<Self, tauri::ipc::InvokeError> {
+        let tauri::ipc::InvokeBody::Json(payload) = command.message.payload() else {
+            return Ok(Self::Keep);
+        };
+        Self::from_payload_value(payload.get(command.key)).map_err(|error| {
+            tauri::Error::InvalidArgs(command.name, command.key, serde::de::Error::custom(error))
+                .into()
+        })
+    }
+}
+
+impl ReasoningLevelUpdate {
+    fn from_payload_value(value: Option<&serde_json::Value>) -> Result<Self, String> {
+        match value {
+            None => Ok(Self::Keep),
+            Some(serde_json::Value::Null) => Ok(Self::Clear),
+            Some(serde_json::Value::String(level)) => {
+                let trimmed = level.trim();
+                if trimmed.is_empty() {
+                    Ok(Self::Clear)
+                } else {
+                    Ok(Self::Set(trimmed.to_string()))
+                }
+            }
+            Some(_) => Err("reasoningLevel must be a string or null".into()),
+        }
+    }
+}
+
 fn start_named_request(
     chats: &NativeChats,
     id: String,
     request: NativeChatStartRequest,
     emit: impl FnMut(EngineEvent) + Send + 'static,
 ) -> Result<String, String> {
+    gate_images(&request.target, &request.images, request.send_anyway)?;
+    chats
+        .targets
+        .lock()
+        .expect("native targets")
+        .insert(id.clone(), request.target.clone());
     let target = resolve_native_target(&request.target)?;
     let system = composed_system_prompt(request.system_prompt.as_deref());
     let vault_path = request
@@ -718,16 +1094,23 @@ fn start_named_request(
         .map(|path| crate::commands::expand_tilde(path).into_owned());
     let vault_paths = request.vault_paths.clone();
     let mode = request.permission_mode;
+    let reasoning = user_reasoning(chats, &id, request.reasoning_level.clone());
     match target {
         NativeChatTarget::FreeTier => {
             let (tx, rx) = mpsc::channel();
             let reporter = tx.clone();
             let model = free_tier_routing_model(system.clone(), move |attempt| {
                 let _ = reporter.send(attempt);
-            })?;
+            })?
+            .with_user_reasoning(
+                Arc::clone(&reasoning.slot),
+                reasoning.notice_tx.clone(),
+                Arc::clone(&reasoning.notices_seen),
+            );
             let mut engine = NativeEngine::with_provider_pair(AgentLoop::new(), model, tx, rx);
             engine.set_vault(vault_path.clone(), vault_paths.clone());
             engine.set_permission_mode(mode);
+            engine.set_reasoning_notice_rx(reasoning.notice_rx);
             engine.set_log_meta(
                 &id,
                 FREE_TIER_TARGET,
@@ -736,14 +1119,22 @@ fn start_named_request(
                 vault_paths.clone(),
                 system.clone(),
             );
-            chats.start_named(id, &request.prompt, engine, emit)
+            engine.set_saved_reasoning_level(reasoning.level);
+            chats.start_named(
+                id,
+                &request.prompt,
+                &request.images,
+                request.send_anyway,
+                engine,
+                emit,
+            )
         }
         NativeChatTarget::Catalog {
             provider_kind,
             provider_id,
             model_id,
         } => {
-            let stream = AiModelStreamRequest {
+            let mut stream = AiModelStreamRequest {
                 provider: catalog_provider(provider_kind, &provider_id)?,
                 model_id,
                 message: request.prompt.clone(),
@@ -752,10 +1143,22 @@ fn start_named_request(
                 vault_paths: vault_paths.clone(),
                 api_key_override: None,
                 event_name: None,
+                reasoning_level: None,
+                reasoning_slot: None,
+                reasoning_notice_tx: None,
+                reasoning_notices_seen: None,
+                chat_images: Vec::new(),
+                vision_state: crate::chat_images::VisionState::Unknown,
+                send_anyway: false,
+                defer_image_skip: false,
+                image_session_id: None,
             };
+            apply_catalog_reasoning(&mut stream, &reasoning);
+            stamp_model_vision(&mut stream);
             let mut engine = NativeEngine::new(ProviderModel::new(stream, HttpLimits::STREAM));
             engine.set_vault(vault_path.clone(), vault_paths.clone());
             engine.set_permission_mode(mode);
+            engine.set_reasoning_notice_rx(reasoning.notice_rx);
             engine.set_log_meta(
                 &id,
                 &request.target,
@@ -764,7 +1167,15 @@ fn start_named_request(
                 vault_paths.clone(),
                 system.clone(),
             );
-            chats.start_named(id, &request.prompt, engine, emit)
+            engine.set_saved_reasoning_level(reasoning.level);
+            chats.start_named(
+                id,
+                &request.prompt,
+                &request.images,
+                request.send_anyway,
+                engine,
+                emit,
+            )
         }
     }
 }
@@ -775,8 +1186,17 @@ pub fn native_chat_send(
     chats: tauri::State<NativeChats>,
     session_id: String,
     text: String,
+    reasoning_level: ReasoningLevelUpdate,
+    images: NativeChatImages,
+    send_anyway: Option<bool>,
 ) -> Result<(), String> {
-    chats.send(&session_id, &text)
+    chats.send_with_reasoning(
+        &session_id,
+        &text,
+        reasoning_level,
+        &images.0,
+        send_anyway.unwrap_or(false),
+    )
 }
 
 #[cfg(desktop)]
@@ -811,6 +1231,36 @@ pub fn native_chat_list() -> Result<Vec<NativeChatListItem>, String> {
     list_native_sessions()
 }
 
+/// `yes`, `no`, or `unknown` for the composer. Unknown is not text-only.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn native_model_vision(target: String) -> Result<String, String> {
+    let resolved = resolve_native_target(&target)?;
+    let state = match resolved {
+        NativeChatTarget::FreeTier => free_tier_vision_state(),
+        NativeChatTarget::Catalog {
+            provider_kind,
+            provider_id,
+            model_id,
+        } => {
+            let provider = catalog_provider(provider_kind, &provider_id)?;
+            let base = crate::ai_models::provider_base_url(&provider).unwrap_or_default();
+            let saved = provider
+                .models
+                .iter()
+                .find(|model| model.id == model_id)
+                .is_some_and(|model| model.capabilities.vision);
+            crate::chat_images::vision_state(&provider_id, &base, &model_id, saved)
+        }
+    };
+    Ok(match state {
+        crate::chat_images::VisionState::Yes => "yes",
+        crate::chat_images::VisionState::No => "no",
+        crate::chat_images::VisionState::Unknown => "unknown",
+    }
+    .to_string())
+}
+
 /// Persist kept turns as a new native session. A fork of an archived chat
 /// gets a new id, so it is not archived.
 pub fn fork_native_session(request: NativeChatForkRequest) -> Result<String, String> {
@@ -824,8 +1274,19 @@ pub fn fork_native_session(request: NativeChatForkRequest) -> Result<String, Str
         vault_path: request.vault_path,
         vault_paths: request.vault_paths,
         system_prompt: request.system_prompt,
+        reasoning_level: None,
     };
     crate::engines::native_log::write_session_events(&header, &request.events)?;
+    if let Some(source) = request.source_session_id.as_deref() {
+        let user_turns = request
+            .events
+            .iter()
+            .filter(|event| matches!(event, crate::rhizome_loop::DurableEvent::User { .. }))
+            .count();
+        if let Err(error) = crate::chat_images::copy_session_images(source, &id, user_turns) {
+            log::warn!("forked chat did not copy images: {error}");
+        }
+    }
     Ok(id)
 }
 
@@ -887,6 +1348,7 @@ where
                 vault_path: None,
                 vault_paths: Vec::new(),
                 system_prompt: None,
+                reasoning_level: None,
             },
             events: record.events.clone(),
             warning: record.warning.clone(),
@@ -905,6 +1367,9 @@ where
             "power_user" => AiAgentPermissionMode::PowerUser,
             _ => AiAgentPermissionMode::Safe,
         },
+        reasoning_level: None,
+        images: Vec::new(),
+        send_anyway: false,
     };
     let target = match resolve_native_target(&request.target) {
         Ok(target) => target,
@@ -922,6 +1387,7 @@ where
         .clone()
         .or_else(|| composed_system_prompt(None));
     let emit = emit_for(&live_id);
+    let reasoning = user_reasoning(chats, &live_id, opened.header.reasoning_level.clone());
     match target {
         NativeChatTarget::FreeTier => {
             let (tx, rx) = mpsc::channel();
@@ -929,7 +1395,11 @@ where
             let model = match free_tier_routing_model_with(keys, system.clone(), move |attempt| {
                 let _ = reporter.send(attempt);
             }) {
-                Ok(model) => model,
+                Ok(model) => model.with_user_reasoning(
+                    Arc::clone(&reasoning.slot),
+                    reasoning.notice_tx.clone(),
+                    Arc::clone(&reasoning.notices_seen),
+                ),
                 Err(error) => {
                     return Ok(NativeChatOpenResult {
                         error: Some(error),
@@ -941,6 +1411,7 @@ where
             let mut engine = NativeEngine::with_provider_pair(agent, model, tx, rx);
             engine.set_vault(request.vault_path.clone(), request.vault_paths.clone());
             engine.set_permission_mode(request.permission_mode);
+            engine.set_reasoning_notice_rx(reasoning.notice_rx);
             engine.set_log_meta(
                 &live_id,
                 FREE_TIER_TARGET,
@@ -949,6 +1420,8 @@ where
                 request.vault_paths.clone(),
                 request.system_prompt.clone(),
             );
+            engine.set_saved_reasoning_level(reasoning.level);
+            chats.remember_target(&live_id, &request.target);
             chats.open_with_engine(live_id, engine, emit)?;
         }
         NativeChatTarget::Catalog {
@@ -956,7 +1429,7 @@ where
             provider_id,
             model_id,
         } => {
-            let stream = AiModelStreamRequest {
+            let mut stream = AiModelStreamRequest {
                 provider: catalog_provider(provider_kind, &provider_id)?,
                 model_id,
                 message: String::new(),
@@ -965,11 +1438,23 @@ where
                 vault_paths: request.vault_paths.clone(),
                 api_key_override: None,
                 event_name: None,
+                reasoning_level: None,
+                reasoning_slot: None,
+                reasoning_notice_tx: None,
+                reasoning_notices_seen: None,
+                chat_images: Vec::new(),
+                vision_state: crate::chat_images::VisionState::Unknown,
+                send_anyway: false,
+                defer_image_skip: false,
+                image_session_id: None,
             };
+            apply_catalog_reasoning(&mut stream, &reasoning);
+            stamp_model_vision(&mut stream);
             let mut engine =
                 NativeEngine::from_parts(agent, ProviderModel::new(stream, HttpLimits::STREAM));
             engine.set_vault(request.vault_path.clone(), request.vault_paths.clone());
             engine.set_permission_mode(request.permission_mode);
+            engine.set_reasoning_notice_rx(reasoning.notice_rx);
             engine.set_log_meta(
                 &live_id,
                 &request.target,
@@ -978,6 +1463,8 @@ where
                 request.vault_paths.clone(),
                 request.system_prompt.clone(),
             );
+            engine.set_saved_reasoning_level(reasoning.level);
+            chats.remember_target(&live_id, &request.target);
             chats.open_with_engine(live_id, engine, emit)?;
         }
     }
@@ -1089,6 +1576,9 @@ mod tests {
                 vault_path: None,
                 vault_paths: Vec::new(),
                 permission_mode: AiAgentPermissionMode::default(),
+                reasoning_level: None,
+                images: Vec::new(),
+                send_anyway: false,
             };
             let expected = composed_system_prompt(request.system_prompt.as_deref());
             assert!(
@@ -1414,6 +1904,7 @@ mod tests {
             vault_path: Some("/vault".into()),
             vault_paths: Vec::new(),
             permission_mode: AiAgentPermissionMode::Safe,
+            source_session_id: None,
         }
     }
 
@@ -1497,6 +1988,97 @@ mod tests {
                 users.contains(&"First") && users.contains(&"Second"),
                 "forked model must see kept turns: {users:?}"
             );
+        });
+    }
+
+    fn tiny_png() -> crate::chat_images::ChatImage {
+        use base64::Engine;
+        crate::chat_images::ChatImage {
+            mime_type: "image/png".into(),
+            data: base64::engine::general_purpose::STANDARD.encode(b"\x89PNG\r\n\x1a\nA"),
+        }
+    }
+
+    #[test]
+    fn a_reopened_chat_can_send_an_image() {
+        with_temp_home(|_| {
+            write_native_log("reopen-image", 1, "openai/gpt-4o", &[]);
+            let id = log_id("reopen-image");
+            let chats = NativeChats::new();
+            let (tx, rx) = mpsc::channel();
+            chats
+                .open_with_engine(
+                    id.clone(),
+                    NativeEngine::from_parts(AgentLoop::new(), FakeModel::saying("seen")),
+                    move |event| {
+                        let _ = tx.send(event);
+                    },
+                )
+                .expect("open");
+            chats
+                .send_with_reasoning(
+                    &id,
+                    "what is this",
+                    ReasoningLevelUpdate::Keep,
+                    &[tiny_png()],
+                    false,
+                )
+                .expect("image send after reopen");
+            let events = wait_for_turn_end(&rx);
+            assert!(events
+                .iter()
+                .any(|event| matches!(event, EngineEvent::TextDelta { text } if text == "seen")));
+            let turns = crate::chat_images::read_turns(&id).expect("ledger");
+            assert_eq!(turns.last().map(Vec::len), Some(1));
+        });
+    }
+
+    #[test]
+    fn a_failed_send_does_not_shift_later_images() {
+        with_temp_home(|_| {
+            write_native_log("failed-image", 1, "openai/gpt-4o", &[]);
+            let id = log_id("failed-image");
+            let chats = NativeChats::new();
+            let (tx, rx) = mpsc::channel();
+            chats
+                .open_with_engine(
+                    id.clone(),
+                    NativeEngine::from_parts(AgentLoop::new(), FakeModel::saying("ok")),
+                    move |event| {
+                        let _ = tx.send(event);
+                    },
+                )
+                .expect("open");
+            chats
+                .send_with_reasoning(&id, "one", ReasoningLevelUpdate::Keep, &[tiny_png()], false)
+                .expect("first image");
+            let _ = wait_for_turn_end(&rx);
+            let original = {
+                let mut sessions = chats.sessions.lock().expect("sessions");
+                let session = sessions.get_mut(&id).expect("live");
+                let (tx, disconnected) = mpsc::channel();
+                drop(disconnected);
+                std::mem::replace(&mut session.ops, tx)
+            };
+            let failed = chats.send_with_reasoning(
+                &id,
+                "phantom",
+                ReasoningLevelUpdate::Keep,
+                &[tiny_png()],
+                false,
+            );
+            assert!(failed.is_err(), "a closed worker must refuse the send");
+            {
+                let mut sessions = chats.sessions.lock().expect("sessions");
+                sessions.get_mut(&id).expect("live").ops = original;
+            }
+            chats
+                .send_with_reasoning(&id, "two", ReasoningLevelUpdate::Keep, &[tiny_png()], false)
+                .expect("later image");
+            let loaded = crate::chat_images::read_turns(&id).expect("ledger");
+            assert_eq!(loaded.len(), 2);
+            assert_eq!(loaded[0].len(), 1);
+            assert_eq!(loaded[1].len(), 1);
         });
     }
 
@@ -1728,6 +2310,7 @@ mod tests {
             vault_path: None,
             vault_paths: Vec::new(),
             system_prompt: None,
+            reasoning_level: None,
         };
         crate::engines::native_log::write_fixture(&header, &events, extra_lines).expect("fixture");
     }
@@ -2220,10 +2803,11 @@ mod tests {
             let _ = hold_tx.send(());
             let _ = wait_for_turn_end(&rx);
             assert!(
-                result.as_ref().err().is_none_or(|error| {
-                    !error.to_lowercase().contains("already running")
-                }),
-                "an immediate resend after a fatal no-key error must not say already running: {result:?}"
+                result
+                    .as_ref()
+                    .err()
+                    .is_none_or(|error| { !error.to_lowercase().contains("already running") }),
+                "an immediate resend after a fatal no-key error must not say already running"
             );
             result.expect("send after fatal no-key");
         });
@@ -2261,11 +2845,13 @@ mod tests {
 
     #[test]
     fn path_traversal_is_rejected() {
-        let open_error = super::open_native_session_record("../x").expect_err("open");
-        assert!(open_error.to_lowercase().contains("uuid"));
-        let delete_error =
-            super::delete_native_session(&NativeChats::new(), "../x").expect_err("delete");
-        assert!(delete_error.to_lowercase().contains("uuid"));
+        with_temp_home_and_cache(|_| {
+            let open_error = super::open_native_session_record("../x").expect_err("open");
+            assert!(open_error.to_lowercase().contains("uuid"));
+            let delete_error =
+                super::delete_native_session(&NativeChats::new(), "../x").expect_err("delete");
+            assert!(delete_error.to_lowercase().contains("uuid"));
+        });
     }
 
     #[test]
@@ -2288,5 +2874,24 @@ mod tests {
             assert_eq!(opened.header.vault_paths, vec!["/extra".to_string()]);
             assert_eq!(opened.header.system_prompt.as_deref(), Some("Be brief"));
         });
+    }
+
+    #[test]
+    fn a_null_reasoning_level_clears_and_a_missing_one_keeps() {
+        assert_eq!(
+            ReasoningLevelUpdate::from_payload_value(None).unwrap(),
+            ReasoningLevelUpdate::Keep
+        );
+        assert_eq!(
+            ReasoningLevelUpdate::from_payload_value(Some(&serde_json::Value::Null)).unwrap(),
+            ReasoningLevelUpdate::Clear
+        );
+        assert_eq!(
+            ReasoningLevelUpdate::from_payload_value(Some(&serde_json::Value::String(
+                "high".into()
+            )))
+            .unwrap(),
+            ReasoningLevelUpdate::Set("high".into())
+        );
     }
 }

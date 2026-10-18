@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_AI_AGENT,
   PRODUCT_AI_AGENT_DEFINITIONS,
+  composerAgentLabel,
+  getAiAgentDefinition,
   getNextAiAgentId,
   normalizeAiAgentsStatus,
   normalizeStoredAiAgent,
@@ -13,7 +15,8 @@ describe('aiAgents helpers', () => {
     expect(normalizeStoredAiAgent('prime')).toBe('prime')
     expect(normalizeStoredAiAgent('claude_code')).toBe('claude_code')
     expect(normalizeStoredAiAgent('hermes')).toBe('hermes')
-    expect(normalizeStoredAiAgent('gemini')).toBe('antigravity')
+    expect(normalizeStoredAiAgent('pi')).toBe('prime')
+    expect(normalizeStoredAiAgent('gemini')).toBe('prime')
     expect(normalizeStoredAiAgent('cursor')).toBeNull()
   })
 
@@ -26,8 +29,23 @@ describe('aiAgents helpers', () => {
     expect(resolveDefaultAiAgent('prime')).toBe('prime')
   })
 
-  it('exposes only Prime in product definitions', () => {
+  it('exposes only Prime in product definitions, labeled Prime Agent', () => {
     expect(PRODUCT_AI_AGENT_DEFINITIONS.map((d) => d.id)).toEqual(['prime'])
+    expect(getAiAgentDefinition('prime').label).toBe('Prime Agent')
+    expect(getAiAgentDefinition('prime').shortLabel).toBe('Prime')
+  })
+
+  it('names the composer after the resolved target, not the global Chat engine', () => {
+    expect(composerAgentLabel({ chatEngine: 'prime', agent: 'prime' })).toBe('Prime')
+    expect(composerAgentLabel({ chatEngine: 'native', agent: 'prime' })).toBe('Rhizome')
+    expect(composerAgentLabel({ agent: 'prime' })).toBe('Prime')
+    expect(composerAgentLabel({ chatEngine: 'prime', agent: 'codex', targetLabel: 'Codex' })).toBe('Codex')
+    expect(composerAgentLabel({ chatEngine: 'native', agent: 'codex', targetLabel: 'Codex' })).toBe('Codex')
+    expect(composerAgentLabel({
+      chatEngine: 'native',
+      agent: 'claude_code',
+      targetLabel: 'Claude Code',
+    })).toBe('Claude Code')
   })
 
   it('normalizes raw status payloads including prime', () => {

@@ -103,10 +103,10 @@ function mockSearchContent(content: string, excludeFrontmatter?: boolean): strin
 
 function mockModifiedFiles(): ModifiedFile[] {
   return [
-    { path: '/Users/luca/Laputa/26q1-laputa-app.md', relativePath: '26q1-laputa-app.md', status: 'modified' },
-    { path: '/Users/luca/Laputa/facebook-ads-strategy.md', relativePath: 'facebook-ads-strategy.md', status: 'modified' },
-    { path: '/Users/luca/Laputa/ai-agents-primer.md', relativePath: 'ai-agents-primer.md', status: 'added' },
-    { path: '/Users/luca/Laputa/old-draft.md', relativePath: 'old-draft.md', status: 'deleted' },
+    { path: '/Users/mock/Vault/26q1-rhizome-app.md', relativePath: '26q1-rhizome-app.md', status: 'modified' },
+    { path: '/Users/mock/Vault/facebook-ads-strategy.md', relativePath: 'facebook-ads-strategy.md', status: 'modified' },
+    { path: '/Users/mock/Vault/ai-agents-primer.md', relativePath: 'ai-agents-primer.md', status: 'added' },
+    { path: '/Users/mock/Vault/old-draft.md', relativePath: 'old-draft.md', status: 'deleted' },
   ]
 }
 
@@ -195,11 +195,14 @@ let mockSettings: Settings = {
   ai_model_providers: null,
   ai_workspace_conversations: null,
   hide_gitignored_files: null,
+  block_secret_files: null,
   all_notes_show_pdfs: null,
   all_notes_show_images: null,
   all_notes_show_unsupported: null,
   multi_workspace_enabled: null,
   agent_profile: null,
+  chat_engine: null,
+  native_chat_target: null,
 }
 
 const DEFAULT_MOCK_VAULT_PATH = '/Users/mock/demo-vault-v2'
@@ -207,7 +210,6 @@ const mockArchivedSessions = new Set<string>()
 const mockArchivedNativeSessions = new Set<string>()
 let mockForkedNative: { sessionId: string; events: unknown[] } | null = null
 let mockPrimeModelAllowList: string[] = ['mock/mock-model']
-const mockPrimePackages: string[] = []
 
 const mockSessionNames = new Map<string, string>()
 
@@ -527,6 +529,19 @@ function handleMoveNoteToWorkspace(args: {
   return { new_path: newPath, updated_files: updatedFiles, failed_updates: 0 }
 }
 
+// Sample Research library for the browser mock (rhizome_scan_library).
+const MOCK_LIBRARY = [
+  {
+    id: 'mock-repo.md',
+    path: 'sources/repos/mock-repo.md',
+    title: 'mock repo',
+    description: 'A sample wiki from the browser mock.',
+    type: 'wiki',
+    tag: 'Repo Wiki',
+    date: 1700000000,
+  },
+]
+
 // Fixture for the wiki graph view (rhizome_wiki_graph tool): three notes
 // and one ghost so browser dev / tests exercise both node variants.
 const MOCK_WIKI_GRAPH = {
@@ -566,7 +581,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     const basePaths = new Set(base.map(f => f.path))
     const extra: ModifiedFile[] = [...mockSavedSinceCommit]
       .filter(p => !basePaths.has(p))
-      .map(p => ({ path: p, relativePath: p.replace(/^.*?\/Laputa\//, ''), status: 'modified' as const }))
+      .map(p => ({ path: p, relativePath: p.replace(/^.*?\/Vault\//, ''), status: 'modified' as const }))
     return [...base, ...extra]
   },
   get_file_diff: (args: { path: string }) => mockFileDiff(args.path),
@@ -586,7 +601,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   }),
   get_build_number: () => 'bDEV',
   should_use_external_media_preview: () => false,
-  get_last_commit_info: (): LastCommitInfo => ({ shortHash: 'a1b2c3d', commitUrl: 'https://github.com/lucaong/laputa-vault/commit/a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0' }),
+  get_last_commit_info: (): LastCommitInfo => ({ shortHash: 'a1b2c3d', commitUrl: 'https://github.com/mock/rhizome-vault/commit/a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0' }),
   is_git_repo: () => true,
   init_git_repo: () => null,
   git_pull: (): GitPullResult => ({ status: 'up_to_date', message: 'Already up to date', updatedFiles: [], conflictFiles: [] }),
@@ -598,8 +613,8 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   git_file_url: (args?: { vaultPath?: string; vault_path?: string; path?: string }): string | null => {
     const vaultPath = args?.vaultPath ?? args?.vault_path ?? mockLastVaultPath ?? DEFAULT_MOCK_VAULT_PATH
     if (!getMockRemoteState(vaultPath)) return null
-    const path = args?.path?.replace(/^.*?\/Laputa\//, '') ?? 'note.md'
-    return `https://github.com/lucaong/laputa-vault/blob/main/${encodeURI(path)}`
+    const path = args?.path?.replace(/^.*?\/Vault\//, '') ?? 'note.md'
+    return `https://github.com/mock/rhizome-vault/blob/main/${encodeURI(path)}`
   },
   git_add_remote: (args?: {
     request?: { vaultPath?: string; vault_path?: string; remoteUrl?: string }
@@ -619,8 +634,8 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     const limit = args.limit ?? 30
     const ts = Math.floor(Date.now() / 1000)
     const commits: PulseCommit[] = [
-      { hash: 'a1b2c3d4e5f6', shortHash: 'a1b2c3d', message: 'Update project notes and add new experiment', date: ts - 3600, githubUrl: 'https://github.com/lucaong/laputa-vault/commit/a1b2c3d4e5f6', files: [{ path: '26q1-laputa-app.md', status: 'modified', title: '26q1 laputa app' }, { path: 'ai-search.md', status: 'added', title: 'ai search' }], added: 1, modified: 1, deleted: 0 },
-      { hash: 'b2c3d4e5f6g7', shortHash: 'b2c3d4e', message: 'Reorganize people notes', date: ts - 86400, githubUrl: 'https://github.com/lucaong/laputa-vault/commit/b2c3d4e5f6g7', files: [{ path: 'alice-johnson.md', status: 'modified', title: 'alice johnson' }, { path: 'bob-smith.md', status: 'modified', title: 'bob smith' }, { path: 'old-contact.md', status: 'deleted', title: 'old contact' }], added: 0, modified: 2, deleted: 1 },
+      { hash: 'a1b2c3d4e5f6', shortHash: 'a1b2c3d', message: 'Update project notes and add new experiment', date: ts - 3600, githubUrl: 'https://github.com/mock/rhizome-vault/commit/a1b2c3d4e5f6', files: [{ path: '26q1-rhizome-app.md', status: 'modified', title: '26q1 rhizome app' }, { path: 'ai-search.md', status: 'added', title: 'ai search' }], added: 1, modified: 1, deleted: 0 },
+      { hash: 'b2c3d4e5f6g7', shortHash: 'b2c3d4e', message: 'Reorganize people notes', date: ts - 86400, githubUrl: 'https://github.com/mock/rhizome-vault/commit/b2c3d4e5f6g7', files: [{ path: 'alice-johnson.md', status: 'modified', title: 'alice johnson' }, { path: 'bob-smith.md', status: 'modified', title: 'bob smith' }, { path: 'old-contact.md', status: 'deleted', title: 'old contact' }], added: 0, modified: 2, deleted: 1 },
       { hash: 'c3d4e5f6g7h8', shortHash: 'c3d4e5f', message: 'Add daily journal entry', date: ts - 172800, githubUrl: null, files: [{ path: '2026-03-03.md', status: 'added', title: '2026 03 03' }], added: 1, modified: 0, deleted: 0 },
     ]
     return commits.slice(0, limit)
@@ -628,11 +643,12 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   get_conflict_files: (): string[] => [],
   check_claude_cli: () => ({ installed: false, version: null }),
   get_ai_agents_status: () => ({
+    // Browser mock only. A native build reports the real Prime version.
+    // Settings hides this line when the version is the string `mock`.
     prime: { installed: true, version: 'mock' },
     claude_code: { installed: false, version: null },
     codex: { installed: false, version: null },
     opencode: { installed: false, version: null },
-    pi: { installed: false, version: null },
     antigravity: { installed: false, version: null },
     kiro: { installed: false, version: null },
     hermes: { installed: false, version: null },
@@ -675,6 +691,12 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   stream_prime_session: () => 'mock-session',
   native_chat_start: () => 'mock-native-session',
   native_chat_send: () => null,
+  native_model_vision: (args?: Record<string, unknown>) => {
+    const target = String(args?.target ?? '')
+    if (target.includes('gpt-3.5') || target.includes('text-only')) return 'no'
+    if (target.includes('gpt-4o') || target.includes('qwen3.6') || target.includes('gemini')) return 'yes'
+    return 'unknown'
+  },
   native_chat_cancel: () => null,
   native_chat_approval_reply: () => null,
   native_chat_end: () => null,
@@ -756,6 +778,13 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     const kind = args?.provider?.kind
     if (kind === 'ollama') return ['llama3.2', 'qwen2.5']
     if (kind === 'lm_studio') return ['llama3.2']
+    return []
+  },
+  list_ai_model_provider_models: (args: { provider?: { kind?: string; id?: string } }) => {
+    const kind = args?.provider?.kind
+    if (kind === 'ollama') return ['llama3.2', 'qwen2.5']
+    if (kind === 'lm_studio') return ['llama3.2']
+    if (args?.provider?.id === 'work-openai') return ['gpt-4o', 'gpt-5']
     return []
   },
   list_prime_sessions: () => [
@@ -900,6 +929,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
       {
         id: '01a0252e-c4d1-7fa2-9b10-77c1de904ab3',
         path: '/mock/sessions/01a0252e-c4d1-7fa2-9b10-77c1de904ab3.jsonl',
+        title: 'Draft the release notes',
         cwd: '/private/tmp',
         mtimeMs: minutes(60 * 26),
         hasConversation: true,
@@ -983,13 +1013,6 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   manage_prime_heartbeat: () => null,
   cancel_prime_scheduled_work: () => null,
   create_prime_scheduled_work: () => null,
-  get_prime_thinking_levels: () => ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
-  // The full scale, deliberately: the browser mock has no daemon and so no
-  // model map to filter by. Answering with a narrow set here would hide the
-  // filtered menu that the real host produces, which is the defect this
-  // command exists to fix.
-  get_prime_supported_thinking_levels: () => ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
-  set_prime_thinking_level: () => null,
   // Real data, not `[]`: a mock that returns nothing makes the custom-format
   // section look unbuilt rather than empty (the mock has hidden three real
   // defects that way already).
@@ -1029,16 +1052,6 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   // "hidden by your list" disclosure — the uncurated case is the one that
   // looks identical to having no feature at all.
   get_prime_model_allow_list: () => [...mockPrimeModelAllowList],
-  list_prime_packages: () => mockPrimePackages,
-  install_prime_package: (args: { source?: string }) => {
-    const source = String(args?.source ?? '').trim()
-    if (!source) throw new Error('Choose a package to install.')
-    const spec = source.startsWith('npm:') || source.startsWith('git:') || source.startsWith('http') || source.startsWith('/')
-      ? source
-      : `npm:${source}`
-    if (!mockPrimePackages.includes(spec)) mockPrimePackages.push(spec)
-    return { source: spec, reloaded: true }
-  },
   ensure_nous_portal_models: () => ({
     provider: 'nous-portal',
     modelCount: 1,
@@ -1090,6 +1103,15 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     if (args.name === 'rhizome_wiki_graph') {
       return JSON.stringify(MOCK_WIKI_GRAPH)
     }
+    if (args.name === 'rhizome_scan_library') {
+      return JSON.stringify(MOCK_LIBRARY)
+    }
+    if (args.name === 'rhizome_read_events') {
+      return JSON.stringify([])
+    }
+    if (args.name === 'rhizome_search') {
+      return JSON.stringify([])
+    }
     throw new Error(`Mock call_rhizome_tool: unsupported tool ${args.name}`)
   },
   save_note_content: (args: { path: string; content: string }) => {
@@ -1098,12 +1120,22 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     syncWindowContent()
     return null
   },
+  // Browser and test builds have no conflict check. The checked save goes
+  // through the save handler installed now, so fixtures and test hooks on
+  // save_note_content still see every save.
+  save_note_content_checked: async (args: { path: string; content: string }) => {
+    const installed = typeof window === 'undefined'
+      ? undefined
+      : Reflect.get(window.__mockHandlers ?? {}, 'save_note_content') as ((value: typeof args) => unknown) | undefined
+    await (installed ?? mockHandlers.save_note_content)(args)
+    return { contentHash: '', splicedContent: null }
+  },
   save_image: (args: { vault_path?: string; filename: string; data: string }) => {
-    const vault = args.vault_path ?? '/Users/luca/Laputa'
+    const vault = args.vault_path ?? '/Users/mock/Vault'
     return `${vault}/attachments/${Date.now()}-${args.filename}`
   },
   copy_image_to_vault: (args: { vault_path?: string; source_path: string }) => {
-    const vault = args.vault_path ?? '/Users/luca/Laputa'
+    const vault = args.vault_path ?? '/Users/mock/Vault'
     const filename = args.source_path.split('/').pop() ?? 'image.png'
     return `${vault}/attachments/${Date.now()}-${filename}`
   },
@@ -1138,11 +1170,14 @@ export const mockHandlers: Record<string, (args: any) => any> = {
       ai_model_providers: s.ai_model_providers ?? null,
       ai_workspace_conversations: s.ai_workspace_conversations ?? null,
       hide_gitignored_files: s.hide_gitignored_files ?? null,
+      block_secret_files: s.block_secret_files ?? null,
       all_notes_show_pdfs: s.all_notes_show_pdfs ?? null,
       all_notes_show_images: s.all_notes_show_images ?? null,
       all_notes_show_unsupported: s.all_notes_show_unsupported ?? null,
       multi_workspace_enabled: s.multi_workspace_enabled ?? null,
       agent_profile: s.agent_profile?.trim() || null,
+      chat_engine: s.chat_engine ?? null,
+      native_chat_target: s.native_chat_target ?? null,
     }
     return null
   },

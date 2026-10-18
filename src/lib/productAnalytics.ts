@@ -67,20 +67,6 @@ export function trackFilePreviewFailed(previewKind: FilePreviewKind): void {
 }
 
 /**
- * The reasoning level was changed from the composer (#9 / #35).
- *
- * The level id is a fixed, non-identifying enum from Prime's own list, so it
- * is safe to record as-is. `source` says whether it came from the model menu
- * or the composer thinking pill.
- */
-export function trackPrimeThinkingLevelChanged(
-  level: string,
-  source: 'menu' | 'pill' | 'toggle' = 'menu',
-): void {
-  trackEvent('prime_thinking_level_changed', { level, source })
-}
-
-/**
  * A composer control strip pill was opened (#38). Which pill, never the
  * vault path, skill name, or model id — those are user content.
  */
@@ -369,6 +355,10 @@ export function trackCommandRailPinChanged(mode: 'hover' | 'expanded' | 'compact
   trackEvent('command_rail_pin_changed', { mode })
 }
 
+export function trackNotesPanelModeChanged(mode: 'auto' | 'rail' | 'open'): void {
+  trackEvent('notes_panel_mode_changed', { mode })
+}
+
 /** Narrow window: the Sessions rail opened as a temporary drawer over Chat. */
 export function trackSessionsDrawerOpened(): void {
   trackEvent('sessions_drawer_opened')
@@ -592,26 +582,6 @@ export function trackComposerReplyCompletionAccepted(): void {
 
 export function trackComposerReplyCompletionDismissed(): void {
   trackEvent('composer_reply_completion_dismissed')
-}
-
-/**
- * Settings → Extensions opened the Pi package catalog.
- * No query text — that can name a private package path.
- */
-export function trackPrimePackageCatalogOpened(): void {
-  trackEvent('prime_package_catalog_opened')
-}
-
-export function trackPrimePackageInstallCopied(origin: 'catalog' | 'installed'): void {
-  trackEvent('prime_package_install_copied', { origin })
-}
-
-export function trackPrimePackageInstalled(origin: 'catalog' | 'installed'): void {
-  trackEvent('prime_package_installed', { origin })
-}
-
-export function trackPrimePackageInstallFailed(reason: 'cli_missing' | 'error'): void {
-  trackEvent('prime_package_install_failed', { reason })
 }
 
 /**

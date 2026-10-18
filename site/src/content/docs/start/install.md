@@ -5,19 +5,21 @@ description: Build and run the Rhizome developer preview from source on macOS.
 
 You build Rhizome from source on a Mac and run it from there. This takes a few minutes, mostly for the first build.
 
-> **Developer preview.** macOS only. There is no signed download, no Homebrew package and no in-app updater yet. See [Platforms and updates](../reference/platforms-and-updates.md).
+:::note
+**Developer preview.** macOS only. There is no signed download, no Homebrew package and no in-app updater yet. See [Platforms and updates](../reference/platforms-and-updates.md).
+:::
 
 ## Before you start
 
 You need:
 
-1. macOS with the Xcode Command Line Tools (`xcode-select --install`).
-2. Node.js `^20.19.0` or `>=22.12.0`.
-3. pnpm.
-4. Rust `1.77.2` or newer.
-5. git.
+1. macOS with the Xcode Command Line Tools (`xcode-select --install`)
+2. Node.js `^20.19.0` or `>=22.12.0`
+3. pnpm
+4. Rust `1.77.2` or newer
+5. git
 
-Prime Agent is optional. You need it only if you keep Prime as the Chat engine, which is the default.
+Prime Agent is not required for Chat. Rhizome's own engine is the only chat engine. Prime and Hermes are no longer chat engines (ADR-0189); leftover code is still in the repo until the follow-up PRs.
 
 ## Build and run
 
@@ -28,22 +30,15 @@ cd rhizome-agent
 pnpm tauri dev
 ```
 
-`./install.sh` installs the project's dependencies. If Prime Agent isn't on the machine, it also downloads Prime's command-line tool, because Prime is still the default Chat engine. Rhizome doesn't include a copy of Prime or Node.
+`./install.sh` installs the project's dependencies. If Prime Agent isn't on the machine, it may still download Prime's command-line tool. Chat doesn't use it (ADR-0189), and that step comes out with the leftover engine code. Rhizome doesn't include a copy of Prime or Node. Chat runs on Rhizome's own engine.
 
 `pnpm tauri dev` builds the app and opens it.
 
-## Pick an engine
+## Set up Prime (legacy)
 
-Chat runs on one of two engines. You can switch at any time with **Chat engine** in Settings → AI Agents.
+Skip this section unless you use Prime from the CLI. New chats use Rhizome's own engine. Add a provider key or use **Taproot** in Settings → AI Agents. See [Set up models and keys](../guides/configure-ai-models.md).
 
-- **Prime Agent (default).** Prime runs Chat. Set it up below.
-- **Rhizome's own engine.** Turn **Chat engine** on. It doesn't need Prime. Add a provider key, or use **Free tier (auto)**. See [Set up models and keys](../guides/configure-ai-models.md).
-
-## Set up Prime
-
-Skip this section if you use Rhizome's own engine.
-
-The first time `prime-agent` runs in a terminal, it asks you to run `/login` and choose a model provider. You can also sign in from Settings → AI Agents → Local agent: each provider card has a **Sign in** button that runs Prime's login for you.
+The first time `prime-agent` runs in a terminal, it asks you to run `/login` and choose a model provider. Rhizome's Settings no longer has a Prime sign-in.
 
 Prime stops when the terminal that started it closes. To keep it running in the background:
 

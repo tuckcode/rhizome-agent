@@ -74,7 +74,7 @@
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
     "dompurify": "3.4.16",
-    "katex": "^0.16.28",
+    "katex": "^0.18.2",
     "mermaid": "^11.16.1",
     "posthog-js": "^1.363.5",
     "radix-ui": "^1.4.3",
@@ -98,6 +98,7 @@
     "@tauri-apps/cli": "^2.10.0",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.8",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
@@ -119,5 +120,5 @@
     "vitest": "^4.1.11",
     "ws": "^8.19.0"
   },
-  "description": "Rhizome \u2014 desktop chat shell (not Rhizome Desktop)."
+  "description": "Rhizome — desktop chat shell (not Rhizome Desktop)."
 }

@@ -30,7 +30,7 @@ afterEach(() => {
 
 describe('telemetry scrubPaths', () => {
   it('redacts macOS absolute paths', () => {
-    expect(scrubPaths('Error in /Users/luca/Laputa/note.md')).toBe(
+    expect(scrubPaths('Error in /Users/mock/Vault/note.md')).toBe(
       'Error in [redacted-path]'
     )
   })

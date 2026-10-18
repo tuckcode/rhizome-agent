@@ -16,7 +16,7 @@ vi.mock('@/utils/url', () => ({
 
 const defaultProps = {
   mode: 'welcome' as const,
-  defaultVaultPath: '~/Documents/Laputa',
+  defaultVaultPath: '~/Documents/Vault',
   onCreateVault: vi.fn(),
   onRetryCreateVault: vi.fn(),
   onCreateEmptyVault: vi.fn(),
@@ -62,7 +62,7 @@ describe('WelcomeScreen', () => {
     it('shows the Rhizome Vault / Portent template option description', () => {
       render(<WelcomeScreen {...defaultProps} />)
       expect(screen.getByText('Create the Rhizome Vault from the Portent template')).toBeInTheDocument()
-      expect(screen.queryByText(/~\/Documents\/Laputa/)).not.toBeInTheDocument()
+      expect(screen.queryByText(/~\/Documents\/Vault/)).not.toBeInTheDocument()
     })
 
     it('keeps the Rhizome Vault template words on the existing en.json key', () => {
@@ -205,7 +205,7 @@ describe('WelcomeScreen', () => {
 
     it('does not show path badge in welcome mode', () => {
       render(<WelcomeScreen {...defaultProps} />)
-      expect(screen.queryByText('~/Laputa')).not.toBeInTheDocument()
+      expect(screen.queryByText('~/Vault')).not.toBeInTheDocument()
     })
 
     it('opens the first-launch docs from the welcome card', () => {
@@ -219,7 +219,7 @@ describe('WelcomeScreen', () => {
     const missingProps = {
       ...defaultProps,
       mode: 'vault-missing' as const,
-      missingPath: '~/Laputa',
+      missingPath: '~/Vault',
     }
 
     it('keeps the missing-vault state framed as welcome', () => {
@@ -230,7 +230,7 @@ describe('WelcomeScreen', () => {
 
     it('does not show the missing vault path in a badge', () => {
       render(<WelcomeScreen {...missingProps} />)
-      expect(screen.queryByText('~/Laputa')).not.toBeInTheDocument()
+      expect(screen.queryByText('~/Vault')).not.toBeInTheDocument()
     })
 
     it('keeps the existing-vault action label in the friendly recovery state', () => {

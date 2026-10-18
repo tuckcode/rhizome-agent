@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Assemble the GitHub Pages landing page into $1 (default: _site).
+# Assemble the GitHub Pages site into $1 (default: _site).
+# Root = landing page from website/. /docs = Starlight from site/.
 # Assets are copied from where they already live, so the repo holds one copy.
+# scripts/check-pages-artifact.mjs then checks the composed tree.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 out="${1:-_site}"
@@ -12,3 +14,17 @@ cp "$root/src/assets/brand/rhizome-organic-hero.png" "$out/assets/hero.png"
 cp "$root/src/assets/brand/rhizome-organic-hero.png" "$out/assets/og.png"
 cp "$root/src-tauri/icons/128x128.png" "$out/assets/icon.png"
 touch "$out/.nojekyll"
+
+# Starlight (Astro) → /docs. astro.config.mjs sets base to /rhizome-agent/docs
+# so asset and page URLs match GitHub Pages at
+# https://tuckcode.github.io/rhizome-agent/docs/.
+(
+  cd "$root/site"
+  npm ci
+  npm run build
+)
+rm -rf "$out/docs"
+mkdir -p "$out/docs"
+cp -a "$root/site/dist/." "$out/docs/"
+
+node "$root/scripts/check-pages-artifact.mjs" "$out"

@@ -6,6 +6,7 @@ mod rename_cmds;
 mod scan_cmds;
 mod view_cmds;
 
+pub(crate) use boundary::validate_view_filename;
 pub(super) use boundary::{with_registered_boundary, VaultBoundary};
 pub use file_cmds::*;
 pub use frontmatter_cmds::*;
@@ -53,6 +54,8 @@ mod tests {
             sort: None,
             list_properties_display: vec![],
             filters: crate::vault::FilterGroup::All(vec![]),
+            presentation: None,
+            extra: Default::default(),
         }
     }
 
@@ -315,6 +318,34 @@ mod tests {
     #[test]
     fn test_check_vault_exists_false() {
         assert!(!check_vault_exists("/nonexistent/path/abc123".to_string()));
+    }
+
+    #[test]
+    fn check_vault_exists_succeeds_when_prime_dir_is_not_writable() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(dir.path().join("note.md"), "# Note\n").unwrap();
+        std::fs::write(dir.path().join(".prime"), "blocked").unwrap();
+        assert!(check_vault_exists(dir.path().to_string_lossy().to_string()));
+        assert!(!dir
+            .path()
+            .join(".prime/agent/skills/rhizome-vault/SKILL.md")
+            .exists());
+    }
+
+    #[tokio::test]
+    async fn list_vault_succeeds_when_prime_dir_is_not_writable() {
+        let dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(dir.path().join("note.md"), "# Note\n").unwrap();
+        std::fs::write(dir.path().join(".prime"), "blocked").unwrap();
+        let entries = list_vault(dir.path().to_path_buf())
+            .await
+            .expect("listing a vault must not write .prime/");
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].title, "Note");
+        assert!(!dir
+            .path()
+            .join(".prime/agent/skills/rhizome-vault/SKILL.md")
+            .exists());
     }
 
     #[test]

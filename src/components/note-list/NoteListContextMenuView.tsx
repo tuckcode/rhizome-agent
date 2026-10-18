@@ -25,6 +25,7 @@ import { trackEvent } from '../../lib/telemetry'
 import type { VaultEntry } from '../../types'
 import { isMarkdownEntry } from '../../utils/typeDefinitions'
 import type { NoteListContextMenuState } from './NoteListContextMenu'
+import { SETTINGS_MENU_Z_CLASS } from '../../lib/settingsMenuLayer'
 import { getContextMenuPositionStyle } from '../contextMenuPosition'
 
 interface NoteListContextMenuItem {
@@ -360,7 +361,7 @@ export function NoteListContextMenuNode(props: NoteListContextMenuNodeProps) {
   return (
     <div
       ref={ctxMenuRef}
-      className="fixed z-[12000] rounded-md border bg-popover p-1 shadow-md"
+      className={`fixed ${SETTINGS_MENU_Z_CLASS} rounded-md border bg-popover p-1 shadow-md`}
       style={getContextMenuPositionStyle(ctxMenu, { minWidth: 240 })}
       data-testid="note-list-context-menu"
     >

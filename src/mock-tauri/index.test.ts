@@ -54,4 +54,21 @@ describe('mockInvoke production guard', () => {
     vi.stubEnv('PROD', false)
     await expect(mockInvoke('list_vault')).resolves.toBeDefined()
   })
+
+  it('serves rhizome_scan_library through the mock tool handler', async () => {
+    vi.stubEnv('PROD', false)
+    const raw = await mockInvoke<string>('call_rhizome_tool', {
+      name: 'rhizome_scan_library',
+      args: { vaultPath: '/Users/mock/Vault' },
+    })
+    const items = JSON.parse(raw) as Array<{ id: string; type: string }>
+    expect(Array.isArray(items)).toBe(true)
+    expect(items.length).toBeGreaterThan(0)
+    expect(items[0]).toEqual(expect.objectContaining({
+      id: expect.any(String),
+      path: expect.any(String),
+      title: expect.any(String),
+      type: expect.stringMatching(/wiki|source|card/),
+    }))
+  })
 })

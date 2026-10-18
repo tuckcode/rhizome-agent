@@ -13,7 +13,7 @@ import { completeAiModelText } from './completeAiModelText'
 const provider = { id: 'openai', name: 'OpenAI', kind: 'open_ai' as const, models: [] }
 const model = {
   id: 'gpt-4.1',
-  capabilities: { streaming: true, tools: false, vision: false, json_mode: false, reasoning: false },
+  capabilities: { streaming: true, tools: false, vision: false, json_mode: false, reasoning: { state: 'unknown' as const } },
 }
 
 describe('completeAiModelText', () => {

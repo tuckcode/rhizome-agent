@@ -1,6 +1,12 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { AiMessage } from './AiMessage'
+import {
+  APPROVAL_ARIA_LABEL_MAX,
+  COLLAPSED_COMMAND_VISIBLE_CHARS,
+  approvalAriaLabel,
+  escapeApprovalLabel,
+} from '../lib/collapsedApproval'
 import { AI_COMPOSER_INSERT_EVENT } from '../utils/aiPromptBridge'
 
 function selectNodeText(node: HTMLElement) {
@@ -351,7 +357,7 @@ describe('AiMessage', () => {
     expect(screen.queryByTestId('reasoning-content')).toBeNull()
   })
 
-  it('lists each tool call inside collapsed-by-default Reasoning', () => {
+  it('does not show Reasoning for tool calls when there is no reasoning text', () => {
     render(
       <AiMessage
         userMessage="Ask"
@@ -364,15 +370,9 @@ describe('AiMessage', () => {
       />,
     )
 
-    expect(screen.getByTestId('reasoning-toggle')).toBeTruthy()
-    expect(screen.queryByTestId('reasoning-content')).toBeNull()
-    expect(screen.queryByTestId('reasoning-tools')).toBeNull()
-
-    fireEvent.click(screen.getByTestId('reasoning-toggle'))
-    const tools = screen.getAllByTestId('reasoning-tool')
-    expect(tools).toHaveLength(2)
-    expect(tools[0]).toHaveTextContent('ipython')
-    expect(tools[1]).toHaveTextContent('get_note')
+    expect(screen.queryByTestId('reasoning-toggle')).toBeNull()
+    expect(screen.queryByText('ipython')).toBeNull()
+    expect(screen.queryByText('get_note')).toBeNull()
   })
 
   it('expands collapsed reasoning on toggle click', () => {
@@ -491,6 +491,323 @@ describe('AiMessage', () => {
     expect(screen.getAllByTestId('ai-action-card')).toHaveLength(2)
   })
 
+  const APPROVAL_OPTIONS = [
+    { id: 'allow_once', label: 'Allow once' },
+    { id: 'allow_session', label: 'Allow for session' },
+    { id: 'deny', label: 'Deny' },
+  ]
+
+  function pendingApprovalAction(
+    tool: string,
+    extra: Record<string, unknown> = {},
+  ) {
+    return {
+      tool,
+      toolId: `${tool}-1`,
+      label: tool,
+      status: 'pending' as const,
+      approval: {
+        promptId: `${tool}-prompt`,
+        options: APPROVAL_OPTIONS,
+        onReply: vi.fn(),
+        ...extra,
+      },
+    }
+  }
+
+  it('auto-expands a pending bash approval so Allow and Deny stay visible', () => {
+    render(
+      <AiMessage
+        userMessage="Run it"
+        actions={[pendingApprovalAction('bash')]}
+      />,
+    )
+
+    expect(screen.getByTestId('tool-use-toggle')).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: 'Allow once' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Deny' })).toBeVisible()
+    expect(screen.getByTestId('tool-approval-card')).toBeInTheDocument()
+  })
+
+  it('auto-expands pending file edit and write approvals', () => {
+    const { rerender } = render(
+      <AiMessage
+        userMessage="Edit"
+        actions={[pendingApprovalAction('edit_file', { path: 'notes/plan.md', preview: '@@\n-a\n+b' })]}
+      />,
+    )
+    expect(screen.getByTestId('tool-approval-card')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Allow once' })).toBeVisible()
+
+    rerender(
+      <AiMessage
+        userMessage="Write"
+        actions={[pendingApprovalAction('write_file', { path: 'notes/fresh.md', created: true, preview: '--- /dev/null\n+++ notes/fresh.md' })]}
+      />,
+    )
+    expect(screen.getByTestId('tool-approval-card')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Allow once' })).toBeVisible()
+  })
+
+  it('keeps Allow and Deny focusable on the collapsed tool-use row', () => {
+    const raw = '{"command":"ls"}'
+    render(
+      <AiMessage
+        userMessage="Run it"
+        actions={[pendingApprovalAction('bash', { args: raw, callId: 'bash-1' })]}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByTestId('tool-use-toggle')).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('tool-approval-card')).toBeNull()
+
+    const allow = screen.getByRole('button', { name: `Allow once: ${raw}` })
+    const deny = screen.getByRole('button', { name: `Deny: ${raw}` })
+    expect(allow).toBeVisible()
+    expect(deny).toBeVisible()
+    expect(allow).not.toBeDisabled()
+    expect(deny).not.toBeDisabled()
+    allow.focus()
+    expect(allow).toHaveFocus()
+    expect(screen.getByTestId('tool-use-approval-command').textContent).toBe(raw)
+    expect(screen.queryByRole('button', { name: /Allow for session/ })).toBeNull()
+    expect(screen.getByTestId('tool-use-needs-approval')).toHaveTextContent('Needs approval')
+  })
+
+  it('keeps two pending approvals on their own collapsed rows', () => {
+    const allowSafe = vi.fn()
+    const allowEvil = vi.fn()
+    render(
+      <AiMessage
+        userMessage="Run two"
+        actions={[
+          pendingApprovalAction('bash', {
+            args: 'echo SAFE',
+            callId: 'safe',
+            onReply: allowSafe,
+          }),
+          {
+            tool: 'bash',
+            toolId: 'evil-1',
+            label: 'bash',
+            status: 'pending' as const,
+            approval: {
+              promptId: 'evil-prompt',
+              callId: 'evil',
+              args: 'rm -rf ~/EVIL',
+              options: APPROVAL_OPTIONS,
+              onReply: allowEvil,
+            },
+          },
+        ]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    const rows = screen.getAllByTestId('tool-use-approval-row')
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toHaveAttribute('data-call-id', 'safe')
+    expect(rows[1]).toHaveAttribute('data-call-id', 'evil')
+    const groups = screen.getAllByTestId('tool-use-approval-actions')
+    expect(groups[0].className).toContain('w-[15rem]')
+    expect(groups[1].className).toContain('w-[15rem]')
+    expect(groups[0].className).toContain('grid-cols-2')
+    expect(groups[1].className).toContain('grid-cols-2')
+    fireEvent.click(screen.getByRole('button', { name: 'Allow once: echo SAFE' }))
+    expect(allowSafe).toHaveBeenCalledWith('allow_once')
+    expect(allowEvil).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Allow once: rm -rf ~/EVIL' }))
+    expect(allowEvil).toHaveBeenCalledWith('allow_once')
+  })
+
+  it('shows the path on a collapsed edit approval and hides Allow for session', () => {
+    render(
+      <AiMessage
+        userMessage="Edit"
+        actions={[pendingApprovalAction('edit_file', { path: 'notes/plan.md', preview: '@@\n-a\n+b' })]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByTestId('tool-use-approval-command')).toHaveTextContent('Edit notes/plan.md')
+    expect(screen.getByTestId('tool-use-approval-icon')).toHaveAttribute('data-kind', 'edit')
+    expect(screen.getByRole('button', { name: 'Allow once: notes/plan.md' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Deny: notes/plan.md' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: /Allow for session/ })).toBeNull()
+  })
+
+  it('reads a collapsed write row as Write plus the path, with a pencil icon', () => {
+    render(
+      <AiMessage
+        userMessage="Write"
+        actions={[pendingApprovalAction('write_file', { path: 'notes/fresh.md' })]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByTestId('tool-use-approval-command')).toHaveTextContent('Write notes/fresh.md')
+    expect(screen.getByTestId('tool-use-approval-icon')).toHaveAttribute('data-kind', 'write')
+  })
+
+  it('reads a new write_file as Create plus the path', () => {
+    render(
+      <AiMessage
+        userMessage="Write"
+        actions={[pendingApprovalAction('write_file', { path: 'notes/fresh.md', created: true })]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByTestId('tool-use-approval-command')).toHaveTextContent('Create notes/fresh.md')
+    expect(screen.getByTestId('tool-use-approval-icon')).toHaveAttribute('data-kind', 'create')
+  })
+
+  it('badges hidden characters in a collapsed edit path instead of reordering it', () => {
+    const path = 'notes/invoice\u202Edm.exe'
+    render(
+      <AiMessage
+        userMessage="Edit"
+        actions={[pendingApprovalAction('edit_file', { path, preview: '@@\n-a\n+b' })]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByTestId('tool-use-approval-command')).toHaveTextContent(/Edit/)
+    expect(screen.getByTestId('command-hidden')).toHaveTextContent('\\u{202E}')
+    expect(screen.getByTestId('tool-use-approval-command').textContent).toContain('invoice')
+    expect(screen.getByTestId('tool-use-approval-command').textContent).toContain('dm.exe')
+    expect(screen.getByTestId('approval-review')).toHaveAttribute(
+      'aria-label',
+      'Review: notes/invoice\\u{202E}dm.exe',
+    )
+  })
+
+  it('keeps the filename on a long collapsed edit path', () => {
+    const path = 'very/deep/nested/directory/structure/notes/plan.md'
+    render(
+      <AiMessage
+        userMessage="Edit"
+        actions={[pendingApprovalAction('edit_file', { path, preview: '@@\n-a\n+b' })]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    const command = screen.getByTestId('tool-use-approval-command')
+    expect(command).toHaveTextContent(/Edit/)
+    expect(command).toHaveTextContent('plan.md')
+    expect(command).toHaveTextContent('…/')
+    expect(command).toHaveAttribute('title', path)
+    expect(screen.getByTestId('approval-review')).toHaveAttribute(
+      'aria-label',
+      approvalAriaLabel('Review', path),
+    )
+  })
+
+  it('offers Review instead of Allow when a collapsed command overflows', () => {
+    const command = `echo ${'A'.repeat(COLLAPSED_COMMAND_VISIBLE_CHARS)}`
+    render(
+      <AiMessage
+        userMessage="Run it"
+        actions={[pendingApprovalAction('bash', { args: command, callId: 'long' })]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByRole('button', { name: `Review: ${command}` })).toBeVisible()
+    const tag = screen.getByTestId('approval-overflow-tag')
+    expect(tag).toHaveTextContent('Long command')
+    expect(tag.className).toMatch(/me-2/)
+    expect(screen.queryByRole('button', { name: `Allow once: ${command}` })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: `Review: ${command}` }))
+    expect(screen.getByTestId('tool-use-toggle')).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByTestId('tool-approval-card')).toBeInTheDocument()
+  })
+
+  it('offers Review and Deny when a collapsed bash approval has nothing to display', () => {
+    render(
+      <AiMessage
+        userMessage="Run it"
+        actions={[pendingApprovalAction('bash', { args: '', callId: 'empty' })]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByRole('button', { name: 'Review' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Deny' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: /^Allow once/ })).toBeNull()
+    expect(screen.getByTestId('tool-use-approval-command')).toHaveTextContent('Empty command')
+  })
+
+  it('offers Review and Deny for whitespace-only bash args', () => {
+    render(
+      <AiMessage
+        userMessage="Run it"
+        actions={[pendingApprovalAction('bash', { args: '   ', callId: 'spaces' })]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByTestId('tool-use-approval-command')).toHaveTextContent('Empty command')
+    expect(screen.getByRole('button', { name: 'Review' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: /^Allow once/ })).toBeNull()
+  })
+
+  it('offers Review and Deny when a collapsed file approval has no path', () => {
+    render(
+      <AiMessage
+        userMessage="Edit"
+        actions={[pendingApprovalAction('edit_file')]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByRole('button', { name: 'Review' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Deny' })).toBeVisible()
+    expect(screen.queryByRole('button', { name: /^Allow once/ })).toBeNull()
+  })
+
+  it('escapes hidden characters in collapsed approval labels and caps them', () => {
+    const hidden = 'echo \u202Esecret'
+    render(
+      <AiMessage
+        userMessage="Run it"
+        actions={[pendingApprovalAction('bash', { args: hidden, callId: 'hidden' })]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    const review = screen.getByTestId('approval-review')
+    expect(review).toHaveAttribute('aria-label', 'Review: echo \\u{202E}secret')
+    expect(review.getAttribute('aria-label')).not.toContain('\u202E')
+    expect(screen.getByTestId('approval-deny')).toHaveAttribute(
+      'aria-label',
+      'Deny: echo \\u{202E}secret',
+    )
+  })
+
+  it('caps a long escaped approval label at 80 graphemes', () => {
+    const command = `echo ${'A'.repeat(120)}`
+    render(
+      <AiMessage
+        userMessage="Run it"
+        actions={[pendingApprovalAction('bash', { args: command, callId: 'cap' })]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    const label = screen.getByTestId('approval-review').getAttribute('aria-label') ?? ''
+    expect(label).toBe(approvalAriaLabel('Review', command))
+    expect(label.endsWith('…')).toBe(true)
+    expect(escapeApprovalLabel(command).endsWith('…')).toBe(true)
+    expect([...escapeApprovalLabel(command)].length).toBe(APPROVAL_ARIA_LABEL_MAX + 1)
+    expect(label).not.toMatch(/[\n\u202E]/u)
+  })
+
+  it('offers Review when a collapsed command contains a newline', () => {
+    const command = 'ls\nrm -rf ~'
+    render(
+      <AiMessage
+        userMessage="Run it"
+        actions={[pendingApprovalAction('bash', { args: command, callId: 'nl' })]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByRole('button', { name: 'Review: ls⏎rm -rf ~' })).toBeVisible()
+    expect(screen.getByTestId('approval-overflow-tag')).toHaveTextContent('Multiple lines')
+    expect(screen.queryByRole('button', { name: /^Allow once/ })).toBeNull()
+    const label = screen.getByTestId('approval-review').getAttribute('aria-label') ?? ''
+    expect(label).not.toContain('\n')
+  })
+
   it('groups five identical tool names into one counted row', () => {
     render(
       <AiMessage
@@ -507,6 +824,264 @@ describe('AiMessage', () => {
     expect(screen.getByTestId('tool-use-count').textContent).toBe('5')
     expect(screen.getAllByTestId('ai-action-card')).toHaveLength(1)
     expect(screen.getByText('ipython ×5')).toBeTruthy()
+  })
+
+  it('shows the Run command card and bash result row', () => {
+    const { rerender } = render(
+      <AiMessage
+        userMessage="list files"
+        actions={[{
+          tool: 'bash',
+          toolId: 't1',
+          label: 'ls',
+          status: 'pending',
+          input: '{"command":"wrong","timeout_secs":30}',
+          approval: {
+            promptId: 'p1',
+            callId: 't1',
+            args: 'ls',
+            options: [
+              { id: 'allow_once', label: 'Allow once' },
+              { id: 'allow_session', label: 'Allow for session' },
+              { id: 'deny', label: 'Deny' },
+            ],
+          },
+        }]}
+      />,
+    )
+    expect(screen.getByText('Run command')).toBeTruthy()
+    expect(screen.getByTestId('approval-command')).toHaveTextContent('ls')
+    expect(screen.getByTestId('approval-timeout')).toHaveTextContent('Stops after 30 seconds.')
+    expect(screen.queryByRole('button', { name: 'Allow for session' })).toBeNull()
+
+    rerender(
+      <AiMessage
+        userMessage="list files"
+        actions={[{
+          tool: 'bash',
+          toolId: 't1',
+          label: 'ls',
+          status: 'done',
+          input: '{"command":"ls"}',
+          output: JSON.stringify({
+            kind: 'bash_result',
+            exit_code: 0,
+            timed_out: false,
+            stopped: false,
+            stdout: 'notes\n',
+            stderr: '',
+            stdout_truncated: false,
+            stderr_truncated: false,
+          }),
+        }]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByTestId('bash-result-card')).toBeTruthy()
+    expect(screen.getByTestId('bash-result-exit')).toHaveTextContent('exit 0')
+    expect(screen.queryByTestId('tool-approval-card')).toBeNull()
+  })
+
+  it('shows a raw ApprovalRequested command with surrounding whitespace and copies it exactly', () => {
+    writeClipboardText.mockResolvedValue(undefined)
+    render(
+      <AiMessage
+        userMessage="list files"
+        actions={[{
+          tool: 'bash',
+          toolId: 't1',
+          label: 'ls',
+          status: 'pending',
+          input: '{"command":"  ls notes  ","timeout_secs":30}',
+          approval: {
+            promptId: 'p1',
+            callId: 't1',
+            args: '  ls notes  ',
+            options: [
+              { id: 'allow_once', label: 'Allow once' },
+              { id: 'deny', label: 'Deny' },
+            ],
+          },
+        }]}
+      />,
+    )
+    expect(screen.getByTestId('approval-command').textContent).toBe('  ls notes  ')
+    fireEvent.click(screen.getByRole('button', { name: 'Copy command' }))
+    expect(writeClipboardText).toHaveBeenCalledWith('  ls notes  ')
+  })
+
+  it('shows JSON-looking approval args literally when call_id is present', () => {
+    writeClipboardText.mockResolvedValue(undefined)
+    const raw = '{"command":"ls"}'
+    render(
+      <AiMessage
+        userMessage="list files"
+        actions={[{
+          tool: 'bash',
+          toolId: 't1',
+          label: 'ls',
+          status: 'pending',
+          input: '{"command":"echo hi"}',
+          approval: {
+            promptId: 'p1',
+            callId: 't1',
+            args: raw,
+            options: [{ id: 'allow_once', label: 'Allow once' }, { id: 'deny', label: 'Deny' }],
+          },
+        }]}
+      />,
+    )
+    expect(screen.getByTestId('approval-command').textContent).toBe(raw)
+    fireEvent.click(screen.getByRole('button', { name: 'Copy command' }))
+    expect(writeClipboardText).toHaveBeenCalledWith(raw)
+  })
+
+  it('shows the full pwned command instead of the inner echo hi', () => {
+    writeClipboardText.mockResolvedValue(undefined)
+    const raw = '{"command":"echo hi","x":"$(touch /tmp/pwned)"}'
+    render(
+      <AiMessage
+        userMessage="run"
+        actions={[{
+          tool: 'bash',
+          toolId: 'call_1',
+          label: 'bash',
+          status: 'pending',
+          input: raw,
+          command: raw,
+          approval: {
+            promptId: 'p1',
+            callId: 'call_1',
+            args: raw,
+            options: [{ id: 'allow_once', label: 'Allow once' }, { id: 'deny', label: 'Deny' }],
+          },
+        }]}
+      />,
+    )
+    expect(screen.getByTestId('approval-command').textContent).toBe(raw)
+    expect(screen.getByTestId('approval-command').textContent).toContain('pwned')
+    fireEvent.click(screen.getByRole('button', { name: 'Copy command' }))
+    expect(writeClipboardText).toHaveBeenCalledWith(raw)
+  })
+
+  it('shows driver.rs:669 shown_args unchanged through VisibleCommand', () => {
+    writeClipboardText.mockResolvedValue(undefined)
+    // Exact `shown_args = command` payload from driver.rs:664-669.
+    const shownArgs = [
+      '{"command":"echo hi","x":"$(touch /tmp/pwned)"}',
+      '{"command":"echo safe","command":"rm -rf ~"}',
+      'echo \u202Esecret',
+    ]
+    for (const raw of shownArgs) {
+      const { unmount } = render(
+        <AiMessage
+          userMessage="run"
+          actions={[{
+            tool: 'bash',
+            toolId: 'call_1',
+            label: 'bash',
+            status: 'pending',
+            input: '{"command":"ls"}',
+            command: raw,
+            approval: {
+              promptId: 'p1',
+              callId: 'call_1',
+              args: raw,
+              options: [{ id: 'allow_once', label: 'Allow once' }, { id: 'deny', label: 'Deny' }],
+            },
+          }]}
+        />,
+      )
+      const card = screen.getByTestId('approval-command')
+      if (raw.includes('\u202E')) {
+        expect(card).toHaveTextContent('echo')
+        expect(card).toHaveTextContent('\\u{202E}')
+        expect(card).toHaveTextContent('secret')
+        expect(screen.getByTestId('command-hidden')).toHaveTextContent('\\u{202E}')
+      } else {
+        expect(card.textContent).toBe(raw)
+      }
+      fireEvent.click(screen.getByRole('button', { name: 'Copy command' }))
+      expect(writeClipboardText).toHaveBeenCalledWith(raw)
+      writeClipboardText.mockClear()
+      unmount()
+    }
+  })
+
+  it('reads the result command from JSON tool-call input without trimming', () => {
+    render(
+      <AiMessage
+        userMessage="list files"
+        actions={[{
+          tool: 'bash',
+          toolId: 't1',
+          label: 'ls',
+          status: 'done',
+          input: '{"command":"  ls notes  "}',
+          output: JSON.stringify({
+            kind: 'bash_result',
+            exit_code: 0,
+            timed_out: false,
+            stopped: false,
+            stdout: 'notes\n',
+            stderr: '',
+            stdout_truncated: false,
+            stderr_truncated: false,
+          }),
+        }]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByTestId('bash-result-summary').textContent).toContain('ls notes')
+  })
+
+  it('keeps two consecutive bash calls as separate cards', () => {
+    render(
+      <AiMessage
+        userMessage="run two"
+        actions={[
+          {
+            tool: 'bash',
+            toolId: 't1',
+            label: 'ls',
+            status: 'done',
+            input: '{"command":"ls"}',
+            output: JSON.stringify({
+              kind: 'bash_result',
+              exit_code: 0,
+              timed_out: false,
+              stopped: false,
+              stdout: 'a\n',
+              stderr: '',
+              stdout_truncated: false,
+              stderr_truncated: false,
+            }),
+          },
+          {
+            tool: 'bash',
+            toolId: 't2',
+            label: 'pwd',
+            status: 'done',
+            input: '{"command":"pwd"}',
+            output: JSON.stringify({
+              kind: 'bash_result',
+              exit_code: 0,
+              timed_out: false,
+              stopped: false,
+              stdout: '/vault\n',
+              stderr: '',
+              stdout_truncated: false,
+              stderr_truncated: false,
+            }),
+          },
+        ]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getAllByTestId('bash-result-card')).toHaveLength(2)
+    const summaries = screen.getAllByTestId('bash-result-summary')
+    expect(summaries[0]).toHaveTextContent('ls')
+    expect(summaries[1]).toHaveTextContent('pwd')
   })
 
   it('passes onOpenNote to action cards', () => {

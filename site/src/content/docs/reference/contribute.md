@@ -25,4 +25,4 @@ Small, focused pull requests are welcome. Read [CONTRIBUTING.md](https://github.
 
 ## Origins
 
-Rhizome is a modified version of [Tolaria](https://github.com/refactoringhq/tolaria) by Luca Rossi. See [Credits and licences](credits.md).
+See [Credits and licences](credits.md).

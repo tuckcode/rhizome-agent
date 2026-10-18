@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { callHost } from '../lib/callHost'
 
 export interface RhizomeJob {
   id: string
@@ -172,7 +172,7 @@ export function useRhizomeJobs(): UseRhizomeJobsReturn {
           return
         }
 
-        invoke('start_rhizome_job', { jobId, name, args }).catch((err: unknown) => {
+        callHost('start_rhizome_job', { jobId, name, args }).catch((err: unknown) => {
           const resolve = completersRef.current.get(jobId)
           if (resolve) {
             resolve({ status: 'error', error: String(err) })
@@ -188,7 +188,7 @@ export function useRhizomeJobs(): UseRhizomeJobsReturn {
 
   const cancelJob = useCallback(
     (jobId: string) => {
-      invoke<boolean>('cancel_rhizome_job', { jobId }).catch(() => {
+      callHost<boolean>('cancel_rhizome_job', { jobId }).catch(() => {
         // Best-effort
       })
       const resolve = completersRef.current.get(jobId)

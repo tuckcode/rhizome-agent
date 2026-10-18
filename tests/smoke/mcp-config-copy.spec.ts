@@ -15,13 +15,14 @@ test.describe('MCP config copy', () => {
 
     await sendShortcut(page, ',', ['Control'])
     await expect(page.getByTestId('settings-panel')).toBeVisible({ timeout: 3_000 })
+    await page.getByTestId('settings-advanced-prime-engine-toggle').click()
     await page.getByTestId('settings-copy-mcp-config').click()
 
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain('"mcpServers"')
     const copiedConfig = await page.evaluate(() => navigator.clipboard.readText())
     const parsedConfig = JSON.parse(copiedConfig) as {
       mcpServers: {
-        tolaria: {
+        rhizome: {
           args: string[]
           command: string
           env: Record<string, string>
@@ -29,12 +30,12 @@ test.describe('MCP config copy', () => {
         }
       }
     }
-    const tolariaServer = parsedConfig.mcpServers.tolaria
+    const rhizomeServer = parsedConfig.mcpServers.rhizome
 
-    expect(tolariaServer.type).toBe('stdio')
-    expect(tolariaServer.command).toBe('node')
-    expect(tolariaServer.args[0]).toContain('mcp-server/index.js')
-    expect(tolariaServer.env.VAULT_PATH).toBeUndefined()
-    expect(tolariaServer.env.WS_UI_PORT).toBe('9711')
+    expect(rhizomeServer.type).toBe('stdio')
+    expect(rhizomeServer.command).toBe('node')
+    expect(rhizomeServer.args[0]).toContain('mcp-server/index.js')
+    expect(rhizomeServer.env.VAULT_PATH).toBeUndefined()
+    expect(rhizomeServer.env.WS_UI_PORT).toBe('9711')
   })
 })

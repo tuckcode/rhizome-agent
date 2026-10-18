@@ -12,7 +12,7 @@ describe('NoteList status indicators', () => {
     const indicators = screen.getAllByTestId('modified-indicator')
     expect(indicators).toHaveLength(1)
     const noteRow = indicators[0].closest('[data-testid="modified-indicator"]')!.parentElement!.parentElement!
-    expect(noteRow.textContent).toContain('Build Laputa App')
+    expect(noteRow.textContent).toContain('Build Rhizome App')
   })
 
   it('does not show indicators when everything is clean', () => {
@@ -178,7 +178,7 @@ describe('NoteList multi-select', () => {
 
   function selectTwoNotes(extraProps: Record<string, unknown> = {}) {
     renderNoteList(extraProps)
-    fireEvent.click(screen.getByText('Build Laputa App'))
+    fireEvent.click(screen.getByText('Build Rhizome App'))
     fireEvent.click(screen.getByText('Facebook Ads Strategy'), { shiftKey: true })
   }
 
@@ -189,7 +189,7 @@ describe('NoteList multi-select', () => {
 
   it('clears multi-select and opens the note on regular click', () => {
     const { onReplaceActiveTab } = renderNoteList()
-    fireEvent.click(screen.getByText('Build Laputa App'))
+    fireEvent.click(screen.getByText('Build Rhizome App'))
     fireEvent.click(screen.getByText('Facebook Ads Strategy'), { shiftKey: true })
     fireEvent.click(screen.getByText('Matteo Cellini'))
 
@@ -199,7 +199,7 @@ describe('NoteList multi-select', () => {
 
   it('clears multi-select and enters Neighborhood on Cmd+Click', async () => {
     const { onEnterNeighborhood, onReplaceActiveTab } = renderNoteList()
-    fireEvent.click(screen.getByText('Build Laputa App'))
+    fireEvent.click(screen.getByText('Build Rhizome App'))
     fireEvent.click(screen.getByText('Facebook Ads Strategy'), { shiftKey: true })
     fireEvent.click(screen.getByText('Matteo Cellini'), { metaKey: true })
 

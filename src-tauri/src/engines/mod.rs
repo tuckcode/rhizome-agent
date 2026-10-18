@@ -47,6 +47,21 @@ pub enum EngineEvent {
         tool: String,
         args: String,
         options: Vec<ApprovalOption>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        path: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        preview: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        created: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        overwrite: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        notes: Option<Vec<String>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        capped: Option<bool>,
+        /// Tool-call id for this approval. The chat card still matches a
+        /// pending action by tool name; a later card can match on this id.
+        call_id: String,
     },
     ApprovalDismissed {
         prompt_id: String,
@@ -61,6 +76,15 @@ pub enum EngineEvent {
         /// False for log-save failures and the 100 MiB rollover notice.
         /// True when the turn cannot continue (no key, provider down, ensure_log).
         fatal: bool,
+    },
+    /// A saved reasoning level was not sent as-is. `code` is `downgraded`
+    /// or `unsupported`. The UI maps the code; this event has no copy.
+    ReasoningLevelNotice {
+        code: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        from: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        to: Option<String>,
     },
 }
 
@@ -101,7 +125,8 @@ mod tests {
     use crate::model_events::{FinishReason, ModelErrorKind, ModelEvent};
     use crate::prime_session_host::QuitDisposition;
     use crate::rhizome_loop::{
-        AgentLoop, ApprovalReply, DurableEvent, FakeModel, Model, ModelView, ScriptPart,
+        command_from_args, AgentLoop, ApprovalReply, DurableEvent, FakeModel, Model, ModelView,
+        ScriptPart,
     };
     use crate::rhizome_routing::ProviderAttempt;
     use std::sync::mpsc;
@@ -413,6 +438,182 @@ mod tests {
             .collect();
         assert_eq!(ids, vec!["allow_once", "deny"]);
         assert!(!ids.contains(&"allow_session"));
+    }
+
+    #[test]
+    fn native_engine_write_file_prompt_includes_a_diff() {
+        let vault = tempfile::tempdir().unwrap();
+        let (tx, rx) = mpsc::channel();
+        let mut engine = NativeEngine::from_parts(
+            AgentLoop::new(),
+            FakeModel::script(vec![
+                vec![ScriptPart::Tool {
+                    name: "write_file".into(),
+                    args: serde_json::json!({
+                        "path": "fresh.md",
+                        "content": "hello\n",
+                    })
+                    .to_string(),
+                }],
+                vec![ScriptPart::Text("done".into())],
+            ]),
+        );
+        engine.set_vault(
+            Some(vault.path().to_string_lossy().into_owned()),
+            Vec::new(),
+        );
+        let control = engine.control();
+        let (done_tx, done_rx) = mpsc::channel();
+        thread::spawn(move || {
+            engine
+                .start(
+                    "write",
+                    Box::new(move |event| {
+                        let _ = tx.send(event);
+                    }),
+                )
+                .ok();
+            let _ = done_tx.send(());
+        });
+        let started = std::time::Instant::now();
+        let mut preview = None;
+        let mut prompt_id = String::new();
+        let mut option_ids = Vec::new();
+        while started.elapsed() < Duration::from_secs(2) {
+            match rx.recv_timeout(Duration::from_millis(50)) {
+                Ok(EngineEvent::ApprovalRequested {
+                    prompt_id: id,
+                    options,
+                    preview: card,
+                    path,
+                    created,
+                    overwrite,
+                    ..
+                }) => {
+                    prompt_id = id;
+                    preview = card;
+                    option_ids = options.iter().map(|option| option.id.clone()).collect();
+                    assert_eq!(path.as_deref(), Some("fresh.md"));
+                    assert_eq!(created, Some(true));
+                    assert_eq!(overwrite, Some(false));
+                    break;
+                }
+                Ok(_) => {}
+                Err(_) => {}
+            }
+        }
+        assert_eq!(option_ids, vec!["allow_once", "allow_session", "deny"]);
+        let diff = preview.expect("write_file approval must carry a diff");
+        assert!(diff.contains("--- /dev/null"), "{diff}");
+        assert!(diff.contains("+hello"), "{diff}");
+        assert!(!vault.path().join("fresh.md").exists());
+        control.reply_approval(&prompt_id, ApprovalReply::Deny);
+        done_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("turn finishes");
+        assert!(!vault.path().join("fresh.md").exists());
+    }
+
+    #[test]
+    fn native_engine_bash_approval_shows_the_literal_command() {
+        let vault = tempfile::tempdir().unwrap();
+        let command = "printf '%s' \"a\\b\\\"c\"";
+        let raw = serde_json::json!({ "command": command }).to_string();
+        let expected = command_from_args(&raw).expect("command");
+        assert_ne!(expected, raw);
+        let (tx, rx) = mpsc::channel();
+        let mut engine = NativeEngine::from_parts(
+            AgentLoop::new(),
+            FakeModel::script(vec![vec![ScriptPart::Tool {
+                name: "bash".into(),
+                args: raw,
+            }]]),
+        );
+        engine.set_permission_mode(AiAgentPermissionMode::PowerUser);
+        engine.set_vault(
+            Some(vault.path().to_string_lossy().into_owned()),
+            Vec::new(),
+        );
+        let control = engine.control();
+        let (done_tx, done_rx) = mpsc::channel();
+        thread::spawn(move || {
+            engine
+                .start(
+                    "run",
+                    Box::new(move |event| {
+                        let _ = tx.send(event);
+                    }),
+                )
+                .ok();
+            let _ = done_tx.send(());
+        });
+        let started = std::time::Instant::now();
+        let mut shown = None;
+        let mut prompt_id = String::new();
+        while started.elapsed() < Duration::from_secs(2) {
+            match rx.recv_timeout(Duration::from_millis(50)) {
+                Ok(EngineEvent::ApprovalRequested {
+                    prompt_id: id,
+                    tool,
+                    args,
+                    ..
+                }) => {
+                    assert_eq!(tool, "bash");
+                    prompt_id = id;
+                    shown = Some(args);
+                    break;
+                }
+                Ok(_) => {}
+                Err(_) => {}
+            }
+        }
+        assert_eq!(shown.as_deref(), Some(expected.as_str()));
+        control.reply_approval(&prompt_id, ApprovalReply::Deny);
+        done_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("turn finishes");
+    }
+
+    #[test]
+    fn native_engine_refuses_a_mutate_call_when_preview_fails() {
+        let vault = tempfile::tempdir().unwrap();
+        std::fs::write(vault.path().join("note.md"), "only this\n").unwrap();
+        let mut engine = NativeEngine::from_parts(
+            AgentLoop::new(),
+            FakeModel::script(vec![vec![ScriptPart::Tool {
+                name: "edit_file".into(),
+                args: serde_json::json!({
+                    "path": "note.md",
+                    "old_string": "missing",
+                    "new_string": "x",
+                })
+                .to_string(),
+            }]]),
+        );
+        engine.set_vault(
+            Some(vault.path().to_string_lossy().into_owned()),
+            Vec::new(),
+        );
+        let (tx, rx) = mpsc::channel();
+        engine
+            .start(
+                "edit",
+                Box::new(move |event| {
+                    let _ = tx.send(event);
+                }),
+            )
+            .ok();
+        let events: Vec<_> = std::iter::from_fn(|| rx.try_recv().ok()).collect();
+        assert!(
+            !events
+                .iter()
+                .any(|event| matches!(event, EngineEvent::ApprovalRequested { .. })),
+            "a failed preview must not show Allow: {events:?}"
+        );
+        assert_eq!(
+            std::fs::read_to_string(vault.path().join("note.md")).unwrap(),
+            "only this\n"
+        );
     }
 
     #[test]

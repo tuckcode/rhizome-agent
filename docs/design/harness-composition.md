@@ -11,7 +11,7 @@ plan those docs said they were not: what we intend to take, where it lives,
 and which pairs must not ship together.
 
 **Audience:** anyone about to add a Prime, Hermes, DeepSeek, or OpenCode idea
-to Rhizome Agent.
+to Rhizome.
 
 Pickup index: [`docs/NEXT.md`](../NEXT.md) §1.
 

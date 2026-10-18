@@ -1,5 +1,5 @@
-import { memo, useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { ImageSquare, PaperPlaneRight, Plugs, Plus, Sparkle, Stop, X } from '@phosphor-icons/react'
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { ImageSquare, PaperPlaneRight, Plugs, Plus, Sparkle, Stop, Warning, X } from '@phosphor-icons/react'
 import { AiMessage } from './AiMessage'
 import { Button } from '@/components/ui/button'
 import {
@@ -32,9 +32,12 @@ import type { CommandMenuAction, CommandMenuEntry } from '../lib/primeCommandMen
 import { primeQueueIsEmpty, primeQueueItems, type PrimeQueue } from '../lib/primeQueue'
 import { PrimeQueueItemActions } from './PrimeQueueItemActions'
 import { cn } from '@/lib/utils'
+import { composerIsMultiline } from '../lib/composerMultiline'
 import { requestMcpSetupToggle } from '../hooks/useMcpSetupDialogController'
 import { expandReplyQuotes } from '../lib/replyQuote'
+import { allowPredictedCompletion } from '../lib/consequentialAsk'
 import { suggestReply } from '../lib/replySuggestions'
+import type { AiTargetKind } from '../lib/aiTargets'
 import { latestAssistantMessageIndex } from '../lib/latestAssistantMessage'
 import { useDragRegion } from '../hooks/useDragRegion'
 import { useComposerPromptHistory } from '../hooks/useComposerPromptHistory'
@@ -48,6 +51,7 @@ import { workerStartFailureReason } from '../lib/primeWorkerStartError'
 import { afterPaint } from '../lib/sessionTranscriptHit'
 import { useScrollToTranscriptHit } from '../hooks/useScrollToTranscriptHit'
 import { ChatRunLiveStatus } from './ChatRunLiveStatus'
+import { prefillAiComposer } from '../utils/aiPromptBridge'
 
 interface AiPanelHeaderProps {
   agentLabel: string
@@ -128,6 +132,15 @@ interface AiPanelComposerProps {
   onCommandAction?: (action: CommandMenuAction, nextValue: string) => void
   /** The last agent message in the conversation, used to compute reply suggestions. */
   lastAgentMessage?: string | null
+  /**
+   * Chat target kind. Omitted when the panel has no resolved target, and
+   * then no predicted completion is shown.
+   */
+  targetKind?: AiTargetKind
+  /** Agent id when the target is a CLI or the native stream. */
+  agentId?: string | null
+  /** Only Safe mode may show a predicted completion. */
+  permissionMode?: AiAgentPermissionMode
   /** Open this chat in Mycelium. Absent until the session has a path. */
   sessionPath?: string | null
   onOpenMycelium?: (sessionPath: string) => void
@@ -136,6 +149,15 @@ interface AiPanelComposerProps {
   onPickSkill?: (slash: string) => void
   onOpenGoal?: () => void
   onOpenSchedule?: () => void
+  /** Catalog vision for the selected model. Unknown asks before sending. */
+  vision?: 'yes' | 'no' | 'unknown' | 'pending'
+  modelLabel?: string
+  /** Remembered "Send anyway" for this model. */
+  visionSendAnyway?: boolean
+  onVisionSendAnyway?: () => void
+  onVisionUndo?: () => void
+  /** Size, type, or count rejection, shown with the chips. */
+  attachmentNotice?: string | null
 }
 
 function getComposerPlaceholder(
@@ -179,7 +201,6 @@ function composerStopButtonStyle(): CSSProperties {
 function ComposerInput({
   disabled,
   entries,
-  hasControls,
   input,
   inputRef,
   onChange,
@@ -200,7 +221,6 @@ function ComposerInput({
 }: {
   disabled: boolean
   entries: VaultEntry[]
-  hasControls: boolean
   input: string
   inputRef: React.RefObject<HTMLDivElement | null>
   onChange: (value: string) => void
@@ -239,16 +259,10 @@ function ComposerInput({
       unsupportedPasteMessage={unsupportedPasteMessage}
       disabled={disabled}
       placeholder={shownPlaceholder}
-      placeholderClassName={
-        completion
-          ? cn(
-              hasControls ? 'flex items-center px-1 text-[13px] leading-5' : 'flex items-center px-[10px] py-[8px] text-[13px]',
-              'italic',
-            )
-          : hasControls
-            ? 'flex items-center px-1 text-[13px] leading-5'
-            : undefined
-      }
+      placeholderClassName={cn(
+        'flex items-center p-1 text-[13px] leading-5',
+        completion && 'italic',
+      )}
       placeholderTestId={completion ? 'composer-reply-completion' : undefined}
       onAcceptCompletion={onAcceptCompletion}
       onDismissCompletion={onDismissCompletion}
@@ -259,10 +273,7 @@ function ComposerInput({
       commandInstantLabel={commandInstantLabel}
       onCommandAction={onCommandAction}
       onBrowsePromptHistory={onBrowsePromptHistory}
-      editorClassName={cn(
-        'max-h-[120px] overflow-y-auto overscroll-contain',
-        hasControls && 'min-h-0 border-0 px-1 py-1 leading-5',
-      )}
+      editorClassName="max-h-[120px] min-h-[30px] overflow-y-auto overscroll-contain border-0 px-1 py-1 leading-5"
       editorStyle={{ maxHeight: 120, overflowY: 'auto', overscrollBehavior: 'contain' }}
     />
   )
@@ -510,6 +521,12 @@ function AiPanelTranscriptNotice({
   )
 }
 
+const EMPTY_CHAT_STARTERS = [
+  { label: 'Explain this repo', prompt: 'Explain this repo' },
+  { label: 'Find and fix a bug', prompt: 'Find and fix a bug' },
+  { label: 'Write tests for a file', prompt: 'Write tests for a file' },
+] as const
+
 function AiPanelEmptyState({
   agentLabel,
   agentReadiness,
@@ -521,7 +538,7 @@ function AiPanelEmptyState({
   if (agentReadiness === 'checking') {
     return (
       <div
-        className="flex min-h-full flex-col items-center justify-center text-center text-muted-foreground"
+        className="flex min-h-full flex-1 flex-col items-center justify-center text-center text-muted-foreground"
       >
         <p style={{ fontSize: 13, margin: '0 0 4px' }}>
           {t('ai.panel.empty.checkingTitle')}
@@ -536,13 +553,13 @@ function AiPanelEmptyState({
   if (agentReadiness === 'missing') {
     return (
       <div
-        className="flex min-h-full flex-col items-center justify-center text-center text-muted-foreground"
+        className="flex min-h-full flex-1 flex-col items-center justify-center text-center text-muted-foreground"
       >
         <p style={{ fontSize: 13, margin: '0 0 4px' }}>
           {t('ai.panel.empty.missingTitle', { agent: agentLabel })}
         </p>
         <p style={{ fontSize: 11, margin: 0, opacity: 0.6 }}>
-          {t('ai.panel.empty.missingDescription')}
+          {t('ai.panel.empty.missingDescription', { agent: agentLabel })}
         </p>
       </div>
     )
@@ -550,20 +567,31 @@ function AiPanelEmptyState({
 
   return (
     <div
-      className="flex min-h-full flex-col items-center justify-center text-center text-muted-foreground"
+      className="flex min-h-full flex-1 flex-col items-center justify-center px-6 text-center"
+      data-testid="ai-panel-empty-state"
     >
-      <p style={{ fontSize: 13, margin: '0 0 4px' }}>
+      <h2 className="font-sans text-xl font-medium text-foreground">
+        Ask Rhizome
+      </h2>
+      <p className="mt-2 max-w-lg text-[13px] leading-5 text-muted-foreground">
         {hasContext
-          ? t('ai.panel.empty.withContextTitle', { agent: agentLabel })
-          : t('ai.panel.empty.noContextTitle', { agent: agentLabel })
-        }
+          ? 'Rhizome can work from the open note, or from the rest of this repo.'
+          : 'Rhizome can research this repo, edit files, and run commands here.'}
       </p>
-      <p style={{ fontSize: 11, margin: 0 }}>
-        {hasContext
-          ? t('ai.panel.empty.withContextDescription')
-          : t('ai.panel.empty.noContextDescription')
-        }
-      </p>
+      <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+        {EMPTY_CHAT_STARTERS.map((starter) => (
+          <Button
+            key={starter.label}
+            type="button"
+            size="sm"
+            variant="outline"
+            data-testid="chat-empty-starter"
+            onClick={() => prefillAiComposer(starter.prompt)}
+          >
+            {starter.label}
+          </Button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -783,7 +811,7 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
     // nothing however tall the transcript gets.
     <div
       ref={containerRef}
-      className="chat-transcript min-h-0 flex-1 overflow-y-auto"
+      className="chat-transcript flex min-h-0 flex-1 flex-col overflow-y-auto"
       style={{ padding: 12 }}
       onScroll={updateScrollState}
       onMouseDown={onDragRegionMouseDown}
@@ -793,8 +821,9 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
         role="log"
         aria-live="off"
         aria-relevant="additions"
+        className="flex min-h-0 flex-1 flex-col"
       >
-        <div className="chat-column">
+        <div className="chat-column flex min-h-full flex-col">
           {messages.length === 0 && transcriptPane(transcriptState, isActive) === 'loading' && (
             <AiPanelTranscriptNotice
               testId="ai-panel-transcript-loading"
@@ -1009,21 +1038,39 @@ export function AiPanelComposer({
   commandInstantLabel,
   onCommandAction,
   lastAgentMessage,
+  targetKind,
+  agentId,
+  permissionMode,
   skillsLabel,
   skills,
   onPickSkill,
   onOpenGoal,
   onOpenSchedule,
+  vision = 'yes',
+  modelLabel = 'This model',
+  visionSendAnyway = false,
+  onVisionSendAnyway,
+  onVisionUndo,
+  attachmentNotice = null,
 }: AiPanelComposerProps) {
   const t = createTranslator(locale)
   const { recordSent, browse } = useComposerPromptHistory(onChange)
   const [dismissedCompletionFor, setDismissedCompletionFor] = useState<string | null>(null)
   const replySuggestion = !isActive && lastAgentMessage ? suggestReply(lastAgentMessage) : null
+  const offeredCompletion = replySuggestion?.kind === 'completion' ? replySuggestion.text : null
+  // External CLIs and Power User get no predicted completion. Native stream
+  // and an API model may, and only in Safe mode. A missing target does not.
   const completionText =
-    replySuggestion?.kind === 'completion'
+    offeredCompletion
+    && allowPredictedCompletion({
+      text: offeredCompletion,
+      targetKind,
+      agentId,
+      permissionMode,
+    })
     && input.trim().length === 0
     && dismissedCompletionFor !== lastAgentMessage
-      ? replySuggestion.text
+      ? offeredCompletion
       : null
 
   useEffect(() => {
@@ -1046,6 +1093,7 @@ export function AiPanelComposer({
   }, [completionText, lastAgentMessage])
 
   const handleSend = useCallback((text: string, references: NoteReference[]) => {
+    if (attachments.length > 0 && (vision === 'no' || vision === 'pending' || (vision === 'unknown' && !visionSendAnyway))) return
     const outgoing = expandReplyQuotes(text)
     // Mid-turn Enter with no steer handler is ignored by the send policy.
     // Do not push that keystroke into prompt history.
@@ -1053,7 +1101,7 @@ export function AiPanelComposer({
       recordSent(outgoing)
     }
     onSend(outgoing, references)
-  }, [isActive, onSend, onSteer, recordSent])
+  }, [attachments.length, isActive, onSend, onSteer, recordSent, vision, visionSendAnyway])
   const handleSteer = useCallback((text: string, references: NoteReference[]) => {
     if (!onSteer) return
     const outgoing = expandReplyQuotes(text)
@@ -1069,8 +1117,26 @@ export function AiPanelComposer({
   // An attachment is a message. Pasting a screenshot and asking nothing is
   // the ordinary case for "what is this?", so it must be sendable alone.
   const hasPayload = hasInput || attachments.length > 0
-  const canSend = !composerDisabled && hasPayload
+  const imageBlocked = attachments.length > 0 && vision === 'no'
+  const imageNeedsConfirm = attachments.length > 0 && vision === 'unknown' && !visionSendAnyway
+  const imageLookupPending = attachments.length > 0 && vision === 'pending'
+  const imageSendAnyway = attachments.length > 0 && vision === 'unknown' && visionSendAnyway
+  const canSend = !composerDisabled && hasPayload && !imageBlocked && !imageNeedsConfirm && !imageLookupPending
   const placeholder = getComposerPlaceholder(agentLabel, agentReadiness, t)
+  const boxRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    const box = boxRef.current
+    const editor = inputRef.current
+    if (!box) return
+    const measure = () => {
+      box.dataset.multiline = editor && composerIsMultiline(editor) ? 'true' : 'false'
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined' || !editor) return
+    const observer = new ResizeObserver(measure)
+    observer.observe(editor)
+    return () => observer.disconnect()
+  }, [input, inputRef])
   const hasControls = controls !== undefined && controls !== null
   // While a turn runs: typed text steers it, empty input stops it. The button
   // says which, so the affordance is never ambiguous.
@@ -1198,10 +1264,104 @@ export function AiPanelComposer({
           ))}
         </ul>
       ) : null}
-      <div className={cn(
-        'flex items-center gap-1',
-        hasControls && 'rounded-xl border border-border bg-background px-1.5 py-0.5 shadow-xs',
-      )}>
+      {attachmentNotice ? (
+        <p
+          className="mb-1.5 flex items-start gap-1.5 rounded-md border px-2 py-1.5 text-[12px]"
+          style={{
+            color: 'var(--feedback-warning-text)',
+            background: 'var(--feedback-warning-bg)',
+            borderColor: 'var(--feedback-warning-border)',
+          }}
+          data-testid="composer-attachment-notice"
+        >
+          <Warning size={14} weight="fill" aria-hidden="true" className="mt-0.5 shrink-0" />
+          <span>{attachmentNotice}</span>
+        </p>
+      ) : null}
+      {imageBlocked ? (
+        <p
+          className="mb-1.5 flex items-start gap-1.5 rounded-md border px-2 py-1.5 text-[12px]"
+          style={{
+            color: 'var(--feedback-warning-text)',
+            background: 'var(--feedback-warning-bg)',
+            borderColor: 'var(--feedback-warning-border)',
+          }}
+          data-testid="composer-vision-note"
+        >
+          <Warning size={14} weight="fill" aria-hidden="true" className="mt-0.5 shrink-0" />
+          <span>
+            {modelLabel} can&apos;t read images. Remove the image or{' '}
+            <button
+              type="button"
+              className="underline"
+              data-testid="composer-switch-model"
+              onClick={() => window.dispatchEvent(new Event('rhizome-open-model-picker'))}
+            >
+              switch to a model
+            </button>
+            {' '}that can.
+          </span>
+        </p>
+      ) : null}
+      {imageLookupPending ? (
+        <p
+          className="mb-1.5 px-2 py-1.5 text-[12px] text-muted-foreground"
+          data-testid="composer-vision-pending"
+        >
+          Checking image support…
+        </p>
+      ) : null}
+      {imageNeedsConfirm ? (
+        <p
+          className="mb-1.5 flex flex-wrap items-center gap-1.5 rounded-md border px-2 py-1.5 text-[12px]"
+          style={{
+            color: 'var(--feedback-warning-text)',
+            background: 'var(--feedback-warning-bg)',
+            borderColor: 'var(--feedback-warning-border)',
+          }}
+          data-testid="composer-vision-unknown"
+        >
+          <Warning size={14} weight="fill" aria-hidden="true" className="shrink-0" />
+          <span>Rhizome doesn&apos;t know if {modelLabel} can read images.</span>
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            data-testid="composer-send-anyway"
+            onClick={() => onVisionSendAnyway?.()}
+          >
+            Send anyway
+          </Button>
+        </p>
+      ) : null}
+      {imageSendAnyway ? (
+        <p
+          className="mb-1.5 flex flex-wrap items-center gap-1.5 rounded-md border px-2 py-1.5 text-[12px]"
+          style={{
+            color: 'var(--feedback-warning-text)',
+            background: 'var(--feedback-warning-bg)',
+            borderColor: 'var(--feedback-warning-border)',
+          }}
+          data-testid="composer-vision-send-anyway"
+        >
+          <span>Images will be sent to {modelLabel}.</span>
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            data-testid="composer-undo-send-anyway"
+            onClick={() => onVisionUndo?.()}
+          >
+            Undo
+          </Button>
+        </p>
+      ) : null}
+      <div
+        ref={boxRef}
+        className="flex items-center gap-1 rounded-xl border border-border bg-background p-1 shadow-xs data-[multiline=true]:items-end"
+        data-testid="chat-composer-box"
+        data-multiline="false"
+      >
         <ComposerPlusMenu
           locale={locale}
           onAttachImages={onAttachImages}
@@ -1215,7 +1375,6 @@ export function AiPanelComposer({
           <ComposerInput
             disabled={composerDisabled}
             entries={entries}
-            hasControls={hasControls}
             input={input}
             inputRef={inputRef}
             onChange={onChange}

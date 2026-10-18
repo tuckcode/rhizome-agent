@@ -9,7 +9,7 @@ const defaultSelection: SidebarSelection = { kind: 'filter', filter: 'all' }
 const entries: VaultEntry[] = [{
   path: '/vault/project/build-app.md',
   filename: 'build-app.md',
-  title: 'Build Laputa App',
+  title: 'Build Rhizome App',
   isA: 'Project',
   aliases: [],
   belongsTo: [],
@@ -64,8 +64,8 @@ function openViewContextMenu(options: Partial<MouseEvent> = {}) {
 
 afterEach(() => {
   document.documentElement.style.removeProperty('zoom')
-  document.documentElement.style.removeProperty('--tolaria-overlay-zoom-factor')
-  document.documentElement.style.removeProperty('--tolaria-overlay-zoom-inverse')
+  document.documentElement.style.removeProperty('--rhizome-overlay-zoom-factor')
+  document.documentElement.style.removeProperty('--rhizome-overlay-zoom-inverse')
 })
 
 describe('Sidebar View row actions', () => {
@@ -82,8 +82,8 @@ describe('Sidebar View row actions', () => {
 
   it('positions the View context menu at the pointer while the app is zoomed', () => {
     document.documentElement.style.setProperty('zoom', '130%')
-    document.documentElement.style.setProperty('--tolaria-overlay-zoom-factor', '1.3')
-    document.documentElement.style.setProperty('--tolaria-overlay-zoom-inverse', String(1 / 1.3))
+    document.documentElement.style.setProperty('--rhizome-overlay-zoom-factor', '1.3')
+    document.documentElement.style.setProperty('--rhizome-overlay-zoom-inverse', String(1 / 1.3))
     renderSidebar()
 
     openViewContextMenu({ clientX: 130, clientY: 260 })

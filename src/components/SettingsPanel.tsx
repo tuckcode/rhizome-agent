@@ -1,18 +1,18 @@
-import { Copy, Cube, Monitor, Moon, Stack, Sun, X } from '@phosphor-icons/react'
+import { Copy, Cube, Info, Monitor, Moon, Stack, Sun, X } from '@phosphor-icons/react'
 import {
-  PRODUCT_AI_AGENT_DEFINITIONS,
-  DEFAULT_AI_AGENT,
   createMissingAiAgentsStatus,
   getAiAgentAvailability,
+  getAiAgentDefinition,
   type AiAgentsStatus,
 } from '../lib/aiAgents'
+import { KEPT_EXTERNAL_AGENT_IDS } from '../lib/migrateRemovedHarnessChoices'
+import { AiAgentIcon } from './AiAgentIcon'
 import {
-  agentTargetId,
   normalizeAiModelProviders,
   type AiModelProvider,
 } from '../lib/aiTargets'
-import { ChatEngineSettings } from './ChatEngineSettings'
 import { NativeChatModelPicker } from './NativeChatModelPicker'
+import { resetListProviderModelsCache } from '../lib/listProviderModels'
 import {
   useCallback,
   useEffect,
@@ -61,15 +61,17 @@ import { Textarea } from './ui/textarea'
 import { AccentColorPicker } from './AccentColorPicker'
 import { normalizeReleaseChannel, serializeReleaseChannel, type ReleaseChannel } from '../lib/releaseChannel'
 import { shouldHideGitignoredFiles } from '../lib/gitignoredVisibility'
+import {
+  SECRET_FILE_PATTERN_LINES,
+  SECRET_FILES_HELPER_OFF,
+  SECRET_FILES_HELPER_ON,
+  SECRET_FILES_LABEL,
+  shouldBlockSecretFiles,
+} from '../lib/secretFiles'
 import { areGitFeaturesEnabled } from '../lib/gitSettings'
 import { areAutomaticUpdateChecksEnabled } from '../lib/automaticUpdateChecks'
 import { trackAllNotesVisibilityChanged } from '../lib/productAnalytics'
 import { AiProviderSettings } from './AiProviderSettings'
-import { PrimeDefaultModelSection } from './PrimeDefaultModelSection'
-import { PrimeModelAllowListSection } from './PrimeModelAllowListSection'
-import { PrimeProviderStatusSection } from './PrimeProviderStatusSection'
-import { PrimeExtensionsSection } from './PrimeExtensionsSection'
-import { AiAgentIcon } from './AiAgentIcon'
 import { readCelebrationsEnabled } from '../lib/celebration'
 import { GitSettingsSection } from './GitSettingsSection'
 import { PrivacySettingsSection } from './PrivacySettingsSection'
@@ -108,10 +110,14 @@ import {
 } from '../utils/dateDisplay'
 import { BridgeTokenRow } from './BridgeTokenRow'
 import { Button } from './ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
 import type { NoteWidthMode } from '../types'
 import type { VaultOption } from './status-bar/types'
-import { SETTINGS_SECTION_IDS } from './settingsSectionIds'
+import {
+  SETTINGS_SECTION_IDS,
+  resolveSettingsSectionId,
+} from './settingsSectionIds'
 import {
   trackSettingsPreferenceChanges,
   trackTelemetryConsentChange,
@@ -126,6 +132,8 @@ interface SettingsPanelProps {
   locale?: AppLocale
   systemLocale?: AppLocale
   onSave: (settings: Settings) => void
+  onSavePatch?: (patch: Partial<Settings>) => void
+  loadError?: string | null
   onCopyMcpConfig?: () => void
   vaults?: VaultOption[]
   activeVaultPath?: string | null
@@ -152,7 +160,6 @@ interface SettingsDraft {
   celebrationsEnabled: boolean
   keepInTaskbarOnClose: boolean
   agentProfile: string
-  chatEngine: 'prime' | 'native'
   nativeChatTarget: string | null
   aiModelProviders: AiModelProvider[]
   releaseChannel: ReleaseChannel
@@ -167,6 +174,7 @@ interface SettingsDraft {
   sidebarTypePluralizationEnabled: boolean
   initialH1AutoRename: boolean
   hideGitignoredFiles: boolean
+  blockSecretFiles: boolean
   allNotesFileVisibility: AllNotesFileVisibility
   multiWorkspaceEnabled: boolean
   crashReporting: boolean
@@ -196,8 +204,6 @@ interface SettingsBodyProps {
   setKeepInTaskbarOnClose: (value: boolean) => void
   agentProfile: string
   setAgentProfile: (value: string) => void
-  chatEngine: 'prime' | 'native'
-  setChatEngine: (value: 'prime' | 'native') => void
   nativeChatTarget: string | null
   setNativeChatTarget: (value: string) => void
   aiAgentsStatus: AiAgentsStatus
@@ -231,6 +237,8 @@ interface SettingsBodyProps {
   setInitialH1AutoRename: (value: boolean) => void
   hideGitignoredFiles: boolean
   setHideGitignoredFiles: (value: boolean) => void
+  blockSecretFiles: boolean
+  setBlockSecretFiles: (value: boolean) => void
   allNotesFileVisibility: AllNotesFileVisibility
   setAllNotesFileVisibility: (value: AllNotesFileVisibility) => void
   multiWorkspaceEnabled: boolean
@@ -250,8 +258,6 @@ interface SettingsBodyProps {
   onOpenFeedback?: () => void
   onOpenDocs?: () => void
   initialSectionId?: string | null
-  loadModelCatalog?: boolean
-  loadExtensionCatalog?: boolean
   onClose?: () => void
 }
 
@@ -293,7 +299,6 @@ function createSettingsDraft(
     celebrationsEnabled: readCelebrationsEnabled(settings.celebrations_enabled),
     keepInTaskbarOnClose: settings.keep_in_taskbar_on_close === true,
     agentProfile: settings.agent_profile?.trim() ?? '',
-    chatEngine: settings.chat_engine === 'native' ? 'native' : 'prime',
     nativeChatTarget: settings.native_chat_target ?? null,
     aiModelProviders: normalizeAiModelProviders(settings.ai_model_providers),
     releaseChannel: normalizeReleaseChannel(settings.release_channel),
@@ -308,6 +313,7 @@ function createSettingsDraft(
     sidebarTypePluralizationEnabled: settings.sidebar_type_pluralization_enabled ?? true,
     initialH1AutoRename: settings.initial_h1_auto_rename_enabled ?? true,
     hideGitignoredFiles: shouldHideGitignoredFiles(settings),
+    blockSecretFiles: shouldBlockSecretFiles(settings),
     allNotesFileVisibility: resolveAllNotesFileVisibility(settings),
     multiWorkspaceEnabled: settings.multi_workspace_enabled === true,
     crashReporting: settings.crash_reporting_enabled ?? false,
@@ -377,15 +383,37 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     celebrations_enabled: draft.celebrationsEnabled,
     keep_in_taskbar_on_close: draft.keepInTaskbarOnClose ? true : null,
     agent_profile: draft.agentProfile.trim() || null,
-    chat_engine: draft.chatEngine === 'native' ? 'native' : null,
+    chat_engine: 'native',
     native_chat_target: draft.nativeChatTarget,
-    default_ai_agent: DEFAULT_AI_AGENT,
-    default_ai_target: agentTargetId(DEFAULT_AI_AGENT),
     ai_model_providers: draft.aiModelProviders.length > 0 ? draft.aiModelProviders : null,
     hide_gitignored_files: draft.hideGitignoredFiles,
+    block_secret_files: draft.blockSecretFiles,
     multi_workspace_enabled: draft.multiWorkspaceEnabled,
   }
   return settingsWithAllNotesFileVisibility(nextSettings, draft.allNotesFileVisibility)
+}
+
+function assignSettingsPatch<K extends keyof Settings>(patch: Partial<Settings>, key: K, value: Settings[K]) {
+  patch[key] = value
+}
+
+/** Settings keys whose draft values differ. Other keys stay on the object already in memory. */
+function settingsPatchFromDraft(
+  baseline: SettingsDraft,
+  draft: SettingsDraft,
+  settings: Settings,
+): Partial<Settings> {
+  const before = buildSettingsFromDraft(settings, baseline)
+  const after = buildSettingsFromDraft(settings, draft)
+  const patch: Partial<Settings> = {}
+  const keys = new Set<keyof Settings>([
+    ...(Object.keys(before) as Array<keyof Settings>),
+    ...(Object.keys(after) as Array<keyof Settings>),
+  ])
+  keys.forEach((key) => {
+    if (!Object.is(before[key], after[key])) assignSettingsPatch(patch, key, after[key])
+  })
+  return patch
 }
 
 function sanitizePositiveInteger(value: number | null | undefined, fallback: number): number {
@@ -423,6 +451,8 @@ export function SettingsPanel({
   locale = 'en',
   systemLocale = locale,
   onSave,
+  onSavePatch,
+  loadError = null,
   onCopyMcpConfig,
   vaults = [],
   activeVaultPath = null,
@@ -451,6 +481,8 @@ export function SettingsPanel({
       locale={locale}
       systemLocale={systemLocale}
       onSave={onSave}
+      onSavePatch={onSavePatch}
+      loadError={loadError}
       onCopyMcpConfig={onCopyMcpConfig}
       vaults={vaults}
       activeVaultPath={activeVaultPath}
@@ -487,6 +519,8 @@ function SettingsPanelInner({
   initialSectionId,
   systemLocale,
   onSave,
+  onSavePatch,
+  loadError = null,
   onCopyMcpConfig,
   vaults,
   activeVaultPath,
@@ -502,7 +536,9 @@ function SettingsPanelInner({
   onOpenDocs,
   onClose,
 }: SettingsPanelInnerProps) {
-  const [draft, setDraft] = useState(() => createSettingsDraft(settings, explicitOrganizationEnabled, inboxAutomationEnabled))
+  const initialDraft = createSettingsDraft(settings, explicitOrganizationEnabled, inboxAutomationEnabled)
+  const [draft, setDraft] = useState(initialDraft)
+  const [baseline, setBaseline] = useState(initialDraft)
   const backdropRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const draftLocale = resolveEffectiveLocale(draft.uiLanguage, [systemLocale])
@@ -516,20 +552,31 @@ function SettingsPanelInner({
   const [adoptedSettings, setAdoptedSettings] = useState(settings)
   const [adoptedExplicitOrganization, setAdoptedExplicitOrganization] = useState(explicitOrganizationEnabled)
   const [adoptedInboxAutomation, setAdoptedInboxAutomation] = useState(inboxAutomationEnabled)
+  const [adoptedLoadError, setAdoptedLoadError] = useState(loadError)
 
   const settingsSourceChanged =
     adoptedSettings !== settings ||
     adoptedExplicitOrganization !== explicitOrganizationEnabled ||
     adoptedInboxAutomation !== inboxAutomationEnabled
+  const loadRecovered = adoptedLoadError != null && loadError == null
 
-  if (settingsSourceChanged) {
+  if (settingsSourceChanged || adoptedLoadError !== loadError) {
     setAdoptedSettings(settings)
     setAdoptedExplicitOrganization(explicitOrganizationEnabled)
     setAdoptedInboxAutomation(inboxAutomationEnabled)
-    if (!draftDirty) {
-      setDraft(createSettingsDraft(settings, explicitOrganizationEnabled, inboxAutomationEnabled))
+    setAdoptedLoadError(loadError)
+    if (!draftDirty || loadRecovered) {
+      const nextDraft = createSettingsDraft(settings, explicitOrganizationEnabled, inboxAutomationEnabled)
+      setDraft(nextDraft)
+      setBaseline(nextDraft)
+      if (loadRecovered) setDraftDirty(false)
     }
   }
+
+  const savesBlocked = loadError != null
+  const warnSavesBlocked = useCallback(() => {
+    console.warn('[settings] Did not save settings. The settings file still failed to load.')
+  }, [])
 
   useSettingsPanelAutofocus(panelRef, open)
   useSettingsPanelFocusTrap(panelRef, open)
@@ -550,8 +597,9 @@ function SettingsPanelInner({
 
   useEffect(() => {
     if (!initialSectionId) return
+    const targetId = resolveSettingsSectionId(initialSectionId)
     const timer = window.setTimeout(() => {
-      document.getElementById(initialSectionId)?.scrollIntoView({ block: 'start' })
+      if (targetId) document.getElementById(targetId)?.scrollIntoView({ block: 'start' })
     }, 50)
     return () => window.clearTimeout(timer)
   }, [initialSectionId])
@@ -564,59 +612,108 @@ function SettingsPanelInner({
     [],
   )
 
+  const persistPatch = useCallback((patch: Partial<Settings>) => {
+    if (savesBlocked) {
+      warnSavesBlocked()
+      return
+    }
+    if (onSavePatch) {
+      onSavePatch(patch)
+      return
+    }
+    onSave({ ...settings, ...patch })
+  }, [onSave, onSavePatch, savesBlocked, settings, warnSavesBlocked])
+
   const handleGitignoredVisibilityChange = useCallback((value: boolean) => {
+    if (savesBlocked) {
+      warnSavesBlocked()
+      return
+    }
     updateDraft('hideGitignoredFiles', value)
-    onSave({ ...settings, hide_gitignored_files: value })
-  }, [onSave, settings, updateDraft])
+    persistPatch({ hide_gitignored_files: value })
+  }, [persistPatch, savesBlocked, updateDraft, warnSavesBlocked])
 
   const handleAllNotesFileVisibilityChange = useCallback((value: AllNotesFileVisibility) => {
+    if (savesBlocked) {
+      warnSavesBlocked()
+      return
+    }
     trackAllNotesVisibilityChanged(draft.allNotesFileVisibility, value)
     updateDraft('allNotesFileVisibility', value)
-    onSave(settingsWithAllNotesFileVisibility(settings, value))
-  }, [draft.allNotesFileVisibility, onSave, settings, updateDraft])
+    const next = settingsWithAllNotesFileVisibility(settings, value)
+    persistPatch({
+      all_notes_show_pdfs: next.all_notes_show_pdfs,
+      all_notes_show_images: next.all_notes_show_images,
+      all_notes_show_unsupported: next.all_notes_show_unsupported,
+    })
+  }, [draft.allNotesFileVisibility, persistPatch, savesBlocked, settings, updateDraft, warnSavesBlocked])
 
   const handleThemeModeChange = useCallback((value: ThemeMode) => {
+    if (savesBlocked) {
+      warnSavesBlocked()
+      return
+    }
     updateDraft('themeMode', value)
     updateDraft('colorTheme', '')
     applyAppearanceSelection(value, '', draft.accentColor)
-    onSave({ ...settings, theme_mode: value, color_theme: null })
-  }, [draft.accentColor, onSave, settings, updateDraft])
+    persistPatch({ theme_mode: value, color_theme: null })
+  }, [draft.accentColor, persistPatch, savesBlocked, updateDraft, warnSavesBlocked])
 
   const handleColorThemeChange = useCallback((value: string, mode?: ThemeMode) => {
+    if (savesBlocked) {
+      warnSavesBlocked()
+      return
+    }
     const nextMode = mode ?? draft.themeMode
     const persistColor = persistableColorTheme(value, nextMode)
     if (mode) updateDraft('themeMode', mode)
     updateDraft('colorTheme', persistColor ?? '')
     applyAppearanceSelection(nextMode, persistColor ?? '', draft.accentColor)
-    onSave({
-      ...settings,
+    persistPatch({
       color_theme: persistColor,
       ...(mode ? { theme_mode: mode } : {}),
     })
-  }, [draft.accentColor, draft.themeMode, onSave, settings, updateDraft])
+  }, [draft.accentColor, draft.themeMode, persistPatch, savesBlocked, updateDraft, warnSavesBlocked])
 
   const handleAccentColorChange = useCallback((value: AccentColor) => {
+    if (savesBlocked) {
+      warnSavesBlocked()
+      return
+    }
     updateDraft('accentColor', value)
     applyAppearanceSelection(draft.themeMode, draft.colorTheme, value)
-    onSave({ ...settings, accent_color: value })
-  }, [draft.colorTheme, draft.themeMode, onSave, settings, updateDraft])
+    persistPatch({ accent_color: value })
+  }, [draft.colorTheme, draft.themeMode, persistPatch, savesBlocked, updateDraft, warnSavesBlocked])
 
   const handleAiModelProvidersChange = useCallback((value: AiModelProvider[]) => {
+    if (savesBlocked) {
+      warnSavesBlocked()
+      return
+    }
+    resetListProviderModelsCache()
     updateDraft('aiModelProviders', value)
-    onSave({
-      ...settings,
+    persistPatch({
       ai_model_providers: value.length > 0 ? value : null,
     })
-  }, [onSave, settings, updateDraft])
+  }, [persistPatch, savesBlocked, updateDraft, warnSavesBlocked])
 
   const handleSave = useCallback(() => {
+    if (savesBlocked) {
+      warnSavesBlocked()
+      return
+    }
     trackTelemetryConsentChange(settings.analytics_enabled === true, draft.analytics)
     trackSettingsPreferenceChanges(settings, draft)
-    onSave(buildSettingsFromDraft(settings, draft))
+    if (onSavePatch) {
+      const patch = settingsPatchFromDraft(baseline, draft, settings)
+      if (Object.keys(patch).length > 0) onSavePatch(patch)
+    } else {
+      onSave(buildSettingsFromDraft(settings, draft))
+    }
     onSaveExplicitOrganization?.(draft.explicitOrganization)
     onSaveInboxAutomation?.(draft.inboxAutomationEnabled)
     onClose()
-  }, [draft, onClose, onSave, onSaveExplicitOrganization, onSaveInboxAutomation, settings])
+  }, [baseline, draft, onClose, onSave, onSaveExplicitOrganization, onSaveInboxAutomation, onSavePatch, savesBlocked, settings, warnSavesBlocked])
 
   useEffect(() => {
     if (!open) return
@@ -695,7 +792,7 @@ function SettingsPanelInner({
           initialSectionId={initialSectionId}
           onClose={onClose}
         />
-        <SettingsFooter onClose={onClose} onSave={handleSave} t={t} />
+        <SettingsFooter onClose={onClose} onSave={handleSave} saveDisabled={savesBlocked} t={t} />
       </div>
     </div>
   )
@@ -807,8 +904,6 @@ function SettingsBodyFromDraft({
       setKeepInTaskbarOnClose={(value) => updateDraft('keepInTaskbarOnClose', value)}
       agentProfile={draft.agentProfile}
       setAgentProfile={(value) => updateDraft('agentProfile', value)}
-      chatEngine={draft.chatEngine}
-      setChatEngine={(value) => updateDraft('chatEngine', value)}
       nativeChatTarget={draft.nativeChatTarget}
       setNativeChatTarget={(value) => updateDraft('nativeChatTarget', value)}
       aiAgentsStatus={aiAgentsStatus}
@@ -840,6 +935,8 @@ function SettingsBodyFromDraft({
       setInitialH1AutoRename={(value) => updateDraft('initialH1AutoRename', value)}
       hideGitignoredFiles={draft.hideGitignoredFiles}
       setHideGitignoredFiles={setHideGitignoredFiles}
+      blockSecretFiles={draft.blockSecretFiles}
+      setBlockSecretFiles={(value) => updateDraft('blockSecretFiles', value)}
       allNotesFileVisibility={draft.allNotesFileVisibility}
       setAllNotesFileVisibility={setAllNotesFileVisibility}
       initialSectionId={initialSectionId}
@@ -865,60 +962,13 @@ function SettingsBodyFromDraft({
 }
 
 function SettingsBody(props: SettingsBodyProps) {
-  const [loadModelCatalog, setLoadModelCatalog] = useState(
-    props.initialSectionId === SETTINGS_SECTION_IDS.ai,
-  )
-  const [loadExtensionCatalog, setLoadExtensionCatalog] = useState(
-    props.initialSectionId === SETTINGS_SECTION_IDS.extensions,
-  )
-
-  useEffect(() => {
-    if (loadModelCatalog) return
-    const el = document.getElementById(SETTINGS_SECTION_IDS.ai)
-    if (!el || typeof IntersectionObserver === 'undefined') return
-    const root = el.closest('.overflow-auto')
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) setLoadModelCatalog(true)
-      },
-      { root: root instanceof Element ? root : null, threshold: 0.15 },
-    )
-    io.observe(el)
-    return () => io.disconnect()
-  }, [loadModelCatalog])
-
-  useEffect(() => {
-    if (loadExtensionCatalog) return
-    const el = document.getElementById(SETTINGS_SECTION_IDS.extensions)
-    if (!el || typeof IntersectionObserver === 'undefined') return
-    const root = el.closest('.overflow-auto')
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) setLoadExtensionCatalog(true)
-      },
-      { root: root instanceof Element ? root : null, threshold: 0.15 },
-    )
-    io.observe(el)
-    return () => io.disconnect()
-  }, [loadExtensionCatalog])
-
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden">
-      <SettingsBodyNav
-        t={props.t}
-        onVisit={(id) => {
-          if (id === SETTINGS_SECTION_IDS.ai) setLoadModelCatalog(true)
-          if (id === SETTINGS_SECTION_IDS.extensions) setLoadExtensionCatalog(true)
-        }}
-      />
+      <SettingsBodyNav t={props.t} />
       <div className="min-w-0 flex-1 overflow-auto px-6 py-4">
         <SettingsSyncAndAppearanceSections {...props} />
         <SettingsContentSections {...props} />
-        <SettingsAgentWorkflowSections
-          {...props}
-          loadModelCatalog={loadModelCatalog}
-          loadExtensionCatalog={loadExtensionCatalog}
-        />
+        <SettingsAgentWorkflowSections {...props} />
         {/* Lets the last sections scroll their heading to the top when picked
             in the nav (native audit 2026-09-26). Sized to the scroll box. */}
         <div data-testid="settings-scroll-end-spacer" aria-hidden="true" style={{ minHeight: 'calc(100% - 4rem)' }} />
@@ -1090,8 +1140,8 @@ function SettingsAgentWorkflowSections({
   setCelebrationsEnabled,
   agentProfile,
   setAgentProfile,
-  chatEngine,
-  setChatEngine,
+  blockSecretFiles,
+  setBlockSecretFiles,
   nativeChatTarget,
   setNativeChatTarget,
   aiAgentsStatus,
@@ -1110,9 +1160,6 @@ function SettingsAgentWorkflowSections({
   onOpenFeedback,
   onOpenDocs,
   activeVaultPath,
-  loadModelCatalog = false,
-  loadExtensionCatalog = false,
-  onClose,
 }: SettingsBodyProps) {
   return (
     <>
@@ -1124,24 +1171,19 @@ function SettingsAgentWorkflowSections({
           setCelebrationsEnabled={setCelebrationsEnabled}
           agentProfile={agentProfile}
           setAgentProfile={setAgentProfile}
-          chatEngine={chatEngine}
-          setChatEngine={setChatEngine}
+          blockSecretFiles={blockSecretFiles}
+          setBlockSecretFiles={setBlockSecretFiles}
           nativeChatTarget={nativeChatTarget}
           setNativeChatTarget={setNativeChatTarget}
           aiAgentsStatus={aiAgentsStatus}
           aiModelProviders={aiModelProviders}
           setAiModelProviders={setAiModelProviders}
           onCopyMcpConfig={onCopyMcpConfig}
-          loadModelCatalog={loadModelCatalog}
           activeVaultPath={activeVaultPath}
         />
         <div className="mt-4">
           <SessionImportSettingsSection vaultPath={activeVaultPath ?? null} />
         </div>
-      </SettingsSection>
-
-      <SettingsSection id={SETTINGS_SECTION_IDS.extensions}>
-        <PrimeExtensionsSection active={loadExtensionCatalog} onClose={onClose} />
       </SettingsSection>
 
       <SettingsSection id={SETTINGS_SECTION_IDS.workflow}>
@@ -1511,15 +1553,14 @@ function AiAgentSettingsSection({
   setCelebrationsEnabled,
   agentProfile,
   setAgentProfile,
-  chatEngine,
-  setChatEngine,
+  blockSecretFiles,
+  setBlockSecretFiles,
   nativeChatTarget,
   setNativeChatTarget,
   aiAgentsStatus,
   aiModelProviders,
   setAiModelProviders,
   onCopyMcpConfig,
-  loadModelCatalog,
   activeVaultPath,
 }: Pick<
   SettingsBodyProps,
@@ -1529,18 +1570,16 @@ function AiAgentSettingsSection({
   | 'setCelebrationsEnabled'
   | 'agentProfile'
   | 'setAgentProfile'
-  | 'chatEngine'
-  | 'setChatEngine'
+  | 'blockSecretFiles'
+  | 'setBlockSecretFiles'
   | 'nativeChatTarget'
   | 'setNativeChatTarget'
   | 'aiAgentsStatus'
   | 'aiModelProviders'
   | 'setAiModelProviders'
   | 'onCopyMcpConfig'
-  | 'loadModelCatalog'
   | 'activeVaultPath'
 >) {
-  const primeStatus = getAiAgentAvailability(aiAgentsStatus, DEFAULT_AI_AGENT)
   const vaultConfig = useSyncExternalStore(subscribeVaultConfig, getVaultConfig, getVaultConfig)
   const sessionAutoDistillEnabled = vaultConfig.session_auto_distill_enabled === true
 
@@ -1552,6 +1591,20 @@ function AiAgentSettingsSection({
       />
 
       <SettingsGroup>
+        <SettingsRow
+          label="Chat model"
+          description="New chats start with this model. You can change it per chat in the composer."
+          controlWidth="auto"
+          testId="settings-chat-model"
+        >
+          <NativeChatModelPicker
+            locale={locale}
+            value={nativeChatTarget}
+            onChange={setNativeChatTarget}
+            providers={aiModelProviders}
+            showLabel={false}
+          />
+        </SettingsRow>
         <AutoSaveSettingRow
           label={t('settings.aiAgents.sessionAutoDistill')}
           checked={sessionAutoDistillEnabled}
@@ -1567,22 +1620,12 @@ function AiAgentSettingsSection({
         />
       </SettingsGroup>
 
-      <SettingsGroup>
-        <ChatEngineSettings engine={chatEngine} onChange={setChatEngine} locale={locale} />
-        <NativeChatModelPicker
-          value={nativeChatTarget}
-          onChange={setNativeChatTarget}
-          providers={aiModelProviders}
-        />
-        {chatEngine === 'native' ? null : (
-          <div className="px-3 pb-3 text-xs text-muted-foreground" data-testid="settings-prime-chat-engine">
-            Prime Agent
-            {primeStatus.status === 'installed'
-              ? ` (${t('settings.aiAgents.installed')}${primeStatus.version ? ` ${primeStatus.version}` : ''})`
-              : ` (${t('settings.aiAgents.missing')})`}
-          </div>
-        )}
-      </SettingsGroup>
+      <div className="flex flex-col gap-2">
+        <div className="text-sm font-medium text-foreground">Safety</div>
+        <SettingsGroup>
+          <SecretFilesSettingRow checked={blockSecretFiles} onChange={setBlockSecretFiles} />
+        </SettingsGroup>
+      </div>
 
       <SettingsGroup>
         <SettingsRow
@@ -1606,10 +1649,114 @@ function AiAgentSettingsSection({
         aiModelProviders={aiModelProviders}
         setAiModelProviders={setAiModelProviders}
         onCopyMcpConfig={onCopyMcpConfig}
-        loadModelCatalog={loadModelCatalog}
         vaultPath={activeVaultPath}
       />
     </>
+  )
+}
+
+function SecretFilesSettingRow({
+  checked,
+  onChange,
+}: {
+  checked: boolean
+  onChange: (value: boolean) => void
+}) {
+  const switchId = 'settings-block-secret-files-switch'
+
+  return (
+    <div
+      className="border-b border-border px-4 py-3 last:border-b-0 flex flex-col gap-3 lg:flex-row lg:items-center"
+      data-testid="settings-block-secret-files"
+    >
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex items-center gap-1.5">
+          <label htmlFor={switchId} className="text-sm font-medium text-foreground">
+            {SECRET_FILES_LABEL}
+          </label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Which names are hidden"
+                data-testid="settings-block-secret-files-patterns"
+                onClick={(event) => event.stopPropagation()}
+              >
+                <Info />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-80 text-xs leading-5">
+              <div className="font-medium text-sm">Hidden names</div>
+              <ul className="mt-2 list-disc space-y-1.5 pl-4 text-muted-foreground">
+                {SECRET_FILE_PATTERN_LINES.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </PopoverContent>
+          </Popover>
+        </div>
+        <div
+          className={
+            checked
+              ? 'text-xs leading-5 text-muted-foreground'
+              : 'text-xs leading-5 text-[var(--feedback-warning-text)]'
+          }
+          data-testid="settings-block-secret-files-help"
+        >
+          {checked ? SECRET_FILES_HELPER_ON : SECRET_FILES_HELPER_OFF}
+        </div>
+      </div>
+      <div className="flex justify-start lg:shrink-0 lg:justify-end">
+        <SettingsSwitchControl
+          id={switchId}
+          label={SECRET_FILES_LABEL}
+          checked={checked}
+          onChange={onChange}
+        />
+      </div>
+    </div>
+  )
+}
+
+const SETTINGS_CLI_STATUS_AGENT_IDS = KEPT_EXTERNAL_AGENT_IDS
+
+function AiAgentsInstalledSection({
+  t,
+  aiAgentsStatus,
+}: {
+  t: Translate
+  aiAgentsStatus: AiAgentsStatus
+}) {
+  return (
+    <div className="rounded-md border border-border bg-card p-3" data-testid="settings-cli-agent-status">
+      <div className="text-sm font-medium text-foreground">{t('settings.aiAgents.installedTitle')}</div>
+      <div className="mt-1 text-xs leading-5 text-muted-foreground">{t('settings.aiAgents.installedDescription')}</div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {SETTINGS_CLI_STATUS_AGENT_IDS.map((id) => {
+          const definition = getAiAgentDefinition(id)
+          const status = getAiAgentAvailability(aiAgentsStatus, definition.id)
+          const installed = status.status === 'installed'
+          return (
+            <div key={definition.id} className="rounded-md border border-border bg-background px-3 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <AiAgentIcon agent={definition.id} size={16} />
+                  <div className="truncate text-sm font-medium text-foreground">{definition.label}</div>
+                </div>
+                <div className={installed ? 'text-xs text-feedback-success-text' : 'text-xs text-muted-foreground'}>
+                  {installed ? t('settings.aiAgents.installed') : t('settings.aiAgents.missing')}
+                </div>
+              </div>
+              <div className="mt-1 truncate text-xs text-muted-foreground">
+                {status.version || t('settings.aiAgents.noVersion')}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
@@ -1619,15 +1766,12 @@ function AiTargetManagementTabs({
   aiModelProviders,
   setAiModelProviders,
   onCopyMcpConfig,
-  loadModelCatalog,
-  vaultPath,
 }: {
   t: Translate
   aiAgentsStatus: AiAgentsStatus
   aiModelProviders: AiModelProvider[]
   setAiModelProviders: (value: AiModelProvider[]) => void
   onCopyMcpConfig?: () => void
-  loadModelCatalog?: boolean
   vaultPath?: string | null
 }) {
   return (
@@ -1639,11 +1783,13 @@ function AiTargetManagementTabs({
       </TabsList>
       <TabsContent value="agents" className="space-y-3">
         <AiAgentsInstalledSection t={t} aiAgentsStatus={aiAgentsStatus} />
-        {/* Same Agents-visible gate as the model list: skip provider IPC until then. */}
-        {loadModelCatalog ? <PrimeProviderStatusSection t={t} /> : null}
-        {loadModelCatalog ? <PrimeDefaultModelSection vaultPath={vaultPath} /> : null}
-        {loadModelCatalog ? <PrimeModelAllowListSection t={t} /> : null}
-        {onCopyMcpConfig ? <CopyMcpConfigButton t={t} onCopyMcpConfig={onCopyMcpConfig} /> : null}
+        {onCopyMcpConfig ? (
+          <SettingsGroup>
+            <SettingsGroupItem>
+              <CopyMcpConfigButton t={t} onCopyMcpConfig={onCopyMcpConfig} />
+            </SettingsGroupItem>
+          </SettingsGroup>
+        ) : null}
         <BridgeTokenRow t={t} />
       </TabsContent>
       <TabsContent value="local">
@@ -1676,43 +1822,6 @@ function CopyMcpConfigButton({
       <Copy size={15} />
       {t('ai.panel.copyMcpConfig')}
     </Button>
-  )
-}
-
-function AiAgentsInstalledSection({
-  t,
-  aiAgentsStatus,
-}: {
-  t: Translate
-  aiAgentsStatus: AiAgentsStatus
-}) {
-  return (
-    <div className="rounded-md border border-border bg-card p-3">
-      <div className="text-sm font-medium text-foreground">{t('settings.aiAgents.installedTitle')}</div>
-      <div className="mt-1 text-xs leading-5 text-muted-foreground">{t('settings.aiAgents.installedDescription')}</div>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        {PRODUCT_AI_AGENT_DEFINITIONS.map((definition) => {
-          const status = getAiAgentAvailability(aiAgentsStatus, definition.id)
-          const installed = status.status === 'installed'
-          return (
-            <div key={definition.id} className="rounded-md border border-border bg-background px-3 py-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
-                  <AiAgentIcon agent={definition.id} size={16} />
-                  <div className="truncate text-sm font-medium text-foreground">{definition.label}</div>
-                </div>
-                <div className={installed ? 'text-xs text-feedback-success-text' : 'text-xs text-muted-foreground'}>
-                  {installed ? t('settings.aiAgents.installed') : t('settings.aiAgents.missing')}
-                </div>
-              </div>
-              <div className="mt-1 truncate text-xs text-muted-foreground">
-                {status.version || t('settings.aiAgents.noVersion')}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
   )
 }
 

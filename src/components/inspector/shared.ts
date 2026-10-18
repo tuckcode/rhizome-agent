@@ -14,7 +14,7 @@ export function resolveRef(ref: string, entries: VaultEntry[]): VaultEntry | und
   if (byTitle) return byTitle
   const lastSegment = target.split('/').pop()
   return entries.find((e) => {
-    const stem = e.path.replace(/^.*\/Laputa\//, '').replace(/\.md$/, '')
+    const stem = e.path.replace(/^.*\/Vault\//, '').replace(/\.md$/, '')
     if (stem === target) return true
     return e.filename.replace(/\.md$/, '') === lastSegment
   })

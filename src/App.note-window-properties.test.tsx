@@ -266,7 +266,6 @@ describe('App note windows', () => {
       claude_code: { installed: true, version: '2.1.90' },
       codex: { installed: true, version: '0.122.0-alpha.1' },
       opencode: { installed: true, version: '0.7.4' },
-      pi: { installed: false, version: null },
       antigravity: { installed: true, version: '0.3.2' },
       kiro: { installed: false, version: null },
       hermes: { installed: false, version: null },

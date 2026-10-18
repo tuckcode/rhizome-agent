@@ -71,6 +71,7 @@ describe('AiPanel — the running model cannot see images', () => {
         <AiPanel
           onClose={vi.fn()}
           vaultPath="/tmp/vault"
+          chatEngine="prime"
           activeEntry={entry}
           entries={[entry]}
           onUnsupportedAiPaste={onUnsupportedAiPaste}

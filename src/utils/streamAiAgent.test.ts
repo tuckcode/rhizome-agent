@@ -7,7 +7,7 @@ const {
   listenMock,
 } = vi.hoisted(() => ({
   getAiAgentDefinitionMock: vi.fn((agent: string) => ({
-    label: agent === 'codex' ? 'Codex' : agent === 'pi' ? 'Pi' : 'Claude Code',
+    label: agent === 'codex' ? 'Codex' : 'Claude Code',
   })),
   invokeMock: vi.fn(),
   isTauriState: { value: false },
@@ -41,6 +41,7 @@ function createCallbacks() {
     onToolStart: vi.fn(),
     onToolDone: vi.fn(),
     onError: vi.fn(),
+    onNotice: vi.fn(),
     onCompaction: vi.fn(),
     onDone: vi.fn(),
   }
@@ -71,7 +72,7 @@ describe('streamAiAgent', () => {
     await promise
 
     expect(callbacks.onText).toHaveBeenCalledWith(
-      '[mock-codex turns=2] You asked: "latest" — This note is related to [[Build Laputa App]] and [[Matteo Cellini]].',
+      '[mock-codex turns=2] You asked: "latest" — This note is related to [[Build Rhizome App]] and [[Matteo Cellini]].',
     )
     expect(callbacks.onDone).toHaveBeenCalledTimes(1)
     expect(listenMock).not.toHaveBeenCalled()
@@ -130,6 +131,37 @@ describe('streamAiAgent', () => {
     expect(callbacks.onToolDone).toHaveBeenCalledWith('tool-1', 'saved')
     expect(callbacks.onDone).toHaveBeenCalledTimes(1)
     expect(unlistenMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('forwards a Prime skill Notice without treating it as a stream error', async () => {
+    isTauriState.value = true
+    listenMock.mockImplementation(async (_eventName: string, handler: (event: { payload: unknown }) => void) => {
+      handler({
+        payload: {
+          kind: 'Notice',
+          message: 'Could not write the Prime vault skill under .prime/. Prime chat can continue, but vault tools may be missing.',
+        },
+      })
+      handler({ payload: { kind: 'TextDelta', text: 'hello' } })
+      handler({ payload: { kind: 'Done' } })
+      return vi.fn()
+    })
+    invokeMock.mockResolvedValue('session-1')
+
+    const callbacks = createCallbacks()
+    await streamAiAgent({
+      agent: 'prime',
+      message: 'Hello',
+      vaultPath: '/vault',
+      callbacks,
+    })
+
+    expect(callbacks.onNotice).toHaveBeenCalledWith(
+      expect.stringContaining('Could not write the Prime vault skill'),
+    )
+    expect(callbacks.onError).not.toHaveBeenCalled()
+    expect(callbacks.onText).toHaveBeenCalledWith('hello')
+    expect(callbacks.onDone).toHaveBeenCalledTimes(1)
   })
 
   it('routes prime agent through stream_prime_session and abort_prime_session_turn', async () => {
@@ -358,7 +390,7 @@ describe('streamAiAgent', () => {
     })
 
     const callbacks = createCallbacks()
-    await streamAiAgent({ agent: 'pi', message: 'hi', vaultPath: '/vault', callbacks })
+    await streamAiAgent({ agent: 'codex', message: 'hi', vaultPath: '/vault', callbacks })
 
     expect(callbacks.onCompaction).toHaveBeenCalledWith('start', 'threshold', undefined)
     expect(callbacks.onCompaction).toHaveBeenCalledWith('end', 'threshold', 150000)

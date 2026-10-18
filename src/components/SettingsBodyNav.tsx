@@ -1,4 +1,4 @@
-import { Article, ArrowsClockwise as RefreshCw, Cube, GitBranch, Info, ListChecks, Palette, PuzzlePiece, Robot as Bot, ShieldCheck, type IconProps } from '@phosphor-icons/react'
+import { Article, ArrowsClockwise as RefreshCw, Cube, GitBranch, Info, ListChecks, Palette, Robot as Bot, ShieldCheck, type IconProps } from '@phosphor-icons/react'
 import type { ComponentType } from 'react'
 import type { TranslationKey } from '../lib/i18n'
 import { Button } from './ui/button'
@@ -21,7 +21,7 @@ let stopFollowing: (() => void) | null = null
 
 /**
  * Scroll a section's heading to the top and keep it there while content
- * settles. Packages loads its catalog lazily as the scroll passes it, which
+ * settles. Agents loads Prime catalogs lazily as the scroll passes it, which
  * pushed later sections (About) down mid-scroll (browser preview,
  * 2026-09-26). Stops on the user's own scroll or input, or after 2s.
  */
@@ -52,7 +52,6 @@ export function SettingsBodyNav({ t, onVisit }: SettingsBodyNavProps) {
     { id: SETTINGS_SECTION_IDS.appearance, label: t('settings.appearance.title'), Icon: Palette },
     { id: SETTINGS_SECTION_IDS.content, label: t('settings.vaultContent.title'), Icon: Article },
     { id: SETTINGS_SECTION_IDS.ai, label: t('settings.aiAgents.title'), Icon: Bot },
-    { id: SETTINGS_SECTION_IDS.extensions, label: 'Packages', Icon: PuzzlePiece },
     { id: SETTINGS_SECTION_IDS.workflow, label: t('settings.workflow.title'), Icon: ListChecks },
     { id: SETTINGS_SECTION_IDS.privacy, label: t('settings.privacy.title'), Icon: ShieldCheck },
     { id: SETTINGS_SECTION_IDS.about, label: t('settings.about.title'), Icon: Info },

@@ -1,11 +1,14 @@
-# AGENTS.md — Rhizome Agent
+# AGENTS.md — Rhizome
 
 > **STOP — wrong tree check.**  
-> This is **Rhizome Agent** (`ai.rhizome.agent`, repo `tuckcode/rhizome-agent`).  
+> This is **Rhizome** (`ai.rhizome.agent`, repo `tuckcode/rhizome-agent`).  
 > It is **not** Rhizome Desktop (`ai.rhizome.desktop`, `knispo/rhizome`).  
 > Do not push here to desktop origin. Do not “fix branding back to Desktop.”  
-> Direction: chat UI + **Rhizome's own harness** (ADR-0180). Prime and
-> Hermes are optional engines. Details: `docs/IDENTITY.md`.
+> Direction: chat UI + **Rhizome's own harness** (ADR-0180). Native is the
+> only chat engine (ADR-0187). Prime and Hermes are no longer chat engines
+> ([ADR-0189](docs/adr/0189-no-ties-to-outside-harnesses.md)); leftover
+> code is still in the repo until the follow-up PRs. Do not add code that depends on
+> them. Details: `docs/IDENTITY.md`.
 > **Personal reply-voice skills stay out of this repo.** Global voice is STE-100
 > in Rhizome Vault `agents/shared/`. Do not copy voice skills into this tree.
 
@@ -436,7 +439,7 @@ said rebuild and will launch.
 
 ## Standing product holds
 
-Durable Rhizome Agent rules. Kept here on purpose so
+Durable Rhizome rules. Kept here on purpose so
 **Learned** stays empty and continual-learning cannot bury them in
 mega-bullets. Do not move these into Learned.
 
@@ -452,7 +455,10 @@ mega-bullets. Do not move these into Learned.
   starting point. Borrow-care in 0168 still holds.
   Kern (getkern/kern) is Linux/WSL2 only.
 - **Rhizome is its own harness (ADR-0180).** It owns the agent loop, tool
-  runner, plugins, and model routing. Prime and Hermes are optional engines.
+  runner, plugins, and model routing. Native is the only chat engine
+  (ADR-0187). Prime and Hermes are no longer chat engines (ADR-0189);
+  leftover code is still in the repo until the follow-up PRs. Do not add
+  code that depends on them.
 
 ## Continual-learning (Cursor plugin)
 
@@ -469,7 +475,7 @@ not a session log, not billing notes, not a second HANDOFF.
    Continual-learning block.
 3. Add a bullet only if it is:
    - **durable** (still true next month without a date),
-   - **Rhizome Agent–specific** (this product / this repo),
+   - **Rhizome-specific** (this product / this repo),
    - **recurring** (said more than once, or Atticus said “always /
      remember / from now on”), and
    - **actionable** (changes how an agent should behave).

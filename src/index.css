@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Screenshot harnesses point Tailwind at this src tree so app utilities load.
+   The notes-panel harness keeps its own @source in scripts/. */
+@source ".";
+
 /* Follow the application theme (`html.dark`), including portaled descendants.
    The default Tailwind variant follows the operating-system preference. */
 @custom-variant dark (&:where(.dark, .dark *));
@@ -66,7 +70,7 @@
 
   /* --- Semantic borders (Earth light) --- */
   --border-default: #DDD4C3;
-  --border-subtle: #E6DFD1;
+  --border-subtle: #DDD4C3;
   --border-strong: #C8BDA8;
   --border-input: #857B66;
   --border-dialog: #C8BDA8;
@@ -75,6 +79,8 @@
   /* --- Interaction states (Earth light) --- */
   --state-hover: #EAE3D6;
   --state-hover-subtle: #EEE9DF;
+  --state-menu-hover: #EAE3D6;
+  --state-menu-selected: #DDD4C3;
   --state-selected: #E1E6DA;
   --state-selected-strong: #DCE3D5;
   --state-active: #DCE3D5;
@@ -134,10 +140,10 @@
   --syntax-highlight-type: #90511E;
   --syntax-highlight-deletion: #A8322E;
   --syntax-highlight-deletion-bg: #F5E2DE;
-  --diff-added-text: #296E46;
-  --diff-added-bg: rgba(41, 110, 70, 0.12);
-  --diff-removed-text: #AD3B31;
-  --diff-removed-bg: rgba(173, 59, 49, 0.12);
+  --diff-added-text: #1E5536;
+  --diff-added-bg: rgba(30, 85, 54, 0.12);
+  --diff-removed-text: #8F2C24;
+  --diff-removed-bg: rgba(143, 44, 36, 0.12);
   --diff-hunk-bg: rgba(44, 106, 77, 0.08);
   --editor-code-block-background: var(--surface-sidebar);
   --editor-code-block-border: var(--border-subtle);
@@ -230,6 +236,8 @@
   /* --- Interaction states (Earth dark, shared) --- */
   --state-hover: #1C1D14;
   --state-hover-subtle: #16170F;
+  --state-menu-hover: #3B3828;
+  --state-menu-selected: #2A281D;
   --state-selected: #1A2619;
   --state-selected-strong: #1C291B;
   --state-active: #1C291B;
@@ -379,6 +387,8 @@
 
   --state-hover: #242321;
   --state-hover-subtle: #1A1917;
+  --state-menu-hover: #4A4948;
+  --state-menu-selected: #3F3E3C;
   --state-selected: #202B23;
   --state-selected-strong: #26382C;
   --state-active: #26382C;
@@ -448,6 +458,8 @@
   /* --- Interaction states (Earth dark) --- */
   --state-hover: #1C1D14;
   --state-hover-subtle: #16170F;
+  --state-menu-hover: #3B3828;
+  --state-menu-selected: #2A281D;
   --state-selected: #1A2619;
   --state-selected-strong: #1C291B;
   --state-active: #1C291B;
@@ -644,12 +656,14 @@
 /* --- Tailwind v4 theme inline: register colors + radii --- */
 @theme inline {
   /*
-   * font-mono resolved to Tailwind's built-in system-monospace stack, so the
-   * two monospace faces the app actually loads (IBM Plex Mono for agent code,
-   * JetBrains Mono for the wordmark) were never what any `font-mono` utility
-   * rendered in. Registering it here is the one-line fix: every existing
-   * `font-mono` class picks it up without touching call sites.
+   * font-sans and font-mono resolved to Tailwind's built-in stacks, so Inter
+   * (linked in index.html) and the monospace faces the app loads (IBM Plex
+   * Mono for agent code, JetBrains Mono for the wordmark) were never what the
+   * utilities rendered. Registering them here is the fix: every existing class
+   * picks them up without touching call sites.
    */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    Oxygen, Ubuntu, Cantarell, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
   --color-background: var(--background);
   --color-foreground: var(--foreground);

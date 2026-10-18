@@ -40,6 +40,8 @@ interface FilteredEntriesParams {
   modifiedFiles?: ModifiedFile[]
   subFilter?: NoteListFilter
   inboxPeriod?: InboxPeriod
+  /** Same array the Inbox badge counts. When set, the list does not filter again. */
+  inboxEntries?: readonly VaultEntry[]
   views?: ViewFile[]
   allNotesFileVisibility?: AllNotesFileVisibility
 }
@@ -54,6 +56,7 @@ function buildFilteredEntries({
   modifiedFiles,
   subFilter,
   inboxPeriod,
+  inboxEntries: providedInboxEntries,
   views,
   allNotesFileVisibility,
 }: FilteredEntriesParams & {
@@ -72,7 +75,9 @@ function buildFilteredEntries({
     views,
     allNotesFileVisibility,
     changesEntries,
-    inboxEntries: isInboxView ? filterInboxEntries(entries, inboxPeriod ?? 'month') : undefined,
+    inboxEntries: isInboxView
+      ? [...(providedInboxEntries ?? filterInboxEntries(entries, inboxPeriod ?? 'all'))]
+      : undefined,
   }).entries
 }
 
@@ -84,6 +89,7 @@ export function useFilteredEntries({
   modifiedFiles,
   subFilter,
   inboxPeriod,
+  inboxEntries,
   views,
   allNotesFileVisibility,
 }: FilteredEntriesParams) {
@@ -100,10 +106,11 @@ export function useFilteredEntries({
       modifiedFiles,
       subFilter,
       inboxPeriod,
+      inboxEntries,
       views,
       allNotesFileVisibility,
     })
-  }, [allNotesFileVisibility, entries, inboxPeriod, isChangesView, isInboxView, modifiedFiles, modifiedPathSet, modifiedSuffixes, selection, subFilter, views])
+  }, [allNotesFileVisibility, entries, inboxEntries, inboxPeriod, isChangesView, isInboxView, modifiedFiles, modifiedPathSet, modifiedSuffixes, selection, subFilter, views])
 }
 
 // --- useNoteListData ---
@@ -115,6 +122,7 @@ interface NoteListDataParams {
   modifiedFiles?: ModifiedFile[]
   subFilter?: NoteListFilter
   inboxPeriod?: InboxPeriod
+  inboxEntries?: readonly VaultEntry[]
   views?: ViewFile[]
   allNotesFileVisibility?: AllNotesFileVisibility
 }
@@ -130,6 +138,7 @@ export function useNoteListData({
   modifiedFiles,
   subFilter,
   inboxPeriod,
+  inboxEntries,
   views,
   allNotesFileVisibility,
 }: NoteListDataParams) {
@@ -148,6 +157,7 @@ export function useNoteListData({
     modifiedFiles,
     subFilter,
     inboxPeriod,
+    inboxEntries,
     views,
     allNotesFileVisibility,
   })
@@ -599,6 +609,8 @@ function useInboxPropertyPickerState(
   isInboxView: boolean,
   typeEntryMap: Record<string, VaultEntry>,
 ): ScopedPropertyPickerState {
+  // The picker must use the same period as the Inbox list. App passes 'all'.
+  // A narrower period would drop older notes from the picker only.
   const inboxEntries = useMemo(
     () => isInboxView ? filterInboxEntries(entries, inboxPeriod) : [],
     [entries, inboxPeriod, isInboxView],

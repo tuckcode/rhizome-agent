@@ -54,22 +54,22 @@ describe('graphWorkspaceVaults', () => {
 describe('workspaceIdentityFromVault', () => {
   it('falls back to the path name when native omits a vault label', () => {
     const workspace = workspaceIdentityFromVault({
-      path: '/Users/luca/Workspace/laputa',
+      path: '/Users/mock/Workspace/vault',
     } as VaultOption)
 
-    expect(workspace.label).toBe('laputa')
-    expect(workspace.alias).toBe('laputa')
-    expect(workspace.shortLabel).toBe('LA')
+    expect(workspace.label).toBe('vault')
+    expect(workspace.alias).toBe('vault')
+    expect(workspace.shortLabel).toBe('VA')
   })
 
   it('keeps the slug path-derived when the display name changes', () => {
     const workspace = workspaceIdentityFromVault({
       label: 'Personal Main',
-      path: '/Users/luca/Workspace/laputa',
+      path: '/Users/mock/Workspace/vault',
     } as VaultOption)
 
     expect(workspace.label).toBe('Personal Main')
-    expect(workspace.alias).toBe('laputa')
+    expect(workspace.alias).toBe('vault')
   })
 
   it('uses a custom short label when one is configured', () => {

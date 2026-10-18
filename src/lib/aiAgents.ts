@@ -3,7 +3,6 @@ export type AiAgentId =
   | 'claude_code'
   | 'codex'
   | 'opencode'
-  | 'pi'
   | 'antigravity'
   | 'kiro'
   | 'hermes'
@@ -69,13 +68,6 @@ export const AI_AGENT_DEFINITIONS: readonly AiAgentDefinition[] = [
     productVisible: false,
   },
   {
-    id: 'pi',
-    label: 'Pi',
-    shortLabel: 'Pi',
-    installUrl: 'https://pi.dev',
-    productVisible: false,
-  },
-  {
     id: 'antigravity',
     label: 'Antigravity CLI',
     shortLabel: 'Antigravity',
@@ -127,7 +119,7 @@ export function createMissingAiAgentsStatus(): AiAgentsStatus {
 }
 
 export function normalizeStoredAiAgent(value: string | null | undefined): AiAgentId | null {
-  if (value === 'gemini') return 'antigravity'
+  if (value === 'pi' || value === 'gemini') return DEFAULT_AI_AGENT
   if (AI_AGENT_DEFINITIONS.some((definition) => definition.id === value)) return value as AiAgentId
   return null
 }
@@ -143,6 +135,20 @@ export function resolveDefaultAiAgent(value: string | null | undefined): AiAgent
 
 export function getAiAgentDefinition(agent: AiAgentId): AiAgentDefinition {
   return AI_AGENT_DEFINITIONS.find((definition) => definition.id === agent) ?? AI_AGENT_DEFINITIONS[0]
+}
+
+/** Composer and Cmd+K copy: derive the name from the resolved target, not the global engine. */
+export function composerAgentLabel(options: {
+  chatEngine?: 'prime' | 'native'
+  agent: AiAgentId
+  targetLabel?: string
+}): string {
+  if (options.agent !== 'prime' && options.agent !== 'hermes') {
+    return options.targetLabel ?? getAiAgentDefinition(options.agent).label
+  }
+  if (options.chatEngine === 'native') return 'Rhizome'
+  if (options.agent === 'prime') return getAiAgentDefinition('prime').shortLabel
+  return options.targetLabel ?? getAiAgentDefinition(options.agent).label
 }
 
 function normalizeAvailability(

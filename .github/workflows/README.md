@@ -1,4 +1,4 @@
-# GitHub Actions — Rhizome Agent
+# GitHub Actions — Rhizome
 
 **Origin:** Rewritten 2026-09-01 (Cursor) — replaces Italian bootstrap copy from
 Rhizome Desktop (`11e1315`, 2026-08-09). Align with the workflow YAML files
@@ -15,10 +15,11 @@ English only (C18). This repo is **private**; several workflows are
 | File | Purpose | Trigger (today) |
 |---|---|---|
 | [`ci.yml`](ci.yml) | PR verification: lint, build, tests, coverage | `pull_request` → `main`, `workflow_dispatch` |
+| [`pages.yml`](pages.yml) | GitHub Pages: landing (`website/`) at `/` and Starlight (`site/`) at `/docs` | `push` → `main` (path-filtered), `workflow_dispatch` |
 | [`release.yml`](release.yml) | Alpha release build + GitHub Release | `workflow_dispatch` only |
 | [`release-stable.yml`](release-stable.yml) | Stable release | `workflow_dispatch` only |
 | [`release-build-artifacts.yml`](release-build-artifacts.yml) | Shared macOS artifact build (called by release workflows) | `workflow_call` |
-| ~~`deploy-docs.yml`~~ | Removed — no public VitePress site until Agent has one | — |
+| ~~`deploy-docs.yml`~~ | Removed — Pages now ships Starlight from `site/` via `pages.yml` | — |
 | [`auto-update-prs.yml`](auto-update-prs.yml) | Rebase open PRs onto latest `main` | `workflow_dispatch` only |
 
 **Not automatic on push to `main`:** `ci.yml`, release workflows, and
@@ -109,7 +110,7 @@ Manual cloud verification when you want a clean-room run:
 
 ## Deploy docs
 
-There is no public VitePress site until Agent has one. `pnpm docs:build` only refreshes the existing in-app agent-docs bundle when `site/` is present.
+GitHub Pages is `website/build.sh`: landing page at `/` and the Starlight site from `site/` at `/docs` (`https://tuckcode.github.io/rhizome-agent/docs/`). `pnpm docs:build` still only refreshes the in-app agent-docs bundle.
 
 ---
 

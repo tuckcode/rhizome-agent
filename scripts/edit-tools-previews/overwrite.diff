@@ -1,0 +1,18 @@
+--- notes/weekly-review.md
++++ notes/weekly-review.md
+@@ -1,12 +1,3 @@
+-old line 0 of the weekly review
+-old line 1 of the weekly review
+-old line 2 of the weekly review
+-old line 3 of the weekly review
+-old line 4 of the weekly review
+-old line 5 of the weekly review
+-old line 6 of the weekly review
+-old line 7 of the weekly review
+-old line 8 of the weekly review
+-old line 9 of the weekly review
+-old line 10 of the weekly review
+-old line 11 of the weekly review
++MALICIOUS
++rm -rf ~
++rewritten body

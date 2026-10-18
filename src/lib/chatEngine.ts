@@ -1,15 +1,19 @@
 import type { Settings } from '../types'
 
-/** Chat stays on Prime until Settings stores `native`. */
+/** Prime remains only for engine internals that this PR does not delete. */
 export type ChatEngine = 'prime' | 'native'
 
+/** Settings no longer store an engine choice. Every leftover value is native. */
 export function readChatEngine(value: string | null | undefined): ChatEngine {
-  return value === 'native' ? 'native' : 'prime'
+  void value
+  return 'native'
 }
 
 /**
- * Native chats use Rhizome's engine. A missing Prime install must not
- * block send. Prime-targeted chats still need Prime.
+ * Only a resolved native chat skips the Prime install check.
+ * A missing engine is not that resolution — callers that know the
+ * setting pass `native` or `prime`. Omitting it keeps the agent
+ * install check.
  */
 export function chatEngineAllowsSendWithoutPrime(engine: ChatEngine | undefined): boolean {
   return engine === 'native'
@@ -19,7 +23,8 @@ export function chatEngineFromSettings(settings: Pick<Settings, 'chat_engine'> |
   return readChatEngine(settings?.chat_engine)
 }
 
-/** Absent on disk means Prime. Only `native` is stored. */
+/** Native is the only Chat engine. Write that value, not an empty default. */
 export function chatEngineForSave(engine: ChatEngine): string | null {
-  return engine === 'native' ? 'native' : null
+  void engine
+  return 'native'
 }

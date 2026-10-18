@@ -181,14 +181,16 @@ pub fn write_distilled_card(
 /// chat), falling back to Claude Code — matches the existing fallback at
 /// `commands/ai.rs`.
 pub fn resolve_default_agent_id() -> crate::ai_agents::AiAgentId {
-    use crate::ai_agents::AiAgentId;
     let settings = crate::settings::get_settings().unwrap_or_default();
-    match crate::settings::normalize_default_ai_agent(settings.default_ai_agent.as_deref())
-        .as_deref()
-    {
+    resolve_default_agent_id_from(settings.default_ai_agent.as_deref())
+}
+
+pub fn resolve_default_agent_id_from(stored: Option<&str>) -> crate::ai_agents::AiAgentId {
+    use crate::ai_agents::AiAgentId;
+    match crate::settings::normalize_default_ai_agent(stored).as_deref() {
+        Some("prime") => AiAgentId::Prime,
         Some("codex") => AiAgentId::Codex,
         Some("opencode") => AiAgentId::Opencode,
-        Some("pi") => AiAgentId::Pi,
         Some("antigravity") => AiAgentId::Antigravity,
         Some("kiro") => AiAgentId::Kiro,
         Some("hermes") => AiAgentId::Hermes,
@@ -350,6 +352,22 @@ pub fn append_distill_event(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn stored_prime_default_agent_does_not_fall_back_to_claude_code() {
+        assert_eq!(
+            resolve_default_agent_id_from(Some("prime")),
+            crate::ai_agents::AiAgentId::Prime
+        );
+        assert_eq!(
+            resolve_default_agent_id_from(Some("Prime")),
+            crate::ai_agents::AiAgentId::Prime
+        );
+        assert_eq!(
+            resolve_default_agent_id_from(None),
+            crate::ai_agents::AiAgentId::ClaudeCode
+        );
+    }
 
     #[test]
     fn parses_title_context_and_body() {
@@ -598,7 +616,7 @@ mod tests {
                         tools: false,
                         vision: false,
                         json_mode: true,
-                        reasoning: false,
+                        reasoning: crate::reasoning_levels::ReasoningSupport::Unknown,
                     },
                 }],
             },

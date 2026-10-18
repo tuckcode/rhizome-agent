@@ -30,6 +30,9 @@ serde = { version = "1.0", features = ["derive"] }
 # as a transitive dependency, so declaring it adds no new compiled code.
 sha2 = "0.10"
 serde_yaml = "0.9"
+# Saved views keep unknown keys in file order. Already in the tree via
+# serde_yaml, so declaring it adds no new compiled code.
+indexmap = { version = "2", features = ["serde"] }
 log = "0.4"
 notify = "6.1"
 tauri = { version = "2.10.0", features = ["macos-private-api", "protocol-asset", "devtools", "image-png", "tray-icon"] }
@@ -41,6 +44,16 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 futures-util = "0.3"
 base64 = "0.22"
 regex = "1"
+# Timed Myers diffs for mutate-tool approval previews (Apache-2.0 OR MIT).
+similar = "2.7"
+# Unix process groups and the command-wrapper types for native bash.
+# Apache-2.0 OR MIT. 8.2.1 keeps the 1.77 MSRV; its std JobObject leaves
+# KILL_ON_JOB_CLOSE off, so the Windows job lives in tools/shell.rs.
+process-wrap = { version = "=8.2.1", default-features = false, features = ["std", "process-group"] }
+# gitignore-aware walks and glob matching for native read tools.
+# MIT/Unlicense; already common in the Rust search stack (ripgrep).
+ignore = "0.4"
+globset = "0.4"
 ironcalc_base = "0.7.1"
 csv = "1.4"
 dirs = "5"
@@ -64,6 +77,14 @@ fastembed = { version = "5.17.2", default-features = false, features = [
 
 [target.'cfg(windows)'.dependencies]
 keyring = { version = "3.6.3", features = ["windows-native"] }
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_JobObjects",
+    "Win32_System_Pipes",
+    "Win32_System_Threading",
+] }
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_Security",
@@ -84,4 +105,20 @@ objc2-web-kit = { version = "0.3.2", features = ["WKWebView", "objc2-app-kit"] }
 [target.'cfg(target_os = "linux")'.dependencies]
 keyring = { version = "3.6.3", features = ["sync-secret-service", "crypto-rust"] }
 
-[dev-dependencies]
+# access(W_OK) for 0464-style files, and xattr copy before atomic rename
+# (Finder tags / quarantine on macOS). MIT OR Apache-2.0.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+# `signal` is killpg. `process` is the wait-status types beside libc::waitid.
+# `fs` is the safe fcntl that sets O_NONBLOCK. Apache-2.0 OR MIT.
+# process-wrap already uses 0.30. Features are declared here so this crate
+# does not depend on process-wrap enabling them.
+nix = { version = "0.30", default-features = false, features = ["fs", "process", "signal"] }
+xattr = "1"
+
+# Unlocks `tauri::test` for the updater placeholder-config test. The feature
+# itself is empty; it only compiles the mock runtime. On Windows that runtime
+# makes the whole lib test process exit with STATUS_ENTRYPOINT_NOT_FOUND
+# before any test runs, so the mock app stays off that target.
+[target.'cfg(not(windows))'.dev-dependencies]
+tauri = { version = "2.10.0", features = ["test"] }

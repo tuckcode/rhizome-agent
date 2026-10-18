@@ -1,19 +1,26 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::{Mutex, OnceLock};
 
 use crate::ai_models::{normalize_ai_model_providers, AiModelProvider};
 
+/// Product default. Saved `pi` and the old `gemini` alias migrate here.
+pub const DEFAULT_AI_AGENT: &str = "prime";
+
 const SUPPORTED_DEFAULT_AI_AGENTS: &[&str] = &[
+    "prime",
     "claude_code",
     "codex",
     "opencode",
-    "pi",
     "antigravity",
     "kiro",
     "hermes",
 ];
 pub const DEFAULT_HIDE_GITIGNORED_FILES: bool = true;
+/// Native read tools refuse secret paths unless the user turns this off.
+pub const DEFAULT_BLOCK_SECRET_FILES: bool = true;
 /// A spike behind a flag; unset means OFF.
 /// See `docs/adr/0163-automatic-consolidation-l0-to-l1.md`.
 pub const DEFAULT_AUTOMATIC_CONSOLIDATION_ENABLED: bool = false;
@@ -152,6 +159,11 @@ pub struct Settings {
     pub ai_model_providers: Option<Vec<AiModelProvider>>,
     pub ai_workspace_conversations: Option<Vec<AiWorkspaceConversationSetting>>,
     pub hide_gitignored_files: Option<bool>,
+    /// When true (the default, including `None`), native read tools
+    /// refuse secret paths. Off disables that denylist for reads only.
+    /// Write tools always apply it. A malformed value counts as on.
+    #[serde(default, deserialize_with = "deserialize_optional_bool_on_malformed")]
+    pub block_secret_files: Option<bool>,
     pub all_notes_show_pdfs: Option<bool>,
     pub all_notes_show_images: Option<bool>,
     pub all_notes_show_unsupported: Option<bool>,
@@ -216,14 +228,28 @@ pub struct Settings {
     /// `AGENTS.md` and it is not Prime `USER.md`.
     #[serde(default)]
     pub agent_profile: Option<String>,
-    /// Chat engine. Absent or anything other than `native` means Prime.
-    /// Phase 6 (plan step 4). No migration: nothing on disk is `native` yet.
+    /// Chat engine. Absent means Rhizome's native loop. Settings writes
+    /// null for that default and `prime` only when someone picks Prime.
+    /// An explicit `native` already on disk is kept. Any other value,
+    /// including `hermes`, is dropped.
     #[serde(default)]
     pub chat_engine: Option<String>,
     /// Model id for a native Chat session, `provider/model` or `free_tier_auto`.
     /// Absent uses the catalog default. Anthropic ids are dropped until 6a.
     #[serde(default)]
     pub native_chat_target: Option<String>,
+}
+
+fn deserialize_optional_bool_on_malformed<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = Option::<serde_json::Value>::deserialize(deserializer)?;
+    match value {
+        None | Some(serde_json::Value::Null) => Ok(None),
+        Some(serde_json::Value::Bool(flag)) => Ok(Some(flag)),
+        Some(_) => Ok(None),
+    }
 }
 
 /// Return the persisted bridge token, generating and saving one the first
@@ -290,7 +316,7 @@ pub fn effective_release_channel(value: Option<&str>) -> &'static str {
 
 pub fn normalize_default_ai_agent(value: Option<&str>) -> Option<String> {
     match value.map(|candidate| candidate.trim().to_ascii_lowercase()) {
-        Some(agent) if agent == "gemini" => Some("antigravity".to_string()),
+        Some(agent) if agent == "pi" || agent == "gemini" => Some(DEFAULT_AI_AGENT.to_string()),
         Some(agent) if SUPPORTED_DEFAULT_AI_AGENTS.contains(&agent.as_str()) => Some(agent),
         _ => None,
     }
@@ -419,6 +445,20 @@ pub fn hide_gitignored_files_enabled() -> bool {
         .unwrap_or(DEFAULT_HIDE_GITIGNORED_FILES)
 }
 
+/// Reads honour this flag. Write tools use `resolve_for_write` and
+/// ignore it.
+pub fn should_block_secret_files(settings: &Settings) -> bool {
+    settings
+        .block_secret_files
+        .unwrap_or(DEFAULT_BLOCK_SECRET_FILES)
+}
+
+pub fn block_secret_files_enabled() -> bool {
+    get_settings()
+        .map(|settings| should_block_secret_files(&settings))
+        .unwrap_or(DEFAULT_BLOCK_SECRET_FILES)
+}
+
 /// Gate for the automatic-consolidation spike.
 pub fn automatic_consolidation_enabled(settings: &Settings) -> bool {
     settings
@@ -487,6 +527,7 @@ fn normalize_settings(settings: Settings) -> Settings {
             settings.ai_workspace_conversations,
         ),
         hide_gitignored_files: settings.hide_gitignored_files,
+        block_secret_files: settings.block_secret_files,
         all_notes_show_pdfs: settings.all_notes_show_pdfs,
         all_notes_show_images: settings.all_notes_show_images,
         all_notes_show_unsupported: settings.all_notes_show_unsupported,
@@ -497,10 +538,51 @@ fn normalize_settings(settings: Settings) -> Settings {
     }
 }
 
+/// Absent on disk means native. Leftover Prime/Hermes/garbage values become native.
 fn normalize_chat_engine(value: Option<String>) -> Option<String> {
     match value.as_deref().map(str::trim) {
-        Some("native") => Some("native".into()),
-        _ => None,
+        None | Some("") => None,
+        Some(engine) if engine.eq_ignore_ascii_case("native") => Some("native".into()),
+        _ => Some("native".into()),
+    }
+}
+
+fn leftover_chat_engine_on_disk(raw: &str) -> bool {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(raw) else {
+        return false;
+    };
+    match value
+        .get("chat_engine")
+        .and_then(|engine| engine.as_str())
+        .map(str::trim)
+    {
+        None | Some("") => false,
+        Some(engine) if engine.eq_ignore_ascii_case("native") => false,
+        Some(_) => true,
+    }
+}
+
+fn leftover_chat_engine_writeback_claimed(path: &Path) -> bool {
+    static WRITTEN: OnceLock<Mutex<HashSet<PathBuf>>> = OnceLock::new();
+    let Ok(mut written) = WRITTEN.get_or_init(|| Mutex::new(HashSet::new())).lock() else {
+        return false;
+    };
+    written.insert(path.to_path_buf())
+}
+
+fn persist_leftover_chat_engine_migration(
+    path: &Path,
+    settings: &Settings,
+    persist: impl FnOnce(&Path, Settings) -> Result<(), String>,
+) {
+    if !leftover_chat_engine_writeback_claimed(path) {
+        return;
+    }
+    if let Err(error) = persist(path, settings.clone()) {
+        log::warn!(
+            "Leftover chat_engine migration was not written to {}: {error}",
+            path.display()
+        );
     }
 }
 
@@ -558,6 +640,13 @@ fn settings_path() -> Result<PathBuf, String> {
 }
 
 fn get_settings_at(path: &PathBuf) -> Result<Settings, String> {
+    get_settings_at_with_persist(path, save_settings_at)
+}
+
+fn get_settings_at_with_persist(
+    path: &PathBuf,
+    persist: impl FnOnce(&Path, Settings) -> Result<(), String>,
+) -> Result<Settings, String> {
     if !path.exists() {
         return Ok(Settings::default());
     }
@@ -565,7 +654,11 @@ fn get_settings_at(path: &PathBuf) -> Result<Settings, String> {
         fs::read_to_string(path).map_err(|e| format!("Failed to read settings: {}", e))?;
     let settings =
         serde_json::from_str(&content).map_err(|e| format!("Failed to parse settings: {}", e))?;
-    Ok(normalize_settings(settings))
+    let normalized = normalize_settings(settings);
+    if leftover_chat_engine_on_disk(&content) {
+        persist_leftover_chat_engine_migration(path, &normalized, persist);
+    }
+    Ok(normalized)
 }
 
 fn save_settings_at(path: &Path, settings: Settings) -> Result<(), String> {
@@ -730,28 +823,148 @@ mod tests {
     }
 
     #[test]
-    fn chat_engine_defaults_to_prime_and_native_persists() {
+    fn chat_engine_defaults_to_native_and_leftovers_become_native() {
         let fresh = save_and_reload(Settings::default());
         assert_eq!(fresh.chat_engine, None);
 
-        let kept = save_and_reload(Settings {
+        let kept_native = save_and_reload(Settings {
             chat_engine: Some("native".into()),
             native_chat_target: Some("open_ai/gpt-4.1-mini".into()),
             ..Settings::default()
         });
-        assert_eq!(kept.chat_engine.as_deref(), Some("native"));
+        assert_eq!(kept_native.chat_engine.as_deref(), Some("native"));
         assert_eq!(
-            kept.native_chat_target.as_deref(),
+            kept_native.native_chat_target.as_deref(),
             Some("open_ai/gpt-4.1-mini")
         );
 
-        let dropped = save_and_reload(Settings {
+        let migrated_prime = save_and_reload(Settings {
             chat_engine: Some("prime".into()),
             native_chat_target: Some("anthropic/claude-3-5-sonnet-latest".into()),
             ..Settings::default()
         });
-        assert_eq!(dropped.chat_engine, None);
-        assert_eq!(dropped.native_chat_target, None);
+        assert_eq!(migrated_prime.chat_engine.as_deref(), Some("native"));
+        assert_eq!(migrated_prime.native_chat_target, None);
+
+        let migrated_hermes = save_and_reload(Settings {
+            chat_engine: Some("hermes".into()),
+            ..Settings::default()
+        });
+        assert_eq!(migrated_hermes.chat_engine.as_deref(), Some("native"));
+
+        let migrated_bogus = save_and_reload(Settings {
+            chat_engine: Some("bogus".into()),
+            ..Settings::default()
+        });
+        assert_eq!(migrated_bogus.chat_engine.as_deref(), Some("native"));
+
+        for leftover in ["Prime", "HERMES", "agent:prime", "agent:hermes"] {
+            let migrated = save_and_reload(Settings {
+                chat_engine: Some(leftover.into()),
+                ..Settings::default()
+            });
+            assert_eq!(
+                migrated.chat_engine.as_deref(),
+                Some("native"),
+                "{leftover} should become native"
+            );
+        }
+    }
+
+    #[test]
+    fn leftover_chat_engine_is_written_back_on_load() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("settings.json");
+        // Write leftover casing without save_settings_at, which would normalize first.
+        let leftover = Settings {
+            chat_engine: Some("Prime".into()),
+            ..Settings::default()
+        };
+        fs::write(&path, serde_json::to_string(&leftover).unwrap()).unwrap();
+        let loaded = get_settings_at(&path).unwrap();
+        assert_eq!(loaded.chat_engine.as_deref(), Some("native"));
+        let disk: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(disk["chat_engine"], "native");
+    }
+
+    #[test]
+    fn leftover_chat_engine_write_failure_still_returns_normalized_settings() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("settings.json");
+        let leftover = Settings {
+            chat_engine: Some("Prime".into()),
+            ..Settings::default()
+        };
+        fs::write(&path, serde_json::to_string(&leftover).unwrap()).unwrap();
+
+        let loaded =
+            get_settings_at_with_persist(&path, |_, _| Err("antivirus lock on rename".into()))
+                .unwrap();
+        assert_eq!(loaded.chat_engine.as_deref(), Some("native"));
+        let disk: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(disk["chat_engine"], "Prime");
+
+        get_settings_at_with_persist(&path, |_, _| {
+            panic!("leftover chat_engine write-back must happen at most once");
+        })
+        .unwrap();
+        let disk_again: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(disk_again["chat_engine"], "Prime");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn leftover_chat_engine_readonly_dir_still_returns_ok() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("settings.json");
+        let leftover = Settings {
+            chat_engine: Some("Prime".into()),
+            ..Settings::default()
+        };
+        fs::write(&path, serde_json::to_string(&leftover).unwrap()).unwrap();
+
+        struct RestorePermissions {
+            path: PathBuf,
+            original: std::fs::Permissions,
+        }
+        impl Drop for RestorePermissions {
+            fn drop(&mut self) {
+                let _ = std::fs::set_permissions(&self.path, self.original.clone());
+            }
+        }
+
+        let original = std::fs::metadata(dir.path()).unwrap().permissions();
+        let _restore = RestorePermissions {
+            path: dir.path().to_path_buf(),
+            original,
+        };
+        std::fs::set_permissions(dir.path(), std::fs::Permissions::from_mode(0o555)).unwrap();
+
+        let loaded = get_settings_at(&path).unwrap();
+        assert_eq!(loaded.chat_engine.as_deref(), Some("native"));
+    }
+
+    #[test]
+    fn default_ai_agent_prime_stays_prime_until_distill_moves_to_native() {
+        // Distill, inbox, and jobs still read this field. Map prime → none
+        // only when those callers move to native in a later PR.
+        assert_eq!(
+            normalize_default_ai_agent(Some("prime")).as_deref(),
+            Some("prime")
+        );
+        assert_eq!(
+            normalize_default_ai_agent(Some("Prime")).as_deref(),
+            Some("prime")
+        );
+        assert_eq!(
+            normalize_default_ai_agent(Some("claude_code")).as_deref(),
+            Some("claude_code")
+        );
     }
 
     #[test]
@@ -1027,6 +1240,7 @@ mod tests {
             ai_model_providers: None,
             ai_workspace_conversations: None,
             hide_gitignored_files: Some(false),
+            block_secret_files: Some(false),
             multi_workspace_enabled: Some(true),
             all_notes_show_pdfs: Some(true),
             all_notes_show_images: Some(true),
@@ -1117,6 +1331,35 @@ mod tests {
     }
 
     #[test]
+    fn secret_file_block_is_on_by_default_and_roundtrips() {
+        assert!(should_block_secret_files(&Settings::default()));
+        assert!(should_block_secret_files(&Settings {
+            block_secret_files: Some(true),
+            ..Default::default()
+        }));
+        assert!(!should_block_secret_files(&Settings {
+            block_secret_files: Some(false),
+            ..Default::default()
+        }));
+        let loaded = save_and_reload(Settings {
+            block_secret_files: Some(false),
+            ..Default::default()
+        });
+        assert_eq!(loaded.block_secret_files, Some(false));
+        let missing = serde_json::from_str::<Settings>("{}").unwrap();
+        assert!(should_block_secret_files(&missing));
+    }
+
+    #[test]
+    fn malformed_block_secret_files_counts_as_on() {
+        let parsed: Settings = serde_json::from_str(r#"{"block_secret_files":"nope"}"#).unwrap();
+        assert_eq!(parsed.block_secret_files, None);
+        assert!(should_block_secret_files(&parsed));
+        let number: Settings = serde_json::from_str(r#"{"block_secret_files":1}"#).unwrap();
+        assert!(should_block_secret_files(&number));
+    }
+
+    #[test]
     fn test_save_trims_whitespace() {
         let loaded = save_and_reload(Settings {
             anonymous_id: Some("  test-uuid  ".to_string()),
@@ -1185,12 +1428,12 @@ mod tests {
     }
 
     #[test]
-    fn test_pi_default_ai_agent_is_preserved() {
+    fn test_prime_default_ai_agent_is_preserved() {
         let loaded = save_and_reload(Settings {
-            default_ai_agent: Some("pi".to_string()),
+            default_ai_agent: Some("prime".to_string()),
             ..Default::default()
         });
-        assert_eq!(loaded.default_ai_agent.as_deref(), Some("pi"));
+        assert_eq!(loaded.default_ai_agent.as_deref(), Some("prime"));
     }
 
     #[test]
@@ -1203,12 +1446,21 @@ mod tests {
     }
 
     #[test]
-    fn test_legacy_gemini_default_ai_agent_migrates_to_antigravity() {
-        let loaded = save_and_reload(Settings {
-            default_ai_agent: Some("gemini".to_string()),
-            ..Default::default()
-        });
-        assert_eq!(loaded.default_ai_agent.as_deref(), Some("antigravity"));
+    fn test_legacy_pi_default_ai_agent_loads_as_prime() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("settings.json");
+        fs::write(&path, r#"{ "default_ai_agent": "pi" }"#).unwrap();
+        let loaded = get_settings_at(&path).unwrap();
+        assert_eq!(loaded.default_ai_agent.as_deref(), Some("prime"));
+    }
+
+    #[test]
+    fn test_legacy_gemini_default_ai_agent_loads_as_prime() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let path = dir.path().join("settings.json");
+        fs::write(&path, r#"{ "default_ai_agent": "gemini" }"#).unwrap();
+        let loaded = get_settings_at(&path).unwrap();
+        assert_eq!(loaded.default_ai_agent.as_deref(), Some("prime"));
     }
 
     #[test]

@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
@@ -366,10 +366,10 @@ async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo, folde
       register_mcp_tools: () => null,
       get_mcp_config_snippet: () => JSON.stringify({
         mcpServers: {
-          tolaria: {
+          rhizome: {
             type: 'stdio',
             command: 'node',
-            args: ['/fixture/Tolaria/mcp-server/index.js'],
+            args: ['/fixture/Rhizome/mcp-server/index.js'],
             env: {
               WS_UI_PORT: '9711',
             },
@@ -535,40 +535,92 @@ async function installFixtureVaultInitScript({ page, vaultPath, isGitRepo, folde
   })
 }
 
+/**
+ * Fresh Chat launch shows the Notes rail (#184), not the old Show Notes strip.
+ * Open mode still exists; the restore button is only the classic-shell fallback.
+ */
+function dockedVaultPanelIsOpen(): boolean {
+  return [...document.querySelectorAll('[data-testid="vault-panel"]')].some(
+    (el) => !el.closest('[data-testid="notes-panel-rail"]'),
+  )
+}
+
+export async function openNotesPanelFromClosedShell(
+  page: Page,
+  timeout = FIXTURE_VAULT_READY_TIMEOUT,
+): Promise<void> {
+  if (await page.evaluate(dockedVaultPanelIsOpen)) return
+
+  const restore = page.getByTestId('vault-panel-restore')
+  if (await restore.isVisible().catch(() => false)) {
+    await restore.click()
+  } else {
+    // The Notes rail hover-expands and unmounts the mode menu, so do not click
+    // it. Dispatch Notes (editor-list) the same way the View menu does.
+    await page.waitForFunction(() => window.__rhizomeFrontendReady === true, undefined, { timeout })
+    const deadline = Date.now() + timeout
+    while (Date.now() < deadline) {
+      await page.evaluate(() => {
+        window.dispatchEvent(new CustomEvent('laputa:dispatch-command', { detail: 'view-editor-list' }))
+      })
+      try {
+        await page.waitForFunction(dockedVaultPanelIsOpen, undefined, { timeout: 2_000 })
+        return
+      } catch {
+        // The command listener may not be attached on the first tick.
+      }
+    }
+  }
+  await page.waitForFunction(dockedVaultPanelIsOpen, undefined, { timeout })
+}
+
+/**
+ * Show the full note list and return it. A fresh launch is Chat (ADR-0173),
+ * so this opens Notes from the rail when the list is not already visible
+ * (a stored editor-list still wins), expands Browse, and selects All Notes.
+ * The product default is Inbox when explicit organization is on. Tests use
+ * the full seed set. Do not wait on one title: the virtualized list may keep
+ * that row off-DOM.
+ */
+export async function openAllNotesList(
+  page: Page,
+  timeout = FIXTURE_VAULT_READY_TIMEOUT,
+): Promise<Locator> {
+  const noteList = page.locator('[data-testid="note-list-container"]')
+  // The classic shell (`ff_shell_command_rail=false`) already shows the list.
+  if (!(await noteList.isVisible().catch(() => false))) {
+    try {
+      await page.waitForFunction(dockedVaultPanelIsOpen, undefined, { timeout: 5_000 })
+    } catch {
+      await openNotesPanelFromClosedShell(page, timeout)
+    }
+  }
+  await noteList.waitFor({ timeout })
+
+  // All Notes lives in Browse on the command-rail shell. Expand it when C72
+  // left it collapsed. The classic sidebar shows All Notes directly.
+  const allNotes = page.getByTestId('sidebar-top-nav').getByText('All Notes', { exact: true })
+  const browseToggle = page.getByTestId('vault-panel-browse-toggle')
+  await expect(allNotes.or(browseToggle).first()).toBeVisible({ timeout })
+  if (!(await allNotes.isVisible())) {
+    await browseToggle.click()
+    await expect(allNotes).toBeVisible({ timeout })
+  }
+  await allNotes.click()
+  await expect(noteList.getByRole('option').first()).toBeVisible({ timeout })
+  return noteList
+}
+
 async function waitForFixtureVaultReady({
   page,
   initialPanel,
 }: FixturePageArgs & { initialPanel: 'inbox' | 'notes' }): Promise<void> {
+  await page.setViewportSize({ width: 1400, height: 900 })
   await page.goto('/', { waitUntil: 'domcontentloaded' })
   await page.waitForFunction(() => Boolean(window.__mockHandlers?.list_vault))
 
-  // Fresh launch is Chat (ADR-0173). Tests that need the list open it from
-  // Show Notes. Wait for Chat chrome first; only click restore if Notes never
-  // appears (stored editor-list still wins when one exists).
-  const vaultPanel = page.getByTestId('vault-panel')
-  try {
-    await vaultPanel.waitFor({ state: 'visible', timeout: 5_000 })
-  } catch {
-    await page.getByTestId('vault-panel-restore').click()
-    await vaultPanel.waitFor({ state: 'visible', timeout: FIXTURE_VAULT_READY_TIMEOUT })
-  }
-
-  const noteList = page.locator('[data-testid="note-list-container"]')
-  await noteList.waitFor({ timeout: FIXTURE_VAULT_READY_TIMEOUT })
-
-  // Product default is Inbox when explicit organization is enabled. Fixture
-  // tests use the full seed set, so normalize to All Notes. All Notes lives in
-  // Browse — expand it when C72 left Browse collapsed. Do not wait on one
-  // title: the virtualized list may legitimately keep that row off-DOM.
+  await openAllNotesList(page)
   const browseNav = page.getByTestId('vault-panel-navigation')
-  if ((await browseNav.count()) === 0) {
-    await page.getByTestId('vault-panel-browse-toggle').click()
-    await expect(browseNav).toBeVisible({ timeout: FIXTURE_VAULT_READY_TIMEOUT })
-  }
-  await page.getByTestId('sidebar-top-nav').getByText('All Notes', { exact: true }).click()
-  await expect(noteList.getByRole('option').first()).toBeVisible({
-    timeout: FIXTURE_VAULT_READY_TIMEOUT,
-  })
 
   if (initialPanel === 'inbox') {
     if ((await browseNav.count()) > 0) {

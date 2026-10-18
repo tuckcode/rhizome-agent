@@ -34,11 +34,13 @@ const TOOL_ICON_MAP: Record<string, IconRenderer> = {
   bash: (s) => <Terminal size={s} />,
   ipython: (s) => <Terminal size={s} />,
   Write: (s) => <PencilSimple size={s} />,
+  write_file: (s) => <PencilSimple size={s} />,
   Edit: (s) => <NotePencil size={s} />,
+  edit_file: (s) => <NotePencil size={s} />,
   Read: (s) => <File size={s} />,
   Glob: (s) => <FolderOpen size={s} />,
   Grep: (s) => <MagnifyingGlass size={s} />,
-  // Tolaria MCP tools
+  // Rhizome MCP tools
   search_notes: (s) => <MagnifyingGlass size={s} />,
   get_vault_context: (s) => <ChartBar size={s} />,
   get_note: (s) => <File size={s} />,

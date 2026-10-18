@@ -7,6 +7,7 @@ date: 2026-10-03
 ---
 
 **Origin:** Claude Opus 5.5 · 2026-10-03 · Claude Code desktop, Windows
+**Note:** superseded in part by 0186 (sign-in storage)
 
 ## Context
 

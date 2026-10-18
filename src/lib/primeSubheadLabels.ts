@@ -29,7 +29,7 @@ export function shortPrimeSessionId(sessionId: string | null | undefined): strin
  * Collapse the home directory to `~`.
  *
  * A vault path in a status strip is there to be recognised, not resolved, and
- * `/Users/someone/Documents/Laputa` spends most of its width on the part every
+ * `/Users/someone/Documents/Vault` spends most of its width on the part every
  * path shares.
  */
 export function tildeVaultPath(

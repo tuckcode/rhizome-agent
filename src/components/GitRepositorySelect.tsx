@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { SETTINGS_NESTED_MENU_Z_CLASS } from '../lib/settingsMenuLayer'
 
 interface GitRepositorySelectProps {
   label: string
@@ -39,7 +40,7 @@ export function GitRepositorySelect({
         >
           <SelectValue />
         </SelectTrigger>
-        <SelectContent align="end" className="z-[13000]">
+        <SelectContent align="end" className={SETTINGS_NESTED_MENU_Z_CLASS}>
           {repositories.map((repository) => (
             <SelectItem key={repository.path} value={repository.path} className="text-xs">
               {repository.label}

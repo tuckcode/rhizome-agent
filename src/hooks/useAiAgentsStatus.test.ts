@@ -19,7 +19,6 @@ function installedStatusResponse() {
     claude_code: { installed: true, version: '1.0.20' },
     codex: { installed: false, version: null },
     opencode: { installed: true, version: '0.3.1' },
-    pi: { installed: true, version: '0.70.2' },
     antigravity: { installed: true, version: 'Antigravity CLI 1.0.0' },
     kiro: { installed: true, version: '0.4.0' },
     hermes: { installed: true, version: 'Hermes Agent 0.16.0' },
@@ -56,7 +55,6 @@ describe('useAiAgentsStatus', () => {
         expect(result.current.claude_code).toEqual({ status: 'installed', version: '1.0.20' })
         expect(result.current.codex).toEqual({ status: 'missing', version: null })
         expect(result.current.opencode).toEqual({ status: 'installed', version: '0.3.1' })
-        expect(result.current.pi).toEqual({ status: 'installed', version: '0.70.2' })
         expect(result.current.antigravity).toEqual({ status: 'installed', version: 'Antigravity CLI 1.0.0' })
         expect(result.current.kiro).toEqual({ status: 'installed', version: '0.4.0' })
         expect(result.current.hermes).toEqual({ status: 'installed', version: 'Hermes Agent 0.16.0' })

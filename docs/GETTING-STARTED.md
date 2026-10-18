@@ -10,11 +10,11 @@ How to navigate the **Rhizome** codebase, run the app, and find what you need.
 
 User-facing name is **Rhizome**. The bundle is still `ai.rhizome.agent` / `Rhizome.app`.
 
-- Rhizome owns the agent loop (ADR-0180). Native chat works without Prime. Settings still starts Chat on Prime until you switch **Chat engine**. Hermes is not a usable engine in the app today.
-- Free-tier routing appears as **Free tier (auto)**. The name Taproot is not on main.
+- Rhizome owns the agent loop (ADR-0180). Native is the only chat engine (ADR-0187). Prime and Hermes are no longer chat engines ([ADR-0189](adr/0189-no-ties-to-outside-harnesses.md)); leftover code is still in the repo until the follow-up PRs.
+- **Taproot** is the free automatic router in the model picker (stored target id `free_tier_auto` is unchanged).
 - Graphite is the default theme. Dark is Graphite, Light is Earth light, and System follows the OS between those two. Earth dark, Loam, and Mycelium are color skins.
 - Left rail Views are Research, Graph, Mycelium, and History (Ctrl+Cmd+1–4 on Mac, Ctrl+Shift+1–4 on Windows). Changes sits next to Notes.
-- You read and diff notes in the vault. Mycelium replays builds. The agent cannot search the vault or old Mycelium sessions yet.
+- You read and diff notes in the vault. The native engine can search that vault (`grep`, `read_file`, `list_dir`, `glob`). Mycelium replays builds. The agent cannot search old Mycelium sessions.
 - Provider keys live in the system keychain. A leftover `ai-provider-secrets.json` migrates on first read. Do not tell a user to edit that file.
 
 ## Prerequisites
@@ -22,7 +22,7 @@ User-facing name is **Rhizome**. The bundle is still `ai.rhizome.agent` / `Rhizo
 - **Node.js** `^20.19.0` or `>=22.12.0` (Vite 7) and **pnpm**
 - **Rust** 1.77.2+ (for the Tauri backend)
 - **git** CLI (required by the git integration features)
-- **Prime Agent** on `PATH` only if Chat stays on the Prime engine. Native chat does not need it. `./install.sh` still fetches Prime because Settings still defaults to that engine. Not vendored.
+- **Prime Agent** on `PATH` is not required for Chat. `./install.sh` may still fetch it until the leftover engine code is removed. Not vendored.
 
 ### Linux system dependencies
 
@@ -69,7 +69,21 @@ Linux release CI currently uses Tauri's stock linuxdeploy AppImage output plugin
 pnpm tauri build --target x86_64-unknown-linux-gnu --bundles deb,rpm,appimage
 ```
 
-Release validation verifies that the Linux job produced an AppImage and at least one installer bundle. There is no in-app update feed: `createUpdaterArtifacts` is false and the updater endpoint list is empty, so updater signature files are not required.
+Release validation verifies that the Linux job produced an AppImage and at least one installer bundle. A signed release also produces updater signature files (`.sig`).
+
+The app checks for updates on startup, and from the existing Check for updates control. Alpha reads `https://github.com/tuckcode/rhizome-agent/releases/download/alpha-latest/alpha-latest.json`. Stable reads the same kind of URL on the `stable-latest` tag. Those tags are prereleases on purpose: GitHub's `releases/latest/download` URL does not serve alpha releases. Update now downloads and installs through the Tauri updater. Restart uses the existing Restart control. `plugins.updater.pubkey` in `tauri.conf.json` is the minisign public key for verifying update bundles; release CI supplies the matching private key via `TAURI_SIGNING_PRIVATE_KEY`.
+
+Rust always passes the channel URL. The `plugins.updater.endpoints` entry in `src-tauri/tauri.conf.json` stays as an unused fallback. In tauri-plugin-updater 2.10.0, `UpdaterBuilder::endpoints` replaces that list. `build()` uses the config list only when no runtime list was given, and it errors only when both are empty. The checked-in URL is the alpha feed. Rust passes the stable feed unless the release channel is alpha.
+
+Generate the minisign key outside this repo:
+
+```bash
+pnpm tauri signer generate -w ~/.tauri/rhizome-updater.key
+```
+
+Paste the single line from `~/.tauri/rhizome-updater.key.pub` into `plugins.updater.pubkey`. Put the contents of `~/.tauri/rhizome-updater.key` in the GitHub secret `TAURI_SIGNING_PRIVATE_KEY`, and the password you chose in `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Do not commit the private key. `.gitignore` already ignores `*.key` and `*.key.pub`. Back the key up. Losing it strands every installed copy, because those copies will only accept updates signed by this key. Commit the public key in the same release that first sets those secrets, or in a release before that one.
+
+Release builds export the key only when the secret is non-empty. An unsigned build still ships the versioned downloads, and it turns `createUpdaterArtifacts` off for that build. The moving `alpha-latest` and `stable-latest` feeds are republished only when every platform object in the feed JSON has a `signature`. An unsigned feed must not replace the last signed feed. A local `pnpm tauri build` with `createUpdaterArtifacts` on needs `TAURI_SIGNING_PRIVATE_KEY` in the environment. An unsigned local build can pass `--config '{"bundle":{"createUpdaterArtifacts":false}}'`.
 
 ## Quick Start
 
@@ -306,7 +320,6 @@ rhizome-agent/
 │   │   ├── hermes_cli.rs         # Hermes ACP adapter + one-shot chat fallback
 │   │   ├── claude_cli.rs         # Claude CLI adapter
 │   │   ├── codex_cli.rs          # Codex CLI adapter
-│   │   ├── pi_cli.rs             # Pi CLI adapter
 │   │   ├── kiro_cli.rs           # Kiro CLI adapter
 │   │   ├── mcp.rs                # MCP server lifecycle + explicit config registration/removal
 │   │   ├── app_updater.rs        # Alpha/stable updater metadata resolution
@@ -385,8 +398,8 @@ rhizome-agent/
 | `src-tauri/src/search.rs` | Keyword search — scans vault files with walkdir. |
 | `src-tauri/src/ai_agents.rs` | CLI-agent request normalization, availability aggregation, adapter dispatch, and Claude event mapping. |
 | `src-tauri/src/cli_agent_runtime.rs` | Shared CLI-agent request shape, prompt wrapping, JSON subprocess lifecycle, version probing, and MCP path helpers. |
-| `src-tauri/src/claude_cli.rs`, `src-tauri/src/codex_cli.rs`, `src-tauri/src/opencode_cli.rs`, `src-tauri/src/pi_cli.rs`, `src-tauri/src/antigravity_cli.rs`, `src-tauri/src/kiro_cli.rs` | Per-agent command, config, discovery, and event adapters. |
-| `src-tauri/src/app_updater.rs` | App-update stub. It reports that no release feed is configured. |
+| `src-tauri/src/claude_cli.rs`, `src-tauri/src/codex_cli.rs`, `src-tauri/src/opencode_cli.rs`, `src-tauri/src/antigravity_cli.rs`, `src-tauri/src/kiro_cli.rs` | Per-agent command, config, discovery, and event adapters. |
+| `src-tauri/src/app_updater.rs` | In-app updater. Checks the alpha or stable feed, then downloads and installs through the Tauri updater plugin. |
 
 ### Editor
 
@@ -411,14 +424,11 @@ rhizome-agent/
 | `src/components/aiWorkspaceConversations.ts` | Conversation metadata state, settings persistence, default title generation, and target resolution. |
 | `src/components/aiWorkspaceSizing.ts` | AI workspace sizing, localStorage persistence, class names, and layout style helpers. |
 | `src/components/AiPanel.tsx` | Reusable AI transcript/composer surface — selected target with tool execution, reasoning, actions, and per-vault permission mode. |
-| `src/components/PrimeThinkingToggle.tsx` | Composer thinking-level menu. Levels come from the host and are filtered to the model's own set; no hardcoded list. |
 | `src/components/usePrimeSessionSwitcher.ts` | Session list switch / fork / branch. Skips `ensure_prime_session_host` when the host is already running. Clears the transcript on the same click as the row highlight. |
 | `src/lib/replySuggestions.ts` | Rules-first reply pills and Tab ghost-text (#51 Case 1). Options win over completion. Model-backed suggestions are not built. |
 | `src/components/chatNoteSplit.ts` | On top / Beside for an open note over Chat. Beside forces compact Sessions/Notes. |
 | `src/App.tsx` `handleAskAgentAboutNote` | Right-click a list row → Ask the agent about this note. Keeps Chat and opens that note (`App.test.tsx`). |
 | `src/hooks/useNoteLockMode.ts` | Ephemeral per-note lock. Locked notes make BlockNote/raw read-only (`EditorContentLayout.test.tsx`). Not vault `editor_mode`. |
-| `src/components/PrimeExtensionsSection.tsx` | Settings → Packages hub. Catalog is npm `pi-package`; install is the Prime CLI, not a daemon command. |
-| `src/lib/primePackages.ts` | Catalog search URL, install spec (`npm:` prefix), and Ask-Chat fallback prompt. |
 | `src/hooks/useViewMode.ts` | Runtime pane preset (`chat` / `notes` / `read` / `workbench`). Legacy `editor-only` / `editor-list` / `all` remain compatibility mirrors. Fresh default is Chat. |
 | `src/components/ConnectionsPanel.tsx` | Overlay for note-list **Show in Graph** and for a Chat session footprint. Renders nothing until presented. The rail Graph view is `GraphView`, not this panel. |
 | `src/lib/railViews.ts` | Research, Graph, Mycelium, and History: labels, command ids, and order. Changes is not in this list. |
@@ -448,7 +458,7 @@ rhizome-agent/
 | `src/hooks/useMainWindowSizeConstraints.ts` | Derives the main-window minimum width from the visible panes and asks Tauri to grow back to fit wider layouts. |
 | `src/hooks/useVaultConfig.ts` | Per-vault local UI preferences (zoom, view mode, colors, Inbox columns, explicit organization workflow, Git setup prompt preference, AI permission mode). |
 | `src/components/SettingsPanel.tsx` | Settings UI for telemetry, release channel, Git visibility, sync interval, UI language, content display preferences, default AI agent, and the vault-level explicit organization toggle. |
-| `src/hooks/useUpdater.ts` | App-update UI. The host currently reports that no feed is configured. |
+| `src/hooks/useUpdater.ts` | App-update UI. Startup check after 3 seconds, plus the manual check. Install and relaunch stay on the existing banner actions. |
 
 ## Architecture Patterns
 
@@ -514,6 +524,11 @@ Verified against source 2026-09-14. Longer landmine list:
   32px hit target). Inbox toggles; it does not mount Graph. Beside an open
   note folds Sessions/Notes — do not restore hover-collapse on that pane
   (`App.layout-edges.test.ts`). ADR-0173.
+- **Notes panel modes.** After Notes is shown, the column is Auto (46px,
+  hover-expands), Rail (46px pinned), or Open (in-flow, resizable). Default
+  stored mode is Open (`NOTES_PANEL_DEFAULT_MODE`). Cycle with ⌘⇧. on Mac
+  or Ctrl+Shift+. elsewhere (`notesPanelMode.ts`). A fresh Chat vault still
+  starts with Notes shut; the stored mode applies when you show the panel.
 - **Rail Views are Research, Graph, Mycelium, and History.** Order and
   labels live in `src/lib/railViews.ts`. Shortcuts are Ctrl+Cmd+1–4 on Mac
   and Ctrl+Shift+1–4 elsewhere (`src/lib/railViewShortcuts.ts`). Do not
@@ -524,21 +539,27 @@ Verified against source 2026-09-14. Longer landmine list:
   itself. `ConnectionsPanel` is the **Show in Graph** overlay, not the
   rail Graph. ADR-0171's "mount only on Changes" does not match `App.tsx`.
   Inbox stays a Notes filter. Do not remount Graph under Inbox.
-- **Thinking levels come from the host.** Call `get_prime_thinking_levels`
-  for the scale and `get_prime_supported_thinking_levels` for the attached
-  model's subset of it. Do not hardcode Off → Max in the frontend, and do not
-  offer a level the model refuses — Prime clamps it and the click looks dead.
+- **Prime `thinkingLevelMap` in `models.json` is live.** The external Prime
+  daemon reads it to clamp thinking per model. Settings → Add to Chat list still
+  writes maps via `prime_custom_models` / `merge_nous_portal`; do not drop those
+  fields on merge. Rhizome no longer ships a composer pill or Tauri commands to
+  change thinking levels from the UI.
 - **Session switch skip-ensure.** `usePrimeSessionSwitcher` skips
   `ensure_prime_session_host` when `hostRunning` is true. Status-poll retry
   of ensure is still required when the host is down. The click must clear the
   transcript immediately; leaving the old messages up is the beachball.
 - **Settings catalog is lazy.** Do not fetch `get_available_prime_models` or
-  `get_prime_provider_status` until Agents is visible. Do not search the
-  Packages catalog until that section is opened. Do not cache a failed
-  “host is not running” catalog.
-- **Chat default stays Prime.** Settings must not present Prime as an
-  optional local-agent alternative. An API-model default must say it
-  skips Prime sessions and vault tools.
+  `get_prime_provider_status` until Agents is visible. There is no Packages
+  marketplace. Old section ids `packages` and `settings-section-extensions`
+  open **AI Agents** (`settings-section-ai`). **Copy MCP config**
+  (`ai.panel.copyMcpConfig`) is on that page. Do
+  not restore `setLoadExtensionCatalog` or **Browse packages**. Do not
+  cache a failed “host is not running” catalog.
+- **Native-only chat (ADR-0187).** `readChatEngine` in
+  `src/lib/chatEngine.ts` always returns `native`. `ChatEngineSettings` is
+  gone (#218).
+  ChatHome still must not strip Prime chrome when the default AI *agent* is
+  Prime and the default *target* is an API model.
 - **Red X quits unless Keep in taskbar.** Default close exits and
   `release_helpers_on_quit` stops the app-owned MCP bridge, Mindwalk,
   and a Prime daemon this process spawned (ADR-0179). Keep in taskbar
@@ -547,8 +568,6 @@ Verified against source 2026-09-14. Longer landmine list:
   so the grant can live. Never send Prime `shutdown` (ADR-0163
   transport, kept by ADR-0180). A Rhizome-owned turn that is not
   using Prime is not a Prime helper. Cmd+Q still quits.
-- **Packages install is CLI, not the daemon.** `install_prime_package` runs
-  `prime-agent package install` (180s). Confirm full system access once.
 - **Tab completion is rules-first.** `suggestReply` only. Do not add
   model-backed ghost text (#51 Case 2) without a separate decision.
 - **MCP wiki verbs are gone.** `listTools` must not include
@@ -678,6 +697,7 @@ BASE_URL="http://localhost:5202" npx playwright test tests/smoke/<slug>.spec.ts
 5. **Shared CLI runtime behavior**: Edit `src-tauri/src/cli_agent_runtime.rs` for process lifecycle, prompt wrapping, version probing, and common Rhizome MCP path handling.
 6. **Agent-specific arguments/events**: Edit the per-agent adapter modules (`claude_cli.rs`, `codex_cli.rs`, `opencode_*`, `pi_*`, `antigravity_*`, `kiro_*`). Keep Codex Safe on `read-only` + `untrusted` and Codex Power User on active-vault `workspace-write` + `never`, keep Pi, Antigravity, and Kiro on transient MCP config, and do not use dangerous permission bypasses unless an ADR explicitly designs a new mode. Pi's transient agent directory must be seeded from the user's existing Pi agent directory before Rhizome MCP is merged so standalone provider/auth setup keeps working. Antigravity Safe uses sandboxed `proceed-in-sandbox`, Power User uses `always-proceed` without `--dangerously-skip-permissions`, and workspace MCP config lives in `.agents/mcp_config.json`. Kiro receives prompt content over stdin and writes Rhizome MCP config into `.kiro/settings/mcp.json` in the active vault.
 7. **Availability probing**: Edit `src/hooks/useAiAgentsStatus.ts` and `src-tauri/src/ai_agents.rs` for AI-agent install/status detection. Keep renderer probing deferred until after first paint, skip it when AI features or AI surfaces are unavailable, and keep backend per-agent CLI checks parallel so missing tools do not serialize shell startup cost.
+8. **Native Chat tools**: Edit `src-tauri/src/rhizome_loop/tools/` (registry and policy) and `src-tauri/src/commands/native_chat.rs` (start / send / cancel / approval). Read-only file tools auto-run. `edit_file` / `write_file` ask in both modes. Power User `bash` runs in the vault root after approval. Do not restore a stub that only echoes args.
 
 ### Work with external MCP setup
 

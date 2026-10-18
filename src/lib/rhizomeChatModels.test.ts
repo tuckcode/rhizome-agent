@@ -9,7 +9,12 @@ import {
   REMOVED_PROVIDER_ERROR,
   REMOVED_PROVIDER_LABEL,
   resolveRhizomeChatModel,
+  rhizomeModelRowLabel,
+  rhizomeModelVisibleName,
+  rhizomeProviderNeedsApiKey,
   seedRhizomeChatModels,
+  excludeKeylessRhizomeModels,
+  countKeylessRhizomeProviders,
 } from './rhizomeChatModels'
 
 vi.mock('./callHost', () => ({
@@ -25,7 +30,7 @@ const capabilities = {
   tools: true,
   vision: true,
   json_mode: true,
-  reasoning: false,
+  reasoning: { state: 'unknown' as const },
 }
 
 const configured: AiModelProvider[] = [
@@ -69,6 +74,31 @@ describe('seedRhizomeChatModels', () => {
     expect(listed.some((model) => model.id === 'free_tier_auto')).toBe(true)
     expect(listed.some((model) => model.id.startsWith('anthropic/'))).toBe(false)
     expect(listed.at(-1)?.id).toBe('free_tier_auto')
+    expect(listed.find((model) => model.id === 'work-openai/gpt-4o')?.displayName).toBe('GPT-4o')
+    expect(rhizomeModelVisibleName(listed.at(-1)!)).toBe('Taproot')
+  })
+
+  it('prefixes the provider when two display names collide', () => {
+    const openai = {
+      id: 'openai/gpt-4o',
+      providerId: 'openai',
+      providerKind: 'open_ai' as const,
+      providerName: 'OpenAI',
+      modelId: 'gpt-4o',
+      displayName: 'GPT-4o',
+      label: 'OpenAI · GPT-4o',
+    }
+    const azure = {
+      ...openai,
+      id: 'azure/gpt-4o',
+      providerId: 'azure',
+      providerKind: 'open_ai_compatible' as const,
+      providerName: 'Azure',
+      label: 'Azure · GPT-4o',
+    }
+    expect(rhizomeModelRowLabel(openai, [openai, azure])).toBe('OpenAI · GPT-4o')
+    expect(rhizomeModelRowLabel(azure, [openai, azure])).toBe('Azure · GPT-4o')
+    expect(rhizomeModelRowLabel(openai, [openai])).toBe('GPT-4o')
   })
 
   it('lists OpenRouter Claude models and still hides Anthropic and Claude Code', () => {
@@ -192,5 +222,51 @@ describe('resolveRhizomeChatModel', () => {
         (model) => model.label === REMOVED_PROVIDER_LABEL,
       ),
     ).toBe(false)
+  })
+
+  it('asks for a Settings key only on remote catalog kinds with no configured provider', () => {
+    expect(rhizomeProviderNeedsApiKey('open_ai', configured)).toBe(false)
+    expect(rhizomeProviderNeedsApiKey('gemini', configured)).toBe(true)
+    expect(rhizomeProviderNeedsApiKey('ollama', [])).toBe(false)
+    expect(rhizomeProviderNeedsApiKey('open_ai', [])).toBe(true)
+  })
+
+  it('omits keyless remote catalog groups and counts them for the footer', () => {
+    const listed = seedRhizomeChatModels(configured)
+    const keyed = excludeKeylessRhizomeModels(listed, configured)
+    expect(keyed.some((model) => model.providerKind === 'gemini')).toBe(false)
+    expect(keyed.some((model) => model.id === 'work-openai/gpt-4o')).toBe(true)
+    expect(countKeylessRhizomeProviders(listed, configured)).toBeGreaterThan(0)
+  })
+
+  it('counts one keyless provider when every remote catalog kind except Gemini has a key', () => {
+    const keyedExceptGemini: AiModelProvider[] = [
+      ...configured,
+      {
+        id: 'work-router',
+        name: 'Work OpenRouter',
+        kind: 'open_router',
+        base_url: 'https://openrouter.ai/api/v1',
+        api_key_storage: 'local_file',
+        models: [{ id: 'openai/gpt-4.1-mini', display_name: 'GPT-4.1 mini', capabilities }],
+      },
+      {
+        id: 'work-compat',
+        name: 'Work custom',
+        kind: 'open_ai_compatible',
+        base_url: 'https://api.example.com/v1',
+        api_key_storage: 'local_file',
+        models: [{ id: 'gpt-4.1-mini', display_name: 'GPT-4.1 mini', capabilities }],
+      },
+    ]
+    const listed = seedRhizomeChatModels(keyedExceptGemini)
+    expect(countKeylessRhizomeProviders(listed, keyedExceptGemini)).toBe(1)
+  })
+
+  it('keeps the selected model when its provider has no key', () => {
+    const listed = seedRhizomeChatModels([])
+    const keyed = excludeKeylessRhizomeModels(listed, [], 'gemini/gemini-2.5-flash')
+    expect(keyed.some((model) => model.id === 'gemini/gemini-2.5-flash')).toBe(true)
+    expect(keyed.some((model) => model.providerKind === 'open_ai')).toBe(false)
   })
 })

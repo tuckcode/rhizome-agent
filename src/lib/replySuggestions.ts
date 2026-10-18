@@ -18,6 +18,8 @@
  * reading a question the agent already asked.
  */
 
+import { predictedCompletion, suppressesReply } from './consequentialAsk'
+
 /** One pill. */
 export interface ReplyOption {
   /**
@@ -51,9 +53,28 @@ const MAX_OPTION_LENGTH = 40
  */
 export function suggestReply(agentMessage: string): ReplySuggestion | null {
   const trimmed = agentMessage.trim()
+  if (suppressesReply(trimmed)) return null
+
+  // A newline or bullet inside the offer sentence is not a closed choice.
+  // A blank line before that sentence does not count.
+  const offerSentence = lastSentenceOf(trimmed)
+  if (
+    /[\n\r]/.test(offerSentence)
+    && (
+      /\b(?:want me to|shall i|should i|would you like me to)\b/i.test(offerSentence)
+      || /\bi can\b[\s\S]+?\bif you(?:'d| would) like/i.test(offerSentence)
+    )
+  ) {
+    return null
+  }
+
+  const paragraphs = trimmed.split(/\n\s*\n/).map((part) => part.trim()).filter((part) => part.length > 0)
+  const lastParagraph = paragraphs[paragraphs.length - 1] ?? trimmed
+  const nestedList = /(?:^|\n)[ \t]{2,}[-*•]\s+/.test(trimmed)
+  const offerAfterList = nestedList && /\b(?:want me to|shall i|should i|would you like me to)\b/i.test(lastParagraph)
 
   // Closed-question pills win when both could apply. Never both.
-  if (trimmed.match(/\?+!*$/)) {
+  if (!offerAfterList && trimmed.match(/\?+!*$/)) {
     const withoutQuestion = trimmed.replace(/[?!]+$/, '').trim()
 
     const numberedOptions = tryExtractNumberedOptions(withoutQuestion)
@@ -87,49 +108,19 @@ export function suggestReply(agentMessage: string): ReplySuggestion | null {
  * not become a ghost after the agent has already moved on.
  */
 function lastSentenceOf(text: string): string {
-  const sentences = text
+  const paragraphs = text.split(/\n\s*\n/).map((part) => part.trim()).filter((part) => part.length > 0)
+  const tail = paragraphs.length > 1 ? paragraphs[paragraphs.length - 1] ?? text : text
+  const sentences = tail
     .split(/(?<=[.!?])(?:\s+|$)/)
     .map((part) => part.trim())
     .filter((part) => part.length > 0)
-  return sentences[sentences.length - 1] ?? text
+  return sentences[sentences.length - 1] ?? tail
 }
 
 function tryExtractCompletion(text: string): ReplySuggestion | null {
-  const last = lastSentenceOf(text)
-
-  if (
-    /let me know when you(?:'re| are) ready/i.test(last)
-    || /when you(?:'re| are) ready\.?$/i.test(last)
-  ) {
-    return { kind: 'completion', text: 'Ready — proceed' }
-  }
-
-  if (
-    /\bwant me to\b/i.test(last)
-    || /\bshall i\b/i.test(last)
-    || /\bi can\b[\s\S]+\bif you(?:'d| would) like/i.test(last)
-  ) {
-    return { kind: 'completion', text: 'Yes, go ahead' }
-  }
-
-  const nextStep = last.replace(/[?!]+$/, '').trim().match(
-    /^(?:next[,:]?\s+(?:i(?:'ll| will)|we(?:'ll| will))\s+|the next step is to\s+)(.+)$/i,
-  )
-  if (nextStep) {
-    const echo = nextStep[1].replace(/[.]+$/, '').trim()
-    if (
-      echo.length >= 3
-      && echo.length <= 80
-      && !/^(what|how|why|when|where|who|which)\b/i.test(echo)
-    ) {
-      return {
-        kind: 'completion',
-        text: echo.charAt(0).toUpperCase() + echo.slice(1),
-      }
-    }
-  }
-
-  return null
+  const completion = predictedCompletion(lastSentenceOf(text), text)
+  if (!completion) return null
+  return { kind: 'completion', text: completion }
 }
 
 /**

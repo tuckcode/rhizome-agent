@@ -40,11 +40,11 @@ function renderPanel(props: Partial<Parameters<typeof NodePreviewPanel>[0]> = {}
 
 describe('NodePreviewPanel', () => {
   it('renders title, snippet, type chip, and relative timestamp', () => {
-    renderPanel({ projects: ['Laputa'] })
+    renderPanel({ projects: ['Vault'] })
     expect(screen.getByText('Alpha')).toBeInTheDocument()
     expect(screen.getByText('The first note about alpha things.')).toBeInTheDocument()
     expect(screen.getByText('Project')).toBeInTheDocument()
-    expect(screen.getByText('Laputa')).toBeInTheDocument()
+    expect(screen.getByText('Vault')).toBeInTheDocument()
     expect(screen.getByText('3d ago')).toBeInTheDocument()
   })
 

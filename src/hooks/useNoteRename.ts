@@ -2,6 +2,7 @@ import { useCallback, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import type { VaultEntry, WorkspaceIdentity } from '../types'
+import { moveSaveBaseline, saveBaselinePaths, setSaveBaseline, clearSaveBaseline } from './noteContentCache'
 import { slugify } from './useNoteCreation'
 import {
   findByNotePath,
@@ -55,6 +56,7 @@ interface LoadNoteContentRequest {
 interface ReloadTabsAfterRenameRequest {
   tabPaths: string[]
   updateTabContent: (path: string, content: string) => void
+  isPathDirty?: (path: string) => boolean
 }
 
 type RenameCommand = 'rename_note' | 'rename_note_filename' | 'move_note_to_folder' | 'move_note_to_workspace'
@@ -348,15 +350,34 @@ export async function reloadVaultAfterRename(reloadVault?: () => Promise<unknown
   }
 }
 
-/** Reload content for open tabs whose wikilinks may have changed after a rename. */
+/**
+ * A rename rewrites linked notes on disk. Open tabs take that text.
+ * Every clean save baseline, open or not, takes it too, so the next edit
+ * is not a false conflict. A dirty note keeps the baseline it was editing.
+ */
 export async function reloadTabsAfterRename({
   tabPaths,
   updateTabContent,
+  isPathDirty,
 }: ReloadTabsAfterRenameRequest): Promise<void> {
+  const refreshed = new Set<string>()
   for (const tabPath of tabPaths) {
     try {
-      updateTabContent(tabPath, await loadNoteContent({ path: tabPath }))
+      const content = await loadNoteContent({ path: tabPath })
+      updateTabContent(tabPath, content)
+      if (!isPathDirty?.(tabPath)) {
+        setSaveBaseline(tabPath, content)
+        refreshed.add(tabPath)
+      }
     } catch { /* skip tabs that fail to reload */ }
+  }
+  for (const path of saveBaselinePaths()) {
+    if (refreshed.has(path) || isPathDirty?.(path)) continue
+    try {
+      setSaveBaseline(path, await loadNoteContent({ path }))
+    } catch {
+      clearSaveBaseline(path)
+    }
   }
 }
 
@@ -400,6 +421,7 @@ export interface NoteRenameConfig {
   setToastMessage: (msg: string | null) => void
   reloadVault?: () => Promise<unknown>
   onPathRenamed?: (oldPath: string, newPath: string) => void
+  isPathDirty?: (path: string) => boolean
 }
 
 interface RenameTabDeps {
@@ -418,7 +440,7 @@ function useRenameResultApplier(
   config: NoteRenameConfig,
   tabDeps: RenameTabDeps,
 ) {
-  const { entries, setToastMessage, reloadVault, onPathRenamed } = config
+  const { entries, setToastMessage, reloadVault, onPathRenamed, isPathDirty } = config
   const { setTabs, activeTabPathRef, handleSwitchTab, updateTabContent } = tabDeps
 
   const tabsRef = useRef(tabDeps.tabs)
@@ -440,17 +462,21 @@ function useRenameResultApplier(
       .filter((tab) => !notePathsMatch(tab.entry.path, oldPath) && !notePathsMatch(tab.entry.path, result.new_path))
       .map((tab) => tab.entry.path)
     if (!notePathsMatch(oldPath, result.new_path)) onPathRenamed?.(oldPath, result.new_path)
+    // The open note now lives at the new path, with the text just read.
+    if (currentTabs.some((tab) => notePathsMatch(tab.entry.path, oldPath))) {
+      moveSaveBaseline(oldPath, result.new_path, newContent)
+    }
     setTabs((prev) => prev.map((tab) => notePathsMatch(tab.entry.path, oldPath) ? { entry: newEntry, content: newContent } : tab))
     if (notePathsMatch(activeTabPathRef.current, oldPath)) handleSwitchTab(result.new_path)
     onEntryRenamed(oldPath, newEntry, newContent)
-    await reloadTabsAfterRename({ tabPaths: otherTabPaths, updateTabContent })
+    await reloadTabsAfterRename({ tabPaths: otherTabPaths, updateTabContent, isPathDirty })
     await reloadVaultAfterRename(reloadVault)
     const successMessage = options?.successMessage
       ? options.successMessage(result)
       : renameToastMessage(result.updated_files, result.failed_updates ?? 0)
     setToastMessage(successMessage)
     return result
-  }, [entries, setTabs, activeTabPathRef, handleSwitchTab, updateTabContent, reloadVault, setToastMessage, onPathRenamed])
+  }, [entries, setTabs, activeTabPathRef, handleSwitchTab, updateTabContent, reloadVault, setToastMessage, onPathRenamed, isPathDirty])
 
   return {
     tabsRef,

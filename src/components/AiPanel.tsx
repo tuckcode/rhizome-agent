@@ -1,4 +1,4 @@
-import { useEffect, useRef, type MutableRefObject, type ReactNode, type RefObject } from 'react'
+import { useEffect, useRef, useState, type MutableRefObject, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { aiPanelFrameStyle } from './aiPanelPulse'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
@@ -24,12 +24,16 @@ import { translate } from '../lib/i18n'
 import PrimeSessionList from './PrimeSessionList'
 import {
   DEFAULT_AI_AGENT,
-  getAiAgentDefinition,
+  composerAgentLabel,
   type AiAgentId,
   type AiAgentReadiness,
 } from '../lib/aiAgents'
 import { chatEngineAllowsSendWithoutPrime } from '../lib/chatEngine'
 import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
+import { nativeModelVision, type NativeVision } from '../lib/nativeVision'
+import { forgetVisionSendAnyway, rememberVisionSendAnyway, visionSendAnywayFor } from '../lib/visionChoice'
+import { setNativeTurnAcceptedHandler } from '../lib/nativeTurnAccepted'
+import { nativeSessionTarget } from '../lib/nativeSessionTarget'
 import type { AiTarget } from '../lib/aiTargets'
 import type { AppLocale } from '../lib/i18n'
 import { type NoteListItem } from '../utils/ai-context'
@@ -53,6 +57,7 @@ import { PrimeGoalDialog } from './PrimeGoalDialog'
 import { PrimeScheduleDialog } from './PrimeScheduleDialog'
 import { useAiPanelGoalDialog } from './useAiPanelGoalDialog'
 import { useAiPanelScheduleDialog } from './useAiPanelScheduleDialog'
+import { sessionHeaderReport } from '../lib/sessionHeaderTitle'
 
 interface AiPanelProps {
   onClose: () => void
@@ -84,7 +89,7 @@ interface AiPanelProps {
   newChatRef?: MutableRefObject<(() => void) | null>
   /** Rendered above the input: banners that explain why a turn may fail. */
   composerControls?: ReactNode
-  /** Live turn controls for the compact row under the input (Prime only). */
+  /** Live turn controls for the compact row under the input. */
   composerDeck?: ReactNode
   /** Skill label shown inside the compact row's Tools menu. */
   composerSkillsLabel?: string | null
@@ -100,6 +105,8 @@ interface AiPanelProps {
   onRailSessionPicked?: () => void
   /** Chat-home engine lock is per conversation; New Chat and session picks clear it. */
   onConversationReset?: () => void
+  /** Chat header title: selected path plus the first user turn when the list has no name yet. */
+  onSessionHeader?: (session: { path: string | null; title: string | null }) => void
   onForkMessage?: (entryId: string) => void
   /** Fork branches the Prime session rather than copying the conversation. */
   forkTargetsPrimeEntry?: boolean
@@ -143,6 +150,7 @@ interface AiPanelViewProps {
   sessionsRailSlot?: HTMLElement | null
   onRailSessionPicked?: () => void
   onConversationReset?: () => void
+  onSessionHeader?: (session: { path: string | null; title: string | null }) => void
   onForkMessage?: (messageId: string) => void
   forkTargetsPrimeEntry?: boolean
   onQueuedPromptTarget?: (targetId: string) => void
@@ -181,17 +189,23 @@ function resolveAiPanelViewModel({
   defaultAiAgentReadiness,
   defaultAiAgentReady,
   defaultAiTarget,
+  chatEngine,
 }: {
   defaultAiAgent?: AiAgentId
   defaultAiAgentReadiness?: AiAgentReadiness
   defaultAiAgentReady?: boolean
   defaultAiTarget?: AiTarget
+  chatEngine?: 'prime' | 'native'
 }): AiPanelViewModel {
   const resolvedAgent = defaultAiAgent ?? DEFAULT_AI_AGENT
   const resolvedReadiness = defaultAiAgentReadiness ?? readinessFromReadyFlag(defaultAiAgentReady)
 
   return {
-    agentLabel: defaultAiTarget?.label ?? getAiAgentDefinition(resolvedAgent).label,
+    agentLabel: composerAgentLabel({
+      chatEngine,
+      agent: resolvedAgent,
+      targetLabel: defaultAiTarget?.label,
+    }),
     defaultAiAgent: resolvedAgent,
     defaultAiAgentReadiness: resolvedReadiness,
     targetKind: defaultAiTarget?.kind ?? 'agent',
@@ -252,6 +266,7 @@ export function AiPanelView({
   sessionsRailSlot,
   onRailSessionPicked,
   onConversationReset,
+  onSessionHeader,
   onForkMessage,
   forkTargetsPrimeEntry,
   onQueuedPromptTarget,
@@ -267,6 +282,7 @@ export function AiPanelView({
     defaultAiAgentReadiness: providedDefaultAiAgentReadiness,
     defaultAiAgentReady: providedDefaultAiAgentReady,
     defaultAiTarget,
+    chatEngine,
   })
   const inputRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLElement>(null)
@@ -283,7 +299,7 @@ export function AiPanelView({
     handlePermissionModeChange,
     handleNewChat,
   } = controller
-  const isPrimeTarget = view.targetKind === 'agent' && view.defaultAiAgent === 'prime' && chatEngine !== 'native'
+  const isPrimeTarget = view.targetKind === 'agent' && view.defaultAiAgent === 'prime' && chatEngine === 'prime'
   const showSessionList = isPrimeTarget || chatEngine === 'native'
   const sessionListEngine = chatEngine === 'native' ? 'native' : 'prime'
   const forkPrime = forksPrimeEntry(isPrimeTarget, forkTargetsPrimeEntry)
@@ -335,13 +351,56 @@ export function AiPanelView({
   // 180–420: narrower and a session title is a truncation, wider and the
   // transcript starts losing the room the design gives it.
   const sessionsWidth = usePanelWidth(APP_STORAGE_KEYS.chatSessionsWidth, 228, 180, 420)
+  const [visionForTarget, setVisionForTarget] = useState<{
+    target: string
+    vision: NativeVision
+  } | null>(null)
+  const [, setVisionSendAnywayRevision] = useState(0)
+  const [attachmentNoticeFor, setAttachmentNoticeFor] = useState<{
+    target: string
+    message: string
+  } | null>(null)
+  const nativeSessionIdForTarget = agent.getNativeSession().sessionId
+  const sessionModel = nativeSessionIdForTarget
+    ? nativeSessionTarget(nativeSessionIdForTarget)
+    : null
+  const modelTarget = resolveNativeChatTarget(sessionModel || nativeTarget)
+  const vision: NativeVision | 'pending' = visionForTarget?.target === modelTarget
+    ? visionForTarget.vision
+    : 'pending'
+  const visionSendAnyway = visionSendAnywayFor(modelTarget)
+  const attachmentNotice = attachmentNoticeFor?.target === modelTarget
+    ? attachmentNoticeFor.message
+    : null
+  useEffect(() => {
+    if (!modelTarget) return
+    let cancelled = false
+    void nativeModelVision(modelTarget).then((next) => {
+      if (!cancelled) setVisionForTarget({ target: modelTarget, vision: next })
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [modelTarget])
+  const reportAttachment = (message: string) => {
+    setAttachmentNoticeFor({ target: modelTarget, message })
+    onUnsupportedAiPaste?.(message)
+  }
   const { attachments, attachImages, removeAttachment, clearAttachments } = useAiPanelAttachments({
     locale,
-    onUnsupportedAiPaste,
-    modelAcceptsImages: primeHost.modelAcceptsImages,
+    onUnsupportedAiPaste: reportAttachment,
+    modelAcceptsImages: chatEngine === 'prime' ? primeHost.modelAcceptsImages : null,
     modelName: primeHost.modelName,
     modelId: primeHost.modelId,
   })
+  const acceptKey = agent.getNativeLiveSlot?.() ?? 'panel'
+  useEffect(() => {
+    setNativeTurnAcceptedHandler(acceptKey, () => {
+      clearAttachments()
+      setAttachmentNoticeFor(null)
+    })
+    return () => setNativeTurnAcceptedHandler(acceptKey, null)
+  }, [acceptKey, clearAttachments])
 
   // Prime owns the queue. Chat used to remember follow-ups locally because
   // we had no read; `get_queue` is that read.
@@ -349,6 +408,7 @@ export function AiPanelView({
     handleSend,
     isActive,
     isPrimeTarget,
+    clearOnSend: chatEngine !== 'native',
     onSendPrompt,
     attachments,
     clearAttachments,
@@ -395,6 +455,21 @@ export function AiPanelView({
     onConversationReset?.()
     return handleSelectSession(...args)
   }
+  const nativeSessionId = agent.getNativeSession().sessionId ?? null
+  const firstUserMessage = agent.messages.find((message) => message.userMessage?.trim())?.userMessage ?? null
+  useEffect(() => {
+    if (!onSessionHeader) return
+    // sessionHeaderReport drops firstUserMessage when a new path is set
+    // before a native session id exists, so leftover turns do not title it.
+    const report = sessionHeaderReport({
+      activeSessionPath,
+      primeSessionPath: primeHost.sessionPath,
+      nativeSessionId,
+      firstUserMessage,
+    })
+    if (!report) return
+    onSessionHeader(report)
+  }, [activeSessionPath, firstUserMessage, nativeSessionId, onSessionHeader, primeHost.sessionPath])
   const handleNativeFork = async (messageId: string) => {
     try {
       const sessionId = await persistNativeFork({
@@ -403,6 +478,7 @@ export function AiPanelView({
         target: resolveNativeChatTarget(nativeTarget),
         vaultPath,
         permissionMode,
+        sourceSessionId: nativeSessionId,
       })
       await pickSession({
         id: sessionId,
@@ -585,11 +661,26 @@ export function AiPanelView({
         queue={isPrimeTarget ? queue : undefined}
         onClearQueue={isPrimeTarget ? () => void clearQueue() : undefined}
         onStop={handleStop}
-        onUnsupportedAiPaste={onUnsupportedAiPaste}
+        onUnsupportedAiPaste={reportAttachment}
+        vision={vision}
+        modelLabel={modelTarget.split('/').pop() || 'This model'}
+        visionSendAnyway={visionSendAnyway}
+        onVisionSendAnyway={() => {
+          rememberVisionSendAnyway(modelTarget)
+          setVisionSendAnywayRevision((revision) => revision + 1)
+        }}
+        onVisionUndo={() => {
+          forgetVisionSendAnyway(modelTarget)
+          setVisionSendAnywayRevision((revision) => revision + 1)
+        }}
+        attachmentNotice={attachmentNotice}
         attachments={attachments}
         onAttachImages={attachImages}
         onRemoveAttachment={removeAttachment}
         lastAgentMessage={getLastAgentMessage(agent.messages)}
+        targetKind={defaultAiTarget?.kind}
+        agentId={defaultAiTarget?.kind === 'agent' ? defaultAiTarget.agent : view.defaultAiAgent}
+        permissionMode={permissionMode}
         sessionPath={activeSessionPath}
         onOpenMycelium={onOpenMycelium}
         skillsLabel={isPrimeTarget ? composerSkillsLabel : undefined}
@@ -602,12 +693,12 @@ export function AiPanelView({
         } : undefined}
         onOpenGoal={isPrimeTarget ? goalDialog.openDialog : undefined}
         onOpenSchedule={isPrimeTarget ? () => scheduleDialog.onOpenChange(true) : undefined}
-        foot={isPrimeTarget ? (
+        foot={(isPrimeTarget || (view.defaultAiAgent === 'prime' && chatEngine === 'native')) ? (
           <ChatComposerBar
             locale={locale}
             deck={composerDeck}
             working={isActive}
-            failureReason={agent.status === 'error'
+            failureReason={isPrimeTarget && agent.status === 'error'
               ? workerStartFailureReason(getLastAgentMessage(agent.messages) ?? '')
               : null}
             stats={primeStats}
@@ -687,6 +778,7 @@ export function AiPanel({
   sessionsRailSlot,
   onRailSessionPicked,
   onConversationReset,
+  onSessionHeader,
   onOpenMycelium,
 }: AiPanelProps) {
   const defaultAiAgentReadiness = chatEngineAllowsSendWithoutPrime(chatEngine)
@@ -731,6 +823,7 @@ export function AiPanel({
       sessionsRailSlot={sessionsRailSlot}
       onRailSessionPicked={onRailSessionPicked}
       onConversationReset={onConversationReset}
+      onSessionHeader={onSessionHeader}
       onOpenMycelium={onOpenMycelium}
       onClose={onClose}
       onOpenNote={onOpenNote}

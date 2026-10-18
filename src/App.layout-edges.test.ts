@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { readAppShellSource } from './test-utils/appShellSource'
 
 const appCss = readFileSync(`${process.cwd()}/src/App.css`, 'utf8')
-const appSource = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+const appSource = readAppShellSource()
 const commandRail = readFileSync(`${process.cwd()}/src/components/CommandRail.tsx`, 'utf8')
 const noteList = readFileSync(`${process.cwd()}/src/components/NoteList.tsx`, 'utf8')
 

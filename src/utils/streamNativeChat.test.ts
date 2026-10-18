@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentStreamCallbacks } from './streamAiAgent'
+import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
+import { rememberVisionSendAnyway } from '../lib/visionChoice'
 import {
   NATIVE_NO_KEY_GUIDANCE,
   applyNativeEvent,
@@ -57,6 +59,11 @@ describe('native chat user errors', () => {
       `No free-tier provider key is set. ${NATIVE_NO_KEY_GUIDANCE}`,
     )
   })
+
+  it('leaves a locked or denied keychain error unchanged', () => {
+    const message = 'The keychain could not be read for groq. It may be locked, or access was denied.'
+    expect(nativeChatUserError(message)).toBe(message)
+  })
 })
 
 describe('native stream events', () => {
@@ -106,6 +113,66 @@ describe('native stream events', () => {
     const next = callbacks()
     expect(applyNativeEvent({ kind: 'text_delta', text: 'hi' }, next)).toBe(false)
     expect(next.onText).toHaveBeenCalledWith('hi')
+  })
+
+  it('surfaces an approval card payload without ending the stream', () => {
+    const next = callbacks()
+    next.onApprovalRequested = vi.fn()
+    expect(applyNativeEvent({
+      kind: 'approval_requested',
+      prompt_id: 'prompt_1',
+      tool: 'write_file',
+      args: '{"path":"fresh.md","content":"hello\\n"}',
+      path: 'fresh.md',
+      preview: '--- /dev/null\n+++ fresh.md\n+hello\n',
+      created: true,
+      overwrite: false,
+      call_id: 'call_1',
+      options: [
+        { id: 'allow_once', label: 'Allow once' },
+        { id: 'allow_session', label: 'Allow for session' },
+        { id: 'deny', label: 'Deny' },
+      ],
+    }, next)).toBe(false)
+    expect(next.onApprovalRequested).toHaveBeenCalledWith(expect.objectContaining({
+      promptId: 'prompt_1',
+      tool: 'write_file',
+      path: 'fresh.md',
+      created: true,
+      overwrite: false,
+      callId: 'call_1',
+    }))
+  })
+
+  it('maps ApprovalRequested.call_id to prompt.callId and ignores event.id', () => {
+    const next = callbacks()
+    next.onApprovalRequested = vi.fn()
+    expect(applyNativeEvent({
+      kind: 'approval_requested',
+      prompt_id: 'prompt_2',
+      tool: 'bash',
+      args: '{"command":"ls"}',
+      id: 'not-the-call-id',
+      call_id: 'call_2',
+    }, next)).toBe(false)
+    expect(next.onApprovalRequested).toHaveBeenCalledWith(expect.objectContaining({
+      callId: 'call_2',
+    }))
+  })
+
+  it('leaves callId unset when ApprovalRequested has no call_id', () => {
+    const next = callbacks()
+    next.onApprovalRequested = vi.fn()
+    expect(applyNativeEvent({
+      kind: 'approval_requested',
+      prompt_id: 'prompt_3',
+      tool: 'bash',
+      args: '{"command":"ls"}',
+      id: 'not-the-call-id',
+    }, next)).toBe(false)
+    expect(next.onApprovalRequested).toHaveBeenCalledWith(expect.objectContaining({
+      callId: undefined,
+    }))
   })
 })
 
@@ -227,7 +294,140 @@ describe('native stream listen', () => {
     expect(invokeMock).toHaveBeenCalledWith('native_chat_send', {
       sessionId: 'already-open',
       text: 'what next',
+      sendAnyway: false,
     })
     expect(invokeMock).not.toHaveBeenCalledWith('native_chat_start', expect.anything())
+  })
+
+  it('passes a reasoning level on start and on the next send', async () => {
+    const next = callbacks()
+    listenMock.mockImplementation(async (_name: string, handler: (event: { payload: unknown }) => void) => {
+      queueMicrotask(() => {
+        handler({ payload: { kind: 'turn_end' } })
+      })
+      return vi.fn()
+    })
+    invokeMock.mockResolvedValue('new-id')
+
+    await streamNativeChat({
+      target: 'xai/grok-4.7',
+      message: 'hi',
+      vaultPath: '/vault',
+      reasoningLevel: 'high',
+      callbacks: next,
+    })
+
+    expect(invokeMock).toHaveBeenCalledWith('native_chat_start', expect.objectContaining({
+      request: expect.objectContaining({ reasoningLevel: 'high' }),
+    }))
+
+    invokeMock.mockClear()
+    await streamNativeChat({
+      target: 'xai/grok-4.7',
+      message: 'again',
+      vaultPath: '/vault',
+      sessionId: 'already-open',
+      reasoningLevel: 'low',
+      callbacks: callbacks(),
+    })
+
+    expect(invokeMock).toHaveBeenCalledWith('native_chat_send', {
+      sessionId: 'already-open',
+      text: 'again',
+      reasoningLevel: 'low',
+      sendAnyway: false,
+    })
+  })
+
+  it('sends null to clear a reasoning level and omits the key when unset', async () => {
+    listenMock.mockImplementation(async (_name: string, handler: (event: { payload: unknown }) => void) => {
+      queueMicrotask(() => {
+        handler({ payload: { kind: 'turn_end' } })
+      })
+      return vi.fn()
+    })
+    invokeMock.mockResolvedValue(undefined)
+
+    await streamNativeChat({
+      target: 'xai/grok-4.7',
+      message: 'clear it',
+      vaultPath: '/vault',
+      sessionId: 'already-open',
+      reasoningLevel: null,
+      callbacks: callbacks(),
+    })
+
+    expect(invokeMock).toHaveBeenCalledWith('native_chat_send', {
+      sessionId: 'already-open',
+      text: 'clear it',
+      reasoningLevel: null,
+      sendAnyway: false,
+    })
+  })
+
+  it('sends composer images on native start and on the next turn', async () => {
+    const next = callbacks()
+    listenMock.mockImplementation(async (_name: string, handler: (event: { payload: unknown }) => void) => {
+      queueMicrotask(() => {
+        handler({ payload: { kind: 'turn_end' } })
+      })
+      return vi.fn()
+    })
+    invokeMock.mockResolvedValue('new-id')
+    const images = [{ type: 'image' as const, data: 'aaaa', mimeType: 'image/png' }]
+
+    await streamNativeChat({
+      target: 'openai/gpt-4o',
+      message: 'what is this',
+      vaultPath: '/vault',
+      images,
+      callbacks: next,
+    })
+
+    expect(invokeMock).toHaveBeenCalledWith('native_chat_start', expect.objectContaining({
+      request: expect.objectContaining({
+        prompt: 'what is this',
+        images,
+      }),
+    }))
+
+    invokeMock.mockClear()
+    await streamNativeChat({
+      target: 'openai/gpt-4o',
+      message: 'and this',
+      vaultPath: '/vault',
+      sessionId: 'already-open',
+      images,
+      callbacks: callbacks(),
+    })
+
+    expect(invokeMock).toHaveBeenCalledWith('native_chat_send', {
+      sessionId: 'already-open',
+      text: 'and this',
+      images,
+      sendAnyway: false,
+    })
+  })
+
+  it('sends the remembered send-anyway flag on a text follow-up', async () => {
+    listenMock.mockImplementation(async (_name: string, handler: (event: { payload: unknown }) => void) => {
+      queueMicrotask(() => {
+        handler({ payload: { kind: 'turn_end' } })
+      })
+      return vi.fn()
+    })
+    const target = resolveNativeChatTarget('openai/gpt-4o')
+    rememberVisionSendAnyway(target)
+    await streamNativeChat({
+      target,
+      message: 'and the caption',
+      vaultPath: '/vault',
+      sessionId: 'follow-up-images',
+      callbacks: callbacks(),
+    })
+    expect(invokeMock).toHaveBeenCalledWith('native_chat_send', expect.objectContaining({
+      text: 'and the caption',
+      sendAnyway: true,
+    }))
   })
 })

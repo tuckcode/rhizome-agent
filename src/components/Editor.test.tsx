@@ -400,7 +400,7 @@ describe('Editor', () => {
 
     expect(screen.getByTestId('pdf-file-preview')).toHaveAttribute(
       'data',
-      expect.stringMatching(/^asset:\/\/localhost\/%2Fvault%2Fassets%2Freport\.pdf\?tolaria_pdf_preview=/u),
+      expect.stringMatching(/^asset:\/\/localhost\/%2Fvault%2Fassets%2Freport\.pdf\?rhizome_pdf_preview=/u),
     )
     expect(screen.queryByTestId('blocknote-view')).not.toBeInTheDocument()
   })
@@ -1269,9 +1269,9 @@ describe('person @mention autocomplete', () => {
   }
   const nonPersonEntry: VaultEntry = {
     ...mockEntry,
-    title: 'Build Laputa App',
-    filename: 'laputa-app.md',
-    path: '/vault/project/laputa-app.md',
+    title: 'Build Rhizome App',
+    filename: 'rhizome-app.md',
+    path: '/vault/project/rhizome-app.md',
     isA: 'Project',
     aliases: [],
   }

@@ -6,6 +6,7 @@ import { useSettings } from '../hooks/useSettings'
 import { useVaultAiGuidanceStatus } from '../hooks/useVaultAiGuidanceStatus'
 import { noteExistsOnDisk, persistNewNote } from '../hooks/useNoteCreation'
 import { isTauri } from '../mock-tauri'
+import { chatEngineFromSettings } from '../lib/chatEngine'
 import { translate } from '../lib/i18n'
 import { trackVaultCredentialsHandled } from '../lib/productAnalytics'
 import { redactCredentialTokens } from '../lib/sensitiveTextRedaction'
@@ -247,7 +248,7 @@ export function AiWorkspaceWindowApp() {
     aiWorkspaceWindowSharedContextSnapshot,
     aiWorkspaceWindowSharedContextSnapshot,
   )
-  const { settings, loaded: settingsLoaded, saveSettings } = useSettings()
+  const { settings, loaded: settingsLoaded, loadError, saveSettings } = useSettings()
   const aiAgentsStatus = useAiAgentsStatus()
   const preferences = useAppPreferences({
     aiAgentsStatus,
@@ -338,8 +339,10 @@ export function AiWorkspaceWindowApp() {
             open
             aiAgentsStatus={aiAgentsStatus}
             aiModelProviders={settings.ai_model_providers ?? []}
+            chatEngine={settingsLoaded ? chatEngineFromSettings(settings) : undefined}
+            nativeTarget={settingsLoaded ? settings.native_chat_target ?? undefined : undefined}
             conversationSettings={settings.ai_workspace_conversations ?? null}
-            conversationSettingsReady={settingsLoaded}
+            conversationSettingsReady={settingsLoaded && loadError == null}
             defaultAiAgent={preferences.aiAgentPreferences.defaultAiAgent}
             defaultAiTarget={preferences.aiAgentPreferences.defaultAiTarget}
             defaultAiAgentReadiness={preferences.aiAgentPreferences.defaultAiAgentReadiness}

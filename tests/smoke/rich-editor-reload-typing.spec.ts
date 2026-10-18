@@ -67,7 +67,8 @@ async function createUntitledNote(page: Page): Promise<void> {
   await page.locator('body').click()
   await triggerMenuCommand(page, 'file-new-note')
   await expect(page.locator('.bn-editor')).toBeVisible({ timeout: 5_000 })
-  await expect(page.getByTestId('breadcrumb-filename-trigger')).toContainText(/untitled-note-\d+(?:-\d+)?/i, {
+  // The breadcrumb shows the note title. The filename is the trigger's title attribute.
+  await expect(page.getByTestId('breadcrumb-filename-trigger')).toHaveAttribute('title', /untitled-note-\d+(?:-\d+)?/i, {
     timeout: 5_000,
   })
   const titleBlock = page.locator('.bn-block-content[data-content-type="heading"]').first()
@@ -77,7 +78,7 @@ async function createUntitledNote(page: Page): Promise<void> {
 }
 
 async function expectActiveFilename(page: Page, filenameStem: string): Promise<void> {
-  await expect(page.getByTestId('breadcrumb-filename-trigger')).toContainText(filenameStem, { timeout: 10_000 })
+  await expect(page.getByTestId('breadcrumb-filename-trigger')).toHaveAttribute('title', filenameStem, { timeout: 10_000 })
 }
 
 async function expectEditorFocused(page: Page): Promise<void> {

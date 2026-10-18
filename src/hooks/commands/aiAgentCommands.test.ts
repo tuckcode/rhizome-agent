@@ -2,15 +2,15 @@ import { describe, expect, it, vi } from 'vitest'
 import { buildAiAgentCommands } from './aiAgentCommands'
 
 describe('buildAiAgentCommands', () => {
-  it('exposes Hermes Agent as an installed switch target', () => {
+  it('does not expose Prime or Hermes as switch targets', () => {
     const onSetDefaultAiAgent = vi.fn()
 
     const commands = buildAiAgentCommands({
       aiAgentsStatus: {
+        prime: { status: 'installed', version: '0.9.5' },
         claude_code: { status: 'installed', version: '1.0.20' },
-        codex: { status: 'missing', version: null },
+        codex: { status: 'installed', version: '0.37.0' },
         opencode: { status: 'missing', version: null },
-        pi: { status: 'missing', version: null },
         antigravity: { status: 'missing', version: null },
         kiro: { status: 'missing', version: null },
         hermes: { status: 'installed', version: 'Hermes Agent 0.16.0' },
@@ -19,14 +19,15 @@ describe('buildAiAgentCommands', () => {
       onSetDefaultAiAgent,
     })
 
-    const command = commands.find((item) => item.id === 'switch-ai-agent-hermes')
+    expect(commands.find((item) => item.id === 'switch-ai-agent-hermes')).toBeUndefined()
+    expect(commands.find((item) => item.id === 'switch-ai-agent-prime')).toBeUndefined()
+    const command = commands.find((item) => item.id === 'switch-ai-agent-codex')
     expect(command).toMatchObject({
-      label: 'Switch AI Agent to Hermes Agent',
+      label: 'Switch AI Agent to Codex',
       enabled: true,
     })
-
     command?.execute()
-    expect(onSetDefaultAiAgent).toHaveBeenCalledWith('hermes')
+    expect(onSetDefaultAiAgent).toHaveBeenCalledWith('codex')
   })
 
   it('adds a restore guidance command when the vault guidance needs repair', () => {

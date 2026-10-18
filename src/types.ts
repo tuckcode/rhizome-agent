@@ -164,6 +164,11 @@ export interface Settings {
   ai_model_providers?: AiModelProvider[] | null
   ai_workspace_conversations?: AiWorkspaceConversationSetting[] | null
   hide_gitignored_files?: boolean | null
+  /**
+   * Native file tools refuse secret paths. Absent means on.
+   * Off disables that denylist only; root sandboxing still applies.
+   */
+  block_secret_files?: boolean | null
   all_notes_show_pdfs?: boolean | null
   all_notes_show_images?: boolean | null
   all_notes_show_unsupported?: boolean | null
@@ -176,7 +181,7 @@ export interface Settings {
    */
   agent_profile?: string | null
   /**
-   * `native` sends new chats through Rhizome's engine. Absent means Prime.
+   * Native is the only Chat engine. Leftover Prime/Hermes values migrate to `native`.
    */
   chat_engine?: string | null
   /** Native picker value. Absent uses the catalog default. */

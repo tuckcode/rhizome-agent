@@ -1,7 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import { normalizeStoredAiAgent } from '../lib/aiAgents'
+import {
+  migrateRemovedHarnessSettings,
+  removedHarnessSettingsNeedPersist,
+} from '../lib/migrateRemovedHarnessChoices'
 import { normalizeAiModelProviders } from '../lib/aiTargets'
 import { shouldHideGitignoredFiles } from '../lib/gitignoredVisibility'
 import {
@@ -69,6 +73,7 @@ const EMPTY_SETTINGS: Settings = {
   ai_model_providers: null,
   ai_workspace_conversations: null,
   hide_gitignored_files: null,
+  block_secret_files: null,
   all_notes_show_pdfs: null,
   all_notes_show_images: null,
   all_notes_show_unsupported: null,
@@ -79,7 +84,7 @@ const EMPTY_SETTINGS: Settings = {
 function normalizeSettings(settings: Settings): Settings {
   const aiModelProviders = normalizeAiModelProviders(settings.ai_model_providers)
 
-  return {
+  return migrateRemovedHarnessSettings({
     ...settings,
     git_enabled: settings.git_enabled ?? null,
     release_channel: serializeReleaseChannel(
@@ -100,12 +105,14 @@ function normalizeSettings(settings: Settings): Settings {
     ai_model_providers: aiModelProviders.length > 0 ? aiModelProviders : null,
     ai_workspace_conversations: normalizeAiWorkspaceConversations(settings.ai_workspace_conversations),
     hide_gitignored_files: settings.hide_gitignored_files ?? null,
+    block_secret_files: settings.block_secret_files ?? null,
     all_notes_show_pdfs: settings.all_notes_show_pdfs ?? null,
     all_notes_show_images: settings.all_notes_show_images ?? null,
     all_notes_show_unsupported: settings.all_notes_show_unsupported ?? null,
     multi_workspace_enabled: settings.multi_workspace_enabled ?? null,
     agent_profile: settings.agent_profile?.trim() || null,
-  }
+    chat_engine: settings.chat_engine ?? null,
+  })
 }
 
 function normalizeAiWorkspaceConversations(settings: Settings['ai_workspace_conversations']) {
@@ -131,17 +138,52 @@ function effectiveAccentColor(settings: Settings): string {
   return normalizeAccentColor(settings.accent_color) ?? DEFAULT_ACCENT_COLOR
 }
 
+function loadErrorMessage(err: unknown): string {
+  const text = err instanceof Error ? err.message : String(err)
+  const located = text.match(/\bline (\d+) column (\d+)/i)
+  if (located) return `parse error at line ${located[1]} column ${located[2]}`
+  if (/parse|serde|json|expected/i.test(text)) return 'parse error'
+  return 'load failed'
+}
+
 export function useSettings() {
   const [settings, setSettings] = useState<Settings>(EMPTY_SETTINGS)
   const [loaded, setLoaded] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const settingsRef = useRef(settings)
+  const loadOkRef = useRef(false)
+  const loadedRef = useRef(false)
+  const loadEpoch = useRef(0)
+  const retryInFlight = useRef(false)
 
-  const loadSettings = useCallback(async () => {
+  const loadSettings = useCallback(async (): Promise<Settings | null> => {
+    const epoch = ++loadEpoch.current
     try {
-      const s = await tauriCall<Settings>('get_settings', {})
-      setSettings(normalizeSettings(s))
+      const raw = await tauriCall<Settings>('get_settings', {})
+      if (epoch !== loadEpoch.current) {
+        return loadOkRef.current ? settingsRef.current : null
+      }
+      const normalized = normalizeSettings(raw)
+      settingsRef.current = normalized
+      loadOkRef.current = true
+      setLoadError(null)
+      setSettings(normalized)
+      if (removedHarnessSettingsNeedPersist(raw, normalized)) {
+        if (epoch !== loadEpoch.current) return normalized
+        try {
+          await tauriCall<null>('save_settings', { settings: normalized })
+        } catch (persistErr) {
+          console.warn('Failed to persist harness migration:', persistErr)
+        }
+      }
+      return normalized
     } catch (err) {
-      console.warn('Failed to load settings:', err)
+      const detail = loadErrorMessage(err)
+      console.warn('Failed to load settings:', detail)
+      if (epoch === loadEpoch.current) setLoadError(detail)
+      return null
     } finally {
+      loadedRef.current = true
       setLoaded(true)
     }
   }, [])
@@ -150,13 +192,36 @@ export function useSettings() {
     loadSettings()
   }, [loadSettings])
 
-  const saveSettings = useCallback(async (newSettings: Settings) => {
-    const previousHideGitignored = shouldHideGitignoredFiles(settings)
-    const previousThemeMode = effectiveThemeMode(settings)
-    const previousColorTheme = effectiveColorTheme(settings)
-    const previousAccentColor = effectiveAccentColor(settings)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const retryFailedLoad = () => {
+      if (loadOkRef.current || !loadedRef.current || retryInFlight.current) return
+      retryInFlight.current = true
+      void loadSettings().finally(() => {
+        retryInFlight.current = false
+      })
+    }
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') retryFailedLoad()
+    }
+    window.addEventListener('focus', retryFailedLoad)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('focus', retryFailedLoad)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [loadSettings])
+
+  const writeSettings = useCallback(async (newSettings: Settings) => {
+    loadEpoch.current += 1
+    const previous = settingsRef.current
+    const previousHideGitignored = shouldHideGitignoredFiles(previous)
+    const previousThemeMode = effectiveThemeMode(previous)
+    const previousColorTheme = effectiveColorTheme(previous)
+    const previousAccentColor = effectiveAccentColor(previous)
     const normalizedSettings = normalizeSettings(newSettings)
     // Optimistic local state so theme/UI prefs flip immediately; disk write follows.
+    settingsRef.current = normalizedSettings
     setSettings(normalizedSettings)
     try {
       await tauriCall<null>('save_settings', { settings: normalizedSettings })
@@ -178,10 +243,40 @@ export function useSettings() {
       }
     } catch (err) {
       console.error('Failed to save settings:', err)
-      // Roll back in-memory settings if persist failed.
-      setSettings(settings)
+      settingsRef.current = previous
+      setSettings(previous)
     }
-  }, [settings])
+  }, [])
+
+  const saveSettings = useCallback(async (newSettings: Settings) => {
+    if (!loadOkRef.current) {
+      const disk = await loadSettings()
+      if (!disk || !loadOkRef.current) {
+        console.warn('[settings] Did not save settings. The settings file still failed to load.')
+        return
+      }
+      // The caller built this object from the empty in-memory settings.
+      // Writing it would replace the file with form defaults. Show disk instead.
+      console.warn('[settings] Did not save settings. The file loaded on retry, so this change was dropped.')
+      return
+    }
+    await writeSettings(newSettings)
+  }, [loadSettings, writeSettings])
+
+  const saveSettingsPatch = useCallback(async (patch: Partial<Settings>) => {
+    if (!loadOkRef.current) {
+      const disk = await loadSettings()
+      if (!disk || !loadOkRef.current) {
+        console.warn('[settings] Did not save settings. The settings file still failed to load.')
+        return
+      }
+    }
+    await writeSettings({ ...settingsRef.current, ...patch })
+  }, [loadSettings, writeSettings])
+
+  const saveNativeChatTarget = useCallback(async (target: string) => {
+    await saveSettingsPatch({ native_chat_target: target })
+  }, [saveSettingsPatch])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -199,5 +294,5 @@ export function useSettings() {
     }
   }, [saveSettings, settings])
 
-  return { settings, loaded, saveSettings }
+  return { settings, loaded, loadError, saveSettings, saveSettingsPatch, saveNativeChatTarget }
 }

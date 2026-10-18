@@ -5,16 +5,16 @@ describe('viewCreationVaultPath', () => {
   it('creates new views in the default workspace when multiple workspaces are mounted', () => {
     expect(viewCreationVaultPath({
       fallbackVaultPath: '/portent',
-      graphDefaultWorkspacePath: '/laputa',
+      graphDefaultWorkspacePath: '/vault',
       multiWorkspaceEnabled: true,
-    })).toBe('/laputa')
+    })).toBe('/vault')
   })
 
   it('keeps edited views in their owning vault', () => {
     expect(viewCreationVaultPath({
       editingRootPath: '/refactoring',
       fallbackVaultPath: '/portent',
-      graphDefaultWorkspacePath: '/laputa',
+      graphDefaultWorkspacePath: '/vault',
       multiWorkspaceEnabled: true,
     })).toBe('/refactoring')
   })
@@ -22,7 +22,7 @@ describe('viewCreationVaultPath', () => {
   it('uses the active vault when workspace mounting is disabled', () => {
     expect(viewCreationVaultPath({
       fallbackVaultPath: '/portent',
-      graphDefaultWorkspacePath: '/laputa',
+      graphDefaultWorkspacePath: '/vault',
       multiWorkspaceEnabled: false,
     })).toBe('/portent')
   })

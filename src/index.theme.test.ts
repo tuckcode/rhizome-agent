@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 // Regression guard for the Rhizome default-theme redesign: the two
 // first-party default theme blocks in index.css must keep the Rhizome
-// green accent, not silently regress back to Tolaria blue (#155DFF light /
+// green accent, not silently regress back to Rhizome blue (#155DFF light /
 // #78A4FF dark). Structure-insensitive: matches the theme block by its
 // selector, not by line number, so unrelated edits to the file don't break it.
 const css = readFileSync(join(__dirname, 'index.css'), 'utf-8')
@@ -19,6 +19,14 @@ function extractAccentBlue(blockSelectorRegex: RegExp): string {
   expect(accentMatch).not.toBeNull()
   return accentMatch![1]
 }
+
+describe('index.css Tailwind font tokens', () => {
+  it('registers --font-sans in @theme inline with the app Inter stack', () => {
+    expect(css).toMatch(
+      /--font-sans:\s*'Inter',\s*-apple-system,\s*BlinkMacSystemFont,\s*'Segoe UI',\s*Roboto,/,
+    )
+  })
+})
 
 describe('index.css default theme tokens', () => {
   it('keeps the Rhizome green accent in the default light theme', () => {
@@ -35,7 +43,7 @@ describe('index.css default theme tokens', () => {
 describe('theme picker swatch stays in sync with the default theme tokens', () => {
   // The Rhizome chip in Settings → Appearance is a static hex tuple in
   // themeMode.ts — it does not read CSS variables. This guard failed silently
-  // during the ledger/mycelium redesign (chip previewed Tolaria white/blue
+  // during the ledger/mycelium redesign (chip previewed Rhizome white/blue
   // while clicking applied sage/forest). Keep the tuple pinned to the
   // light-theme tokens: [--surface-sidebar, --surface-app, --accent-blue].
   it('Earth swatch tuple matches the light-theme surface and accent tokens', () => {

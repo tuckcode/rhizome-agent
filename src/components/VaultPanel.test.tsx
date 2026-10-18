@@ -120,6 +120,24 @@ describe('VaultPanel', () => {
     expect(onFocusToggle).toHaveBeenCalledTimes(1)
   })
 
+  it('puts the 24px mode button at the top right of the header', () => {
+    render(
+      <VaultPanel
+        browseOpen={false}
+        locale="en"
+        navigation={<div />}
+        noteList={<div />}
+        onBrowseToggle={vi.fn()}
+        onCollapse={vi.fn()}
+        mode="open"
+        onModeChange={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAttribute('data-mode', 'open')
+    expect(screen.queryByTestId('vault-panel-collapse')).not.toBeInTheDocument()
+  })
+
   it('keeps the title, its inline tools, and the collapse control as siblings — never absolutely positioned over each other', () => {
     render(
       <VaultPanel

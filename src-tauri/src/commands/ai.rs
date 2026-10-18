@@ -1,7 +1,7 @@
 #[cfg(desktop)]
 use crate::ai_agents::{AiAgentStreamRequest, AiAgentsStatus};
 #[cfg(desktop)]
-use crate::ai_models::{AiModelProviderTestRequest, AiModelStreamRequest};
+use crate::ai_models::{AiModelProvider, AiModelProviderTestRequest, AiModelStreamRequest};
 use crate::claude_cli::{ChatStreamRequest, ClaudeCliStatus};
 use crate::vault::VaultAiGuidanceStatus;
 
@@ -270,6 +270,15 @@ pub async fn discover_ai_models(
     .await?
 }
 
+/// Model ids the provider lists for its saved key. Blocking HTTP, so it runs off the UI thread.
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn list_ai_model_provider_models(
+    provider: AiModelProvider,
+) -> Result<Vec<String>, String> {
+    run_blocking(move || crate::ai_models::list_provider_models(provider)).await?
+}
+
 /// One plain reply with no tools, for batch callers such as chat titles.
 #[cfg(desktop)]
 #[tauri::command]
@@ -396,6 +405,14 @@ pub async fn discover_ai_models(
 
 #[cfg(mobile)]
 #[tauri::command]
+pub async fn list_ai_model_provider_models(
+    _provider: crate::ai_models::AiModelProvider,
+) -> Result<Vec<String>, String> {
+    Err("Provider model lists are only available in the desktop app.".into())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
 pub async fn complete_ai_model_text(
     _request: crate::ai_models::AiModelStreamRequest,
 ) -> Result<String, String> {
@@ -424,40 +441,6 @@ where
 pub async fn get_prime_session_host_status(
 ) -> Result<crate::prime_session_host::PrimeHostStatus, String> {
     run_blocking(crate::prime_session_host::get_status).await
-}
-
-/// Set the attached session's reasoning level (#9).
-///
-/// Paired with `set_prime_model` behind one strip control: the daemon takes
-/// them as two commands, but the user changes them as one decision.
-#[cfg(desktop)]
-#[tauri::command]
-pub fn set_prime_thinking_level(level: String) -> Result<(), String> {
-    crate::prime_session_host::set_thinking_level(&level)
-}
-
-/// The reasoning levels Prime accepts, ordered. Sourced from the host rather
-/// than duplicated in the frontend so there is one list, not two that drift.
-#[cfg(desktop)]
-#[tauri::command]
-pub fn get_prime_thinking_levels() -> Vec<String> {
-    crate::prime_session_host::PRIME_THINKING_LEVELS
-        .iter()
-        .map(|level| (*level).to_string())
-        .collect()
-}
-
-/// The subset of that scale the attached model can actually run, ordered.
-///
-/// Prime clamps every pick to the model's own set. Offering a level outside it
-/// is a click that applies nothing, which reads as a broken control rather
-/// than as a model limitation — the reason a pill on `deepseek-v4-flash`
-/// would not leave High. Falls back to the full scale when no model is known
-/// yet, so this is never a narrower menu than the truth.
-#[cfg(desktop)]
-#[tauri::command]
-pub fn get_prime_supported_thinking_levels() -> Vec<String> {
-    crate::prime_session_host::supported_thinking_levels_for_session()
 }
 
 /// Pause, resume, or stop one heartbeat (#14).
@@ -696,40 +679,6 @@ mod tests {
 
     #[cfg(desktop)]
     #[test]
-    fn thinking_levels_are_offered_in_increasing_order() {
-        let levels = get_prime_thinking_levels();
-        assert_eq!(
-            levels,
-            vec!["off", "minimal", "low", "medium", "high", "xhigh", "max"],
-            "the strip renders these as a scale, so order is part of the contract",
-        );
-    }
-
-    #[cfg(desktop)]
-    #[test]
-    fn thinking_levels_come_from_the_host_not_a_second_copy() {
-        // #9 requires no hardcoded model or level anywhere in the frontend.
-        // The guard that makes that true is this command returning the host's
-        // own list rather than a duplicate maintained here.
-        assert_eq!(
-            get_prime_thinking_levels().len(),
-            crate::prime_session_host::PRIME_THINKING_LEVELS.len(),
-        );
-    }
-
-    #[cfg(desktop)]
-    #[test]
-    fn setting_an_unknown_thinking_level_is_refused_before_any_host_call() {
-        let error = set_prime_thinking_level("turbo".into()).unwrap_err();
-        assert!(
-            error.contains("turbo"),
-            "the message must name the bad level: {error}"
-        );
-        assert!(error.contains("off"), "and list the valid ones: {error}");
-    }
-
-    #[cfg(desktop)]
-    #[test]
     fn setting_a_half_specified_model_is_refused() {
         assert!(set_prime_model(String::new(), "grok-4.5".into()).is_err());
         assert!(set_prime_model("xai".into(), "  ".into()).is_err());
@@ -822,6 +771,65 @@ mod tests {
         let result = abort_ai_agent_stream("ai-model-stream-chat-123".into());
 
         assert!(matches!(result, Err(message) if message.contains("Invalid AI agent stream id")));
+    }
+
+    #[cfg(desktop)]
+    fn demo_list_provider(base_url: &str) -> crate::ai_models::AiModelProvider {
+        serde_json::from_value(serde_json::json!({
+            "id": "demo",
+            "name": "Demo",
+            "kind": "lm_studio",
+            "base_url": base_url,
+            "api_key_storage": "none",
+            "api_key_env_var": null,
+            "headers": null,
+            "models": [{
+                "id": "demo-model",
+                "capabilities": {
+                    "streaming": false,
+                    "tools": false,
+                    "vision": false,
+                    "json_mode": false,
+                    "reasoning": false
+                }
+            }]
+        }))
+        .expect("demo list provider")
+    }
+
+    #[cfg(desktop)]
+    #[tokio::test]
+    async fn list_ai_model_provider_models_returns_the_ids_the_provider_reports() {
+        let server = crate::ai_models::test_server::serve(vec![
+            crate::ai_models::test_server::http_response(
+                "200 OK",
+                &["Content-Type: application/json"],
+                r#"{"object":"list","data":[{"id":"grok-4"},{"id":"grok-3-mini"}]}"#,
+            ),
+        ]);
+
+        let ids = list_ai_model_provider_models(demo_list_provider(&server.base_url))
+            .await
+            .unwrap();
+
+        assert_eq!(ids, vec!["grok-4", "grok-3-mini"]);
+    }
+
+    #[cfg(desktop)]
+    #[tokio::test]
+    async fn list_ai_model_provider_models_returns_the_provider_error() {
+        let closed = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let base_url = format!("http://{}/v1", closed.local_addr().unwrap());
+        drop(closed);
+
+        let error = list_ai_model_provider_models(demo_list_provider(&base_url))
+            .await
+            .unwrap_err();
+
+        assert!(
+            !error.is_empty(),
+            "the command must surface the provider failure"
+        );
     }
 
     #[test]
@@ -1143,23 +1151,6 @@ pub async fn save_prime_provider_key(provider: String, key: String) -> Result<()
     })
     .await
     .map_err(|error| format!("Saving the key failed: {error}"))?
-}
-
-/// Packages listed in Prime's global settings. Catalog search is the public
-/// npm `pi-package` index.
-#[tauri::command]
-pub fn list_prime_packages() -> Vec<crate::prime_settings::InstalledPrimePackage> {
-    crate::prime_settings::list_packages()
-}
-
-/// Run `prime-agent package install`, then reload the attached session.
-#[tauri::command]
-pub async fn install_prime_package(
-    source: String,
-) -> Result<crate::prime_packages::InstallPrimePackageResult, String> {
-    tokio::task::spawn_blocking(move || crate::prime_packages::install(&source))
-        .await
-        .map_err(|error| format!("Install task failed: {error}"))?
 }
 
 /// Fetch Nous Portal's public model list and merge it into Prime's catalog.

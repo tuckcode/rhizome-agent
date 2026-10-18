@@ -69,11 +69,11 @@ describe('evaluateView', () => {
 
   it('filters by relationship contains wikilink', () => {
     const entries = [
-      makeEntry({ title: 'Match', relationships: { 'Related to': ['[[laputa-app|Laputa App]]', '[[other]]'] } }),
+      makeEntry({ title: 'Match', relationships: { 'Related to': ['[[rhizome-app|Rhizome App]]', '[[other]]'] } }),
       makeEntry({ title: 'No match', relationships: { 'Related to': ['[[something]]'] } }),
       makeEntry({ title: 'No rels', relationships: {} }),
     ]
-    expectFilterTitles({ field: 'Related to', op: 'contains', value: '[[laputa-app]]' }, entries, ['Match'], 'Related')
+    expectFilterTitles({ field: 'Related to', op: 'contains', value: '[[rhizome-app]]' }, entries, ['Match'], 'Related')
   })
 
   it('evaluates nested AND/OR groups', () => {

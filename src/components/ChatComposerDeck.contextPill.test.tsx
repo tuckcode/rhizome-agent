@@ -7,8 +7,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 vi.mock('../lib/productAnalytics', () => ({
   trackComposerPillOpened: vi.fn(),
 }))
-vi.mock('./PrimeModelPicker', () => ({ PrimeModelPicker: () => null }))
-vi.mock('./PrimeThinkingToggle', () => ({ PrimeThinkingToggle: () => null }))
+vi.mock('./NativeChatModelPicker', () => ({ NativeChatModelPicker: () => null }))
 
 /**
  * #38: a pill that looks like a control and does nothing reads as a broken

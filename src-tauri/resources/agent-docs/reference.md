@@ -25,7 +25,7 @@ Small, focused pull requests are welcome. Read [CONTRIBUTING.md](https://github.
 
 ## Origins
 
-Rhizome is a modified version of [Tolaria](https://github.com/refactoringhq/tolaria) by Luca Rossi. See [Credits and licences](credits.md).
+See [Credits and licences](credits.md).
 
 ---
 
@@ -38,10 +38,10 @@ Rhizome is free software under AGPL-3.0-or-later. It builds on the projects belo
 
 | Project | Licence | What Rhizome uses |
 |---|---|---|
-| [Tolaria](https://github.com/refactoringhq/tolaria) by Luca Rossi | AGPL-3.0 | Rhizome is a modified version of Tolaria: the vault, editor and note model |
+| [Tolaria](https://github.com/refactoringhq/tolaria) by Luca Rossi | AGPL-3.0 | Thanks to Tolaria (AGPL-3.0), whose editor code Rhizome adapted. |
 | [Mindwalk](https://github.com/cosmtrek/mindwalk) © 2026 Ricko Yu | MIT | The map engine behind [Mycelium](../concepts/mycelium.md). You install it separately; Rhizome calls it |
-| [OmniRoute](https://github.com/diegosouzapw/OmniRoute) © 2026 diegosouzapw | MIT | [Free tier (auto)](../concepts/free-models-and-routing.md): the provider catalog data and cooldown rules are ported from it |
-| [freellmapi](https://github.com/tashfeenahmed/freellmapi) | MIT | Free tier (auto): used as an edge-case checklist for retries and failover. No code or hosted catalog is copied |
+| [OmniRoute](https://github.com/diegosouzapw/OmniRoute) © 2026 diegosouzapw | MIT | [Taproot](../concepts/free-models-and-routing.md): the provider catalog data and cooldown rules are ported from it |
+| [freellmapi](https://github.com/tashfeenahmed/freellmapi) | MIT | Taproot: used as an edge-case checklist for retries and failover. No code or hosted catalog is copied |
 | [Portent](https://portent.md) ([portent-vault-template](https://github.com/refactoringhq/portent-vault-template) at commit `87c4adc`) © 2026 Refactoring | MIT | The default work types for new vaults, copied into `src-tauri/src/vault/config_seed.rs`. See [Structure a vault with Portent](../guides/structure-with-portent.md) |
 | [IronCalc](https://github.com/ironcalc/IronCalc) | MIT or Apache-2.0 | Spreadsheet engine for sheet notes |
 
@@ -245,7 +245,7 @@ If you built an `.app` before, replace it with a new build.
 
 ## Update Prime
 
-If you use Prime as the Chat engine, Rhizome checks for Prime updates but never installs one on its own. When an update is ready, click **Update now**. If it fails, update Prime from a terminal.
+If you still use Prime from the CLI or in a legacy Prime-locked chat, Rhizome may check for Prime updates but never installs one on its own. When an update is ready, click **Update now**. If it fails, update Prime from a terminal.
 
 ## Report a platform bug
 

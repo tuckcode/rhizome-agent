@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createCrossWindowPersistedStore } from './crossWindowPersistedStore'
 
-const STORAGE_KEY = 'tolaria:test-cross-window-store'
-const CHANNEL_NAME = 'tolaria-test-cross-window-store'
+const STORAGE_KEY = 'rhizome:test-cross-window-store'
+const CHANNEL_NAME = 'rhizome-test-cross-window-store'
 
 interface TestSnapshot {
   value: string

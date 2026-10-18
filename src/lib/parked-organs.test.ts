@@ -1,12 +1,11 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { readAppShellSource } from '../test-utils/appShellSource'
 
 describe('parked organs leftover', () => {
-  it('does not vendor TokenJuice or add kanban.db', () => {
+  it('does not vendor TokenJuice or tinyhumans', () => {
     const pkg = readFileSync(`${process.cwd()}/package.json`, 'utf8')
-    const cargo = readFileSync(`${process.cwd()}/src-tauri/Cargo.toml`, 'utf8')
     expect(pkg).not.toMatch(/tokenjuice|tinyhumans/i)
-    expect(cargo).not.toMatch(/kanban/i)
   })
 
   it('does not invent selected-text Copy path on the note editor', () => {
@@ -138,13 +137,12 @@ describe('parked organs leftover', () => {
     expect(rail).not.toMatch(/label=\{t\('rail\.inbox'\)\}/)
   })
 
-  it('keeps thinking Limited-by-model, Graph Find a note, no composer vault pill', () => {
+  it('keeps Graph Find a note and no composer vault pill', () => {
     const en = readFileSync(`${process.cwd()}/src/lib/locales/en.json`, 'utf8')
     const deck = readFileSync(
       `${process.cwd()}/src/components/ChatComposerDeck.tsx`,
       'utf8',
     )
-    expect(en).toContain('"ai.composer.thinkingModelLimited": "Limited by this model"')
     expect(en).toContain('"graph.controls.searchPlaceholder": "Find a note…"')
     expect(deck).not.toContain('composer-vault-pill')
     expect(deck).not.toMatch(/Switch vault/)
@@ -259,16 +257,12 @@ describe('parked organs leftover', () => {
       `${process.cwd()}/src/components/SettingsPanel.tsx`,
       'utf8',
     )
-    const toggle = readFileSync(
-      `${process.cwd()}/src/components/ChatEngineSettings.tsx`,
-      'utf8',
-    )
     const composer = readFileSync(
       `${process.cwd()}/src/components/ChatComposerBar.tsx`,
       'utf8',
     )
-    expect(settings.match(/<ChatEngineSettings /g)?.length).toBe(1)
-    expect(toggle).toContain('settings-chat-engine')
+    expect(settings).not.toContain('ChatEngineSettings')
+    expect(settings).not.toContain('settings-chat-engine')
     expect(composer).not.toContain('settings-chat-engine')
     expect(composer).not.toContain('ChatEngineSettings')
   })
@@ -295,50 +289,26 @@ describe('parked organs leftover', () => {
     expect(history).toContain('ArrowUp → older, ArrowDown → newer')
   })
 
-  it('waits to load Settings catalogs until Agents or Packages is opened', () => {
+  it('does not offer a Chat engine picker or Prime engine settings', () => {
     const settings = readFileSync(
       `${process.cwd()}/src/components/SettingsPanel.tsx`,
       'utf8',
     )
-    expect(settings).toContain(
-      'props.initialSectionId === SETTINGS_SECTION_IDS.ai',
-    )
-    expect(settings).toContain(
-      'props.initialSectionId === SETTINGS_SECTION_IDS.extensions',
-    )
-    expect(settings).toContain(
-      "if (id === SETTINGS_SECTION_IDS.ai) setLoadModelCatalog(true)",
-    )
-    expect(settings).toContain(
-      "if (id === SETTINGS_SECTION_IDS.extensions) setLoadExtensionCatalog(true)",
-    )
-    const toggle = readFileSync(
-      `${process.cwd()}/src/components/ChatEngineSettings.tsx`,
-      'utf8',
-    )
-    const en = readFileSync(`${process.cwd()}/src/lib/locales/en.json`, 'utf8')
-    expect(toggle).toContain("translate(locale, 'settings.chatEngine.description')")
-    expect(en).toContain("On: new chats use Rhizome's engine")
-    expect(en).toContain(
-      "Off: new chats use Prime, and they switch to Rhizome's engine if Prime isn't installed",
-    )
-    expect(en).toContain('Changes apply to new chats, and an open chat keeps the engine it started with')
+    expect(settings).not.toContain('ChatEngineSettings')
+    expect(settings).not.toContain('settings-chat-engine')
+    expect(settings).not.toContain('AdvancedPrimeEngineSection')
+    expect(settings).not.toContain('PrimeDefaultModelSection')
+    expect(settings).not.toContain('PrimeModelAllowListSection')
+    expect(settings).not.toContain('PrimeProviderStatusSection')
+    expect(settings).not.toContain('setLoadExtensionCatalog')
+    expect(settings).not.toContain('Browse packages')
   })
 
   it('mounts Graph and Mycelium only on Changes, not Inbox', () => {
-    const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+    const app = readAppShellSource()
     expect(app).toContain('chatCentered ? (')
     expect(app).not.toContain('chatCentered && isChangesSelection ? (')
     expect(app).not.toMatch(/isInboxSelection[\s\S]{0,80}GraphView/)
-  })
-
-  it('keeps X-High in the thinking-level set', () => {
-    const levels = readFileSync(
-      `${process.cwd()}/src/lib/primeThinkingLevels.ts`,
-      'utf8',
-    )
-    expect(levels).toContain("xhigh: 'X-High'")
-    expect(levels).toContain("const LOUD_LEVEL_IDS = ['high', 'xhigh', 'max']")
   })
 
   it('keeps Chat message actions as icons with hover tooltips', () => {
@@ -358,8 +328,12 @@ describe('parked organs leftover', () => {
       `${process.cwd()}/src/components/PrimeProviderStatusSection.tsx`,
       'utf8',
     )
-    expect(providers).toContain("anthropic: 'Anthropic'")
-    expect(providers).toContain("deepseek: 'DeepSeek'")
+    const labels = readFileSync(
+      `${process.cwd()}/src/lib/primeProviderLabels.ts`,
+      'utf8',
+    )
+    expect(labels).toContain("anthropic: 'Anthropic'")
+    expect(labels).toContain("deepseek: 'DeepSeek'")
     expect(providers).toContain("connected || provider.expired ? 'Reconnect' : 'Sign in'")
     expect(providers).toContain("return 'Add key'")
   })
@@ -378,14 +352,13 @@ describe('parked organs leftover', () => {
     expect(gs).toContain("'Failed to create scaffold folder'")
   })
 
-  it('keeps model-picker provider labels at text-primary contrast', () => {
+  it('keeps native model-picker group labels sentence-case muted', () => {
     const picker = readFileSync(
-      `${process.cwd()}/src/components/PrimeModelPicker.tsx`,
+      `${process.cwd()}/src/components/NativeChatModelPicker.tsx`,
       'utf8',
     )
-    expect(picker).toContain(
-      "const PROVIDER_LABEL_CLASS = 'font-mono text-[10px] uppercase tracking-[0.1em] text-primary'",
-    )
+    expect(picker).toContain('text-[11px] font-medium text-muted-foreground normal-case tracking-normal')
+    expect(picker).not.toMatch(/uppercase tracking-\[0\.1em\] text-primary/)
   })
 
   it('keeps queued follow-ups visible and does not speak mutate_queued_message', () => {
@@ -415,7 +388,7 @@ describe('parked organs leftover', () => {
       `${process.cwd()}/src/components/askChatExcerpt.ts`,
       'utf8',
     )
-    const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+    const app = readAppShellSource()
     expect(excerpt).toContain(
       'Look at this excerpt from “${noteTitle}”:',
     )
@@ -446,7 +419,7 @@ describe('parked organs leftover', () => {
 
   it('keeps Create Rhizome Vault and Inbox as a Notes folder mode', () => {
     const en = readFileSync(`${process.cwd()}/src/lib/locales/en.json`, 'utf8')
-    const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+    const app = readAppShellSource()
     expect(en).toContain(
       '"status.vault.cloneGettingStarted": "Create Rhizome Vault"',
     )
@@ -454,7 +427,7 @@ describe('parked organs leftover', () => {
   })
 
   it('keeps Notes click-to-close, green latest-reply mark, and chat drag vs select', () => {
-    const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+    const app = readAppShellSource()
     const message = readFileSync(
       `${process.cwd()}/src/components/AiMessage.tsx`,
       'utf8',
@@ -479,7 +452,7 @@ describe('parked organs leftover', () => {
   })
 
   it('toasts Rhizome Vault as created, not cloned', () => {
-    const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+    const app = readAppShellSource()
     expect(app).toContain('Rhizome Vault created and opened at')
     expect(app).not.toContain('vault cloned and opened')
   })
@@ -497,19 +470,6 @@ describe('parked organs leftover', () => {
     expect(input).toContain('if (event.key === \'Tab\' && !event.shiftKey && onAcceptCompletion?.())')
     expect(suggestions).toContain('That is case 2 in #51')
     expect(suggestions).toContain('Deliberately not built here')
-  })
-
-  it('installs Prime packages via CLI, with Chat as fallback', () => {
-    const packages = readFileSync(
-      `${process.cwd()}/src/components/PrimeExtensionsSection.tsx`,
-      'utf8',
-    )
-    expect(packages).toContain(
-      'Install runs `prime-agent package install` in the background, then reloads',
-    )
-    expect(packages).toContain('They run with full system access.')
-    expect(packages).toContain('askChatToInstall')
-    expect(packages).toContain('queueAiPrompt(primePackageAskAgentPrompt(source), [])')
   })
 
   it('keeps Chat per-message clocks in the C70 local style', () => {
@@ -654,7 +614,7 @@ describe('parked organs leftover', () => {
       `${process.cwd()}/src/components/PrimeProviderStatusSection.tsx`,
       'utf8',
     )
-    const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+    const app = readAppShellSource()
     const about = readFileSync(
       `${process.cwd()}/src/components/AboutSettingsSection.tsx`,
       'utf8',
@@ -808,7 +768,6 @@ describe('parked organs leftover', () => {
       `${process.cwd()}/src-tauri/src/lib.rs`,
       'utf8',
     )
-    expect(home).toContain('thinkingLevel={primeHost?.thinkingLevel ?? null}')
     expect(home).toContain('<AgentsPill')
     expect(home).toContain('activeEntry={openNoteEntry}')
     expect(rail).not.toContain("label={t('rail.notes')}")
@@ -903,7 +862,7 @@ describe('parked organs leftover', () => {
   })
 
   it('keeps Chat on screen when Notes is open', () => {
-    const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+    const app = readAppShellSource()
     const rail = readFileSync(
       `${process.cwd()}/src/components/CommandRail.tsx`,
       'utf8',
@@ -977,8 +936,8 @@ describe('parked organs leftover', () => {
     expect(deck).toContain('min-w-0 truncate')
     expect(message).toContain('data-testid="ai-message-copy"')
     expect(message).toContain('<Copy size={14}')
-    expect(settings).toContain('skip provider IPC until then')
-    expect(settings).toContain('{loadModelCatalog ? <PrimeProviderStatusSection t={t} /> : null}')
+    expect(settings).not.toContain('PrimeProviderStatusSection')
+    expect(settings).not.toContain('loadModelCatalog')
   })
 
   it('still polls Prime with an empty vault and wires ChatHome to that host', () => {
@@ -1001,21 +960,20 @@ describe('parked organs leftover', () => {
     expect(sessions).toContain("await call('rename_prime_session', { path: session.path, name })")
   })
 
-  it('lets New Chat, thinking, and the model picker run without a vault', () => {
+  it('lets New Chat and the model picker run without a vault', () => {
     const home = readFileSync(
       `${process.cwd()}/src/components/ChatHome.tsx`,
       'utf8',
     )
     const picker = readFileSync(
-      `${process.cwd()}/src/components/PrimeModelPicker.tsx`,
+      `${process.cwd()}/src/components/NativeChatModelPicker.tsx`,
       'utf8',
     )
     expect(home).toContain('newChatRef.current?.()')
     expect(home).toContain('clearEngineLock()')
-    expect(home).toContain('thinkingLevel={primeHost?.thinkingLevel ?? null}')
     expect(home).not.toMatch(/if \(!vaultPath\) return/)
-    expect(picker).toContain('if (!hostReady && vaultPath)')
-    expect(picker).toContain("await callHost('ensure_prime_session_host', { vaultPath })")
+    expect(picker).not.toMatch(/if \(!vaultPath\)/)
+    expect(picker).toContain('data-testid="native-chat-model-picker"')
   })
 
   it('keeps the composer deck optional-vault and does not invent a sheet lock', () => {
@@ -1034,7 +992,7 @@ describe('parked organs leftover', () => {
   })
 
   it('keeps Browse and the note list as two independent panels', () => {
-    const app = readFileSync(`${process.cwd()}/src/App.tsx`, 'utf8')
+    const app = readAppShellSource()
     expect(app).toContain('const showSidebarTree = classicSidebarVisible')
     expect(app).toContain('const showNoteListPanel = classicNoteListVisible')
     expect(app).toContain('showInbox={explicitOrganizationEnabled}')
@@ -1264,20 +1222,6 @@ describe('parked organs leftover', () => {
     expect(mycelium).toContain('src={sidecar.url}')
     expect(mycelium).toContain('data-testid="mycelium-embed"')
     expect(mycelium).not.toContain('window.open')
-  })
-
-  it('offers the full thinking-level set, including Off and X-High', () => {
-    const levels = readFileSync(
-      `${process.cwd()}/src/lib/primeThinkingLevels.ts`,
-      'utf8',
-    )
-    expect(levels).toContain("off: 'Off'")
-    expect(levels).toContain("minimal: 'Minimal'")
-    expect(levels).toContain("low: 'Low'")
-    expect(levels).toContain("medium: 'Medium'")
-    expect(levels).toContain("high: 'High'")
-    expect(levels).toContain("xhigh: 'X-High'")
-    expect(levels).toContain("max: 'Max'")
   })
 
   it('promotes on Keep working, then finishes the close', () => {

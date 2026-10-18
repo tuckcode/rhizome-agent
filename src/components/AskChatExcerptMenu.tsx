@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { ChatTeardropText, CopySimple } from '@phosphor-icons/react'
 import { writeClipboardText } from '../utils/clipboardText'
+import { SETTINGS_MENU_Z_CLASS } from '../lib/settingsMenuLayer'
 import { getContextMenuPositionStyle } from './contextMenuPosition'
 
 function selectedTextInside(root: HTMLElement): string {
@@ -69,7 +70,7 @@ export function AskChatExcerptMenu({ children, onAsk }: AskChatExcerptMenuProps)
           ref={menuRef}
           role="menu"
           data-testid="ask-chat-excerpt-menu"
-          className="fixed z-[12000] rounded-md border bg-popover p-1 shadow-md"
+          className={`fixed ${SETTINGS_MENU_Z_CLASS} rounded-md border bg-popover p-1 shadow-md`}
           style={getContextMenuPositionStyle(menu, { minWidth: 220 })}
         >
           <button

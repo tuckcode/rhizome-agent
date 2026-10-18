@@ -69,7 +69,7 @@ describe('PrimeSessionSubhead — status control', () => {
       <PrimeSessionSubhead
         live
         sessionId="019fe641-61fa-73e9-82ef-91fc90097aab"
-        vaultPath="/Users/jdoe/Documents/Laputa"
+        vaultPath="/Users/jdoe/Documents/Vault"
         startedAt="2026-08-15T09:00:00.000Z"
       />,
     )
@@ -78,17 +78,17 @@ describe('PrimeSessionSubhead — status control', () => {
 
     expect(screen.getByTestId('prime-subhead-connection')).toHaveTextContent('Prime session live')
     expect(screen.getByTestId('prime-subhead-session')).toHaveTextContent('7aab')
-    expect(screen.getByTestId('prime-subhead-vault')).toHaveTextContent('~/Documents/Laputa')
+    expect(screen.getByTestId('prime-subhead-vault')).toHaveTextContent('~/Documents/Vault')
     expect(screen.getByTestId('prime-subhead-uptime')).toHaveTextContent('2h 30m')
     vi.useRealTimers()
   })
 
   it('never shows the absolute home path in the popover', () => {
-    render(<PrimeSessionSubhead live vaultPath="/Users/jdoe/Documents/Laputa" />)
+    render(<PrimeSessionSubhead live vaultPath="/Users/jdoe/Documents/Vault" />)
 
     openStatus()
 
-    expect(screen.queryByText('/Users/jdoe/Documents/Laputa')).not.toBeInTheDocument()
+    expect(screen.queryByText('/Users/jdoe/Documents/Vault')).not.toBeInTheDocument()
   })
 
   it('omits popover segments it has no value for', () => {
@@ -206,6 +206,12 @@ describe('PrimeSessionSubhead — actions', () => {
    * moves — leaving a maximised window with no obvious place to grab it.
    * Reported from use, 2026-09-05.
    */
+  it('hides the Idle dot and session popover when asked', () => {
+    render(<PrimeSessionSubhead live={false} showSessionStatus={false} sessionTitle="Plan the launch" />)
+    expect(screen.getByTestId('prime-session-title')).toHaveTextContent('Plan the launch')
+    expect(screen.queryByTestId('prime-session-status')).toBeNull()
+  })
+
   it('does not let a drag select its text instead of moving the window', () => {
     const { container } = render(<PrimeSessionSubhead live sessionId="abc123" vaultPath="/vault" />)
 

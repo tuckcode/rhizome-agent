@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { isTauri, mockInvoke } from '../mock-tauri'
+import { useSaveNote } from './useSaveNote'
 import type { VaultEntry } from '../types'
 import type { Dispatch, SetStateAction } from 'react'
 import {
@@ -9,6 +10,7 @@ import {
   renameToastMessage,
   useNoteRename,
 } from './useNoteRename'
+import { clearSaveBaselines, getSaveBaseline, setSaveBaseline } from './noteContentCache'
 
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }))
 vi.mock('../mock-tauri', () => ({
@@ -127,6 +129,7 @@ describe('useNoteRename hook', () => {
     vi.clearAllMocks()
     vi.mocked(isTauri).mockReturnValue(false)
     activeTabPathRef.current = null
+    clearSaveBaselines()
   })
 
   const stubRenameNote = (
@@ -169,6 +172,67 @@ describe('useNoteRename hook', () => {
 
     return { onEntryRenamed }
   }
+
+  it('PROBE8 a linked note keeps a baseline that matches the rewrite', async () => {
+    const rewritten = 'See [[New]]\n'
+    setSaveBaseline('/vault/a.md', 'See [[Old]]\n')
+    vi.mocked(mockInvoke).mockImplementation(async (cmd: string, args?: { path?: string }) => {
+      if (cmd === 'rename_note') return { new_path: '/vault/new.md', updated_files: 1, failed_updates: 0 }
+      if (cmd === 'get_note_content' && args?.path === '/vault/a.md') return rewritten
+      if (cmd === 'get_note_content') return '# New\n'
+      return null
+    })
+    const { result } = renderUseNoteRename()
+    await act(async () => {
+      await result.current.handleRenameNote('/vault/old.md', 'New', '/vault', vi.fn())
+    })
+    expect(getSaveBaseline('/vault/a.md')).toBe(rewritten)
+
+    vi.mocked(isTauri).mockReturnValue(true)
+    const { invoke } = await import('@tauri-apps/api/core')
+    vi.mocked(invoke).mockResolvedValue({ contentHash: 'x', splicedContent: null })
+    const { result: save } = renderHook(() => useSaveNote(vi.fn()))
+    await act(async () => { await save.current.saveNote('/vault/a.md', `${rewritten}more\n`) })
+    expect(invoke).toHaveBeenCalledWith('save_note_content_checked', {
+      path: '/vault/a.md',
+      content: `${rewritten}more\n`,
+      expectedContent: rewritten,
+    })
+    expect(invoke).not.toHaveBeenCalledWith('create_note_content', expect.anything())
+  })
+
+  it('a dirty linked note keeps the baseline it was editing', async () => {
+    setSaveBaseline('/vault/a.md', 'See [[Old]]\n')
+    vi.mocked(mockInvoke).mockImplementation(async (cmd: string) => {
+      if (cmd === 'rename_note') return { new_path: '/vault/new.md', updated_files: 1, failed_updates: 0 }
+      if (cmd === 'get_note_content') return 'See [[New]]\n'
+      return null
+    })
+    const { result } = renderHook(() => useNoteRename(
+      { entries: [], setToastMessage, isPathDirty: (path) => path === '/vault/a.md' },
+      { tabs: [], setTabs, activeTabPathRef, handleSwitchTab, updateTabContent },
+    ))
+    await act(async () => {
+      await result.current.handleRenameNote('/vault/old.md', 'New', '/vault', vi.fn())
+    })
+    expect(getSaveBaseline('/vault/a.md')).toBe('See [[Old]]\n')
+  })
+
+  it('moves the open note\'s save baseline to the new path', async () => {
+    clearSaveBaselines()
+    setSaveBaseline('/vault/old.md', '# Old\n')
+    stubRenameNote({ new_path: '/vault/new.md', updated_files: 0, failed_updates: 0 }, '# New\n')
+    const open = { entry: makeEntry({ path: '/vault/old.md' }), content: '# Old\n' }
+    const { result } = renderHook(() => useNoteRename(
+      { entries: [], setToastMessage },
+      { tabs: [open], setTabs, activeTabPathRef, handleSwitchTab, updateTabContent },
+    ))
+    await act(async () => {
+      await result.current.handleRenameNote('/vault/old.md', 'New', '/vault', vi.fn())
+    })
+    expect(getSaveBaseline('/vault/old.md')).toBeNull()
+    expect(getSaveBaseline('/vault/new.md')).toBe('# New\n')
+  })
 
   it('handleRenameNote calls rename_note and updates toast', async () => {
     const entry = makeEntry({ path: '/vault/old.md', title: 'Old' })

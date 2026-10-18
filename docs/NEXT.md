@@ -31,7 +31,7 @@ Read the session file first:
 | 3 | **Live thinking / no-answer** | Reproduce High/loud thinking that never answers; keep clickable Reasoning; disable = thinking **Off**. Do not force Off globally. |
 | 4 | **Public-install dogfood** | Draft: [`PUBLIC-PREVIEW.md`](PUBLIC-PREVIEW.md). Still needs a clean-account run. Honest Prime-missing first minute (C64); one live turn + note; #46 live. Windows out. |
 | 5 | **Harness leftovers** | #41 live steer/queue; human session titles (unwrap history blobs on list); Packages rail shortcut only if claimed. |
-| Parked | Import `1`, W11 cards, TraderAlice patterns, kanban/automations on rail | Ledger: [inventory](plans/2026-09-20-public-readiness-inventory.md). A row is not approval. #56 is won't-remove under ADR-0180 (`ai_models.rs` starts the Rhizome loop). |
+| Parked | Import `1`, W11 cards, TraderAlice patterns, automations on rail | Ledger: [inventory](plans/2026-09-20-public-readiness-inventory.md). Kanban park lifted ([ADR-0188](adr/0188-rhizome-builds-its-own-kanban-board.md)); board not built; still no `kanban.db`. A row is not approval. #56 is won't-remove under ADR-0180 (`ai_models.rs` starts the Rhizome loop). |
 | Done | **Red X quits unless Keep in taskbar** | ADR-0179. Default close exits and stops Rhizome-owned helpers. Native live-check still open. |
 | Wanted | **Grill the standing rules** | Sit-down `/grill-with-docs` (or vault) over `AGENTS.md`, ASTRA_PACKET §10, YOU-SHOULD-KNOW, ship rules, ADR-0163/0168/0180. Map: [`plans/2026-10-06-standing-rule-inventory.md`](plans/2026-10-06-standing-rule-inventory.md). Remind him. Do not start unless he says now. |
 | Wanted | **Vault as agent home + scratch hygiene** | Wiki + `agents/shared/` / dotfiles as sacred. Scratch untitled notes may go. Never in-app `git clean -fd`. Parked layout: [`design/vault-skill-home.md`](design/vault-skill-home.md). Inventory §7. Do not start unless he says now. |
@@ -92,11 +92,12 @@ Board cards: [`BOARD.md`](BOARD.md) W11.
 | #5 Prime surface skeleton | Structured talk | [`design/prime-agent-surface.md`](design/prime-agent-surface.md) |
 | Sessions-only rail + Research on status bar | Local `4f9b4c4`, **unpushed** | [0438](plans/handoffs/2026-09-20-0438-cursor-composer-rail-reasoning-pickup.md) |
 | Public preview install claims | Draft, not dogfooded | [`PUBLIC-PREVIEW.md`](PUBLIC-PREVIEW.md) · [inventory](plans/2026-09-20-public-readiness-inventory.md) |
-| Packages shortcut on rail | Parked brainstorm | Settings → Packages already exists |
-| Rail automations / kanban icons | Later | Empty icons no |
+| Packages shortcut on rail | Parked; marketplace removed | No Settings → Packages. Legacy deep links open AI Agents |
+| Rail automations / kanban icons | Later | Empty icons no. ADR-0188 lifted the Kanban park; board is not built |
 
-Chat ↔ Prime still first. Do not replace Chat. Do not add `kanban.db`.
-Do not invent the briefing. Do not expand two big overlays at once.
+Chat ↔ native engine first. Do not replace Chat. Do not add `kanban.db`
+(ADR-0188 Phase 1 is vault notes + a board view). Do not invent the
+briefing. Do not expand two big overlays at once.
 
 **Stamped 15:52:** D6 landed at `c44ee2b`. Session-list import still
 waits for **`1`**. #51 Case 2 and #36 stay parked. TokenJuice /
@@ -219,9 +220,11 @@ Filter: ADR-0168 / [`harness-doctrine.md`](design/harness-doctrine.md).
 
 **#40 identity is settled (ADR-0180, 2026-10-09):** Rhizome is its own
 harness and owns the loop. ADR-0177 (client of harnesses, 2026-10-05) is
-superseded. #5 remains the Prime surface spec for the optional engine.
-Hermes ACP is [ADR-0178](adr/0178-generic-acp-client.md): one optional
-engine; chat fallback until a real Hermes install dogfoods it.
+superseded. [ADR-0189](adr/0189-no-ties-to-outside-harnesses.md)
+(2026-10-17) removes Prime and Hermes as engines; Rhizome's own engine is
+the only one. #5 (Prime surface) is history. The generic ACP client
+([ADR-0178](adr/0178-generic-acp-client.md)) stays open (ADR-0189
+decision 7); only Hermes as an engine is gone.
 **#56** is won't-remove: `ai_models.rs` is a starting point for the
 Rhizome loop. Re-read #45 and #48 under ADR-0180.
 
@@ -253,7 +256,7 @@ composition doc — do not restate them here.
 
 | Decision | Blocks | Where it stands |
 |---|---|---|
-| **Harness identity (#40)** | bare Rhizome loop + CI tests; harness plan (other teammate); #5 surface spec; #45 / #48 re-read | **Settled 2026-10-09 ([ADR-0180](adr/0180-rhizome-is-its-own-harness.md)).** 0177 superseded. Hermes ACP (ADR-0178) and Prime daemon (ADR-0163) stay optional engines. #56 is a starting point. |
+| **Harness identity (#40)** | bare Rhizome loop + CI tests; harness plan (other teammate); #5 surface spec; #45 / #48 re-read | **Settled 2026-10-09 ([ADR-0180](adr/0180-rhizome-is-its-own-harness.md)).** 0177 superseded. Prime and Hermes are no longer engines ([ADR-0189](adr/0189-no-ties-to-outside-harnesses.md)). #56 is a starting point. |
 | **Session import destinations** | first-run + Settings import build | **Vault half shipped 2026-09-06** (Settings → Import chat history; Claude Code → `Imports/`). Prime session-list half still blocked on `import_jsonl` semantics (Atticus decision). Decision page: [`plans/import-jsonl-decision.md`](plans/import-jsonl-decision.md) (recommend **route 1**). Plan: [`plans/2026-09-01-session-import-plan.md`](plans/2026-09-01-session-import-plan.md). Relates to #23, C9. |
 | **C57 permission naming / defaults** | honest Limited-tools UX | **Settled 2026-09-06 (Atticus).** CLI default Limited tools; Prime toggle stays hidden (always Power User); keep Limited tools / Power User — no Vault Safe. Code already matched. |
 | **#50 live app view: which surface** | agent QA of the drawn UI | Answers proposed 2026-08-29, awaiting Atticus. Browser `pnpm dev`, read + test-bridge steer, `pnpm live-ui` not an in-app pane. [plan](plans/2026-08-29-live-app-view-plan.md). |
@@ -267,8 +270,8 @@ composition doc — do not restate them here.
 
 **#40** closes against [ADR-0180](adr/0180-rhizome-is-its-own-harness.md)
 (Rhizome is its own harness; it owns the loop). That is the identity
-answer. **#5** stays — it is the Prime harness surface spec for the
-optional engine. **#56** is won't-remove; `ai_models.rs` starts the
+answer. **#5** was the Prime harness surface spec; Prime is no longer an
+engine (ADR-0189). **#56** is won't-remove; `ai_models.rs` starts the
 Rhizome loop.
 
 The shipped map is sessions left, Chat center, and one optional right column:
@@ -346,7 +349,7 @@ column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 **Models and providers**
 | | |
 |---|---|
-| #45 | Model settings: Rhizome catalog (`ai_models.rs`) is the main list. Prime `models.json` only when the Prime engine is picked. [Harness plan](plans/2026-10-09-rhizome-harness-plan.md) Phase 4. |
+| #45 | Model settings: Rhizome catalog (`ai_models.rs`) is the main list for new chats. Prime `models.json` only for legacy Prime-locked chats still open. [Harness plan](plans/2026-10-09-rhizome-harness-plan.md) Phase 4. |
 | #48 | OmniRoute goal kept, not the program: free catalog + fallback in Rhizome Rust. No outward gateway. Phase 4b. |
 | #46 | **Security — still open.** Local **`4416411`** refuses HOME aliases (`~/`, `$HOME/`, symlink-to-HOME). Seed / MCP / `save_vault_list` already drop HOME roots. Connect scrubs only a Rhizome-authored global `rhizome-vault`. **Leftover:** live Chat-without-vault (no global skill returns). Source lock: ChatHome still mounts with empty vault ([1456](plans/handoffs/2026-09-14-1456-cursor-grok-4-6-chat-no-vault.md)). Host status still polls with empty path ([1466](plans/handoffs/2026-09-14-1466-cursor-grok-4-6-host-no-vault.md)). Do not close from units. Do not invent a Prime sandbox. Do not change `normalize_cwd("")` — empty vault → Prime cwd `$HOME` is Chat-without-vault, not MCP scope. |
 
@@ -361,7 +364,7 @@ column. Captured in ADR-0166 (Chat centre) and ADR-0170 (stacked right panel).
 | | |
 |---|---|
 | #5 | Spec: the Prime harness surface — parent of #40; **B** on §1 / `harness-composition.md` |
-| #40 | Harness or client — **reversed ADR-0180**. Hermes ACP client is ADR-0178 (optional engine). |
+| #40 | Harness or client — **reversed ADR-0180**. Hermes as an engine is gone (ADR-0189); the generic ACP client (ADR-0178) stays open (ADR-0189 decision 7). |
 | #56 | Direct-to-provider path — **won't-remove** under ADR-0180; starting point for the Rhizome loop |
 
 #29 (credential redaction) is **closed**. #46 (HOME vault / wide MCP) is the

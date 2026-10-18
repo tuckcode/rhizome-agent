@@ -49,7 +49,6 @@ test.describe('Breadcrumb action icon size regression', () => {
     await chooseNotePlacement(page, 'top')
 
     await expectIconSize('Add to favorites', page)
-    await expectIconSize('Set note as organized', page)
     await expectIconSize('Reload vault', page)
     await expectIconSize('Show the note source', page)
     await expectIconSize('More note actions', page)

@@ -1,8 +1,10 @@
 import { CaretDown, CaretUp, CornersIn, CornersOut, DotsThree, SidebarSimple } from '@phosphor-icons/react'
-import type { ReactNode } from 'react'
+import type { ReactNode, Ref } from 'react'
 import { translate, type AppLocale } from '../lib/i18n'
 import { COMMAND_RAIL_WIDTH_PX } from '../utils/trafficLights'
+import type { NotesPanelMode } from '../lib/notesPanelMode'
 import { ActionTooltip } from './ui/action-tooltip'
+import { NotesPanelModeControl } from './NotesPanelModeControl'
 import { ResizeHandle } from './ResizeHandle'
 import { Button } from './ui/button'
 import {
@@ -24,6 +26,12 @@ interface VaultPanelProps {
   onCollapse: () => void
   focused?: boolean
   onFocusToggle?: () => void
+  mode?: NotesPanelMode
+  onModeChange?: (mode: NotesPanelMode) => void
+  onModeMenuOpenChange?: (open: boolean) => void
+  modeButtonRef?: Ref<HTMLButtonElement>
+  windowTooNarrow?: boolean
+  openForNow?: boolean
 }
 
 export function VaultPanel({
@@ -36,6 +44,12 @@ export function VaultPanel({
   onCollapse,
   focused = false,
   onFocusToggle,
+  mode,
+  onModeChange,
+  onModeMenuOpenChange,
+  modeButtonRef,
+  windowTooNarrow = false,
+  openForNow = false,
 }: VaultPanelProps) {
   const collapseLabel = translate(locale, 'sidebar.action.collapse')
   const browseLabel = translate(
@@ -114,18 +128,29 @@ export function VaultPanel({
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="vault-panel__collapse"
-          onClick={onCollapse}
-          title={collapseLabel}
-          aria-label={collapseLabel}
-          data-testid="vault-panel-collapse"
-        >
-          <SidebarSimple size={16} weight="regular" mirrored />
-        </Button>
+        {mode && onModeChange ? (
+          <NotesPanelModeControl
+            mode={mode}
+            onModeChange={onModeChange}
+            onMenuOpenChange={onModeMenuOpenChange}
+            triggerRef={modeButtonRef}
+            windowTooNarrow={windowTooNarrow}
+            openForNow={openForNow}
+          />
+        ) : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="vault-panel__collapse"
+            onClick={onCollapse}
+            title={collapseLabel}
+            aria-label={collapseLabel}
+            data-testid="vault-panel-collapse"
+          >
+            <SidebarSimple size={16} weight="regular" mirrored />
+          </Button>
+        )}
       </header>
       <div className="vault-panel__content">
         <div className="vault-panel__note-list" data-testid="vault-panel-note-list" style={{ width: notesWidth }}>

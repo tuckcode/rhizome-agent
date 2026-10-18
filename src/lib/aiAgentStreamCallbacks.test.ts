@@ -27,7 +27,7 @@ vi.mock('../utils/sessionAutoDistill', async (importOriginal) => {
 })
 
 import { createStreamCallbacks } from './aiAgentStreamCallbacks'
-import { translate } from './i18n'
+import { conversationToNativeEvents } from './nativeChatTranscript'
 
 function createMessageStore(initialMessages: AiAgentMessage[]) {
   let messages = initialMessages
@@ -123,12 +123,146 @@ describe('aiAgentStreamCallbacks', () => {
           status: 'done',
           input: '{"path":"/vault/note.md"}',
           output: 'saved',
+          beforeText: 'Hello',
         }],
         isStreaming: false,
         reasoning: 'step 1',
         reasoningDone: true,
         response: 'Hello',
       },
+    ])
+  })
+
+  it.each([
+    ['claude_code', 'claude_code'],
+    ['native', 'prime'],
+  ] as const)('keeps a pre-tool-only displayed response on %s', (_engine, agent) => {
+      const messages = createMessageStore([
+        {
+          id: 'msg-1',
+          userMessage: 'Question',
+          actions: [],
+          isStreaming: true,
+        },
+      ])
+      const responseAccRef = { current: '' }
+      const callbacks = createStreamCallbacks({
+        agent,
+        messageId: 'msg-1',
+        vaultPath: '/vault',
+        setMessages: messages.setMessages,
+        setStatus: createStatusStore().setStatus,
+        abortRef: { current: { aborted: false } },
+        responseAccRef,
+        toolInputMapRef: { current: new Map() },
+        fileCallbacksRef: { current: undefined },
+      })
+
+      callbacks.onText('Hello')
+      callbacks.onToolStart('search', 't1', '{}')
+      callbacks.onToolDone('t1', 'hits')
+      callbacks.onDone()
+
+      expect(responseAccRef.current).toBe('Hello')
+      expect(messages.getMessages()[0].response).toBe('Hello')
+      expect(messages.getMessages()[0].actions[0].beforeText).toBe('Hello')
+      expect(conversationToNativeEvents(messages.getMessages())).toEqual([
+        { User: { text: 'Question' } },
+        { Assistant: { text: 'Hello' } },
+        { ToolCall: { id: 't1', name: 'search', args: '{}' } },
+        { ToolResult: { id: 't1', name: 'search', output: 'hits' } },
+        'TurnEnd',
+      ])
+    },
+  )
+
+  it.each([
+    ['claude_code', 'claude_code'],
+    ['native', 'prime'],
+  ] as const)('forks a live %s chat with assistant text still in front of its tool round', (_engine, agent) => {
+      const messages = createMessageStore([
+        {
+          id: 'msg-1',
+          userMessage: 'Do both',
+          actions: [],
+          isStreaming: true,
+        },
+      ])
+      const callbacks = createStreamCallbacks({
+        agent,
+        messageId: 'msg-1',
+        vaultPath: '/vault',
+        setMessages: messages.setMessages,
+        setStatus: createStatusStore().setStatus,
+        abortRef: { current: { aborted: false } },
+        responseAccRef: { current: '' },
+        toolInputMapRef: { current: new Map() },
+        fileCallbacksRef: { current: undefined },
+      })
+
+      callbacks.onText('I will search first')
+      callbacks.onToolStart('search', 't1', '{}')
+      callbacks.onToolDone('t1', 'hits')
+      callbacks.onText('Here is the answer')
+      callbacks.onDone()
+
+      expect(messages.getMessages()[0].response).toBe('I will search firstHere is the answer')
+      expect(messages.getMessages()[0].actions[0].beforeText).toBe('I will search first')
+      expect(conversationToNativeEvents(messages.getMessages())).toEqual([
+        { User: { text: 'Do both' } },
+        { Assistant: { text: 'I will search first' } },
+        { ToolCall: { id: 't1', name: 'search', args: '{}' } },
+        { ToolResult: { id: 't1', name: 'search', output: 'hits' } },
+        { Assistant: { text: 'Here is the answer' } },
+        'TurnEnd',
+      ])
+    },
+  )
+
+  it('records only the slice since the previous tool start as beforeText', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'Do both',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const callbacks = createStreamCallbacks({
+      agent: 'prime',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: createStatusStore().setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef: { current: '' },
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+
+    callbacks.onText('I will search first')
+    callbacks.onToolStart('search', 't1', '{}')
+    callbacks.onToolDone('t1', 'hits')
+    callbacks.onText('Now I will write')
+    callbacks.onToolStart('write', 't2', '{}')
+    callbacks.onToolDone('t2', 'ok')
+    callbacks.onText('Here is the answer')
+    callbacks.onDone()
+
+    const message = messages.getMessages()[0]
+    expect(message.response).toBe('I will search firstNow I will writeHere is the answer')
+    expect(message.actions[0].beforeText).toBe('I will search first')
+    expect(message.actions[1].beforeText).toBe('Now I will write')
+    expect(conversationToNativeEvents(messages.getMessages())).toEqual([
+      { User: { text: 'Do both' } },
+      { Assistant: { text: 'I will search first' } },
+      { ToolCall: { id: 't1', name: 'search', args: '{}' } },
+      { ToolResult: { id: 't1', name: 'search', output: 'hits' } },
+      { Assistant: { text: 'Now I will write' } },
+      { ToolCall: { id: 't2', name: 'write', args: '{}' } },
+      { ToolResult: { id: 't2', name: 'write', output: 'ok' } },
+      { Assistant: { text: 'Here is the answer' } },
+      'TurnEnd',
     ])
   })
 
@@ -175,7 +309,7 @@ describe('aiAgentStreamCallbacks', () => {
       onVaultChanged: vi.fn(),
     }
     const callbacks = createStreamCallbacks({
-      agent: 'pi',
+      agent: 'codex',
       messageId: 'msg-1',
       vaultPath: String.raw`H:\Notes`,
       setMessages: messages.setMessages,
@@ -361,42 +495,9 @@ describe('aiAgentStreamCallbacks', () => {
     expect(messages.getMessages().filter((message) => message.localMarker)).toHaveLength(1)
   })
 
-  it('localizes Pi empty-output stream errors with diagnostic output', () => {
-    const messages = createMessageStore([
-      {
-        id: 'msg-1',
-        userMessage: 'Question',
-        actions: [],
-        isStreaming: true,
-      },
-    ])
-    const diagnosticOutput = 'npm warn exec installing pi-mcp-adapter'
-    const callbacks = createStreamCallbacks({
-      agent: 'pi',
-      locale: 'it-IT',
-      messageId: 'msg-1',
-      vaultPath: '/vault',
-      setMessages: messages.setMessages,
-      setStatus: createStatusStore().setStatus,
-      abortRef: { current: { aborted: false } },
-      responseAccRef: { current: '' },
-      toolInputMapRef: { current: new Map() },
-      fileCallbacksRef: { current: undefined },
-    })
-
-    callbacks.onError(`rhizome:i18n-error:${JSON.stringify({
-      key: 'ai.error.pi.emptyOutputWithDiagnostic',
-      values: { diagnostic_output: diagnosticOutput },
-    })}`)
-
-    expect(messages.getMessages()[0].response).toBe(
-      `Error: ${translate('it-IT', 'ai.error.pi.emptyOutputWithDiagnostic', { diagnostic_output: diagnosticOutput })}`,
-    )
-  })
-
   it.each([
     ['claude_code', 'Claude Code finished without returning a reply.'],
-    ['pi', 'Pi finished without returning a reply.'],
+    ['hermes', 'Hermes Agent finished without returning a reply.'],
   ] as const)('uses the %s label for empty stream responses', (agent, response) => {
     const messages = createMessageStore([
       {
@@ -477,7 +578,7 @@ describe('aiAgentStreamCallbacks', () => {
     expect(status.getStatus()).toBe('done')
     expect(messages.getMessages()[0].reasoning).toContain('simple arithmetic')
     expect(messages.getMessages()[0].response).toBe(
-      'Prime Agent finished without returning a reply.',
+      'Prime finished without returning a reply.',
     )
     expect(messages.getMessages()[0].response).not.toContain('rejected this request')
   })
@@ -756,5 +857,188 @@ describe('aiAgentStreamCallbacks', () => {
       isStreaming: false,
     })
     expect(messages.getMessages()[0].response).toBe('first-turn-done')
+  })
+
+  it('attaches an approval card to a pending mutate tool', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'edit it',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const callbacks = createStreamCallbacks({
+      agent: 'prime',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: createStatusStore().setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef: { current: '' },
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+    const reply = vi.fn()
+    callbacks.onToolStart('edit_file', 'call_1', '{"path":"notes/a.md","old_string":"x","new_string":"y"}')
+    callbacks.onApprovalRequested?.({
+      promptId: 'prompt_1',
+      tool: 'edit_file',
+      args: '{"path":"notes/a.md","old_string":"x","new_string":"y"}',
+      options: [{ id: 'allow_once', label: 'Allow once' }],
+      path: 'notes/a.md',
+      preview: '-x\n+y\n',
+      callId: 'call_1',
+      reply,
+    })
+    const action = messages.getMessages()[0]?.actions[0]
+    expect(action?.approval?.promptId).toBe('prompt_1')
+    expect(action?.approval?.path).toBe('notes/a.md')
+    expect(action?.approval?.args).toBe('{"path":"notes/a.md","old_string":"x","new_string":"y"}')
+    expect(action?.approval?.callId).toBe('call_1')
+    action?.approval?.onReply?.('allow_once')
+    expect(reply).toHaveBeenCalledWith('allow_once')
+    expect(messages.getMessages()[0]?.actions[0]?.approval?.busy).toBe(true)
+  })
+
+  it('attaches an approval to the pending bash call with the same call id', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'run',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const callbacks = createStreamCallbacks({
+      agent: 'prime',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: createStatusStore().setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef: { current: '' },
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+    callbacks.onToolStart('bash', 'call_old', '{"command":"pwd"}')
+    callbacks.onToolStart('bash', 'call_2', '{"command":"ls"}')
+    callbacks.onApprovalRequested?.({
+      promptId: 'prompt_2',
+      tool: 'bash',
+      callId: 'call_2',
+      args: '{"command":"ls"}',
+      options: [{ id: 'allow_once', label: 'Allow once' }],
+      reply: vi.fn(),
+    })
+    const actions = messages.getMessages()[0]?.actions ?? []
+    expect(actions[0]?.approval).toBeUndefined()
+    expect(actions[1]?.approval?.promptId).toBe('prompt_2')
+    expect(actions[1]?.approval?.args).toBe('{"command":"ls"}')
+    expect(actions[1]?.approval?.callId).toBe('call_2')
+  })
+
+  it('falls back to the last pending action of the same tool when call_id is absent', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'run',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const callbacks = createStreamCallbacks({
+      agent: 'prime',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: createStatusStore().setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef: { current: '' },
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+    callbacks.onToolStart('edit_file', 'call_edit', '{"path":"a.md","old_string":"x","new_string":"y"}')
+    callbacks.onToolStart('bash', 'call_old', '{"command":"pwd"}')
+    callbacks.onToolStart('bash', 'call_new', '{"command":"ls"}')
+    callbacks.onApprovalRequested?.({
+      promptId: 'prompt_fallback',
+      tool: 'bash',
+      args: '{"command":"ls"}',
+      options: [{ id: 'allow_once', label: 'Allow once' }],
+      reply: vi.fn(),
+    })
+    const actions = messages.getMessages()[0]?.actions ?? []
+    expect(actions[0]?.approval).toBeUndefined()
+    expect(actions[1]?.approval).toBeUndefined()
+    expect(actions[2]?.approval?.promptId).toBe('prompt_fallback')
+    expect(actions[2]?.approval?.args).toBe('{"command":"ls"}')
+    expect(actions[2]?.approval?.callId).toBeUndefined()
+  })
+
+  it('settles the old pending bash call when call_id does not match', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'run',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const callbacks = createStreamCallbacks({
+      agent: 'prime',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: createStatusStore().setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef: { current: '' },
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+    callbacks.onToolStart('bash', 'call_old', '{"command":"pwd"}')
+    callbacks.onApprovalRequested?.({
+      promptId: 'prompt_new',
+      tool: 'bash',
+      callId: 'call_missing',
+      args: '{"command":"echo hi","x":"$(touch /tmp/pwned)"}',
+      options: [{ id: 'allow_once', label: 'Allow once' }],
+      reply: vi.fn(),
+    })
+    const actions = messages.getMessages()[0]?.actions ?? []
+    expect(actions[0]?.status).toBe('error')
+    expect(actions[0]?.superseded).toBe(true)
+    expect(actions[0]?.approval).toBeUndefined()
+    expect(actions[1]?.toolId).toBe('call_missing')
+    expect(actions[1]?.command).toBe('{"command":"echo hi","x":"$(touch /tmp/pwned)"}')
+    expect(actions[1]?.input).toBe('{"command":"echo hi","x":"$(touch /tmp/pwned)"}')
+    expect(actions[1]?.approval?.args).toBe('{"command":"echo hi","x":"$(touch /tmp/pwned)"}')
+  })
+
+  it('marks a denied tool from the deny event', () => {
+    const messages = createMessageStore([
+      {
+        id: 'msg-1',
+        userMessage: 'run',
+        actions: [],
+        isStreaming: true,
+      },
+    ])
+    const callbacks = createStreamCallbacks({
+      agent: 'prime',
+      messageId: 'msg-1',
+      vaultPath: '/vault',
+      setMessages: messages.setMessages,
+      setStatus: createStatusStore().setStatus,
+      abortRef: { current: { aborted: false } },
+      responseAccRef: { current: '' },
+      toolInputMapRef: { current: new Map() },
+      fileCallbacksRef: { current: undefined },
+    })
+    callbacks.onToolStart('bash', 'call_1', '{"command":"ls"}')
+    callbacks.onToolDenied?.('call_1', 'nope')
+    const action = messages.getMessages()[0]?.actions[0]
+    expect(action?.denied).toBe(true)
+    expect(action?.status).toBe('error')
   })
 })

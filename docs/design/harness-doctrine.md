@@ -1,13 +1,15 @@
 # Selective harness doctrine
 
-**Status:** ratified 2026-08-24 (ADR-0168); **amended 2026-10-09 (ADR-0180)**  
+**Status:** ratified 2026-08-24 (ADR-0168); **amended 2026-10-09 (ADR-0180)**; **amended 2026-10-17 ([ADR-0189](../adr/0189-no-ties-to-outside-harnesses.md))**  
 **Audience:** anyone deciding whether Rhizome should borrow a harness idea
 
 ADR-0180 supersedes the Prime-only execution lock. Rhizome owns its
-loop. Prime and Hermes are optional engines. Borrow-care below still
-holds for foreign runtimes.
+loop. Rhizome's own engine is the only one; Prime and Hermes are no longer
+chat engines (ADR-0189); their leftover code is still in the repo until
+the follow-up PRs. Borrow-care below still holds for foreign runtimes. The Prime
+and Hermes verdicts below are kept for history.
 
-This is the Take / Adapt / Reject / Defer rule for Rhizome Agent. It is not an
+This is the Take / Adapt / Reject / Defer rule for Rhizome. It is not an
 implementation plan and not a parity checklist.
 
 Source reviews:
@@ -29,7 +31,7 @@ Composition working notes (older option-2 numbering; identity is ADR-0180):
 ## One sentence
 
 **Borrow with care; own the loop.** Rhizome is its own harness (ADR-0180).
-Prime and Hermes are optional engines. Rhizome owns desktop presentation
+Rhizome's own engine is the only one (ADR-0189). Rhizome owns desktop presentation
 and durable markdown memory. Background work is an explicit, revocable
 grant, not the default. Foreign runtimes still donate contracts, not
 competing organs.
@@ -60,18 +62,18 @@ These three identities may evolve. They may not exchange ownership.
 
 | Layer | Owner | May become | May not become |
 |---|---|---|---|
-| Execution | Rhizome loop (ADR-0180) | richer tools, plugins, routing; optional Prime / Hermes engines | a second competing loop or a second memory authority |
+| Execution | Rhizome loop (ADR-0180) | richer tools, plugins, routing | a second competing loop or a second memory authority |
 | Desktop UX | Rhizome | Rhizome visual language over Prime state | a cloned Prime TUI, Hermes desktop, or DSH console |
 | Durable memory | Rhizome vault | better promote/search/provenance | silent dual-write or a second `MEMORY.md` authority |
 | Background permission | the user | visible leases with stop/expiry | inferred persistence from close, hide, or crash |
 
-Core chat depends on the Rhizome loop. An optional engine may be attached.
-If a borrowed surface or optional engine fails, the product degrades to
+Core chat depends on the Rhizome loop. There is no optional engine
+(ADR-0189). If a borrowed surface fails, the product degrades to
 the bare Rhizome loop. It does not take the app down with it.
 
 ## Source verdicts
 
-### Prime Agent — optional engine; WRAP the policy
+### Prime Agent — removed (ADR-0189); kept for history
 
 When attached, Prime owns daemon supervision, workers, its own loop, providers, credentials,
 model catalog and session model state, tools/IPython, RLM/subagents, queues,
@@ -157,7 +159,7 @@ UI.
 
 | Item | Why |
 |---|---|
-| Rhizome loop as the execution substrate; Prime as an optional engine | Ownership lock (ADR-0180). Prime transport still ADR-0163. |
+| Rhizome loop as the only execution substrate | Ownership lock (ADR-0180). No outside engines (ADR-0189). |
 | Observable, interruptible work | Hermes product invariant. |
 | Explicit lifecycle objects and `unknown` as a first-class outcome | Hermes + Prime 0.8.0. |
 | Children may narrow, never widen | Hermes security seam. |
@@ -189,7 +191,7 @@ UI.
 
 | Item | Why |
 |---|---|
-| A second *competing* agent runtime beside the Rhizome loop | Organ transplant. The Rhizome loop itself is in scope (ADR-0180). Optional Prime / Hermes engines are allowed. |
+| A second *competing* agent runtime beside the Rhizome loop | Organ transplant. The Rhizome loop itself is in scope (ADR-0180). Outside engines are out (ADR-0189). |
 | Command-count parity with Prime | Coverage is by user job. |
 | Resident-by-default sessions and a global “survive quit” preference | Implicit autonomy. |
 | App-stored provider keys or a Rhizome model router *for Prime chat* | Bypasses Prime auth when Prime is the attached engine. A Rhizome router for the Rhizome loop is in scope (ADR-0180). |

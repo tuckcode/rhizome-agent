@@ -4,9 +4,9 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Rhizome</title>
-  <meta name="description" content="A harness that doesn't forget. Rhizome runs its own agent loop. Notes stay as plain Markdown in a vault you own." />
+  <meta name="description" content="A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own." />
   <meta property="og:title" content="Rhizome" />
-  <meta property="og:description" content="A harness that doesn't forget. Rhizome runs its own agent loop." />
+  <meta property="og:description" content="A coding harness that doesn't forget. Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own." />
   <meta property="og:url" content="https://tuckcode.github.io/rhizome-agent/" />
   <meta property="og:image" content="https://tuckcode.github.io/rhizome-agent/assets/og.png" />
   <meta name="twitter:card" content="summary_large_image" />
@@ -22,6 +22,7 @@
       --ink-85: rgb(241 236 226 / 0.85);
       --ink-60: rgb(241 236 226 / 0.6);
       --ink-45: rgb(241 236 226 / 0.45);
+      --ink-kicker: #a8a592;
       --line: rgb(241 236 226 / 0.1);
       --line-2: rgb(241 236 226 / 0.16);
       --fill: rgb(241 236 226 / 0.04);
@@ -35,7 +36,7 @@
     body { margin: 0; color: var(--ink); background: var(--bg); font: 18px/1.55 var(--sans); -webkit-font-smoothing: antialiased; }
     a { color: inherit; }
     .wrap { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
-    .eyebrow { font: 500 11.5px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-45); }
+    .eyebrow { font: 500 12px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-kicker); }
     .btn {
       display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px;
       font: 500 11.5px/1 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; text-decoration: none;
@@ -51,16 +52,14 @@
     .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 500 14px/1 var(--mono); letter-spacing: 0.02em; }
     .logo img { width: 22px; height: 22px; border-radius: 5px; }
     .bar nav { display: flex; align-items: center; gap: 22px; }
-    .bar nav a.link { font: 500 11.5px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-60); text-decoration: none; }
+    .bar nav a.link { font: 500 14px/1 var(--sans); letter-spacing: 0; text-transform: none; color: var(--ink-60); text-decoration: none; }
     .bar nav a.link:hover { color: var(--ink); }
+    .bar nav .btn { text-transform: none; letter-spacing: 0.02em; font-family: var(--sans); }
 
-    /* Hero */
-    .hero { position: relative; border-bottom: 1px solid var(--line); }
-    .hero .art { display: block; width: 100%; height: auto; aspect-ratio: 2 / 1; max-height: 78vh; object-fit: cover; object-position: 70% 50%; }
-    .hero .fade { position: absolute; inset: auto 0 0 0; height: 45%; background: linear-gradient(to bottom, transparent, var(--bg)); pointer-events: none; }
-    .intro { display: grid; grid-template-columns: 1.3fr 1fr; gap: 40px; align-items: end; padding: 8px 0 56px; }
-    .intro h1 { margin: 14px 0 16px; font: 500 clamp(38px, 5.6vw, 72px)/1.02 var(--sans); letter-spacing: -0.035em; }
-    .intro p { margin: 0; color: var(--ink-60); font-size: 18px; max-width: 560px; }
+    /* Hero is HTML text. The glossy 3D molecule art is not used. */
+    .intro { display: grid; grid-template-columns: 1.3fr 1fr; gap: 40px; align-items: end; padding: 56px 0 56px; }
+    .intro h1 { margin: 14px 0 16px; font: 500 clamp(38px, 5.6vw, 72px)/1.02 var(--sans); letter-spacing: -0.035em; color: var(--ink); }
+    .intro p { margin: 0; color: var(--ink-85); font-size: 18px; max-width: 560px; }
     .intro .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 26px; }
     .term { margin-top: 18px; font: 14px/1 var(--mono); color: var(--ink-60); }
     .term b { color: var(--accent); font-weight: 400; }
@@ -132,40 +131,36 @@
       .cell .body { grid-template-columns: 1fr; }
       .run > div:first-child { border-right: 0; border-bottom: 1px solid var(--line); }
       .foot > div { border-right: 0; border-bottom: 1px solid var(--line); }
-      .bar nav a.link { display: none; }
-      .hero .art { aspect-ratio: 2 / 1; max-height: none; object-position: 50% 50%; }
+      .bar nav a.jump { display: none; }
     }
     @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
       .term .caret { animation: none; }
-      .hero .art[data-animated] { content: url("assets/hero.png"); }
+      .hero .fade, .intro .fade { display: none; }
     }
   </style>
 </head>
 <body>
   <header class="bar">
     <div class="wrap">
-      <a class="logo" href="./"><img src="assets/icon.png" alt="" />rhizome</a>
+      <a class="logo" href="./"><img src="assets/icon.png" alt="" />Rhizome</a>
       <nav>
-        <a class="link" href="#features">Features</a>
-        <a class="link" href="#demo">Demo</a>
-        <a class="link" href="#run">Run it</a>
-        <a class="btn solid" href="https://github.com/tuckcode/rhizome-agent">GitHub <span class="arrow">↗</span></a>
+        <a class="link jump" href="#features">Features</a>
+        <a class="link jump" href="#demo">Demo</a>
+        <a class="link jump" href="#run">Run it</a>
+        <a class="btn solid" href="docs/">Docs</a>
+        <a class="link" href="https://github.com/tuckcode/rhizome-agent">GitHub</a>
       </nav>
     </div>
   </header>
 
-  <section class="hero">
-    <img class="art" src="assets/hero.png" width="1774" height="887"
-         alt="Rhizome mark. Branching nodes over dark earth." />
-    <div class="fade"></div>
-  </section>
-
+  <!-- Hero is HTML text. The glossy 3D molecule (hero.png, rejected 11 Oct 2026) is not used. -->
   <div class="wrap">
     <div class="intro">
       <div>
         <span class="eyebrow">Rhizome · developer preview · macOS</span>
-        <h1>A harness that doesn't forget.</h1>
-        <p>Rhizome runs its own agent loop. Chat works without Prime. What you keep stays as plain Markdown in a local vault you own.</p>
+        <h1>A coding harness that doesn't forget.</h1>
+        <p>Rhizome runs its own agent loop on any model, free ones included, and keeps what matters as plain Markdown in a vault you own.</p>
         <div class="actions">
           <a class="btn solid" href="https://github.com/tuckcode/rhizome-agent">View on GitHub <span class="arrow">↗</span></a>
           <a class="btn" href="#demo">Watch the demo</a>
@@ -174,14 +169,13 @@
       </div>
       <div class="aside">
         <strong>Rhizome is the harness.</strong>
-        Prime is an optional engine you can switch to. Hermes is a planned adapter, not a usable engine today. Provider keys live in the system keychain.
+        Its own engine is the only chat engine. Provider keys live in the system keychain.
       </div>
     </div>
 
     <div class="strip" aria-label="Built with">
       <div><span>Harness</span>Rhizome</div>
-      <div><span>Optional engine</span>Prime Agent</div>
-      <div><span>Models</span>Free tier (auto)</div>
+      <div><span>Models</span>Taproot</div>
       <div><span>Theme</span>Graphite</div>
     </div>
 
@@ -207,7 +201,7 @@
           <h3><span class="n">01</span>Chat on Rhizome's engine</h3>
           <div class="body">
             <p>Rhizome owns the agent loop. A non-fatal error shows a notice; it does not cut off the reply. VoiceOver hears run status.</p>
-            <ol><li><span>1.1</span>Works without Prime</li><li><span>1.2</span>Free tier (auto)</li><li><span>1.3</span>Prime is optional</li></ol>
+            <ol><li><span>1.1</span>Works without Prime</li><li><span>1.2</span>Taproot</li><li><span>1.3</span>No outside engine</li></ol>
           </div>
         </article>
         <article class="cell">
@@ -291,12 +285,12 @@
       </div>
       <div class="run">
         <div>
-          You need macOS, Node <code>^20.19.0</code> or <code>&gt;=22.12.0</code>, pnpm, Rust, and the Tauri toolchain. Chat on Rhizome's engine does not need Prime. Settings still starts Chat on Prime until you switch the Chat engine. <code>./install.sh</code> still fetches Prime for that default. There is no signed download yet.
-          <p style="margin:16px 0 0"><a href="https://github.com/tuckcode/rhizome-agent/blob/main/docs/start/README.md">Getting started →</a></p>
+          You need macOS, Node <code>^20.19.0</code> or <code>&gt;=22.12.0</code>, pnpm, Rust, and the Tauri toolchain. Chat runs on Rhizome's own engine; Prime is no longer a chat engine (ADR-0189). <code>./install.sh</code> may still fetch Prime until the leftover engine code is removed. There is no signed download yet.
+          <p style="margin:16px 0 0"><a href="docs/start/install/">Getting started →</a></p>
           <p style="margin:8px 0 0"><a href="https://github.com/tuckcode/rhizome-agent/blob/main/docs/for-agents/README.md">Agent instructions →</a></p>
         </div>
         <div>
-<pre><span class="c"># install Rhizome. The script still fetches Prime.</span>
+<pre><span class="c"># install Rhizome. The script may still fetch Prime until the leftover engine code is removed.</span>
 <span class="p">$</span> git clone https://github.com/tuckcode/rhizome-agent.git
 <span class="p">$</span> cd rhizome-agent &amp;&amp; ./install.sh
 <span class="p">$</span> pnpm tauri dev</pre>
@@ -309,11 +303,12 @@
     <div class="wrap foot">
       <div>
         <span class="eyebrow">Rhizome</span>
-        <p>AGPL-3.0-or-later. A modified version of <a style="display:inline" href="https://github.com/refactoringhq/tolaria">Tolaria</a> by Luca Rossi.</p>
+        <p>AGPL-3.0-or-later. Thanks to <a style="display:inline" href="https://github.com/refactoringhq/tolaria">Tolaria</a> (AGPL-3.0), whose editor code Rhizome adapted.</p>
         <p>The Mycelium view embeds Mindwalk (MIT) © 2026 Ricko Yu.</p>
       </div>
       <div>
         <span class="eyebrow">Project</span>
+        <a href="docs/">Docs</a>
         <a href="https://github.com/tuckcode/rhizome-agent">GitHub</a>
         <a href="https://github.com/tuckcode/rhizome-agent/issues">Issues</a>
         <a href="https://github.com/tuckcode/rhizome-agent/blob/main/CONTRIBUTING.md">Contributing</a>

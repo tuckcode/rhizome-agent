@@ -43,8 +43,8 @@ function formatToolLabel(toolName: string, input?: string): string {
   if (toolName === 'Bash' || toolName === 'bash') {
     return 'Ran shell command'
   }
-  if (toolName === 'Write') return 'Wrote file'
-  if (toolName === 'Edit') return 'Edited file'
+  if (toolName === 'Write' || toolName === 'write_file') return 'Wrote file'
+  if (toolName === 'Edit' || toolName === 'edit_file') return 'Edited file'
   if (toolName === 'create_note') return 'Created note'
   if (toolName === 'open_note') return 'Open note'
   if (toolName === 'get_note') return 'Read note'
@@ -89,7 +89,9 @@ const OPEN_NOTE_TOOLS = new Set([
   'get_note',
   'Read',
   'Write',
+  'write_file',
   'Edit',
+  'edit_file',
   'ui_open_note',
 ])
 
@@ -100,6 +102,7 @@ export function updateToolAction(
   toolName: string,
   toolId: string,
   input?: string,
+  beforeText?: string,
 ): AiAgentMessage {
   const path = notePathFromToolInput(toolName, input)
   const existing = message.actions.find((action) => action.toolId === toolId)
@@ -113,6 +116,9 @@ export function updateToolAction(
               input: input ?? action.input,
               path: path ?? action.path,
               label: action.label || formatToolLabel(toolName, input ?? action.input),
+              ...(action.beforeText || beforeText
+                ? { beforeText: action.beforeText || beforeText }
+                : {}),
             }
           : action
       )),
@@ -132,6 +138,7 @@ export function updateToolAction(
         path,
         status: 'pending' as const,
         input,
+        ...(beforeText ? { beforeText } : {}),
       },
     ],
   }

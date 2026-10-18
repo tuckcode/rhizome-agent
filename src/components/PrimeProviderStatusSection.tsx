@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils'
 import { createTranslator } from '../lib/i18n'
 import { callHost } from '../lib/callHost'
 import { resetPrimeModelCatalog } from '../lib/primeModelCatalog'
+import { primeProviderLabel as providerLabel } from '../lib/primeProviderLabels'
 import { trackNousPortalAddedToChat, trackPrimeProviderSignIn } from '../lib/productAnalytics'
 import { Button } from './ui/button'
 import { Input } from './ui/input'
@@ -70,29 +71,6 @@ interface EnsureNousPortalResult {
   provider: string
   modelCount: number
   reloaded: boolean
-}
-
-/**
- * Prime's provider ids are lowercase slugs. A card headed "anthropic" beside
- * one headed "Prime Agent" looks like two different kinds of thing; these are
- * the names people actually use.
- */
-const PROVIDER_LABELS: Record<string, string> = {
-  anthropic: 'Anthropic',
-  openai: 'OpenAI',
-  'openai-codex': 'ChatGPT (Codex)',
-  openrouter: 'OpenRouter',
-  opencode: 'OpenCode',
-  'opencode-go': 'OpenCode Go',
-  'prime-inference': 'Prime Inference',
-  xai: 'xAI (Grok)',
-  google: 'Google',
-  deepseek: 'DeepSeek',
-  'nous-portal': 'Nous Portal',
-}
-
-function providerLabel(name: string): string {
-  return PROVIDER_LABELS[name] ?? name
 }
 
 function authKindLabel(kind: string): string {

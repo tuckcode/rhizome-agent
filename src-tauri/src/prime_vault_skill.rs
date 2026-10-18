@@ -4,6 +4,9 @@
 //! fully wired through the host kernel path. The reliable injection for v0 is a
 //! project skill under `<vault>/.prime/agent/skills/rhizome-vault/` that shells
 //! to `mcp-server/cli-call.mjs` with VAULT_PATH set.
+//!
+//! Call this only when a Prime chat turn starts. Vault open must not write
+//! under `.prime/` — Prime is an optional backup engine.
 
 use std::path::{Path, PathBuf};
 
@@ -65,6 +68,22 @@ pub(crate) fn seed_vault_skill(vault_cwd: &Path) -> Result<VaultSkillSeed, Strin
         cli_call_path,
         vault_path: vault_path_str,
     })
+}
+
+/// True when `seed_vault_skill` failed because it could not write under `.prime/`.
+pub(crate) fn is_prime_skill_write_failure(error: &str) -> bool {
+    let lower = error.to_ascii_lowercase();
+    lower.contains(".prime")
+        && (lower.contains("failed to write")
+            || lower.contains("failed to create")
+            || lower.contains("permission denied"))
+}
+
+/// User-facing copy when a Prime chat could not seed its vault skill.
+pub(crate) fn prime_skill_write_failure_message(error: &str) -> String {
+    format!(
+        "Could not write the Prime vault skill under .prime/. Prime chat can continue, but vault tools may be missing. {error}"
+    )
 }
 
 fn looks_like_vault(path: &Path) -> bool {
@@ -834,6 +853,42 @@ mod tests {
         let resolved = rhizome_tool_for_seed();
         unsafe { std::env::remove_var("RHIZOME_TOOL_PATH") };
         assert_eq!(resolved.as_deref(), Some(fake_tool.as_path()));
+    }
+
+    #[test]
+    fn write_failure_helper_matches_prime_dir_errors_only() {
+        assert!(is_prime_skill_write_failure(
+            "Failed to create Prime skill dir /vault/.prime/agent/skills/rhizome-vault: Permission denied (os error 13)"
+        ));
+        assert!(is_prime_skill_write_failure(
+            "Failed to write /vault/.prime/agent/skills/rhizome-vault/SKILL.md: Permission denied (os error 13)"
+        ));
+        assert!(!is_prime_skill_write_failure(
+            "cwd is not a Rhizome vault (missing notes/wiki markers): /Users/jdoe"
+        ));
+        assert!(!is_prime_skill_write_failure(
+            "Rhizome MCP cli-call not found next to index.js"
+        ));
+        let message = prime_skill_write_failure_message("Permission denied (os error 13)");
+        assert!(message.contains("Prime chat can continue"));
+        assert!(message.contains(".prime/"));
+        assert!(message.contains("Permission denied"));
+    }
+
+    #[test]
+    fn seed_fails_clearly_when_prime_dir_is_not_writable() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("AGENTS.md"), "# vault\n").unwrap();
+        std::fs::write(dir.path().join(".prime"), "blocked").unwrap();
+        let error = seed_vault_skill(dir.path()).expect_err("blocked .prime must not seed");
+        assert!(
+            is_prime_skill_write_failure(&error),
+            "expected a .prime write failure, got {error}"
+        );
+        assert!(!dir
+            .path()
+            .join(".prime/agent/skills/rhizome-vault/SKILL.md")
+            .exists());
     }
 
     #[test]

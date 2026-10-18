@@ -3,6 +3,7 @@ import { APP_COMMAND_IDS } from '../../src/hooks/appCommandCatalog'
 import { RUNTIME_STYLE_NONCE } from '../../src/lib/runtimeStyleNonce'
 import {
   installKeyupStamps,
+  expectBreadcrumbFilename,
   SMOKE_UI_READY_TIMEOUT,
   waitUntilKeyupOutsideDuplicateWindow,
 } from './helpers'
@@ -139,7 +140,7 @@ test.describe('keyboard command routing', () => {
     await openFixtureVaultDesktopHarness(page, tempVaultDir)
     await triggerMenuCommand(page, APP_COMMAND_IDS.fileNewNote)
 
-    await expect(page.getByTestId('breadcrumb-filename-trigger')).toContainText(/untitled-note-\d+/i, { timeout: SMOKE_UI_READY_TIMEOUT })
+    await expectBreadcrumbFilename(page, /untitled-note-\d+/i)
     await expectRuntimeStyleNonce(page)
     expect(runtimeStyleCspSignals).toEqual([])
   })

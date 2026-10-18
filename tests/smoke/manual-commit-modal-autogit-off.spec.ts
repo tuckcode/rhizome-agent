@@ -100,10 +100,25 @@ function installCommitFlowMocks() {
   })
 }
 
+/**
+ * The classic shell opens Notes from the View command, as the View menu
+ * does. At launch the browser mock switches from the dev-server vault to
+ * the mock vault list's active vault, and that switch resets the view.
+ * A Notes command sent before it is lost, so send it again until a note
+ * row shows.
+ */
 async function openFirstNote(page: Page) {
-  const noteList = page.locator('[data-testid="note-list-container"]')
-  await noteList.waitFor({ timeout: 5_000 })
-  await noteList.locator('.cursor-pointer').first().click()
+  await page.waitForFunction(() => window.__rhizomeFrontendReady === true)
+  const firstNote = page.locator('[data-testid="note-list-container"] [role="option"]').first()
+  await expect(async () => {
+    if (!(await firstNote.isVisible())) {
+      await page.evaluate(() => {
+        window.dispatchEvent(new CustomEvent('laputa:dispatch-command', { detail: 'view-editor-list' }))
+      })
+    }
+    await expect(firstNote).toBeVisible({ timeout: 2_000 })
+  }).toPass({ timeout: 10_000 })
+  await firstNote.click()
   await expect(page.locator('.bn-editor')).toBeVisible({ timeout: 5_000 })
 }
 
@@ -157,6 +172,9 @@ async function expectPushCount(page: Page, expectedCount: number) {
 
 test('@smoke commit entry opens the manual modal when AutoGit is off and switches back immediately when enabled', async ({ page }) => {
   await page.addInitScript(installCommitFlowMocks)
+  // The busy and keyboard states under test belong to the classic status-bar
+  // Commit button. The command-rail shell folds Commit into the vault pill.
+  await page.addInitScript(() => localStorage.setItem('ff_shell_command_rail', 'false'))
   await pinNotesShellLaunch(page)
   await page.goto('/')
   await page.waitForLoadState('networkidle')
@@ -176,7 +194,7 @@ test('@smoke commit entry opens the manual modal when AutoGit is off and switche
   await expect(page.getByRole('heading', { name: 'Commit & Push' })).toBeVisible()
   const messageInput = page.locator('textarea[placeholder="Commit message..."]')
   await expect(messageInput).toBeFocused()
-  await page.keyboard.press('Meta+A')
+  await page.keyboard.press('ControlOrMeta+A')
   await page.keyboard.type('Manual commit from keyboard')
   await page.keyboard.press('Meta+Enter')
 

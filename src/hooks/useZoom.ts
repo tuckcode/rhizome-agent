@@ -28,8 +28,8 @@ function loadPersistedZoom(): number {
 
 function applyZoomToDocument(level: number): void {
   document.documentElement.style.setProperty('zoom', `${level}%`)
-  document.documentElement.style.setProperty('--tolaria-overlay-zoom-factor', String(level / DEFAULT_ZOOM))
-  document.documentElement.style.setProperty('--tolaria-overlay-zoom-inverse', String(DEFAULT_ZOOM / level))
+  document.documentElement.style.setProperty('--rhizome-overlay-zoom-factor', String(level / DEFAULT_ZOOM))
+  document.documentElement.style.setProperty('--rhizome-overlay-zoom-inverse', String(DEFAULT_ZOOM / level))
   window.dispatchEvent(new Event('laputa-zoom-change'))
 }
 

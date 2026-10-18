@@ -7,10 +7,12 @@ type Translate = ReturnType<typeof createTranslator>
 export function SettingsFooter({
   onClose,
   onSave,
+  saveDisabled = false,
   t,
 }: {
   onClose: () => void
   onSave: () => void
+  saveDisabled?: boolean
   t: Translate
 }) {
   return (
@@ -19,13 +21,13 @@ export function SettingsFooter({
       style={{ height: 56, padding: '0 24px', borderTop: '1px solid var(--border)' }}
     >
       <span style={{ fontSize: 11, color: 'var(--muted-foreground)' }}>
-        {getAppCommandShortcutDisplay(APP_COMMAND_IDS.appSettings)} to open settings
+        Open settings {getAppCommandShortcutDisplay(APP_COMMAND_IDS.appSettings)}
       </span>
       <div className="flex gap-2">
         <Button variant="outline" size="sm" onClick={onClose}>
           {t('settings.cancel')}
         </Button>
-        <Button size="sm" onClick={onSave} data-testid="settings-save">
+        <Button size="sm" onClick={onSave} data-testid="settings-save" disabled={saveDisabled}>
           {t('settings.save')}
         </Button>
       </div>

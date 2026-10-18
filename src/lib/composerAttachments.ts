@@ -27,6 +27,7 @@ export const IMAGE_MIME_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/
  * oversized paste is not one slow message — it is one enormous line, and the
  * session stalls behind it. 5 MB covers any screenshot from a retina display.
  */
+/** Decoded file cap. The provider still sees the larger base64 form. */
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
 /** Per-message cap, for the same reason. */

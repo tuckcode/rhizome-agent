@@ -666,7 +666,7 @@ describe('useCommandRegistry', () => {
 
   it('keeps root folder reveal and copy commands enabled without destructive actions', () => {
     expectFolderCommandStates({
-      selection: { kind: 'folder', path: '', rootPath: '/Users/luca/Laputa' },
+      selection: { kind: 'folder', path: '', rootPath: '/Users/mock/Vault' },
       onRenameFolder: vi.fn(),
       onDeleteFolder: vi.fn(),
       onRevealSelectedFolder: vi.fn(),
@@ -1065,7 +1065,6 @@ describe('reload-vault command', () => {
         claude_code: { status: 'installed', version: '1.0.20' },
         codex: { status: 'installed', version: '0.37.0' },
         opencode: { status: 'installed', version: '0.3.1' },
-        pi: { status: 'installed', version: '0.70.2' },
         antigravity: { status: 'installed', version: '0.5.1' },
       }),
       selectedAiAgent: 'claude_code',
@@ -1077,7 +1076,6 @@ describe('reload-vault command', () => {
     expect(cmd).toBeDefined()
     expect(cmd!.label).toBe('Switch AI Agent to Codex')
     expect(findCommand(result.current, 'switch-ai-agent-opencode')).toBeDefined()
-    expect(findCommand(result.current, 'switch-ai-agent-pi')).toBeDefined()
     expect(findCommand(result.current, 'switch-ai-agent-antigravity')).toBeDefined()
 
     cmd!.execute()
@@ -1091,7 +1089,6 @@ describe('reload-vault command', () => {
         claude_code: { status: 'installed', version: '1.0.20' },
         codex: { status: 'missing', version: null },
         opencode: { status: 'missing', version: null },
-        pi: { status: 'missing', version: null },
         antigravity: { status: 'missing', version: null },
       }),
       selectedAiAgent: 'claude_code',
@@ -1101,7 +1098,6 @@ describe('reload-vault command', () => {
 
     expect(findCommand(result.current, 'switch-ai-agent-codex')).toBeUndefined()
     expect(findCommand(result.current, 'switch-ai-agent-opencode')).toBeUndefined()
-    expect(findCommand(result.current, 'switch-ai-agent-pi')).toBeUndefined()
     expect(findCommand(result.current, 'switch-ai-agent-antigravity')).toBeUndefined()
     expect(findCommand(result.current, 'switch-default-ai-agent')).toBeUndefined()
   })

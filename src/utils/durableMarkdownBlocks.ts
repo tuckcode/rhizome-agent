@@ -102,10 +102,20 @@ function durableToken(codec: DurableBlockCodec, payload: unknown): string {
   return `${codec.tokenPrefix}${encodePayload(payload)}${codec.tokenSuffix}`
 }
 
+function durableTokenReadPrefixes(prefix: string): string[] {
+  const prefixes = [prefix]
+  if (prefix.includes('RHIZOME')) prefixes.push(prefix.replaceAll('RHIZOME', 'TOLARIA'))
+  return prefixes
+}
+
 function readDurableToken(codec: DurableBlockCodec, text: string): unknown | null {
   const trimmed = text.trim()
-  if (!trimmed.startsWith(codec.tokenPrefix) || !trimmed.endsWith(codec.tokenSuffix)) return null
-  return decodePayload(codec, trimmed.slice(codec.tokenPrefix.length, -codec.tokenSuffix.length))
+  if (!trimmed.endsWith(codec.tokenSuffix)) return null
+  for (const prefix of durableTokenReadPrefixes(codec.tokenPrefix)) {
+    if (!trimmed.startsWith(prefix)) continue
+    return decodePayload(codec, trimmed.slice(prefix.length, -codec.tokenSuffix.length))
+  }
+  return null
 }
 
 function readFenceOpening(line: string, codec: DurableBlockCodec): FenceOpening | null {

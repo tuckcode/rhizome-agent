@@ -42,8 +42,10 @@ test.describe('AI chat conversation history', () => {
     await expect(response).toContainText('You said: "Hello"')
   })
 
-  test('development mode labels its fake model as a mock, not a real provider', async ({ page }) => {
-    await expect(page.getByTestId('prime-model-chip')).toContainText('Mock model')
+  test('the composer shows the native model chip on Chat', async ({ page }) => {
+    await expect(page.getByTestId('native-chat-model-picker')).toBeVisible()
+    await expect(page.getByTestId('native-chat-model-trigger')).toBeVisible()
+    await expect(page.getByTestId('prime-model-chip')).toHaveCount(0)
   })
 
   test('the compact rail opens on hover and closes when the pointer leaves', async ({ page }) => {

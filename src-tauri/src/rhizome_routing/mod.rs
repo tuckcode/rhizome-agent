@@ -115,6 +115,14 @@ pub struct RoutingModel<K: KeyStore, C: Clock> {
     inner: Option<ProviderModel>,
     observer: Option<AttemptObserver>,
     system_prompt: Option<String>,
+    reasoning_slot: Option<crate::reasoning_levels::ReasoningLevelSlot>,
+    reasoning_notice_tx:
+        Option<std::sync::mpsc::Sender<crate::reasoning_levels::ReasoningLevelNotice>>,
+    reasoning_notices_seen:
+        Option<std::sync::Arc<std::sync::Mutex<std::collections::HashSet<String>>>>,
+    chat_images: Vec<Vec<crate::chat_images::ChatImage>>,
+    send_anyway: bool,
+    image_session_id: Option<String>,
 }
 
 impl<K: KeyStore, C: Clock> RoutingModel<K, C> {
@@ -130,7 +138,32 @@ impl<K: KeyStore, C: Clock> RoutingModel<K, C> {
             inner: None,
             observer: None,
             system_prompt: None,
+            reasoning_slot: None,
+            reasoning_notice_tx: None,
+            reasoning_notices_seen: None,
+            chat_images: Vec::new(),
+            send_anyway: false,
+            image_session_id: None,
         }
+    }
+
+    pub fn with_chat_images(mut self, images: Vec<Vec<crate::chat_images::ChatImage>>) -> Self {
+        self.chat_images = images;
+        self
+    }
+
+    /// Attach the open chat's reasoning level. Routing health checks that
+    /// build a `RoutingModel` without this send no reasoning fields.
+    pub fn with_user_reasoning(
+        mut self,
+        slot: crate::reasoning_levels::ReasoningLevelSlot,
+        notice_tx: std::sync::mpsc::Sender<crate::reasoning_levels::ReasoningLevelNotice>,
+        notices_seen: std::sync::Arc<std::sync::Mutex<std::collections::HashSet<String>>>,
+    ) -> Self {
+        self.reasoning_slot = Some(slot);
+        self.reasoning_notice_tx = Some(notice_tx);
+        self.reasoning_notices_seen = Some(notices_seen);
+        self
     }
 
     /// Persona / profile for every attempt. Catalog `ProviderModel`
@@ -164,9 +197,29 @@ impl<K: KeyStore, C: Clock> RoutingModel<K, C> {
         self.budget = budget;
         self
     }
+
+    #[cfg(test)]
+    fn with_send_anyway(mut self, send_anyway: bool) -> Self {
+        self.send_anyway = send_anyway;
+        self
+    }
+
+    #[cfg(test)]
+    fn with_image_session(mut self, session: String) -> Self {
+        self.image_session_id = Some(session);
+        self
+    }
 }
 
 impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
+    fn set_chat_images(&mut self, images: Vec<Vec<crate::chat_images::ChatImage>>) {
+        self.chat_images = images;
+        if let Some((session, send_anyway)) = crate::chat_images::armed_image_turn() {
+            self.image_session_id = Some(session);
+            self.send_anyway = send_anyway;
+        }
+    }
+
     fn complete(&mut self, view: &ModelView, emit: &mut dyn FnMut(ModelEvent) -> bool) -> bool {
         let Self {
             catalog,
@@ -179,6 +232,12 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
             inner,
             observer,
             system_prompt,
+            reasoning_slot,
+            reasoning_notice_tx,
+            reasoning_notices_seen,
+            chat_images,
+            send_anyway,
+            image_session_id,
         } = self;
         let mut report = |attempt: ProviderAttempt| {
             if let Some(observer) = observer.as_mut() {
@@ -188,13 +247,23 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
         let started = clock.now_ms();
         let mut tried = 0;
         let mut keyed = false;
+        let mut skipped_vision = false;
         let mut reopens_at: Option<Millis> = None;
         let mut last_error: Option<ModelError> = None;
+        let mut image_rejection = false;
+        let mut keychain_error: Option<String> = None;
 
         for target in catalog.targets(options) {
             let provider = &catalog.providers[target.provider];
-            let Some((credential, base_url)) = reachable(provider, keys) else {
-                continue;
+            let (credential, base_url) = match reach(provider, keys) {
+                Reach::Ready(credential, base_url) => (credential, base_url),
+                Reach::Missing => continue,
+                Reach::Unreadable(error) => {
+                    if keychain_error.is_none() {
+                        keychain_error = Some(error);
+                    }
+                    continue;
+                }
             };
             keyed = true;
             let attempt = Attempt {
@@ -205,26 +274,47 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
                 key: fingerprint(credential.as_ref()),
             };
             let now = clock.now_ms();
-            if let Some(until) = health.blocked_until(&attempt, now) {
-                reopens_at = Some(reopens_at.map_or(until, |earliest| earliest.min(until)));
-                continue;
-            }
             // The first try and one failover always run (freellmapi checklist).
             // The user's own endpoint is last and always runs, so slow free
             // providers cannot use up its turn.
             if tried >= 2 && now.saturating_sub(started) >= *budget && !provider.user_supplied {
                 continue;
             }
-            tried += 1;
 
             let provider_id = provider.id.clone();
             let model_id = target.model.clone();
+            let mut request =
+                provider_request(provider, &target.model, base_url.clone(), credential);
+            let current_images = chat_images.last().is_some_and(|turn| !turn.is_empty());
+            let can_see = match request.vision_state {
+                crate::chat_images::VisionState::Yes => true,
+                crate::chat_images::VisionState::Unknown => *send_anyway,
+                crate::chat_images::VisionState::No => false,
+            };
+            if current_images && !can_see {
+                skipped_vision = true;
+                continue;
+            }
+            if let Some(until) = health.blocked_until(&attempt, now) {
+                reopens_at = Some(reopens_at.map_or(until, |earliest| earliest.min(until)));
+                continue;
+            }
+            if *send_anyway && request.vision_state == crate::chat_images::VisionState::Unknown {
+                request.vision_state = crate::chat_images::VisionState::Yes;
+                request.send_anyway = true;
+            }
+            request.defer_image_skip = true;
+            request.image_session_id = image_session_id.clone();
+            request.chat_images = chat_images.clone();
+            tried += 1;
             report(ProviderAttempt::Trying {
                 provider_id: provider_id.clone(),
                 model_id: model_id.clone(),
             });
-            let mut request = provider_request(provider, &target.model, base_url, credential);
             request.system_prompt = system_prompt.clone();
+            request.reasoning_slot = reasoning_slot.clone();
+            request.reasoning_notice_tx = reasoning_notice_tx.clone();
+            request.reasoning_notices_seen = reasoning_notices_seen.clone();
             let model = inner.get_or_insert_with(|| ProviderModel::new(request.clone(), *limits));
             model.retarget(request, provider.tool_params.clone());
             let mut on_first_output = || {
@@ -249,6 +339,13 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
                 }
                 Outcome::Stopped => return true,
                 Outcome::FailedEarly(error) => {
+                    let current_images = chat_images.last().is_some_and(|turn| !turn.is_empty());
+                    if current_images
+                        && crate::chat_images::image_client_status(error.status)
+                        && crate::chat_images::error_mentions_image(&error.message)
+                    {
+                        image_rejection = true;
+                    }
                     health.record_failure(&attempt, &error, clock.now_ms());
                     report(ProviderAttempt::FailedOver {
                         provider_id,
@@ -260,7 +357,36 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
             }
         }
 
-        let error = exhausted(last_error, reopens_at, keyed, clock.now_ms());
+        let current_images = chat_images.last().is_some_and(|turn| !turn.is_empty());
+        if current_images && tried == 0 && reopens_at.is_some() && last_error.is_none() {
+            emit(ModelEvent::Error(crate::model_events::ModelError {
+                kind: crate::model_events::ModelErrorKind::Rejected,
+                status: None,
+                message: "Every model that can read images is cooling down. Try again shortly."
+                    .into(),
+            }));
+            return true;
+        }
+        if skipped_vision && tried == 0 && last_error.is_none() {
+            emit(ModelEvent::Error(crate::model_events::ModelError {
+                kind: crate::model_events::ModelErrorKind::Rejected,
+                status: None,
+                message: crate::chat_images::text_only_refusal("This model"),
+            }));
+            return true;
+        }
+        if image_rejection {
+            if let Some(session) = image_session_id.clone() {
+                let _ = crate::chat_images::skip_current_turn_images(&session);
+            }
+        }
+        let error = exhausted(
+            last_error,
+            reopens_at,
+            keyed,
+            keychain_error.as_deref(),
+            clock.now_ms(),
+        );
         report(ProviderAttempt::Exhausted {
             reason: error.kind.clone(),
         });
@@ -269,39 +395,65 @@ impl<K: KeyStore, C: Clock> Model for RoutingModel<K, C> {
     }
 }
 
-/// True when at least one target can be tried: its provider is on, and it
-/// has the key (and account id) it needs, or needs none. The Chat picker
-/// shows "Free tier (auto)" only then (D11). A keyless user endpoint counts.
+/// True when Free tier (auto) should stay in the picker (D11).
+///
+/// A target counts when its provider is on and it has the key (and account
+/// id) it needs, or needs none. A keyless user endpoint counts. A locked or
+/// denied keychain also counts: the key may be there, so the picker stays
+/// and the send path reports the keychain error instead of "no key".
 pub fn has_usable_target(
     catalog: &Catalog,
     options: &RoutingOptions,
     keys: &impl KeyStore,
 ) -> bool {
-    catalog
-        .targets(options)
-        .iter()
-        .any(|target| reachable(&catalog.providers[target.provider], keys).is_some())
+    let mut keychain_blocked = false;
+    for target in catalog.targets(options) {
+        match reach(&catalog.providers[target.provider], keys) {
+            Reach::Ready(_, _) => return true,
+            Reach::Unreadable(_) => keychain_blocked = true,
+            Reach::Missing => {}
+        }
+    }
+    keychain_blocked
 }
 
-/// The credential and base URL for one provider, or `None` when it cannot
-/// be called: a key it needs is missing, or its URL needs an account id the
-/// credential lacks. The router and `has_usable_target` share this rule.
-fn reachable(
-    provider: &CatalogProvider,
-    keys: &impl KeyStore,
-) -> Option<(Option<Credential>, String)> {
-    let credential = match &provider.api_key {
-        Some(api_key) => Some(Credential {
+/// Why one provider can or cannot be called. The router and
+/// `has_usable_target` share this rule.
+enum Reach {
+    Ready(Option<Credential>, String),
+    /// A required key is missing, or the URL needs an account id the
+    /// credential lacks.
+    Missing,
+    /// The key store could not be read. The key may still be there.
+    Unreadable(String),
+}
+
+fn reach(provider: &CatalogProvider, keys: &impl KeyStore) -> Reach {
+    let lookup = match &provider.api_key {
+        Some(api_key) => Ok(Some(Credential {
             api_key: api_key.clone(),
             account_id: None,
-        }),
-        None => keys.credential(provider.key_id.as_deref().unwrap_or(&provider.id)),
+        })),
+        None => keys.try_credential(provider.key_id.as_deref().unwrap_or(&provider.id)),
     };
-    if provider.key_required && credential.is_none() {
-        return None;
+    match lookup {
+        Ok(credential) => {
+            if provider.key_required && credential.is_none() {
+                return Reach::Missing;
+            }
+            match resolve_base_url(&provider.base_url, credential.as_ref()) {
+                Some(base_url) => Reach::Ready(credential, base_url),
+                None => Reach::Missing,
+            }
+        }
+        Err(error) if provider.key_required => Reach::Unreadable(error),
+        // A key is optional. A locked keychain must not hide a provider
+        // that can be called without one.
+        Err(error) => match resolve_base_url(&provider.base_url, None) {
+            Some(base_url) => Reach::Ready(None, base_url),
+            None => Reach::Unreadable(error),
+        },
     }
-    let base_url = resolve_base_url(&provider.base_url, credential.as_ref())?;
-    Some((credential, base_url))
 }
 
 enum Outcome {
@@ -350,6 +502,7 @@ fn exhausted(
     last_error: Option<ModelError>,
     reopens_at: Option<Millis>,
     keyed: bool,
+    keychain_error: Option<&str>,
     now: Millis,
 ) -> ModelError {
     let failure = |kind, message: &str| ModelError {
@@ -364,6 +517,9 @@ fn exhausted(
         };
     }
     if !keyed {
+        if let Some(error) = keychain_error {
+            return failure(ModelErrorKind::Auth, error);
+        }
         return failure(ModelErrorKind::Auth, "No free-tier provider key is set.");
     }
     match reopens_at {
@@ -409,7 +565,9 @@ fn provider_request(
     base_url: String,
     credential: Option<Credential>,
 ) -> AiModelStreamRequest {
-    serde_json::from_value(json!({
+    let vision: crate::chat_images::VisionState =
+        crate::chat_images::vision_state(&provider.id, &base_url, model, false);
+    let mut request: AiModelStreamRequest = serde_json::from_value(json!({
         "provider": {
             "id": provider.id,
             "name": provider.name,
@@ -422,9 +580,9 @@ fn provider_request(
                 "capabilities": {
                     "streaming": true,
                     "tools": true,
-                    "vision": false,
+                    "vision": vision == crate::chat_images::VisionState::Yes,
                     "json_mode": false,
-                    "reasoning": false
+                    "reasoning": crate::reasoning_levels::support_for_free_tier(&provider.id, &base_url, model)
                 }
             }]
         },
@@ -432,7 +590,9 @@ fn provider_request(
         "message": "",
         "api_key_override": credential.map(|credential| credential.api_key),
     }))
-    .expect("a catalog provider request must deserialize")
+    .expect("a catalog provider request must deserialize");
+    request.vision_state = vision;
+    request
 }
 
 #[cfg(test)]
@@ -441,12 +601,238 @@ mod tests {
     use crate::ai_models::test_server::{http_response, serve, sse, TEST_LIMITS};
     use crate::model_events::FinishReason;
     use crate::rhizome_loop::{AgentLoop, DurableEvent};
+    use base64::Engine;
     use serde_json::Value;
     use std::collections::HashMap;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;
 
     const T0: Millis = 1_760_000_000_000;
+
+    #[test]
+    fn provider_request_uses_resolved_reasoning_instead_of_false() {
+        let dir = tempfile::tempdir().expect("temp");
+        crate::reasoning_levels::reset_reasoning_state_for_test(Some(dir.path().to_path_buf()));
+        let nvidia: CatalogProvider = serde_json::from_value(json!({
+            "id": "nvidia",
+            "name": "NVIDIA NIM",
+            "base_url": "https://integrate.api.nvidia.com/v1",
+            "models": []
+        }))
+        .expect("provider");
+        let nemotron = provider_request(
+            &nvidia,
+            "nvidia/nemotron-3-super-120b-a12b",
+            nvidia.base_url.clone(),
+            None,
+        );
+        assert!(matches!(
+            nemotron.provider.models[0].capabilities.reasoning,
+            crate::reasoning_levels::ReasoningSupport::Levels(_)
+        ));
+        let unknown = provider_request(&nvidia, "not-a-real-model", nvidia.base_url.clone(), None);
+        assert_eq!(
+            unknown.provider.models[0].capabilities.reasoning,
+            crate::reasoning_levels::ReasoningSupport::Unknown
+        );
+        let _keep_off_the_user_cache = tempfile::tempdir().expect("temp");
+        crate::reasoning_levels::reset_reasoning_state_for_test(Some(
+            _keep_off_the_user_cache.path().to_path_buf(),
+        ));
+    }
+
+    #[test]
+    fn images_skip_a_text_model_and_reach_a_vision_model() {
+        let dir = tempfile::tempdir().expect("temp");
+        std::fs::write(
+            dir.path().join("models-dev.json"),
+            r#"{
+              "openai": {"models": {"openai-model": {"modalities": {"input": ["text"]}}}},
+              "google": {"models": {"google-model": {"modalities": {"input": ["text", "image"]}}}}
+            }"#,
+        )
+        .unwrap();
+        std::fs::write(dir.path().join("openrouter-models.json"), r#"{"data":[]}"#).unwrap();
+        crate::reasoning_levels::reset_reasoning_state_for_test(Some(dir.path().to_path_buf()));
+
+        let text = serve(vec![reply("nope")]);
+        let vision = serve(vec![reply("seen")]);
+        let mut router = RoutingModel::new(
+            catalog(&[("openai", &text.base_url), ("google", &vision.base_url)]),
+            keys(&["openai", "google"]),
+            FakeClock::at(T0),
+            TEST_LIMITS,
+        );
+        let image = crate::chat_images::ChatImage {
+            mime_type: "image/png".into(),
+            data: base64::engine::general_purpose::STANDARD.encode(b"png"),
+        };
+        router = router.with_chat_images(vec![vec![image]]);
+        assert_eq!(run(&mut router), done("seen"));
+        assert!(text.requests.lock().unwrap().is_empty());
+        let body: Value = serde_json::from_str(&vision.requests.lock().unwrap()[0].1).unwrap();
+        assert_eq!(body["messages"][0]["content"][1]["type"], "image_url");
+
+        let _restore = tempfile::tempdir().expect("temp");
+        crate::reasoning_levels::reset_reasoning_state_for_test(Some(
+            _restore.path().to_path_buf(),
+        ));
+    }
+
+    #[test]
+    fn images_are_refused_when_no_routed_model_accepts_them() {
+        let dir = tempfile::tempdir().expect("temp");
+        std::fs::write(
+            dir.path().join("models-dev.json"),
+            r#"{"openai": {"models": {"openai-model": {"modalities": {"input": ["text"]}}}}}"#,
+        )
+        .unwrap();
+        std::fs::write(dir.path().join("openrouter-models.json"), r#"{"data":[]}"#).unwrap();
+        crate::reasoning_levels::reset_reasoning_state_for_test(Some(dir.path().to_path_buf()));
+
+        let text = serve(vec![reply("nope")]);
+        let mut router = RoutingModel::new(
+            catalog(&[("openai", &text.base_url)]),
+            keys(&["openai"]),
+            FakeClock::at(T0),
+            TEST_LIMITS,
+        );
+        router = router.with_chat_images(vec![vec![crate::chat_images::ChatImage {
+            mime_type: "image/jpeg".into(),
+            data: base64::engine::general_purpose::STANDARD.encode(b"jpg"),
+        }]]);
+        let events = run(&mut router);
+        match events.last() {
+            Some(ModelEvent::Error(error)) => {
+                assert!(error.message.contains("can't read images"));
+            }
+            other => panic!("expected a vision refusal, got {other:?}"),
+        }
+        assert!(text.requests.lock().unwrap().is_empty());
+        let _restore = tempfile::tempdir().expect("temp");
+        crate::reasoning_levels::reset_reasoning_state_for_test(Some(
+            _restore.path().to_path_buf(),
+        ));
+    }
+
+    #[test]
+    fn send_anyway_delivers_an_image_to_an_unknown_route() {
+        let dir = tempfile::tempdir().expect("temp");
+        std::fs::write(
+            dir.path().join("models-dev.json"),
+            r#"{"openai":{"models":{}}}"#,
+        )
+        .unwrap();
+        std::fs::write(dir.path().join("openrouter-models.json"), r#"{"data":[]}"#).unwrap();
+        crate::reasoning_levels::reset_reasoning_state_for_test(Some(dir.path().to_path_buf()));
+        let unknown = serve(vec![reply("seen")]);
+        let mut router = RoutingModel::new(
+            catalog(&[("openai", &unknown.base_url)]),
+            keys(&["openai"]),
+            FakeClock::at(T0),
+            TEST_LIMITS,
+        )
+        .with_send_anyway(true)
+        .with_chat_images(vec![vec![crate::chat_images::ChatImage {
+            mime_type: "image/png".into(),
+            data: base64::engine::general_purpose::STANDARD.encode(b"png"),
+        }]]);
+        assert_eq!(run(&mut router), done("seen"));
+        let body: Value = serde_json::from_str(&unknown.requests.lock().unwrap()[0].1).unwrap();
+        assert_eq!(body["messages"][0]["content"][1]["type"], "image_url");
+        let _restore = tempfile::tempdir().expect("temp");
+        crate::reasoning_levels::reset_reasoning_state_for_test(Some(
+            _restore.path().to_path_buf(),
+        ));
+    }
+
+    #[test]
+    fn a_failover_400_does_not_skip_the_image() {
+        let _lock = crate::app_config::TEST_CONFIG_ENV
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let home = tempfile::tempdir().expect("home");
+        let previous = std::env::var("HOME").ok();
+        let previous_xdg = std::env::var("XDG_CONFIG_HOME").ok();
+        std::env::set_var("HOME", home.path());
+        std::env::remove_var("XDG_CONFIG_HOME");
+        let session = uuid::Uuid::new_v4().to_string();
+        crate::chat_images::push_turn(
+            &session,
+            vec![crate::chat_images::ChatImage {
+                mime_type: "image/png".into(),
+                data: base64::engine::general_purpose::STANDARD.encode(b"\x89PNG\r\n\x1a\nA"),
+            }],
+        )
+        .unwrap();
+        let dir = tempfile::tempdir().expect("temp");
+        std::fs::write(
+            dir.path().join("models-dev.json"),
+            r#"{
+              "google": {"models": {"google-model": {"modalities": {"input": ["text", "image"]}}}},
+              "openai": {"models": {"openai-model": {"modalities": {"input": ["text", "image"]}}}}
+            }"#,
+        )
+        .unwrap();
+        std::fs::write(dir.path().join("openrouter-models.json"), r#"{"data":[]}"#).unwrap();
+        crate::reasoning_levels::reset_reasoning_state_for_test(Some(dir.path().to_path_buf()));
+        let first = serve(vec![http_response(
+            "400 Bad Request",
+            &[],
+            "unsupported image_url",
+        )]);
+        let second = serve(vec![reply("seen")]);
+        let mut router = RoutingModel::new(
+            catalog(&[("google", &first.base_url), ("openai", &second.base_url)]),
+            keys(&["google", "openai"]),
+            FakeClock::at(T0),
+            TEST_LIMITS,
+        )
+        .with_image_session(session.clone())
+        .with_chat_images(crate::chat_images::read_turns(&session).unwrap());
+        assert_eq!(run(&mut router), done("seen"));
+        assert_eq!(
+            crate::chat_images::read_turns(&session).unwrap()[0].len(),
+            1,
+            "failover success keeps the image"
+        );
+        if let Some(value) = previous {
+            std::env::set_var("HOME", value);
+        } else {
+            std::env::remove_var("HOME");
+        }
+        if let Some(value) = previous_xdg {
+            std::env::set_var("XDG_CONFIG_HOME", value);
+        } else {
+            std::env::remove_var("XDG_CONFIG_HOME");
+        }
+        let _restore = tempfile::tempdir().expect("temp");
+        crate::reasoning_levels::reset_reasoning_state_for_test(Some(
+            _restore.path().to_path_buf(),
+        ));
+    }
+
+    #[test]
+    fn a_routing_probe_sends_no_reasoning_params() {
+        let server = serve(vec![reply("ok")]);
+        let mut router = RoutingModel::new(
+            catalog(&[("groq", &server.base_url)]),
+            keys(&["groq"]),
+            FakeClock::at(T0),
+            TEST_LIMITS,
+        );
+        assert_eq!(run(&mut router), done("ok"));
+        let body = server.requests.lock().unwrap()[0].1.clone();
+        let body: Value = serde_json::from_str(&body).unwrap();
+        for key in [
+            "reasoning_effort",
+            "reasoning",
+            "thinking",
+            "chat_template_kwargs",
+        ] {
+            assert!(body.get(key).is_none(), "{key} was sent: {body}");
+        }
+    }
 
     struct FakeKeys(HashMap<String, Credential>);
 
@@ -554,6 +940,50 @@ mod tests {
     }
 
     #[test]
+    fn cooling_vision_routes_refuse_instead_of_sending_a_text_model() {
+        let dir = tempfile::tempdir().expect("temp");
+        std::fs::write(
+            dir.path().join("models-dev.json"),
+            r#"{
+              "google": {"models": {"google-model": {"modalities": {"input": ["text", "image"]}}}},
+              "openai": {"models": {"openai-model": {"modalities": {"input": ["text"]}}}}
+            }"#,
+        )
+        .unwrap();
+        std::fs::write(dir.path().join("openrouter-models.json"), r#"{"data":[]}"#).unwrap();
+        crate::reasoning_levels::reset_reasoning_state_for_test(Some(dir.path().to_path_buf()));
+        let vision = serve(vec![http_response(
+            "429 Too Many Requests",
+            &["Retry-After: 30"],
+            "slow down",
+        )]);
+        let text = serve(vec![reply("half")]);
+        let mut router = RoutingModel::new(
+            catalog(&[("google", &vision.base_url), ("openai", &text.base_url)]),
+            keys(&["google", "openai"]),
+            FakeClock::at(T0),
+            TEST_LIMITS,
+        );
+        assert_eq!(run(&mut router), done("half"));
+        router = router.with_chat_images(vec![vec![crate::chat_images::ChatImage {
+            mime_type: "image/png".into(),
+            data: base64::engine::general_purpose::STANDARD.encode(b"png"),
+        }]]);
+        let events = run(&mut router);
+        match events.last() {
+            Some(ModelEvent::Error(error)) => {
+                assert!(error.message.contains("cooling down"), "{}", error.message);
+            }
+            other => panic!("expected a cooling refusal, got {other:?}"),
+        }
+        assert_eq!(text.requests.lock().unwrap().len(), 1);
+        let _restore = tempfile::tempdir().expect("temp");
+        crate::reasoning_levels::reset_reasoning_state_for_test(Some(
+            _restore.path().to_path_buf(),
+        ));
+    }
+
+    #[test]
     fn a_429_fails_over_and_the_next_step_skips_the_cooling_provider() {
         let first = serve(vec![http_response(
             "429 Too Many Requests",
@@ -642,7 +1072,10 @@ mod tests {
         });
         let endpoint = catalog.providers.last().unwrap();
 
-        let (credential, _) = reachable(endpoint, &keys(&["open_ai_compatible-abc"])).unwrap();
+        let Reach::Ready(credential, _) = reach(endpoint, &keys(&["open_ai_compatible-abc"]))
+        else {
+            panic!("expected the saved key");
+        };
 
         assert_eq!(credential.unwrap().api_key, "test-open_ai_compatible-abc");
         assert_eq!(endpoint.name, "Hosted");
@@ -673,6 +1106,76 @@ mod tests {
             &RoutingOptions::default(),
             &with_account
         ));
+    }
+
+    struct LockedStore;
+
+    impl KeyStore for LockedStore {
+        fn credential(&self, _: &str) -> Option<Credential> {
+            None
+        }
+
+        fn try_credential(&self, provider_id: &str) -> Result<Option<Credential>, String> {
+            Err(format!(
+                "The keychain could not be read for {provider_id}. It may be locked, or access was denied."
+            ))
+        }
+    }
+
+    fn error_message(events: &[ModelEvent]) -> String {
+        match events.last() {
+            Some(ModelEvent::Error(error)) => error.message.clone(),
+            other => panic!("expected an error, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_locked_keychain_stays_in_the_picker_and_names_the_keychain() {
+        let catalog = catalog(&[("a", "http://127.0.0.1:9")]);
+        let options = RoutingOptions::default();
+        assert!(has_usable_target(&catalog, &options, &LockedStore));
+
+        let mut router = RoutingModel::new(catalog, LockedStore, FakeClock::at(T0), TEST_LIMITS);
+        let message = error_message(&run(&mut router));
+
+        assert!(message.contains("keychain"), "{message}");
+        assert!(
+            message.contains("locked") || message.contains("denied"),
+            "{message}"
+        );
+        assert!(!message.contains("No free-tier provider key"), "{message}");
+    }
+
+    #[test]
+    fn a_locked_keychain_still_calls_a_keyless_endpoint() {
+        let server = serve(vec![reply("local")]);
+        let catalog = catalog(&[]).with_user_endpoint(UserEndpoint {
+            base_url: server.base_url.clone(),
+            model: "local".into(),
+            ..Default::default()
+        });
+        assert!(has_usable_target(
+            &catalog,
+            &RoutingOptions::default(),
+            &LockedStore
+        ));
+        let mut router = RoutingModel::new(catalog, LockedStore, FakeClock::at(T0), TEST_LIMITS);
+        assert_eq!(run(&mut router), done("local"));
+    }
+
+    #[test]
+    fn a_missing_key_still_says_no_key_is_set() {
+        let mut router = RoutingModel::new(
+            catalog(&[("a", "http://127.0.0.1:9")]),
+            keys(&[]),
+            FakeClock::at(T0),
+            TEST_LIMITS,
+        );
+        let message = error_message(&run(&mut router));
+        assert!(
+            message.contains("No free-tier provider key is set."),
+            "{message}"
+        );
     }
 
     #[test]

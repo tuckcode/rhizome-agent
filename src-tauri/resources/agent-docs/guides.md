@@ -71,7 +71,7 @@ In most harnesses, memory is a file or store that belongs to the tool: `MEMORY.m
 | Your past sessions | Settings → AI Agents → **Import chat history** brings them into the vault as notes under `Imports/claude-code/`. See [Import Claude Code history](import-a-session.md) |
 | `CLAUDE.md` | The vault's `AGENTS.md`. Rhizome keeps a `CLAUDE.md` alongside it for compatibility |
 | MCP servers | Rhizome is an MCP server too. **Set Up External AI Tools…** (⌘K) adds it to Claude Code's config, so Claude Code can read and write your vault from the terminal |
-| Claude models | Prime, signed in on the Anthropic card in Settings → AI Agents → Local agent. Rhizome's own engine doesn't offer Anthropic models yet |
+| Claude models | Not on Rhizome's own engine yet; use another provider or Taproot |
 | Permission prompts | Permission modes, **Limited tools** and **Power User**, set per vault |
 | `/resume` | The sessions list. See [Sessions](sessions.md) |
 
@@ -84,8 +84,8 @@ Rhizome doesn't run Claude Code inside Chat. Keep using Claude Code in the termi
 | `MEMORY.md` / `USER.md` | Vault notes you save on purpose. Automatic saving exists but is off by default |
 | Memory writes you approve | **Save to vault** is an explicit click. It writes straight away, so review the note after, or undo with Git |
 | Observable, interruptible runs | Stop any run; with Prime, send a follow-up while it works; see a Prime run's file footprint in [Mycelium](../concepts/mycelium.md) |
-| Skills | Prime packages (Settings → Packages) when Prime is the engine. Rhizome's own plugin system is planned |
-| Your choice of provider | Your own providers, local models or **Free tier (auto)**. Keys live in the system keychain |
+| Skills | Rhizome's own plugin system is planned |
+| Your choice of provider | Your own providers, local models or **Taproot**. Keys live in the system keychain |
 
 ## From Cursor
 
@@ -94,28 +94,17 @@ Rhizome doesn't run Claude Code inside Chat. Keep using Claude Code in the termi
 | Agent chat beside your files | Chat with notes beside it (⌘2 shows Notes) |
 | Cursor's MCP settings | **Set Up External AI Tools…** (⌘K) writes Rhizome's MCP entry into `~/.cursor/mcp.json`, so Cursor's agent can use your vault |
 | Rules files | The vault's `AGENTS.md` |
-| Model picker | Prime's models, your own providers, or **Free tier (auto)** |
+| Model picker | Your providers or **Taproot** |
 
 Rhizome isn't a code editor. Keep Cursor for code, and use Rhizome as the place where what you and your agents learn is kept, reviewed and found again.
 
-## From Prime Agent
-
-Prime is still Rhizome's default engine, so nothing changes about how Prime runs:
-
-- Your sessions stay in `~/.prime/agent/sessions/`. Rhizome lists them, lets you switch, fork and archive, and draws their footprint in Mycelium.
-- Your login stays with Prime (`/login` in a terminal, or **Sign in** on a provider card in Settings → AI Agents → Local agent).
-- Prime packages install from Settings → Packages. They have full system access.
-- Rhizome connects to Prime's background service.
-
-What Rhizome adds is the vault: Save to vault, recall with its source, Git history, the Graph view and Mycelium.
-
 ## Bring your own model
 
-To skip Prime, turn on **Chat engine** in Settings → AI Agents and add a provider, or use **Free tier (auto)**. Rhizome's engine works without Prime installed. It's early: it can create notes, but can't read, search or edit files, or search the vault, yet. See [Set up models and keys](configure-ai-models.md).
+Add a provider or use **Taproot**. Rhizome's engine can read, search, edit, and create notes in the open vault. Power User can run one approved shell command in the vault folder. See [Set up models and keys](configure-ai-models.md).
 
 ## Plugins
 
-Rhizome's own plugin system is planned, not shipped. Today you can extend Prime with packages, and other apps can reach your vault through MCP.
+Rhizome's own plugin system is planned, not shipped. Other apps can reach your vault through MCP.
 
 ---
 
@@ -157,16 +146,13 @@ URL: /guides/configure-ai-models
 
 Choose which models Chat can use, store their API keys safely, and check that they answer. Keys are kept in your operating system's keychain, never in the vault.
 
-## Choose an engine first
+## Engine
 
-**Chat engine** in Settings → AI Agents decides who runs Chat:
-
-- **Off (default):** Prime handles its own provider login. Sign in from Settings → AI Agents → Local agent, or run `prime-agent` in a terminal and use `/login`.
-- **On:** Rhizome's own engine runs new chats with the models you set up below. It doesn't need Prime.
+New chats use Rhizome's own engine (ADR-0187). Set up the models below in Settings → AI Agents.
 
 ## Add a provider
 
-Settings → AI Agents has three tabs. **Local model** is for models on your computer. **API model** is for hosted models and holds **Free tier (auto)**.
+Settings → AI Agents has three tabs. **Local model** is for models on your computer. **API model** is for hosted models and holds **Taproot**.
 
 | Kind | Examples | Needs |
 |---|---|---|
@@ -174,7 +160,7 @@ Settings → AI Agents has three tabs. **Local model** is for models on your com
 | Local | Ollama, LM Studio | Base URL, model ID, usually no key |
 | Your own | Any OpenAI-compatible server | Base URL, model ID, optional key and headers |
 
-Anthropic models aren't offered by Rhizome's own Chat engine yet.
+Anthropic models are not offered by Rhizome's own engine yet.
 
 ## Store the key
 
@@ -192,11 +178,11 @@ Click **Test model** on the provider. It sends one short request with no tools. 
 
 ## Use free models
 
-**Free tier (auto)**, on the **API model** tab, lets Rhizome pick free hosted models for you and move on when one runs out. Each free provider needs its own key. See [Free models and routing](../concepts/free-models-and-routing.md).
+**Taproot**, the free automatic router on the **API model** tab, lets Rhizome pick free hosted models for you and move on when one runs out. Each free provider needs its own key. See [Free models and routing](../concepts/free-models-and-routing.md).
 
 ## Pick the model for Chat
 
-Choose a model, or **Free tier (auto)**, in the picker. The choice is saved with your settings.
+Choose a model, or **Taproot**, in the picker. The choice is saved with your settings.
 
 ## If it doesn't connect
 
@@ -529,16 +515,15 @@ Chat is where you work with the agent: ask, let it use tools, keep what's worth 
 2. Attach a vault if you want the agent to read your notes or save to them.
 3. Type a message and press Enter.
 
-Which engine answers depends on **Chat engine** in Settings → AI Agents: Prime Agent (the default) or Rhizome's own engine. See [Agents, engines and models](../concepts/ai.md).
+New chats use Rhizome's own engine (ADR-0187). See [Agents, engines and models](../concepts/ai.md).
 
 ## While a reply is running
 
 The message box stays open, so you can write your next message while the agent works.
 
-- **With Prime:** press Enter to send it to the running turn. Prime queues it and reads it before its next step.
-- **With Rhizome's engine:** Enter does nothing until the reply finishes. Your text stays in the box; send it when the turn ends.
+Enter does nothing until the reply finishes. Your text stays in the box; send it when the turn ends.
 
-Press Stop to end the run with either engine. With VoiceOver, Rhizome announces when a run starts, when a tool starts or fails, and when the reply is complete or stopped.
+Press Stop to end the run. With VoiceOver, Rhizome announces when a run starts, when a tool starts or fails, and when the reply is complete or stopped.
 
 ## Ask from the editor or about a note
 
@@ -552,8 +537,7 @@ Under a reply worth keeping, click **Save to vault**. Rhizome writes it as a Mar
 
 ## Come back to a chat
 
-- **Rhizome's engine:** chats are saved as they go and listed with automatic titles. Reopen one to continue it. If Rhizome quit in the middle of a turn, that turn is marked cancelled when you reopen the chat. Tool approvals you gave earlier aren't restored, so the agent asks again. Only one window can send to a chat at a time.
-- **Prime:** use the sessions list to switch between, fork and archive Prime sessions.
+Chats are saved as they go and listed with automatic titles. Reopen one to continue it. If Rhizome quit in the middle of a turn, that turn is marked cancelled when you reopen the chat. Tool approvals you gave earlier aren't restored, so the agent asks again. Only one window can send to a chat at a time.
 
 See [Sessions](sessions.md).
 
@@ -561,26 +545,23 @@ See [Sessions](sessions.md).
 
 The vault's permission mode decides what the agent may do without asking:
 
-- **Limited tools:** Rhizome's engine can echo and create notes, and asks before each note.
-- **Power User:** creates notes without asking, and also offers `bash`, with approval each time. `bash` doesn't run a shell yet.
+- **Limited tools:** Rhizome's engine can read and search the vault without asking. It asks before each new note and before each file edit. It does not offer a shell command.
+- **Power User:** read, search, and new notes run without asking. File edits still ask unless you already allowed that tool and path for the session. **Run command** (`bash`) asks every time, then runs in the vault folder.
 
-Prime always runs as Power User, with its local tools and no sandbox. See [Agents, engines and models](../concepts/ai.md#permission-modes).
+See [Agents, engines and models](../concepts/ai.md#permission-modes).
 
 ## See what the agent did
 
 - **Changes:** next to All Notes in the sidebar. The files that changed, with diffs. Commit or revert.
-- **Mycelium:** for Prime sessions, a map of which files the run searched, read or edited. See [Mycelium](../concepts/mycelium.md).
+- **Mycelium:** for Prime sessions, a map of which files the run searched, read or edited. See [Mycelium](../concepts/mycelium.md). Native chats are not drawn in Mycelium.
 
 ## Requests that work well
 
-With Prime, which can read and search the vault:
+Rhizome's engine can read and search the open vault:
 
 - "Find notes related to this project and summarize what's open."
 - "Draft a weekly review from the notes linked here."
 - "What did we decide about X? Check the vault."
-
-With Rhizome's engine, which can create notes but not read them yet:
-
 - "Write up these meeting notes as a note called *Weekly sync*."
 
 ---

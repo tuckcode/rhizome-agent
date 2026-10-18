@@ -11,8 +11,12 @@
 //!   `stop` for a step that called tools.
 //! - An error after partial text or tool calls is the single terminal event.
 //!   Open calls get no `ToolCallEnd`.
+//! - `reasoning_content` is kept in memory for the current replay session.
+//!   It is not a model event, so it cannot reach the native session log.
 
-use std::collections::BTreeMap;
+use std::cell::RefCell;
+use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::sync::{Mutex, OnceLock};
 
 use serde_json::Value;
 
@@ -34,6 +38,236 @@ pub(crate) struct OpenAiStreamParser {
     /// Keyed by the wire `index`, so ends come out in index order.
     calls: BTreeMap<u64, ToolCallState>,
     finished: bool,
+    /// Assistant text from this completion. A key for reasoning replay
+    /// when the step called no tools.
+    assistant_text: String,
+    /// DeepSeek thinking deltas for this completion. Replay only.
+    reasoning: String,
+}
+
+/// Drops the thread-local replay session when the stream worker ends.
+#[must_use]
+pub(crate) struct ReasoningReplayGuard;
+
+impl Drop for ReasoningReplayGuard {
+    fn drop(&mut self) {
+        set_replay_session(None);
+    }
+}
+
+/// One captured assistant step. Oldest turns are dropped first.
+struct ReplayTurn {
+    reasoning: String,
+    call_ids: Vec<String>,
+    /// Set only when the step called no tools. Matched in capture order.
+    text: Option<String>,
+}
+
+/// Remembers `reasoning_content` for one in-memory session.
+///
+/// The map is not written to disk or to the native session log. Dropping
+/// the provider model removes the session. A full session drops the oldest
+/// turns until it is within the turn count and the byte cap. A reopened
+/// chat has a new session and misses.
+#[derive(Default)]
+struct ReplayBucket {
+    turns: VecDeque<ReplayTurn>,
+    bytes: usize,
+}
+
+/// Most recent steps kept for one chat. Older steps replay as `""`.
+const MAX_SESSION_TURNS: usize = 32;
+/// About 1 MB of reasoning, call ids, and text-only answers per chat.
+const MAX_SESSION_BYTES: usize = 1024 * 1024;
+
+fn reasoning_replay() -> &'static Mutex<HashMap<String, ReplayBucket>> {
+    static REPLAY: OnceLock<Mutex<HashMap<String, ReplayBucket>>> = OnceLock::new();
+    REPLAY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+thread_local! {
+    static REPLAY_SESSION: RefCell<Option<String>> = const { RefCell::new(None) };
+}
+
+pub(crate) fn enter_reasoning_replay_session(session: String) -> ReasoningReplayGuard {
+    set_replay_session(Some(session));
+    ReasoningReplayGuard
+}
+
+fn set_replay_session(session: Option<String>) {
+    REPLAY_SESSION.with(|slot| *slot.borrow_mut() = session);
+}
+
+fn current_replay_session() -> Option<String> {
+    REPLAY_SESSION.with(|slot| slot.borrow().clone())
+}
+
+/// Stores reasoning captured for `session`. Empty reasoning is not stored.
+pub(crate) fn note_reasoning(session: &str, call_ids: &[String], text: &str, reasoning: &str) {
+    note_reasoning_limited(
+        session,
+        call_ids,
+        text,
+        reasoning,
+        MAX_SESSION_TURNS,
+        MAX_SESSION_BYTES,
+    );
+}
+
+fn note_reasoning_limited(
+    session: &str,
+    call_ids: &[String],
+    text: &str,
+    reasoning: &str,
+    max_turns: usize,
+    max_bytes: usize,
+) {
+    if session.is_empty() || reasoning.is_empty() {
+        return;
+    }
+    let call_ids: Vec<String> = call_ids
+        .iter()
+        .filter(|id| !id.is_empty())
+        .cloned()
+        .collect();
+    let text = if call_ids.is_empty() && !text.is_empty() {
+        Some(text.to_string())
+    } else {
+        None
+    };
+    if call_ids.is_empty() && text.is_none() {
+        return;
+    }
+    let turn = ReplayTurn {
+        reasoning: reasoning.to_string(),
+        call_ids,
+        text,
+    };
+    let mut sessions = reasoning_replay()
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+    let bucket = sessions.entry(session.to_string()).or_default();
+    bucket.bytes = bucket.bytes.saturating_add(turn_bytes(&turn));
+    bucket.turns.push_back(turn);
+    evict_oldest(bucket, max_turns, max_bytes);
+}
+
+/// Drops one chat's captured reasoning. Safe to call twice.
+pub(crate) fn clear_reasoning_session(session: &str) {
+    if session.is_empty() {
+        return;
+    }
+    let mut sessions = reasoning_replay()
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+    sessions.remove(session);
+}
+
+fn turn_bytes(turn: &ReplayTurn) -> usize {
+    turn.reasoning.len()
+        + turn.call_ids.iter().map(String::len).sum::<usize>()
+        + turn.text.as_ref().map(String::len).unwrap_or(0)
+}
+
+/// Drops the oldest turns until the session fits. The newest turn stays
+/// even when it alone is over the byte cap.
+fn evict_oldest(bucket: &mut ReplayBucket, max_turns: usize, max_bytes: usize) {
+    let max_turns = max_turns.max(1);
+    while bucket.turns.len() > max_turns || (bucket.bytes > max_bytes && bucket.turns.len() > 1) {
+        let Some(old) = bucket.turns.pop_front() else {
+            break;
+        };
+        bucket.bytes = bucket.bytes.saturating_sub(turn_bytes(&old));
+    }
+}
+
+/// Reasoning for a tool step, matched by call id. A miss is an evicted,
+/// reopened, or foreign turn.
+pub(crate) fn recall_call_reasoning(session: &str, call_ids: &[String]) -> Option<String> {
+    if session.is_empty() || call_ids.is_empty() {
+        return None;
+    }
+    let sessions = reasoning_replay()
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+    let bucket = sessions.get(session)?;
+    bucket
+        .turns
+        .iter()
+        .rev()
+        .find(|turn| {
+            call_ids
+                .iter()
+                .any(|id| turn.call_ids.iter().any(|stored| stored == id))
+        })
+        .map(|turn| turn.reasoning.clone())
+}
+
+/// Reasoning for text-only assistant steps, in history order.
+///
+/// Walks `texts` and the stored turns backwards together. The stored
+/// cursor moves only when the texts match, so a missing middle turn
+/// does not slide reasoning onto a later answer. A stored turn whose
+/// text is nowhere in the history still ahead is skipped, so an orphan
+/// does not block an older match. A step this session never captured,
+/// or that the cap already dropped, is `None`. The caller sends `""`
+/// for that miss.
+///
+/// Identical text can still mis-pair. Stored `D1` then `D2`, both
+/// `"Done."`, against history `[D1, X, D2]` that is also all `"Done."`
+/// gives `X` the reasoning from `D1`. Telling those turns apart needs
+/// a per-turn id. DeepSeek does not answer 400 for that mismatch.
+pub(crate) fn recall_text_reasoning(session: &str, texts: &[&str]) -> Vec<Option<String>> {
+    if session.is_empty() {
+        return vec![None; texts.len()];
+    }
+    let stored = {
+        let sessions = reasoning_replay()
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let Some(bucket) = sessions.get(session) else {
+            return vec![None; texts.len()];
+        };
+        bucket
+            .turns
+            .iter()
+            .filter_map(|turn| {
+                turn.text
+                    .as_ref()
+                    .map(|text| (text.clone(), turn.reasoning.clone()))
+            })
+            .collect::<Vec<_>>()
+    };
+    let mut matched = vec![None; texts.len()];
+    let mut stored_at = stored.len();
+    for (index, text) in texts.iter().enumerate().rev() {
+        while stored_at > 0 {
+            let (stored_text, _) = &stored[stored_at - 1];
+            let still_ahead = texts[..=index]
+                .iter()
+                .any(|candidate| candidate == stored_text);
+            if still_ahead {
+                break;
+            }
+            stored_at -= 1;
+        }
+        if stored_at == 0 {
+            break;
+        }
+        let (stored_text, reasoning) = &stored[stored_at - 1];
+        if *text == stored_text {
+            matched[index] = Some(reasoning.clone());
+            stored_at -= 1;
+        }
+    }
+    matched
+}
+
+fn store_current_reasoning(call_ids: &[String], text: &str, reasoning: &str) {
+    let Some(session) = current_replay_session() else {
+        return;
+    };
+    note_reasoning(&session, call_ids, text, reasoning);
 }
 
 impl OpenAiStreamParser {
@@ -102,7 +336,16 @@ impl OpenAiStreamParser {
         let choice = &chunk["choices"][0];
         let delta = &choice["delta"];
         if let Some(text) = delta["content"].as_str().filter(|text| !text.is_empty()) {
+            self.assistant_text.push_str(text);
             events.push(ModelEvent::TextDelta { text: text.into() });
+        }
+        // DeepSeek thinking mode streams this beside `content`. It stays
+        // out of `ModelEvent` so the native log format does not change.
+        if let Some(text) = delta["reasoning_content"]
+            .as_str()
+            .filter(|text| !text.is_empty())
+        {
+            self.reasoning.push_str(text);
         }
         if let Some(calls) = delta["tool_calls"].as_array() {
             for (position, call) in calls.iter().enumerate() {
@@ -150,6 +393,7 @@ impl OpenAiStreamParser {
     }
 
     fn finish(&mut self, reason: Option<&str>) -> Vec<ModelEvent> {
+        self.store_reasoning();
         let calls = std::mem::take(&mut self.calls);
         let called_tools = !calls.is_empty();
         let mut events = Vec::new();
@@ -174,6 +418,22 @@ impl OpenAiStreamParser {
             reason: finish_reason(reason, called_tools),
         });
         events
+    }
+
+    /// Associates this completion's thinking text with its tool-call ids
+    /// and its visible answer. The next DeepSeek request reads it back.
+    fn store_reasoning(&mut self) {
+        let reasoning = std::mem::take(&mut self.reasoning);
+        let text = std::mem::take(&mut self.assistant_text);
+        if reasoning.is_empty() {
+            return;
+        }
+        let ids = self
+            .calls
+            .values()
+            .filter_map(|call| call.id.clone())
+            .collect::<Vec<_>>();
+        store_current_reasoning(&ids, &text, &reasoning);
     }
 
     fn fail(&mut self, error: ModelError) -> Vec<ModelEvent> {
@@ -555,6 +815,209 @@ mod tests {
         );
         assert!(parser.is_finished());
         assert!(parser.end_of_stream().is_empty());
+    }
+
+    #[test]
+    fn reasoning_content_is_not_a_model_event() {
+        // The native log is built from model events. Keeping thinking
+        // text out of the event list keeps it out of the log.
+        let events = run(&[
+            r#"{"choices":[{"delta":{"reasoning_content":"hidden thought"}}]}"#,
+            r#"{"choices":[{"delta":{"content":"Hi"},"finish_reason":"stop"}]}"#,
+            "[DONE]",
+        ]);
+
+        assert_eq!(events, vec![text("Hi"), finish(FinishReason::Stop)]);
+        let logged = format!("{events:?}");
+        assert!(
+            !logged.contains("hidden thought"),
+            "thinking text must not ride a model event: {logged}"
+        );
+    }
+
+    #[test]
+    fn reasoning_content_is_stored_for_the_replay_session_only() {
+        let _guard = enter_reasoning_replay_session("parser-session".into());
+        let events = run(&[
+            r#"{"choices":[{"delta":{"reasoning_content":"need "}}]}"#,
+            r#"{"choices":[{"delta":{"reasoning_content":"the tool","content":"Looking."}}]}"#,
+            r#"{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_a","function":{"name":"echo","arguments":"{}"}},{"index":1,"id":"call_b","function":{"name":"echo","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}"#,
+        ]);
+
+        assert_eq!(
+            events,
+            vec![
+                text("Looking."),
+                start("call_a", "echo"),
+                args("call_a", "{}"),
+                start("call_b", "echo"),
+                args("call_b", "{}"),
+                end("call_a"),
+                end("call_b"),
+                finish(FinishReason::ToolCalls),
+            ]
+        );
+        assert_eq!(
+            recall_call_reasoning("parser-session", &["call_b".into()]),
+            Some("need the tool".into())
+        );
+        assert_eq!(
+            recall_text_reasoning("parser-session", &["Looking."]),
+            vec![None],
+            "a tool step is not stored under its visible text"
+        );
+        assert_eq!(
+            recall_call_reasoning("other-session", &["call_a".into()]),
+            None
+        );
+    }
+
+    #[test]
+    fn a_whole_completion_keeps_reasoning_content_out_of_events() {
+        let _guard = enter_reasoning_replay_session("completion-session".into());
+        let mut parser = OpenAiStreamParser::default();
+        let events = parser.push_completion(&json!({
+            "choices": [{
+                "message": {
+                    "role": "assistant",
+                    "content": "Done.",
+                    "reasoning_content": "checked the tool"
+                },
+                "finish_reason": "stop"
+            }]
+        }));
+
+        assert_eq!(events, vec![text("Done."), finish(FinishReason::Stop)]);
+        assert_eq!(
+            recall_text_reasoning("completion-session", &["Done."]),
+            vec![Some("checked the tool".into())]
+        );
+    }
+
+    #[test]
+    fn an_orphan_stored_turn_does_not_block_an_older_match() {
+        note_reasoning_limited("orphan", &[], "A", "kept", 8, 1_000_000);
+        note_reasoning_limited("orphan", &[], "ORPHAN", "dropped", 8, 1_000_000);
+
+        assert_eq!(
+            recall_text_reasoning("orphan", &["A", "B"]),
+            vec![Some("kept".into()), None]
+        );
+        clear_reasoning_session("orphan");
+    }
+
+    #[test]
+    fn a_gap_in_the_middle_does_not_shift_reasoning_onto_a_later_turn() {
+        note_reasoning_limited("gap-mid", &[], "alpha", "first", 8, 1_000_000);
+        note_reasoning_limited("gap-mid", &[], "gamma", "third", 8, 1_000_000);
+
+        assert_eq!(
+            recall_text_reasoning("gap-mid", &["alpha", "beta", "gamma"]),
+            vec![Some("first".into()), None, Some("third".into())]
+        );
+        clear_reasoning_session("gap-mid");
+    }
+
+    #[test]
+    fn a_gap_between_identical_neighbours_keeps_each_text_match() {
+        note_reasoning_limited("gap-same", &[], "same", "left", 8, 1_000_000);
+        note_reasoning_limited("gap-same", &[], "same", "right", 8, 1_000_000);
+
+        assert_eq!(
+            recall_text_reasoning("gap-same", &["same", "other", "same"]),
+            vec![Some("left".into()), None, Some("right".into())]
+        );
+        clear_reasoning_session("gap-same");
+    }
+
+    #[test]
+    fn fully_aligned_text_turns_replay_in_capture_order() {
+        note_reasoning_limited("aligned", &[], "alpha", "one", 8, 1_000_000);
+        note_reasoning_limited("aligned", &[], "beta", "two", 8, 1_000_000);
+        note_reasoning_limited("aligned", &[], "gamma", "three", 8, 1_000_000);
+
+        assert_eq!(
+            recall_text_reasoning("aligned", &["alpha", "beta", "gamma"]),
+            vec![Some("one".into()), Some("two".into()), Some("three".into())]
+        );
+        clear_reasoning_session("aligned");
+    }
+
+    #[test]
+    fn identical_text_only_answers_keep_their_own_reasoning_in_order() {
+        note_reasoning_limited("order-session", &[], "Done.", "first thought", 8, 1_000_000);
+        note_reasoning_limited(
+            "order-session",
+            &[],
+            "Done.",
+            "second thought",
+            8,
+            1_000_000,
+        );
+
+        assert_eq!(
+            recall_text_reasoning("order-session", &["Done.", "Done."]),
+            vec![Some("first thought".into()), Some("second thought".into())]
+        );
+        clear_reasoning_session("order-session");
+    }
+
+    #[test]
+    fn the_session_cap_drops_the_oldest_turns_first() {
+        note_reasoning_limited("cap-session", &["c1".into()], "", "one", 2, 1_000_000);
+        note_reasoning_limited("cap-session", &["c2".into()], "", "two", 2, 1_000_000);
+        note_reasoning_limited("cap-session", &["c3".into()], "", "three", 2, 1_000_000);
+
+        assert_eq!(recall_call_reasoning("cap-session", &["c1".into()]), None);
+        assert_eq!(
+            recall_call_reasoning("cap-session", &["c2".into()]),
+            Some("two".into())
+        );
+        assert_eq!(
+            recall_call_reasoning("cap-session", &["c3".into()]),
+            Some("three".into())
+        );
+
+        note_reasoning_limited("text-cap", &[], "Done.", "old", 2, 1_000_000);
+        note_reasoning_limited("text-cap", &[], "Done.", "mid", 2, 1_000_000);
+        note_reasoning_limited("text-cap", &[], "Done.", "new", 2, 1_000_000);
+        assert_eq!(
+            recall_text_reasoning("text-cap", &["Done.", "Done.", "Done."]),
+            vec![None, Some("mid".into()), Some("new".into())]
+        );
+        clear_reasoning_session("cap-session");
+        clear_reasoning_session("text-cap");
+    }
+
+    #[test]
+    fn the_byte_cap_drops_the_oldest_turn_and_keeps_the_newest() {
+        let fat = "x".repeat(20);
+        note_reasoning_limited("byte-cap", &[], "a", &fat, 10, 30);
+        note_reasoning_limited("byte-cap", &[], "b", &fat, 10, 30);
+
+        assert_eq!(
+            recall_text_reasoning("byte-cap", &["a", "b"]),
+            vec![None, Some(fat)]
+        );
+        clear_reasoning_session("byte-cap");
+    }
+
+    #[test]
+    fn clearing_one_session_leaves_the_other() {
+        note_reasoning("keep-session", &["keep".into()], "", "stay");
+        note_reasoning("drop-session", &["gone".into()], "", "leave");
+        clear_reasoning_session("drop-session");
+
+        assert_eq!(
+            recall_call_reasoning("keep-session", &["keep".into()]),
+            Some("stay".into())
+        );
+        assert_eq!(
+            recall_call_reasoning("drop-session", &["gone".into()]),
+            None
+        );
+        clear_reasoning_session("keep-session");
+        clear_reasoning_session("drop-session");
     }
 
     #[test]

@@ -648,7 +648,7 @@ export function useAppCommands(config: AppCommandsConfig): CommandAction[] {
   const keyboardActions = createKeyboardActions(config)
   const menuEventHandlers = createMenuEventHandlers(config, selectFilter, viewChanges)
 
-  useAppKeyboard({ ...keyboardActions, onArchiveNote: toggleArchive })
+  useAppKeyboard({ ...keyboardActions, onArchiveNote: toggleArchive, onSelectFilter: selectFilter })
 
   useMenuEvents({ ...menuEventHandlers, onArchiveNote: toggleArchive })
 

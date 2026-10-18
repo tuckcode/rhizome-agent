@@ -5,7 +5,7 @@ import {
   type AgentFileCallbacks,
 } from './aiAgentFileOperations'
 
-const VAULT = '/Users/luca/Laputa'
+const VAULT = '/Users/mock/Vault'
 
 function makeCallbacks() {
   return {
@@ -47,6 +47,25 @@ describe('detectFileOperation', () => {
     detectFileOperation({ toolName: 'Edit', input: JSON.stringify({ file_path: `${VAULT}/note/test.md` }), vaultPath: VAULT, callbacks: cb })
     expect(cb.onFileModified).toHaveBeenCalledWith('note/test.md')
     expect(cb.onFileCreated).not.toHaveBeenCalled()
+  })
+
+  it('treats native write_file and edit_file like Write and Edit', () => {
+    const created = makeCallbacks()
+    detectFileOperation({
+      toolName: 'write_file',
+      input: JSON.stringify({ path: `${VAULT}/note/new.md`, content: 'hi' }),
+      vaultPath: VAULT,
+      callbacks: created,
+    })
+    expect(created.onFileCreated).toHaveBeenCalledWith('note/new.md')
+    const edited = makeCallbacks()
+    detectFileOperation({
+      toolName: 'edit_file',
+      input: JSON.stringify({ path: `${VAULT}/note/test.md`, old_string: 'a', new_string: 'b' }),
+      vaultPath: VAULT,
+      callbacks: edited,
+    })
+    expect(edited.onFileModified).toHaveBeenCalledWith('note/test.md')
   })
 
   it('refreshes the vault when a writable tool target cannot be resolved', () => {

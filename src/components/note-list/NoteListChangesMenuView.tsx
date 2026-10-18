@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { translate, type AppLocale } from '../../lib/i18n'
 import type { ChangeActionTarget, ChangesContextMenuState } from './NoteListChangesMenu'
+import { SETTINGS_MENU_Z_CLASS } from '../../lib/settingsMenuLayer'
 import { getContextMenuPositionStyle } from '../contextMenuPosition'
 
 function changeActionLabel(locale: AppLocale, action: ChangeActionTarget['action']): string {
@@ -48,7 +49,7 @@ export function ChangesContextMenuNode({
   return (
     <div
       ref={ctxMenuRef}
-      className="fixed z-[12000] rounded-md border bg-popover p-1 shadow-md"
+      className={`fixed ${SETTINGS_MENU_Z_CLASS} rounded-md border bg-popover p-1 shadow-md`}
       style={getContextMenuPositionStyle(ctxMenu, { minWidth: 180 })}
       data-testid="changes-context-menu"
     >

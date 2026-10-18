@@ -5,6 +5,14 @@ ported into this tree, with each source's licence text. Library
 dependencies stay in `package.json` and `Cargo.toml`. The index of copied
 paths and pins is `docs/vendored-sources.md`.
 
+## Tolaria
+
+- Source: https://github.com/refactoringhq/tolaria
+- Copyright: Luca Rossi
+- License: AGPL-3.0. The license text is in `LICENSE`.
+- Rhizome is a modified version of Tolaria (the vault, editor and note
+  model); modified since 2026-08-09
+
 ## Portent vault template
 
 - Source: https://github.com/refactoringhq/portent-vault-template

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import type { VaultEntry } from '../types'
 import { queueAiPrompt, requestOpenAiChat } from '../utils/aiPromptBridge'
+import { openExternalUrl } from '../utils/url'
 import { readSelectionRange } from './inlineWikilinkDom'
 import { CommandPalette } from './CommandPalette'
 import type { CommandAction } from '../hooks/useCommandRegistry'
@@ -44,6 +45,10 @@ vi.mock('../utils/aiPromptBridge', () => ({
   queueAiPrompt: vi.fn(),
   requestOpenAiChat: vi.fn(),
   AI_COMPOSER_INSERT_EVENT: 'rhizome:ai-composer-insert',
+}))
+
+vi.mock('../utils/url', () => ({
+  openExternalUrl: vi.fn().mockResolvedValue(undefined),
 }))
 
 const makeCommand = (overrides: Partial<CommandAction> = {}): CommandAction => ({
@@ -114,6 +119,21 @@ function updateAiInput(text: string) {
   setSelection(editor, text.length)
   fireEvent.input(editor)
   return screen.queryByTestId('command-palette-ai-input') ?? editor
+}
+
+function typeAiEditorKey(key: string) {
+  const editor = screen.getByTestId('command-palette-ai-input')
+  const event = new Event('beforeinput', { bubbles: true, cancelable: true })
+  Object.defineProperties(event, {
+    data: { value: key },
+    inputType: { value: 'insertText' },
+    isComposing: { value: false },
+  })
+  fireEvent(editor, event)
+}
+
+function typeAiEditorKeys(text: string) {
+  for (const key of text) typeAiEditorKey(key)
 }
 
 function resetNativeDropState() {
@@ -515,6 +535,32 @@ describe('CommandPalette', () => {
     expect(onClose).toHaveBeenCalledOnce()
   })
 
+  it('names the AI-mode placeholder after the engine label', () => {
+    const { unmount } = render(
+      <CommandPalette
+        open={true}
+        commands={commands}
+        aiAgentLabel="Prime"
+        onClose={onClose}
+      />,
+    )
+    fireEvent.change(screen.getByPlaceholderText('Type a command...'), { target: { value: ' ' } })
+    expect(screen.getByTestId('command-palette-ai-input')).toHaveAttribute('aria-placeholder', 'Ask Prime')
+    unmount()
+
+    render(
+      <CommandPalette
+        open={true}
+        commands={commands}
+        aiAgentLabel="Rhizome"
+        onClose={onClose}
+      />,
+    )
+    fireEvent.change(screen.getByPlaceholderText('Type a command...'), { target: { value: ' ' } })
+    expect(screen.getByTestId('command-palette-ai-input')).toHaveAttribute('aria-placeholder', 'Ask Rhizome')
+    expect(screen.getByTestId('command-palette-ai-send-hint')).toBeInTheDocument()
+  })
+
   it('queues AI prompts with the selected workspace target id', () => {
     render(
       <CommandPalette
@@ -534,6 +580,130 @@ describe('CommandPalette', () => {
     expect(screen.getAllByText('Ask Codex').length).toBeGreaterThan(0)
     expect(queueAiPrompt).toHaveBeenCalledWith('ask the selected agent', [], 'agent:codex')
     expect(requestOpenAiChat).toHaveBeenCalledOnce()
+  })
+
+  it('offers install and Rhizome when the selected agent is missing', () => {
+    const onUseRhizome = vi.fn()
+    render(
+      <CommandPalette
+        open={true}
+        commands={commands}
+        aiAgentReady={false}
+        aiAgentLabel="Codex"
+        aiAgentInstallUrl="https://developers.openai.com/codex/cli"
+        aiRhizomeTargetId="agent:prime"
+        onClose={onClose}
+        onUseRhizome={onUseRhizome}
+      />,
+    )
+
+    fireEvent.change(screen.getByPlaceholderText('Type a command...'), { target: { value: ' ' } })
+    expect(screen.getByText('Codex is not available on this machine.')).toBeInTheDocument()
+    expect(screen.queryByTestId('command-palette-ai-send-hint')).not.toBeInTheDocument()
+    expect(screen.queryByText('↵ send')).not.toBeInTheDocument()
+    expect(screen.getByTestId('command-palette-ai-input')).toHaveFocus()
+    expect(screen.getByTestId('command-palette-ai-input')).toHaveAttribute('contenteditable', 'true')
+    expect(screen.getByTestId('command-palette-ai-input')).not.toHaveAttribute('aria-readonly')
+
+    fireEvent.click(screen.getByTestId('command-palette-install-agent'))
+    expect(openExternalUrl).toHaveBeenCalledWith('https://developers.openai.com/codex/cli')
+
+    typeAiEditorKeys('keep this prompt')
+    const editor = screen.getByTestId('command-palette-ai-input')
+    expect(editor).toHaveAttribute('contenteditable', 'true')
+    expect(editor.textContent).toContain('keep this prompt')
+    expect(screen.getByTestId('command-palette-use-rhizome').className).toMatch(/focus:ring-2/)
+    expect(screen.getByTestId('command-palette-use-rhizome').className).toMatch(/focus:ring-offset-2/)
+    expect(screen.getByTestId('command-palette-use-rhizome').className).toMatch(/focus:ring-offset-popover/)
+    fireEvent.click(screen.getByTestId('command-palette-use-rhizome'))
+    expect(onUseRhizome).toHaveBeenCalledOnce()
+    expect(queueAiPrompt).toHaveBeenCalledWith('keep this prompt', [], 'agent:prime')
+    expect(requestOpenAiChat).toHaveBeenCalledOnce()
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('keeps an empty Use Rhizome click open in Rhizome mode with the input focused', () => {
+    const onUseRhizome = vi.fn()
+    const view = render(
+      <CommandPalette
+        open={true}
+        commands={commands}
+        aiAgentReady={false}
+        aiAgentLabel="Codex"
+        aiRhizomeTargetId="agent:prime"
+        onClose={onClose}
+        onUseRhizome={onUseRhizome}
+      />,
+    )
+
+    fireEvent.change(screen.getByPlaceholderText('Type a command...'), { target: { value: ' ' } })
+    fireEvent.click(screen.getByTestId('command-palette-use-rhizome'))
+
+    expect(onUseRhizome).toHaveBeenCalledOnce()
+    expect(queueAiPrompt).not.toHaveBeenCalled()
+    expect(requestOpenAiChat).not.toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByTestId('command-palette-ai-input')).toBeInTheDocument()
+
+    view.rerender(
+      <CommandPalette
+        open={true}
+        commands={commands}
+        aiAgentReady={true}
+        aiAgentLabel="Rhizome"
+        aiRhizomeTargetId="agent:prime"
+        onClose={onClose}
+        onUseRhizome={onUseRhizome}
+      />,
+    )
+
+    expect(screen.getAllByText('Ask Rhizome').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Codex is not available on this machine.')).not.toBeInTheDocument()
+    expect(screen.getByTestId('command-palette-ai-input')).toHaveFocus()
+  })
+
+  it('passes note references when using Rhizome instead', () => {
+    const onUseRhizome = vi.fn()
+    render(
+      <CommandPalette
+        open={true}
+        commands={commands}
+        entries={entries}
+        aiAgentReady={false}
+        aiAgentLabel="Codex"
+        aiRhizomeTargetId="agent:prime"
+        onClose={onClose}
+        onUseRhizome={onUseRhizome}
+      />,
+    )
+
+    fireEvent.change(screen.getByPlaceholderText('Type a command...'), { target: { value: ' ' } })
+    updateAiInput(' ask [[Alpha]]')
+    fireEvent.click(screen.getByTestId('command-palette-use-rhizome'))
+
+    expect(onUseRhizome).toHaveBeenCalledOnce()
+    expect(queueAiPrompt).toHaveBeenCalledWith(
+      'ask [[Alpha]]',
+      [expect.objectContaining({ title: 'Alpha', path: '/vault/alpha.md' })],
+      'agent:prime',
+    )
+  })
+
+  it('does not send a missing-agent prompt with Enter', () => {
+    render(
+      <CommandPalette
+        open={true}
+        commands={commands}
+        aiAgentReady={false}
+        aiAgentLabel="Codex"
+        onClose={onClose}
+      />,
+    )
+
+    fireEvent.change(screen.getByPlaceholderText('Type a command...'), { target: { value: ' ' } })
+    typeAiEditorKeys('still blocked')
+    fireEvent.keyDown(screen.getByTestId('command-palette-ai-input'), { key: 'Enter' })
+    expect(queueAiPrompt).not.toHaveBeenCalled()
   })
 
   it('closes without queueing when AI mode only contains the trigger space', () => {

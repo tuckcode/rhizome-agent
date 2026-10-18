@@ -55,6 +55,8 @@ mod tests {
                 value: Some(serde_yaml::Value::String("Project".to_string())),
                 regex: false,
             })]),
+            presentation: None,
+            extra: Default::default(),
         }
     }
 

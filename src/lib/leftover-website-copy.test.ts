@@ -16,14 +16,15 @@ describe('leftover website and preview copy', () => {
     }
   })
 
-  it('names Rhizome as the harness and Free tier as it appears in the app', () => {
+  it('names Rhizome as the harness and Taproot as it appears in the app', () => {
     expect(landing).toContain('<title>Rhizome</title>')
     expect(landing).toContain('Rhizome runs its own agent loop')
-    expect(landing).toContain('Free tier (auto)')
+    expect(landing).toContain('Taproot')
     expect(landing).toContain('Graphite')
     expect(landing).toContain('Earth dark')
     expect(landing).toContain('The agent cannot search the vault yet')
-    expect(readme).toContain('The agent cannot search the vault or old Mycelium sessions yet')
+    expect(readme).toContain('The native engine can read, search, and edit vault files')
+    expect(readme).toContain('It cannot search old Mycelium sessions')
     expect(preview).toContain('System keychain')
   })
 })

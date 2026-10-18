@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render as rtlRender, screen, fireEvent, act, waitFor, within } from '@testing-library/react'
 import { AiPanel, AiPanelView } from './AiPanel'
+import { sessionHeaderReport } from '../lib/sessionHeaderTitle'
 import { UNSUPPORTED_INLINE_PASTE_MESSAGE } from './InlineWikilinkInput'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { AiPanelController } from './useAiPanelController'
@@ -205,18 +206,24 @@ describe('AiPanel', () => {
     }, vi.fn())
   })
 
-  it('renders panel with the default CLI agent header', () => {
+  it('does not treat a missing engine as Prime', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
+    expect(screen.queryByText('Prime · Harness')).toBeNull()
+    expect(screen.queryByTestId('ai-harness-skills')).toBeNull()
+  })
+
+  it('renders panel with the default CLI agent header', () => {
+    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" chatEngine="prime" />)
     expect(screen.getByText('Prime')).toBeTruthy()
-    expect(screen.getByText('Prime Agent · Harness')).toBeTruthy()
+    expect(screen.getByText('Prime · Harness')).toBeTruthy()
     expect(screen.getByTestId('ai-harness-skills')).toBeTruthy()
     expect(screen.queryByTestId('ai-permission-mode-toggle')).toBeNull()
   })
 
   it('starts Prime sessions in power user even when the vault still stores safe', () => {
-    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
+    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" chatEngine="prime" />)
 
-    expect(screen.getByText('Prime Agent · Harness')).toBeTruthy()
+    expect(screen.getByText('Prime · Harness')).toBeTruthy()
     expect(mockUseCliAiAgent).toHaveBeenCalledWith(
       '/tmp/vault',
       undefined,
@@ -246,7 +253,7 @@ describe('AiPanel', () => {
   })
 
   it('does not expose a permission mode toggle for Prime', () => {
-    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
+    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" chatEngine="prime" />)
     expect(screen.queryByTestId('ai-permission-mode-toggle')).toBeNull()
     expect(screen.queryByRole('radio', { name: 'Full access' })).toBeNull()
     expect(screen.getByTestId('ai-harness-skills').textContent).toMatch(/rhizome-vault/)
@@ -255,9 +262,9 @@ describe('AiPanel', () => {
   it('shows working status while the AI agent is running', () => {
     mockStatus = 'thinking'
 
-    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
+    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" chatEngine="prime" />)
 
-    expect(screen.getByText('Prime Agent · working…')).toBeTruthy()
+    expect(screen.getByText('Prime · working…')).toBeTruthy()
     expect(screen.queryByTestId('ai-permission-mode-toggle')).toBeNull()
   })
 
@@ -277,7 +284,7 @@ describe('AiPanel', () => {
   })
 
   it('shows the default toolkit skills strip for Prime', () => {
-    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
+    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" chatEngine="prime" />)
     expect(screen.getByTestId('ai-harness-skills')).toHaveTextContent('rhizome-vault')
   })
 
@@ -337,7 +344,77 @@ describe('AiPanel', () => {
 
   it('renders empty state without context', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
-    expect(screen.getAllByText('Ask Prime Agent').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Ask Rhizome').length).toBeGreaterThan(0)
+  })
+
+  it('prefills the composer from an empty-state starter', () => {
+    render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
+    fireEvent.click(screen.getByRole('button', { name: 'Explain this repo' }))
+    expect(screen.getByTestId('agent-input')).toHaveTextContent('Explain this repo')
+  })
+
+  it('reports the first user message as the session header title', async () => {
+    mockMessages = [{
+      id: 'm1',
+      userMessage: 'Explain this repo',
+      response: 'ok',
+      actions: [],
+    }]
+    const onSessionHeader = vi.fn()
+    render(
+      <AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" onSessionHeader={onSessionHeader} />,
+    )
+    await waitFor(() => {
+      expect(onSessionHeader).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'Explain this repo' }),
+      )
+    })
+  })
+
+  it('collapses whitespace and caps a fallback title at 60 characters', async () => {
+    mockMessages = [{
+      id: 'm1',
+      userMessage: 'Plan\n\nthe   launch of a very long session title that should not fill the header forever',
+      response: 'ok',
+      actions: [],
+    }]
+    const onSessionHeader = vi.fn()
+    render(
+      <AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" onSessionHeader={onSessionHeader} />,
+    )
+    await waitFor(() => {
+      expect(onSessionHeader).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Plan the launch of a very long session title that should not…',
+        }),
+      )
+    })
+  })
+
+  it('does not title a new path from leftover messages before a native session exists', () => {
+    expect(sessionHeaderReport({
+      activeSessionPath: 'rhizome-native:new',
+      primeSessionPath: null,
+      nativeSessionId: null,
+      firstUserMessage: 'Explain this repo',
+    })).toEqual({
+      path: 'rhizome-native:new',
+      title: null,
+    })
+  })
+
+  it('names a native-engine empty chat Rhizome', () => {
+    render(
+      <AiPanel
+        onClose={vi.fn()}
+        vaultPath="/tmp/vault"
+        defaultAiAgent="prime"
+        chatEngine="native"
+      />,
+    )
+    expect(screen.getAllByText('Ask Rhizome').length).toBeGreaterThan(0)
+    expect(screen.getByText(/Rhizome · /)).toBeTruthy()
+    expect(screen.getByTestId('agent-input')).toHaveAttribute('aria-placeholder', 'Ask Rhizome')
   })
 
   it('renders contextual empty state when active entry is provided', () => {
@@ -345,7 +422,7 @@ describe('AiPanel', () => {
     render(
       <AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" activeEntry={entry} entries={[entry]} />
     )
-    expect(screen.getByText('Ask Prime Agent about this note')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Ask Rhizome' })).toBeTruthy()
   })
 
   it('does not render a context bar for the active entry', () => {
@@ -389,13 +466,13 @@ describe('AiPanel', () => {
       <AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" activeEntry={entry} entries={[entry]} />
     )
     const input = screen.getByTestId('agent-input')
-    expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime Agent')
+    expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime')
   })
 
   it('shows active agent placeholder when no active entry', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
     const input = screen.getByTestId('agent-input')
-    expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime Agent')
+    expect(input).toHaveAttribute('aria-placeholder', 'Ask Prime')
   })
 
   it('uses the selected AI agent in the placeholder', () => {
@@ -427,7 +504,8 @@ describe('AiPanel', () => {
     fireEvent.input(input)
 
     expect(screen.getByTestId('agent-send')).toBeEnabled()
-    expect(screen.queryByText('Prime Agent is not available on this machine')).toBeNull()
+    expect(screen.queryByText('Prime is not available on this machine')).toBeNull()
+    expect(screen.getByTestId('agent-input')).toHaveAttribute('aria-placeholder', 'Ask Rhizome')
   })
 
   it('keeps Prime-targeted chat blocked and shows install guidance when Prime is missing', () => {
@@ -438,13 +516,14 @@ describe('AiPanel', () => {
         defaultAiAgent="prime"
         defaultAiAgentReadiness="missing"
         defaultAiAgentReady={false}
+        chatEngine="prime"
       />,
     )
 
-    expect(screen.getByText('Prime Agent is not available on this machine')).toBeTruthy()
+    expect(screen.getByText('Prime is not available on this machine')).toBeTruthy()
     expect(screen.getByTestId('agent-input')).toHaveAttribute(
       'aria-placeholder',
-      'Prime Agent is not installed. Install prime-agent and log in once.',
+      'Prime is not installed. Install it, then retry.',
     )
 
     const input = screen.getByTestId('agent-input')
@@ -460,6 +539,7 @@ describe('AiPanel', () => {
         vaultPath="/tmp/vault"
         defaultAiAgent="codex"
         defaultAiAgentReadiness="checking"
+        chatEngine="prime"
       />,
     )
 
@@ -554,7 +634,7 @@ describe('AiPanel', () => {
     mockMessages = [{
       userMessage: 'Tell me about notes',
       actions: [],
-      response: 'Check out [[Build Laputa App]] for details.',
+      response: 'Check out [[Build Rhizome App]] for details.',
       id: 'msg-1',
     }]
     const onOpenNote = vi.fn()
@@ -563,9 +643,9 @@ describe('AiPanel', () => {
     )
     const wikilink = container.querySelector('.chat-wikilink')
     expect(wikilink).toBeTruthy()
-    expect(wikilink!.textContent).toBe('Build Laputa App')
+    expect(wikilink!.textContent).toBe('Build Rhizome App')
     fireEvent.click(wikilink!)
-    expect(onOpenNote).toHaveBeenCalledWith('Build Laputa App')
+    expect(onOpenNote).toHaveBeenCalledWith('Build Rhizome App')
   })
 
   it('renders wikilinks with special characters and clicking works', () => {
@@ -697,6 +777,7 @@ describe('Chat home opens with its sessions column', () => {
         controller={primeController()}
         onClose={vi.fn()}
         showHeader={false}
+        chatEngine="prime"
         targetId="agent:prime"
       />,
     )
@@ -740,6 +821,7 @@ describe('Chat home opens with its sessions column', () => {
         controller={primeController()}
         onClose={vi.fn()}
         showHeader={false}
+        chatEngine="prime"
         targetId="agent:prime"
         sessionsRailSlot={slot}
       />,
@@ -843,6 +925,7 @@ describe('a pick in the rail Sessions list', () => {
         controller={primeController()}
         onClose={vi.fn()}
         showHeader={false}
+        chatEngine="prime"
         targetId="agent:prime"
         sessionsRailSlot={slot}
         onRailSessionPicked={onRailSessionPicked}
@@ -861,6 +944,77 @@ describe('a pick in the rail Sessions list', () => {
  * small window. Goal and Schedule now live in the compact row's Tools menu,
  * and there is no separate meter row.
  */
+describe('the native composer deck', () => {
+  it('keeps the model chip on the composer row when the engine is native', () => {
+    render(
+      <AiPanelView
+        controller={primeController()}
+        onClose={vi.fn()}
+        showHeader={false}
+        defaultAiAgent="prime"
+        defaultAiAgentReady
+        chatEngine="native"
+        composerDeck={<div data-testid="native-chat-model-picker">chip</div>}
+      />,
+    )
+
+    const bar = screen.getByTestId('chat-composer-bar')
+    expect(bar.contains(screen.getByTestId('native-chat-model-picker'))).toBe(true)
+    expect(screen.queryByTestId('prime-session-subhead')).not.toBeInTheDocument()
+  })
+
+  it('renders no model chip on a Claude Code chat even if a deck is passed', () => {
+    render(
+      <AiPanelView
+        controller={primeController()}
+        onClose={vi.fn()}
+        showHeader={false}
+        defaultAiAgent="claude_code"
+        defaultAiAgentReady
+        composerDeck={<div data-testid="native-chat-model-picker">chip</div>}
+      />,
+    )
+
+    expect(screen.queryByTestId('native-chat-model-picker')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('prime-model-chip')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('chat-composer-bar')).not.toBeInTheDocument()
+  })
+
+  it('does not leave an empty composer footer on a Claude Code native chat', () => {
+    render(
+      <AiPanelView
+        controller={primeController()}
+        onClose={vi.fn()}
+        showHeader={false}
+        defaultAiAgent="claude_code"
+        defaultAiAgentReady
+        chatEngine="native"
+        composerDeck={<div data-testid="native-chat-model-picker">chip</div>}
+      />,
+    )
+
+    expect(screen.queryByTestId('chat-composer-bar')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('native-chat-model-picker')).not.toBeInTheDocument()
+  })
+
+  it('renders no model chip on a Codex chat even if a deck is passed', () => {
+    render(
+      <AiPanelView
+        controller={primeController()}
+        onClose={vi.fn()}
+        showHeader={false}
+        defaultAiAgent="codex"
+        defaultAiAgentReady
+        composerDeck={<div data-testid="native-chat-model-picker">chip</div>}
+      />,
+    )
+
+    expect(screen.queryByTestId('native-chat-model-picker')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('prime-model-chip')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('chat-composer-bar')).not.toBeInTheDocument()
+  })
+})
+
 describe('the Goal button has one home', () => {
   it('lives in the compact composer row, behind Tools', () => {
     render(
@@ -868,6 +1022,7 @@ describe('the Goal button has one home', () => {
         controller={primeController()}
         onClose={vi.fn()}
         showHeader={false}
+        chatEngine="prime"
         targetId="agent:prime"
       />,
     )
@@ -896,6 +1051,7 @@ describe('talking to a turn that is already running', () => {
         controller={primeController({ isActive: true, input })}
         onClose={vi.fn()}
         showHeader={false}
+        chatEngine="prime"
         targetId="agent:prime"
       />,
     )
@@ -968,6 +1124,7 @@ describe('talking to a turn that is already running', () => {
         controller={controller}
         onClose={vi.fn()}
         showHeader={false}
+        chatEngine="prime"
         targetId="agent:prime"
       />
     )
@@ -1069,8 +1226,15 @@ describe('AiPanel Prime permission toggle', () => {
 
   it('does not treat a native-engine chat as a Prime target', () => {
     expect(aiPanelSource).toContain(
-      "const isPrimeTarget = view.targetKind === 'agent' && view.defaultAiAgent === 'prime' && chatEngine !== 'native'",
+      "const isPrimeTarget = view.targetKind === 'agent' && view.defaultAiAgent === 'prime' && chatEngine === 'prime'",
     )
+  })
+
+  it('mounts the composer bar only for Prime chrome or a Prime native chat', () => {
+    expect(aiPanelSource).toContain(
+      "isPrimeTarget || (view.defaultAiAgent === 'prime' && chatEngine === 'native')",
+    )
+    expect(aiPanelSource).not.toContain('foot={(isPrimeTarget || chatEngine === \'native\')')
   })
 })
 
@@ -1100,5 +1264,100 @@ describe('AiPanel last-conversation restore', () => {
       aiPanelSource.indexOf('onOpen: pickSession'),
     )
     expect(block).not.toContain('vaultPath')
+  })
+})
+
+describe('AiPanel predicted completion wiring', () => {
+  const note = "Let me know when you're ready and I'll draft the note."
+
+  function renderGhost({
+    agent = 'prime',
+    chatEngine = 'native',
+    permissionMode = 'safe',
+    withTarget = true,
+    apiModel = false,
+  }: {
+    agent?: 'prime' | 'codex' | 'hermes' | 'claude_code'
+    chatEngine?: 'native' | 'prime'
+    permissionMode?: 'safe' | 'power_user'
+    withTarget?: boolean
+    apiModel?: boolean
+  } = {}) {
+    const agentTarget = {
+      kind: 'agent' as const,
+      agent,
+      id: `agent:${agent}`,
+      label: agent,
+      shortLabel: agent,
+    }
+    const modelTarget = {
+      kind: 'api_model' as const,
+      provider: {
+        id: 'openai',
+        name: 'OpenAI',
+        kind: 'open_ai' as const,
+        models: [],
+      },
+      model: {
+        id: 'gpt-test',
+        capabilities: {
+          streaming: true,
+          tools: false,
+          vision: false,
+          json_mode: false,
+          reasoning: false,
+        },
+      },
+      id: 'model:openai/gpt-test',
+      label: 'OpenAI · gpt-test',
+      shortLabel: 'gpt-test',
+    }
+    return render(
+      <AiPanelView
+        controller={primeController({
+          permissionMode,
+          agent: {
+            ...primeController().agent,
+            messages: [{ userMessage: 'Go on', response: note, actions: [] }],
+          },
+        })}
+        onClose={vi.fn()}
+        showHeader={false}
+        chatEngine={chatEngine}
+        defaultAiAgent={agent}
+        defaultAiTarget={withTarget ? (apiModel ? modelTarget : agentTarget) : undefined}
+      />,
+    )
+  }
+
+  it('shows the ghost for native Safe and for a Prime target in Safe mode', () => {
+    const native = renderGhost({ chatEngine: 'native', agent: 'prime' })
+    expect(screen.getByTestId('composer-reply-completion')).toHaveTextContent('Yes — draft the note')
+    native.unmount()
+
+    renderGhost({ chatEngine: 'prime', agent: 'prime' })
+    expect(screen.getByTestId('composer-reply-completion')).toHaveTextContent('Yes — draft the note')
+  })
+
+  it('hides the ghost for Codex, Power User, and an undefined target', () => {
+    const codex = renderGhost({ agent: 'codex', chatEngine: 'native' })
+    expect(screen.queryByTestId('composer-reply-completion')).toBeNull()
+    codex.unmount()
+
+    const power = renderGhost({ agent: 'prime', chatEngine: 'native', permissionMode: 'power_user' })
+    expect(screen.queryByTestId('composer-reply-completion')).toBeNull()
+    power.unmount()
+
+    renderGhost({ agent: 'prime', chatEngine: 'native', withTarget: false })
+    expect(screen.queryByTestId('composer-reply-completion')).toBeNull()
+  })
+
+  it('shows the ghost for an API model in Safe mode and hides Claude Code', () => {
+    const model = renderGhost({ apiModel: true, permissionMode: 'safe' })
+    expect(screen.getByTestId('composer-reply-completion')).toHaveTextContent('Yes — draft the note')
+    model.unmount()
+
+    renderGhost({ agent: 'claude_code', chatEngine: 'native', permissionMode: 'safe' })
+    expect(screen.queryByTestId('composer-reply-completion')).toBeNull()
   })
 })

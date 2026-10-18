@@ -11,6 +11,7 @@ mod antigravity_discovery;
 mod app_config;
 mod app_icon;
 pub mod app_updater;
+mod board;
 pub mod claude_cli;
 mod claude_invocation;
 mod cli_agent_runtime;
@@ -41,10 +42,6 @@ mod opencode_config;
 mod opencode_discovery;
 mod opencode_events;
 mod permission_decision;
-pub mod pi_cli;
-mod pi_config;
-mod pi_discovery;
-mod pi_events;
 pub mod preflight;
 pub mod prime_agent_activity;
 mod prime_custom_models;
@@ -53,7 +50,6 @@ mod prime_daemon_pipe;
 mod prime_discovery;
 mod prime_events;
 mod prime_login;
-mod prime_packages;
 pub mod prime_session_host;
 pub mod prime_sessions;
 mod prime_settings;
@@ -73,7 +69,12 @@ pub mod engines;
 pub mod rhizome_loop;
 // Provider adapter and free-tier routing. They compile now. Chat must not
 // call them until Phase 6.
+pub mod chat_images;
+pub mod hermes_reasoning;
 pub mod provider_keys;
+#[cfg(test)]
+mod reasoning_chat;
+pub mod reasoning_levels;
 pub mod rhizome_provider_model;
 pub mod rhizome_routing;
 pub mod rhizome_search;
@@ -724,6 +725,8 @@ macro_rules! app_invoke_handler {
             commands::validate_note_content,
             commands::create_note_content,
             commands::save_note_content,
+            commands::save_note_content_checked,
+            commands::move_board_card,
             commands::update_frontmatter,
             commands::delete_frontmatter_property,
             commands::rename_note,
@@ -779,9 +782,6 @@ macro_rules! app_invoke_handler {
             commands::get_prime_commands,
             commands::export_prime_session,
             commands::set_prime_model,
-            commands::set_prime_thinking_level,
-            commands::get_prime_thinking_levels,
-            commands::get_prime_supported_thinking_levels,
             commands::fork_prime_session,
             commands::settle_prime_session,
             commands::finish_main_window_close,
@@ -809,8 +809,6 @@ macro_rules! app_invoke_handler {
             commands::get_prime_provider_status,
             commands::sign_in_prime_provider,
             commands::save_prime_provider_key,
-            commands::list_prime_packages,
-            commands::install_prime_package,
             commands::ensure_nous_portal_models,
             commands::preflight_chat,
             commands::start_mindwalk_sidecar,
@@ -818,6 +816,7 @@ macro_rules! app_invoke_handler {
             commands::stream_ai_model,
             commands::native_chat_start,
             commands::native_chat_send,
+            commands::native_model_vision,
             commands::native_chat_cancel,
             commands::native_chat_approval_reply,
             commands::native_chat_end,
@@ -832,6 +831,7 @@ macro_rules! app_invoke_handler {
             commands::delete_ai_model_provider_api_key,
             commands::test_ai_model_provider,
             commands::discover_ai_models,
+            commands::list_ai_model_provider_models,
             commands::complete_ai_model_text,
             commands::reload_vault,
             commands::reload_vault_entry,

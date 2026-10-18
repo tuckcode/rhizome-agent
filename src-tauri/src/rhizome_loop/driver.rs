@@ -1,8 +1,8 @@
 use std::collections::VecDeque;
-use std::sync::mpsc;
 use std::sync::{Arc, Mutex, MutexGuard};
 use std::thread;
-use std::time::Duration;
+
+use tokio::sync::{oneshot, Notify};
 
 use crate::ai_agents::AiAgentPermissionMode;
 use crate::model_events::ModelEvent;
@@ -25,7 +25,8 @@ pub enum ApprovalReply {
 /// Default model rounds in one turn. A runaway tool loop stops here.
 pub const DEFAULT_STEP_CAP: usize = 8;
 
-type ApprovalWaiter = Arc<dyn Fn(&str, &str) -> ApprovalReply + Send + Sync>;
+type ApprovalWaiter =
+    Arc<dyn Fn(&str, &str, Option<&tools::ApprovalPreview>, &str) -> ApprovalReply + Send + Sync>;
 type ApprovalDismiss = Arc<dyn Fn() + Send + Sync>;
 type AfterToolHook = Box<dyn FnMut(&str, &str) + Send>;
 type DurableHook = Arc<dyn Fn(DurableEvent) + Send + Sync>;
@@ -40,9 +41,13 @@ struct Shared {
     mode: AiAgentPermissionMode,
     /// Name and args already consumed by an allow-once grant.
     grants: Vec<(String, String)>,
-    /// Session grants. Echo and other tools match by name; bash
-    /// matches the exact command. Cleared by `end_session`.
+    /// Session grants. Echo matches by name. Mutate matches the
+    /// path. Bash has no session grant. Cleared by `end_session`
+    /// and `set_vault`.
     session_grants: Vec<(String, String)>,
+    /// Hash of the file as it was when the approval card opened,
+    /// keyed by tool-call id.
+    pending_stamp: Option<(String, String)>,
     /// Names a test adds on top of `policy::offered_tools`. Production
     /// modes do not use this list.
     extra_offered: Vec<String>,
@@ -97,6 +102,9 @@ struct OpenCall {
 #[derive(Clone)]
 pub struct AgentLoop {
     shared: Arc<Mutex<Shared>>,
+    /// Wakes an approval wait when cancel or quit lands. The wait itself
+    /// does not block a tokio worker.
+    cancel_notify: Arc<Notify>,
 }
 
 impl Default for AgentLoop {
@@ -241,6 +249,7 @@ impl AgentLoop {
                 grants: Vec::new(),
                 session_grants: Vec::new(),
                 extra_offered: Vec::new(),
+                pending_stamp: None,
                 vault_path: None,
                 vault_paths: Vec::new(),
                 waiter: None,
@@ -252,6 +261,7 @@ impl AgentLoop {
                 after_tool: None,
                 on_durable: None,
             })),
+            cancel_notify: Arc::new(Notify::new()),
         }
     }
 
@@ -270,6 +280,7 @@ impl AgentLoop {
             shared.cancel_cause = Some(cause.into());
         }
         drop(shared);
+        self.cancel_notify.notify_waiters();
         self.dismiss_live_prompt();
     }
 
@@ -278,15 +289,32 @@ impl AgentLoop {
     }
 
     /// Vault for this run. `create_note` uses it; it is not on `ModelView`.
+    /// Changing vaults drops session grants so a path in the old vault
+    /// cannot cover a file in the new one.
     pub fn set_vault(&self, vault_path: Option<String>, vault_paths: Vec<String>) {
         let mut shared = self.lock();
+        let changed = shared.vault_path != vault_path || shared.vault_paths != vault_paths;
         shared.vault_path = vault_path;
         shared.vault_paths = vault_paths;
+        if changed {
+            shared.session_grants.clear();
+            shared.pending_stamp = None;
+        }
     }
 
     pub fn set_approval_waiter(
         &self,
         waiter: impl Fn(&str, &str) -> ApprovalReply + Send + Sync + 'static,
+    ) {
+        self.set_approval_waiter_preview(move |name, args, _preview, _call_id| waiter(name, args));
+    }
+
+    pub fn set_approval_waiter_preview(
+        &self,
+        waiter: impl Fn(&str, &str, Option<&tools::ApprovalPreview>, &str) -> ApprovalReply
+            + Send
+            + Sync
+            + 'static,
     ) {
         self.lock().waiter = Some(Arc::new(waiter));
     }
@@ -318,6 +346,7 @@ impl AgentLoop {
             shared.cancel_cause = Some(cause.into());
         }
         drop(shared);
+        self.cancel_notify.notify_waiters();
         self.dismiss_live_prompt();
     }
 
@@ -351,8 +380,8 @@ impl AgentLoop {
     }
 
     /// Adds a name to this loop's offered set. Production `offered_tools`
-    /// is Safe = echo and create_note, Power User = echo, bash, and
-    /// create_note.
+    /// comes from the tool registry: Safe = echo, read-only file tools,
+    /// edit_file, write_file, and create_note. Power User also offers bash.
     pub fn offer_extra_tool_for_test(&self, name: impl Into<String>) {
         self.lock().extra_offered.push(name.into());
     }
@@ -427,7 +456,7 @@ impl AgentLoop {
             };
             steps += 1;
             tokio::task::yield_now().await;
-            if !self.apply_round(accepted) {
+            if !self.apply_round(accepted).await {
                 break;
             }
         }
@@ -462,7 +491,7 @@ impl AgentLoop {
     }
 
     /// Returns true when another model round should run (tools ran).
-    fn apply_round(&self, events: Vec<ModelEvent>) -> bool {
+    async fn apply_round(&self, events: Vec<ModelEvent>) -> bool {
         let mut text = String::new();
         let mut calls: Vec<OpenCall> = Vec::new();
         let mut failed: Option<String> = None;
@@ -529,7 +558,7 @@ impl AgentLoop {
                 name: call.name.clone(),
                 args: call.args.clone(),
             });
-            self.dispatch_tool(&call.id, &call.name, &call.args);
+            self.dispatch_tool(&call.id, &call.name, &call.args).await;
         }
         !self.is_cancelled()
     }
@@ -548,7 +577,7 @@ impl AgentLoop {
         self.lock().cancel_cause.is_some()
     }
 
-    fn dispatch_tool(&self, id: &str, name: &str, args: &str) {
+    async fn dispatch_tool(&self, id: &str, name: &str, args: &str) {
         if let Err(reason) = parsed_tool_args(args) {
             self.record_denial(id, name, reason);
             self.fire_after_tool(name, args);
@@ -564,7 +593,7 @@ impl AgentLoop {
             return;
         }
         if self.session_allows(name, args) {
-            self.record_run(id, name, args, false);
+            self.record_run(id, name, args, false).await;
             self.fire_after_tool(name, args);
             return;
         }
@@ -574,19 +603,27 @@ impl AgentLoop {
             .iter()
             .any(|(spent_name, spent_args)| spent_name == name && spent_args == args);
         match policy::rule_tool(mode, name, grant_spent) {
-            Ruling::Run { spend_grant } => self.record_run(id, name, args, spend_grant),
+            Ruling::Run { spend_grant } => self.record_run(id, name, args, spend_grant).await,
             Ruling::Deny { reason } => self.record_denial(id, name, reason),
-            Ruling::Ask => self.ask_then_finish(id, name, args),
+            Ruling::Ask => self.ask_then_finish(id, name, args).await,
         }
         self.fire_after_tool(name, args);
     }
 
     fn session_allows(&self, name: &str, args: &str) -> bool {
-        self.lock()
+        let shared = self.lock();
+        shared
             .session_grants
             .iter()
             .any(|(granted_name, granted_args)| {
-                granted_name == name && policy::session_matches(name, granted_args, args)
+                granted_name == name
+                    && policy::session_matches_in(
+                        name,
+                        granted_args,
+                        args,
+                        shared.vault_path.as_deref(),
+                        &shared.vault_paths,
+                    )
             })
     }
 
@@ -598,12 +635,53 @@ impl AgentLoop {
         self.lock().after_tool = hook;
     }
 
-    fn ask_then_finish(&self, id: &str, name: &str, args: &str) {
+    async fn ask_then_finish(&self, id: &str, name: &str, args: &str) {
         if self.is_cancelled() {
             self.record_denial(id, name, "cancelled".into());
             return;
         }
-        let reply = self.wait_for_approval(name, args);
+        let policy = tools::lookup(name).map(|tool| tool.policy);
+        let is_bash = matches!(policy, Some(tools::ToolPolicy::Bash));
+        let shown_args;
+        let prepared = if matches!(policy, Some(tools::ToolPolicy::Mutate)) {
+            let (vault_path, vault_paths) = {
+                let shared = self.lock();
+                (shared.vault_path.clone(), shared.vault_paths.clone())
+            };
+            match tools::mutate_prepare(name, args, vault_path.as_deref(), &vault_paths) {
+                Ok(preview) => {
+                    self.lock().pending_stamp =
+                        Some((id.to_string(), preview.content_hash.clone()));
+                    shown_args = args.to_string();
+                    Some(preview)
+                }
+                Err(error) => {
+                    self.clear_pending_stamp(id);
+                    self.record_tool_output(id, name, error);
+                    return;
+                }
+            }
+        } else if is_bash {
+            match tools::bash_command(args) {
+                Ok(command) => {
+                    let stamp = tools::bash_stamp(id, &command);
+                    self.lock().pending_stamp = Some((id.to_string(), stamp));
+                    shown_args = command;
+                    None
+                }
+                Err(error) => {
+                    self.clear_pending_stamp(id);
+                    self.record_tool_output(id, name, error);
+                    return;
+                }
+            }
+        } else {
+            shown_args = args.to_string();
+            None
+        };
+        let reply = self
+            .wait_for_approval(name, &shown_args, prepared.as_ref(), id)
+            .await;
         // Cancel or quit can land while the waiter is blocked, or just
         // after it returns. Either way the tool does not run.
         if self.is_cancelled() {
@@ -612,13 +690,14 @@ impl AgentLoop {
         }
         match reply {
             ApprovalReply::AllowOnce => {
-                self.record_run(id, name, args, name != "bash" && name != "create_note")
+                self.record_run(id, name, args, spend_allow_once(name))
+                    .await
             }
             ApprovalReply::AllowSession => {
-                if name != "create_note" {
+                if name != "create_note" && !is_bash {
                     self.grant_for_session(name, args);
                 }
-                self.record_run(id, name, args, false);
+                self.record_run(id, name, args, false).await;
             }
             ApprovalReply::Deny | ApprovalReply::Cancelled => {
                 self.record_denial(id, name, "approval cancelled".into());
@@ -626,10 +705,16 @@ impl AgentLoop {
         }
     }
 
-    /// Runs the waiter off-thread so cancel/quit can end the wait
-    /// without waiting for a human reply. The waiter is not locked
-    /// for the whole wait, so a later turn can ask again.
-    fn wait_for_approval(&self, name: &str, args: &str) -> ApprovalReply {
+    /// The waiter runs on its own thread. This task awaits that reply,
+    /// or cancel, without blocking a tokio worker. The tool run stays
+    /// on `spawn_blocking`.
+    async fn wait_for_approval(
+        &self,
+        name: &str,
+        args: &str,
+        preview: Option<&tools::ApprovalPreview>,
+        call_id: &str,
+    ) -> ApprovalReply {
         let Some(waiter) = self.lock().waiter.clone() else {
             return ApprovalReply::Cancelled;
         };
@@ -639,34 +724,47 @@ impl AgentLoop {
             shared.live_prompt = Some(shared.prompt_gen);
             shared.prompt_gen
         };
-        let (tx, rx) = mpsc::channel();
+        let (tx, mut rx) = oneshot::channel();
         let asked = name.to_string();
         let asked_args = args.to_string();
+        let call_id = call_id.to_string();
+        let preview = preview.cloned();
         thread::spawn(move || {
-            let reply = waiter(&asked, &asked_args);
+            let reply = waiter(&asked, &asked_args, preview.as_ref(), &call_id);
             let _ = tx.send((gen, reply));
         });
+        let notify = Arc::clone(&self.cancel_notify);
         loop {
+            // Register the waiter before reading the cancel flag.
+            // `notify_waiters` misses a cancel that lands after the
+            // check and before `notified()` is created.
+            let notified = notify.notified();
+            tokio::pin!(notified);
+            notified.as_mut().enable();
             if self.is_cancelled() {
                 self.dismiss_live_prompt();
                 return ApprovalReply::Cancelled;
             }
-            // 10ms poll: cancel/quit must end the wait without a human
-            // reply. A condvar would wake faster; this is enough while
-            // the loop is test-only.
-            match rx.recv_timeout(Duration::from_millis(10)) {
-                Ok((reply_gen, reply)) => {
-                    let live = self.lock().live_prompt;
-                    if live == Some(reply_gen) {
-                        self.lock().live_prompt = None;
-                        return reply;
+            tokio::select! {
+                result = &mut rx => {
+                    match result {
+                        Ok((reply_gen, reply)) => {
+                            let live = self.lock().live_prompt;
+                            if live == Some(reply_gen) {
+                                self.lock().live_prompt = None;
+                                return reply;
+                            }
+                            // The oneshot is finished. Polling it again
+                            // panics, and a newer prompt may own `live_prompt`.
+                            return ApprovalReply::Cancelled;
+                        }
+                        Err(_) => {
+                            self.dismiss_live_prompt();
+                            return ApprovalReply::Cancelled;
+                        }
                     }
                 }
-                Err(mpsc::RecvTimeoutError::Timeout) => {}
-                Err(mpsc::RecvTimeoutError::Disconnected) => {
-                    self.dismiss_live_prompt();
-                    return ApprovalReply::Cancelled;
-                }
+                _ = notified => {}
             }
         }
     }
@@ -684,14 +782,48 @@ impl AgentLoop {
         }
     }
 
-    fn record_run(&self, id: &str, name: &str, args: &str, spend_grant: bool) {
+    fn record_tool_output(&self, id: &str, name: &str, output: String) {
+        {
+            let mut shared = self.lock();
+            shared.history.push(HistoryItem::ToolResult {
+                id: id.to_string(),
+                name: name.to_string(),
+                output: output.clone(),
+            });
+        }
+        self.push_log(DurableEvent::ToolResult {
+            id: id.to_string(),
+            name: name.to_string(),
+            output,
+        });
+    }
+
+    async fn record_run(&self, id: &str, name: &str, args: &str, spend_grant: bool) {
+        let expected_hash = self.take_pending_stamp(id);
         let (vault_path, vault_paths) = {
             let shared = self.lock();
             (shared.vault_path.clone(), shared.vault_paths.clone())
         };
-        let output = match tools::execute_allowed(name, args, vault_path.as_deref(), &vault_paths) {
-            Ok(output) => output,
-            Err(error) => error,
+        let name_owned = name.to_string();
+        let args_owned = args.to_string();
+        let id_owned = id.to_string();
+        let cancel_loop = self.clone();
+        let joined = tokio::task::spawn_blocking(move || {
+            tools::execute_stamped(
+                &name_owned,
+                &args_owned,
+                vault_path.as_deref(),
+                &vault_paths,
+                expected_hash.as_deref(),
+                &id_owned,
+                &|| cancel_loop.is_cancelled(),
+            )
+        })
+        .await;
+        let output = match joined {
+            Ok(Ok(output)) => output,
+            Ok(Err(error)) => error,
+            Err(_) => "tool task failed".into(),
         };
         {
             let mut shared = self.lock();
@@ -711,7 +843,24 @@ impl AgentLoop {
         });
     }
 
+    fn take_pending_stamp(&self, id: &str) -> Option<String> {
+        let mut shared = self.lock();
+        match shared.pending_stamp.take() {
+            Some((stamp_id, hash)) if stamp_id == id => Some(hash),
+            Some(other) => {
+                shared.pending_stamp = Some(other);
+                None
+            }
+            None => None,
+        }
+    }
+
+    fn clear_pending_stamp(&self, id: &str) {
+        let _ = self.take_pending_stamp(id);
+    }
+
     fn record_denial(&self, id: &str, name: &str, reason: String) {
+        self.clear_pending_stamp(id);
         {
             let mut shared = self.lock();
             shared.history.push(HistoryItem::ToolDenied {
@@ -769,6 +918,15 @@ fn parsed_tool_args(raw: &str) -> Result<(), String> {
     }
 }
 
+fn spend_allow_once(name: &str) -> bool {
+    !matches!(
+        tools::lookup(name).map(|tool| tool.policy),
+        Some(tools::ToolPolicy::Bash)
+            | Some(tools::ToolPolicy::CreateNote)
+            | Some(tools::ToolPolicy::Mutate)
+    )
+}
+
 fn offered_names(shared: &Shared) -> Vec<String> {
     let mut names = policy::offered_tools(shared.mode);
     for extra in &shared.extra_offered {
@@ -777,4 +935,107 @@ fn offered_names(shared: &Shared) -> Vec<String> {
         }
     }
     names
+}
+
+#[cfg(test)]
+mod approval_wait_tests {
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+    use std::time::{Duration, Instant};
+
+    use super::*;
+
+    fn runtime() -> tokio::runtime::Runtime {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+    }
+
+    #[test]
+    fn cancel_while_the_waiter_is_blocked_returns_without_the_reply() {
+        let agent = AgentLoop::new();
+        agent.lock().step_active = true;
+        let entered = Arc::new(AtomicBool::new(false));
+        let entered_flag = Arc::clone(&entered);
+        agent.set_approval_waiter_preview(move |_, _, _, _| {
+            entered_flag.store(true, Ordering::SeqCst);
+            thread::sleep(Duration::from_secs(30));
+            ApprovalReply::AllowOnce
+        });
+        let runtime = runtime();
+        let waiting = agent.clone();
+        let cancelling = agent.clone();
+        let reply = runtime.block_on(async move {
+            let task = tokio::spawn(async move {
+                waiting
+                    .wait_for_approval("bash", "echo hi", None, "call-1")
+                    .await
+            });
+            let started = Instant::now();
+            while !entered.load(Ordering::SeqCst) {
+                assert!(
+                    started.elapsed() < Duration::from_secs(2),
+                    "waiter did not start"
+                );
+                tokio::task::yield_now().await;
+            }
+            cancelling.cancel("quit");
+            tokio::time::timeout(Duration::from_secs(2), task)
+                .await
+                .expect("cancel did not wake the approval wait")
+                .expect("task")
+        });
+        assert_eq!(reply, ApprovalReply::Cancelled);
+    }
+
+    #[test]
+    fn a_stale_approval_generation_returns_cancelled_without_panicking() {
+        let agent = AgentLoop::new();
+        agent.lock().step_active = true;
+        let release = Arc::new(AtomicBool::new(false));
+        let first_in = Arc::new(AtomicBool::new(false));
+        let release_flag = Arc::clone(&release);
+        let first_flag = Arc::clone(&first_in);
+        let calls = Arc::new(AtomicUsize::new(0));
+        let calls_flag = Arc::clone(&calls);
+        agent.set_approval_waiter_preview(move |_, _, _, _| {
+            if calls_flag.fetch_add(1, Ordering::SeqCst) == 0 {
+                first_flag.store(true, Ordering::SeqCst);
+                while !release_flag.load(Ordering::SeqCst) {
+                    thread::sleep(Duration::from_millis(5));
+                }
+                ApprovalReply::AllowOnce
+            } else {
+                ApprovalReply::Deny
+            }
+        });
+        let runtime = runtime();
+        let first_agent = agent.clone();
+        let second_agent = agent.clone();
+        let first_reply = runtime.block_on(async move {
+            let first = tokio::spawn(async move {
+                first_agent
+                    .wait_for_approval("edit", "one", None, "c1")
+                    .await
+            });
+            let started = Instant::now();
+            while !first_in.load(Ordering::SeqCst) {
+                assert!(started.elapsed() < Duration::from_secs(2));
+                tokio::task::yield_now().await;
+            }
+            let second = tokio::time::timeout(
+                Duration::from_secs(2),
+                second_agent.wait_for_approval("edit", "two", None, "c2"),
+            )
+            .await
+            .expect("second wait");
+            assert_eq!(second, ApprovalReply::Deny);
+            release.store(true, Ordering::SeqCst);
+            tokio::time::timeout(Duration::from_secs(2), first)
+                .await
+                .expect("stale wait")
+                .expect("task")
+        });
+        assert_eq!(first_reply, ApprovalReply::Cancelled);
+    }
 }

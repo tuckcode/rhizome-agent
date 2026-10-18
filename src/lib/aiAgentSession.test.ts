@@ -142,7 +142,7 @@ const apiModel: AiModelDefinition = {
     tools: false,
     vision: false,
     json_mode: false,
-    reasoning: false,
+    reasoning: { state: 'unknown' as const },
   },
 }
 const apiTarget: AiTarget = {
@@ -235,10 +235,11 @@ describe('aiAgentSession', () => {
   async function expectLocalResponse(options: {
     messageId: string
     context: {
-      agent: 'claude_code' | 'codex' | 'opencode' | 'pi' | 'antigravity'
+      agent: 'claude_code' | 'codex' | 'opencode' | 'antigravity'
       ready: boolean
       vaultPath: string
       permissionMode: 'safe' | 'power_user'
+      chatEngine?: 'prime' | 'native'
     }
     prompt: { text: string; references?: [] }
     reason: 'agent_unavailable' | 'missing_vault'
@@ -301,7 +302,12 @@ describe('aiAgentSession', () => {
       },
       {
         messageId: 'msg-missing',
-        context: { agent: 'codex', ready: false, vaultPath: '/vault', permissionMode: 'safe' },
+        context: {
+          agent: 'codex',
+          ready: false,
+          vaultPath: '/vault',
+          permissionMode: 'safe',
+        },
         prompt: { text: 'Open a note', references: [] },
         reason: 'agent_unavailable',
         response:
@@ -312,6 +318,25 @@ describe('aiAgentSession', () => {
     for (const fallbackCase of fallbackCases) {
       await expectLocalResponse(fallbackCase)
     }
+  })
+
+  it('blocks a missing agent when no chat engine is passed', async () => {
+    nextMessageIdMock.mockReturnValue('msg-no-engine')
+    const { runtime, getMessages, getStatus } = createRuntime()
+
+    await sendAgentMessage({
+      runtime,
+      context: { agent: 'codex', ready: false, vaultPath: '/vault', permissionMode: 'safe' },
+      prompt: { text: 'Open a note' },
+    })
+
+    expect(streamAiAgentMock).not.toHaveBeenCalled()
+    expect(streamNativeChatMock).not.toHaveBeenCalled()
+    expect(getStatus()).not.toBe('thinking')
+    expect(getMessages()[0]?.isStreaming).not.toBe(true)
+    expect(getMessages()[0]?.response).toBe(
+      'Codex is not available on this machine. Install it or switch the default AI agent in Settings.',
+    )
   })
 
   it('starts a streaming session with formatted history and fresh refs', async () => {
@@ -442,7 +467,86 @@ describe('aiAgentSession', () => {
     })
   })
 
-  it('chat_default_engine_is_prime', async () => {
+  it('streams Codex when the Chat engine is native', async () => {
+    nextMessageIdMock.mockReturnValue('msg-codex-native-engine')
+    const session = createRuntime()
+    await sendAgentMessage({
+      runtime: session.runtime,
+      context: {
+        agent: 'codex',
+        target: {
+          kind: 'agent',
+          agent: 'codex',
+          id: 'agent:codex',
+          label: 'Codex',
+          shortLabel: 'Codex',
+        },
+        ready: true,
+        vaultPath: '/vault',
+        permissionMode: 'safe',
+        chatEngine: 'native',
+        nativeTarget: 'open_ai/gpt-4.1-mini',
+      },
+      prompt: { text: 'Hello Codex' },
+    })
+    expect(streamAiAgentMock).toHaveBeenCalledWith(expect.objectContaining({ agent: 'codex' }))
+    expect(streamNativeChatMock).not.toHaveBeenCalled()
+  })
+
+  it('streams Claude Code when the Chat engine is native', async () => {
+    nextMessageIdMock.mockReturnValue('msg-claude-native-engine')
+    const session = createRuntime()
+    await sendAgentMessage({
+      runtime: session.runtime,
+      context: {
+        agent: 'claude_code',
+        target: {
+          kind: 'agent',
+          agent: 'claude_code',
+          id: 'agent:claude_code',
+          label: 'Claude Code',
+          shortLabel: 'Claude',
+        },
+        ready: true,
+        vaultPath: '/vault',
+        permissionMode: 'safe',
+        chatEngine: 'native',
+        nativeTarget: 'open_ai/gpt-4.1-mini',
+      },
+      prompt: { text: 'Hello Claude' },
+    })
+    expect(streamAiAgentMock).toHaveBeenCalledWith(expect.objectContaining({ agent: 'claude_code' }))
+    expect(streamNativeChatMock).not.toHaveBeenCalled()
+  })
+
+  it('blocks a missing Codex target even when the Chat engine is native', async () => {
+    nextMessageIdMock.mockReturnValue('msg-codex-missing-native')
+    const session = createRuntime()
+    await sendAgentMessage({
+      runtime: session.runtime,
+      context: {
+        agent: 'codex',
+        target: {
+          kind: 'agent',
+          agent: 'codex',
+          id: 'agent:codex',
+          label: 'Codex',
+          shortLabel: 'Codex',
+        },
+        ready: false,
+        vaultPath: '/vault',
+        permissionMode: 'safe',
+        chatEngine: 'native',
+        nativeTarget: 'open_ai/gpt-4.1-mini',
+      },
+      prompt: { text: 'Hello' },
+    })
+    expect(streamNativeChatMock).not.toHaveBeenCalled()
+    expect(streamAiAgentMock).not.toHaveBeenCalled()
+    expect(session.getMessages()[0]?.response).toContain('Codex is not available')
+  })
+
+  it('streams native when a Prime agent has no engine loaded yet', async () => {
     nextMessageIdMock.mockReturnValue('msg-prime')
     const session = createRuntime()
     await sendAgentMessage({
@@ -455,7 +559,31 @@ describe('aiAgentSession', () => {
       },
       prompt: { text: 'Hello' },
     })
-    expect(streamAiAgentMock).toHaveBeenCalled()
+    expect(streamNativeChatMock).toHaveBeenCalled()
+    expect(streamAiAgentMock).not.toHaveBeenCalled()
+  })
+
+  it('streams Codex when the chat engine is omitted', async () => {
+    nextMessageIdMock.mockReturnValue('msg-codex-omitted')
+    const session = createRuntime()
+    await sendAgentMessage({
+      runtime: session.runtime,
+      context: {
+        agent: 'codex',
+        target: {
+          kind: 'agent',
+          agent: 'codex',
+          id: 'agent:codex',
+          label: 'Codex',
+          shortLabel: 'Codex',
+        },
+        ready: true,
+        vaultPath: '/vault',
+        permissionMode: 'power_user',
+      },
+      prompt: { text: 'Hello' },
+    })
+    expect(streamAiAgentMock).toHaveBeenCalledWith(expect.objectContaining({ agent: 'codex' }))
     expect(streamNativeChatMock).not.toHaveBeenCalled()
   })
 
@@ -484,7 +612,7 @@ describe('aiAgentSession', () => {
     )
   })
 
-  it('still blocks a Prime-targeted chat when Prime is not installed', async () => {
+  it('streams native for leftover Prime engine even when Prime is not installed', async () => {
     nextMessageIdMock.mockReturnValue('msg-prime-missing')
     const session = createRuntime()
     await sendAgentMessage({
@@ -494,12 +622,12 @@ describe('aiAgentSession', () => {
         ready: false,
         vaultPath: '/vault',
         permissionMode: 'safe',
+        chatEngine: 'prime',
       },
       prompt: { text: 'Hello' },
     })
-    expect(streamNativeChatMock).not.toHaveBeenCalled()
+    expect(streamNativeChatMock).toHaveBeenCalled()
     expect(streamAiAgentMock).not.toHaveBeenCalled()
-    expect(session.getMessages()[0]?.response).toContain('Install it with `npm i -g prime-agent`')
   })
 
   it('chat_toggle_native_uses_rhizome_loop', async () => {
@@ -545,6 +673,29 @@ describe('aiAgentSession', () => {
       message: 'What next',
     }))
     expect(streamNativeChatMock.mock.calls[0]?.[0]?.message).not.toContain('Previous')
+  })
+
+  it('sends composer images on the native path', async () => {
+    nextMessageIdMock.mockReturnValue('msg-native-image')
+    const session = createRuntime()
+    const images = [{ type: 'image' as const, data: 'aaaa', mimeType: 'image/png' }]
+    await sendAgentMessage({
+      runtime: session.runtime,
+      context: {
+        agent: 'prime',
+        ready: true,
+        vaultPath: '/vault',
+        permissionMode: 'safe',
+        chatEngine: 'native',
+        nativeTarget: 'open_ai/gpt-4o',
+      },
+      prompt: { text: 'what is this', images },
+    })
+    expect(streamNativeChatMock).toHaveBeenCalledWith(expect.objectContaining({
+      target: 'open_ai/gpt-4o',
+      images,
+    }))
+    expect(streamAiAgentMock).not.toHaveBeenCalled()
   })
 
   it('does not send on a read-only native session', async () => {

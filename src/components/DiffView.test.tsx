@@ -40,6 +40,29 @@ describe('DiffView', () => {
     expect(hunkLine).toBeInTheDocument()
   })
 
+  it('keeps compact content lines that start with --- or +++', () => {
+    render(
+      <DiffView
+        compact
+        diff={'--- a.md\n+++ a.md\n@@ -1,3 +1,3 @@\n+---\n++evil;\n-- sql\n'}
+      />,
+    )
+    expect(screen.queryByText('--- a.md')).not.toBeInTheDocument()
+    expect(screen.getByText('+---')).toBeInTheDocument()
+    expect(screen.getByText('++evil;')).toBeInTheDocument()
+    expect(screen.getByText('-- sql')).toBeInTheDocument()
+  })
+
+  it('uses the raised surface for compact hunk rows and hides file headers', () => {
+    const diff = '--- a.md\n+++ a.md\n@@ -1,1 +1,1 @@\n-old\n+new\n'
+    render(<DiffView compact diff={diff} />)
+    expect(screen.queryByText('--- a.md')).not.toBeInTheDocument()
+    expect(screen.queryByText('+++ a.md')).not.toBeInTheDocument()
+    const hunkLine = screen.getByText('@@ -1,1 +1,1 @@').closest('div')
+    expect(hunkLine).toHaveClass('bg-[var(--surface-button)]')
+    expect(hunkLine).not.toHaveClass('italic')
+  })
+
   it('applies header styling to diff/index/---/+++ lines', () => {
     const diff = 'diff --git a/test.md b/test.md\nindex abc123..def456\n--- a/test.md\n+++ b/test.md'
     const { container } = render(<DiffView diff={diff} />)
@@ -61,4 +84,5 @@ describe('DiffView', () => {
     expect(screen.getByText('2')).toBeInTheDocument()
     expect(screen.getByText('3')).toBeInTheDocument()
   })
+
 })

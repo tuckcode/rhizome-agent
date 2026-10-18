@@ -4,7 +4,7 @@ import { StatusBar } from '../StatusBar'
 import type { VaultOption } from '../StatusBar'
 
 const vaults: VaultOption[] = [
-  { label: 'Main Vault', path: '/Users/luca/Laputa', alias: 'main', mounted: true },
+  { label: 'Main Vault', path: '/Users/mock/Vault', alias: 'main', mounted: true },
   { label: 'Work Vault', path: '/Users/luca/Work', alias: 'work', mounted: false },
 ]
 
@@ -13,7 +13,7 @@ function renderPillStatusBar(overrides: Record<string, unknown> = {}) {
     <StatusBar
       noteCount={100}
       modifiedCount={3}
-      vaultPath="/Users/luca/Laputa"
+      vaultPath="/Users/mock/Vault"
       vaults={vaults}
       onSwitchVault={vi.fn()}
       remoteStatus={{ branch: 'main', ahead: 0, behind: 0, hasRemote: true }}

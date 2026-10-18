@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render as rtlRender, screen, within } from '@testing-library/react'
+import type { ReactElement } from 'react'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { SettingsPanel } from './SettingsPanel'
 import type { Settings } from '../types'
 import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../hooks/appCommandCatalog'
@@ -40,6 +42,7 @@ const emptySettings: Settings = {
   date_display_format: null,
   default_ai_agent: null,
   hide_gitignored_files: null,
+  block_secret_files: null,
   all_notes_show_pdfs: null,
   all_notes_show_images: null,
   all_notes_show_unsupported: null,
@@ -88,6 +91,14 @@ function installMatchMedia(matches = false) {
       dispatchEvent: vi.fn(() => true),
     })),
   })
+}
+
+function render(ui: ReactElement) {
+  const result = rtlRender(<TooltipProvider>{ui}</TooltipProvider>)
+  return {
+    ...result,
+    rerender: (next: ReactElement) => result.rerender(<TooltipProvider>{next}</TooltipProvider>),
+  }
 }
 
 describe('SettingsPanel', () => {
@@ -155,7 +166,7 @@ describe('SettingsPanel', () => {
     expect(screen.getByTestId('settings-panel')).toHaveAttribute('aria-hidden', 'true')
   })
 
-  it('does not fetch the Prime catalog until Agents is opened', async () => {
+  it('does not fetch the Prime catalog from Settings', async () => {
     resetPrimeModelCatalog()
     const spy = vi.spyOn(mockTauri, 'mockInvoke')
     try {
@@ -165,45 +176,65 @@ describe('SettingsPanel', () => {
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 30))
       })
+      fireEvent.click(screen.getByTestId(`settings-nav-${SETTINGS_SECTION_IDS.ai}`))
+      expect(screen.queryByTestId('prime-model-allow-list')).not.toBeInTheDocument()
       expect(
         spy.mock.calls.filter(([cmd]) => cmd === 'get_available_prime_models'),
       ).toHaveLength(0)
-
-      fireEvent.click(screen.getByTestId(`settings-nav-${SETTINGS_SECTION_IDS.ai}`))
-      expect(await screen.findByTestId('prime-model-allow-list')).toBeInTheDocument()
     } finally {
       spy.mockRestore()
       resetPrimeModelCatalog()
     }
   })
 
-  it('does not search the Prime package catalog until Packages is opened', async () => {
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-      ok: true,
-      json: async () => ({ objects: [], total: 0 }),
-    } as Response)
-    try {
-      renderOpenSettings()
-      expect(screen.getByTestId('settings-nav-settings-section-extensions')).toHaveTextContent(
-        'Packages',
-      )
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 30))
-      })
-      expect(fetchSpy).not.toHaveBeenCalled()
+  it('keeps a Packages catalog out of Settings', async () => {
+    renderOpenSettings()
+    expect(screen.queryByTestId('settings-nav-settings-section-extensions')).not.toBeInTheDocument()
+    expect(screen.queryByText('Packages')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Browse packages' })).not.toBeInTheDocument()
 
-      fireEvent.click(screen.getByTestId(`settings-nav-${SETTINGS_SECTION_IDS.extensions}`))
-      expect(await screen.findByTestId('prime-extensions-search')).toBeInTheDocument()
-      await waitFor(() => {
-        expect(fetchSpy).toHaveBeenCalled()
-      })
-      expect(String(fetchSpy.mock.calls[0]?.[0])).toContain('keywords%3Api-package')
-    } finally {
-      fetchSpy.mockRestore()
-    }
+    expect(screen.queryByTestId('settings-advanced-prime-engine-toggle')).not.toBeInTheDocument()
+    expect(screen.queryByText('Prime is not installed')).not.toBeInTheDocument()
+    expect(screen.queryByText('Packages')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Browse packages' })).not.toBeInTheDocument()
   })
 
-  it('loads the Prime catalog when Settings opens on Agents', async () => {
+  it('opens Agents for an old Packages section id', async () => {
+    render(
+      <SettingsPanel
+        open={true}
+        settings={emptySettings}
+        initialSectionId="packages"
+        onSave={onSave}
+        onClose={onClose}
+      />,
+    )
+    expect(screen.queryByTestId('settings-advanced-prime-engine-toggle')).not.toBeInTheDocument()
+    expect(screen.getByTestId('native-chat-model-picker')).toBeInTheDocument()
+    expect(screen.queryByText('Packages')).not.toBeInTheDocument()
+  })
+
+  it('keeps Copy MCP in Agents after Prime engine settings are gone', () => {
+    const aiAgentsStatus: AiAgentsStatus = {
+      ...createMissingAiAgentsStatus(),
+      prime: createAiAgentAvailability('installed', '2.1.18'),
+    }
+    render(
+      <SettingsPanel
+        open={true}
+        settings={emptySettings}
+        aiAgentsStatus={aiAgentsStatus}
+        onSave={onSave}
+        onCopyMcpConfig={vi.fn()}
+        onClose={onClose}
+      />,
+    )
+    expect(screen.queryByTestId('settings-advanced-prime-engine')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Copy MCP config' })).toBeInTheDocument()
+    expect(screen.queryByText('Packages')).not.toBeInTheDocument()
+  })
+
+  it('does not load the Prime catalog when Settings opens on Agents', () => {
     resetPrimeModelCatalog()
     render(
       <SettingsPanel
@@ -214,7 +245,8 @@ describe('SettingsPanel', () => {
         onClose={onClose}
       />
     )
-    expect(await screen.findByTestId('prime-model-allow-list')).toBeInTheDocument()
+    expect(screen.queryByTestId('prime-model-allow-list')).not.toBeInTheDocument()
+    expect(screen.getByTestId('native-chat-model-picker')).toBeInTheDocument()
   })
 
   it('renders modal when open', () => {
@@ -243,10 +275,14 @@ describe('SettingsPanel', () => {
     )
 
     expect(screen.getByText('Recognized local agents')).toBeInTheDocument()
-    expect(screen.getAllByText('Prime Agent').length).toBeGreaterThan(0)
-    expect(screen.getByText('2.1.18')).toBeInTheDocument()
-    // Claude Code is import-source copy (SessionImportSettingsSection), not a
-    // listed local agent. Probe status must still stay off the agents list.
+    expect(screen.getByTestId('settings-cli-agent-status')).toHaveTextContent('Claude Code')
+    expect(screen.getByTestId('settings-cli-agent-status')).toHaveTextContent('Codex')
+    expect(screen.getByTestId('settings-cli-agent-status')).toHaveTextContent('OpenCode')
+    expect(screen.getByTestId('settings-cli-agent-status')).toHaveTextContent('Antigravity')
+    expect(screen.getByTestId('settings-cli-agent-status')).toHaveTextContent('Kiro')
+    expect(screen.queryByText('Prime Agent')).not.toBeInTheDocument()
+    expect(screen.queryByText('Hermes Agent')).not.toBeInTheDocument()
+    // Claude Code also remains import-source copy in SessionImportSettingsSection.
     expect(screen.getByText(/Bring Claude Code sessions into this vault/)).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'Local model' })).toBeInTheDocument()
     expect(screen.getByRole('tab', { name: 'API model' })).toBeInTheDocument()
@@ -257,15 +293,16 @@ describe('SettingsPanel', () => {
     expect(await screen.findByText('Connection works. The model replied successfully.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Add local model' })).toBeInTheDocument()
     expect(screen.queryByText('Recognized local agents')).not.toBeInTheDocument()
+    expect(screen.queryByText('Prime Agent')).not.toBeInTheDocument()
 
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'API model' }), { button: 0, ctrlKey: false })
     expect(screen.getByRole('button', { name: 'Add API model' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add local model' })).not.toBeInTheDocument()
     fireEvent.pointerDown(screen.getByText('OpenAI').closest('button')!, { button: 0, pointerType: 'mouse' })
-    fireEvent.click(screen.getByRole('option', { name: 'Gemini' }))
-    expect(screen.getByDisplayValue('Gemini')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('option', { name: 'Google Gemini' }))
+    expect(screen.getByDisplayValue('Google Gemini')).toBeInTheDocument()
     expect(screen.getByDisplayValue('https://generativelanguage.googleapis.com/v1beta/openai')).toBeInTheDocument()
-    expect(screen.getByPlaceholderText('gemini-2.5-flash')).toBeInTheDocument()
+    expect(screen.getByLabelText('Model ID')).toHaveValue('gemini-3.8-flash')
   })
 
   it('does not offer a global keep-sessions-running-on-quit toggle', () => {
@@ -351,6 +388,7 @@ describe('SettingsPanel', () => {
       note_width_mode: 'normal',
       sidebar_type_pluralization_enabled: true,
       hide_gitignored_files: true,
+      block_secret_files: true,
       all_notes_show_pdfs: false,
       all_notes_show_images: false,
       all_notes_show_unsupported: false,
@@ -930,45 +968,255 @@ describe('SettingsPanel', () => {
     })
   })
 
-  it('keeps Prime as the Chat engine until the Settings toggle is on', () => {
+  it('does not render a Chat engine picker', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
 
-    expect(screen.getByTestId('settings-chat-engine')).toHaveTextContent('Chat engine')
-    expect(screen.getByRole('switch', { name: 'Chat engine' })).toHaveAttribute('aria-checked', 'false')
-    expect(screen.getByTestId('settings-prime-chat-engine')).toHaveTextContent('Prime Agent')
+    expect(screen.queryByTestId('settings-chat-engine')).not.toBeInTheDocument()
+    expect(screen.queryByRole('switch', { name: 'Chat engine' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('settings-prime-chat-engine')).not.toBeInTheDocument()
     expect(screen.getByTestId('native-chat-model-picker')).toBeInTheDocument()
     expect(screen.queryByTestId('settings-default-ai-agent')).not.toBeInTheDocument()
   })
 
-  it('persists the native Chat engine across a settings save and reload', () => {
+  it('puts Chat model at the top of AI Agents and shows Codex and Claude Code install status', () => {
+    const aiAgentsStatus: AiAgentsStatus = createMissingAiAgentsStatus()
+    aiAgentsStatus.claude_code = createAiAgentAvailability('installed', '2.1.90')
+    aiAgentsStatus.codex = createAiAgentAvailability('missing', null)
+    render(
+      <SettingsPanel
+        open={true}
+        settings={emptySettings}
+        aiAgentsStatus={aiAgentsStatus}
+        onSave={onSave}
+        onClose={onClose}
+      />,
+    )
+
+    const chatModel = screen.getByTestId('settings-chat-model')
+    expect(chatModel).toHaveTextContent('Chat model')
+    expect(chatModel).toHaveTextContent(
+      'New chats start with this model. You can change it per chat in the composer.',
+    )
+    expect(within(chatModel).getByTestId('native-chat-model-picker')).toBeInTheDocument()
+
+    const section = chatModel.parentElement
+    expect(section?.firstElementChild).toBe(chatModel)
+
+    const status = screen.getByTestId('settings-cli-agent-status')
+    expect(within(status).getByText('Claude Code')).toBeInTheDocument()
+    expect(within(status).getByText('Codex')).toBeInTheDocument()
+    expect(within(status).getByText('OpenCode')).toBeInTheDocument()
+    expect(within(status).getByText('Antigravity CLI')).toBeInTheDocument()
+    expect(within(status).getByText('Kiro')).toBeInTheDocument()
+    expect(within(status).queryByText('Prime Agent')).not.toBeInTheDocument()
+    expect(within(status).queryByText('Hermes Agent')).not.toBeInTheDocument()
+    expect(within(status).getByText('installed')).toBeInTheDocument()
+    expect(within(status).getAllByText('missing').length).toBeGreaterThan(0)
+  })
+
+  it('hides secret files by default, warns when off, and reloads the saved value', () => {
     const { rerender } = render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
-    fireEvent.click(screen.getByRole('switch', { name: 'Chat engine' }))
-    fireEvent.click(screen.getByTestId('settings-save'))
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ chat_engine: 'native' }))
-    const saved = onSave.mock.calls.at(-1)?.[0]
-    rerender(
-      <SettingsPanel open={true} settings={saved} onSave={onSave} onClose={onClose} />
+
+    const row = screen.getByTestId('settings-block-secret-files')
+    expect(row).toHaveTextContent('Hide secret files from the agent')
+    expect(row).toHaveTextContent("The agent's file tools skip private keys")
+    expect(row).not.toHaveTextContent('shell tool')
+    expect(within(row).getByRole('switch')).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByTestId('settings-block-secret-files-patterns')).toHaveAttribute(
+      'aria-label',
+      'Which names are hidden',
     )
-    expect(screen.getByRole('switch', { name: 'Chat engine' })).toHaveAttribute('aria-checked', 'true')
+
+    fireEvent.click(within(row).getByRole('switch'))
+    expect(screen.getByTestId('settings-block-secret-files-help')).toHaveTextContent(
+      "Off: the agent's file tools can open private keys and .env files.",
+    )
+    fireEvent.click(screen.getByTestId('settings-save'))
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      block_secret_files: false,
+    }))
+
+    rerender(
+      <SettingsPanel
+        open={true}
+        settings={{ ...emptySettings, block_secret_files: false }}
+        onSave={onSave}
+        onClose={onClose}
+      />,
+    )
+    const reloaded = screen.getByTestId('settings-block-secret-files')
+    expect(within(reloaded).getByRole('switch')).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByTestId('settings-block-secret-files-help')).toHaveTextContent(
+      "Off: the agent's file tools can open private keys and .env files.",
+    )
   })
 
-  it('explains that Chat models are selected inside Prime', () => {
+  it('lists denylist patterns in the info popover without toggling the switch', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+    fireEvent.click(screen.getByTestId('settings-block-secret-files-patterns'))
+    expect(screen.getByText('Hidden names')).toBeInTheDocument()
+    expect(screen.getByText(/id_rsa/)).toBeInTheDocument()
+    expect(screen.getByText(/\.env\.example/)).toBeInTheDocument()
+    expect(within(screen.getByTestId('settings-block-secret-files')).getByRole('switch')).toHaveAttribute(
+      'aria-checked',
+      'true',
+    )
+  })
+
+  it('does not show Prime engine copy for a leftover saved prime value', () => {
+    const status = createMissingAiAgentsStatus()
+    status.prime = createAiAgentAvailability('installed', 'mock')
+    render(
+      <SettingsPanel
+        open={true}
+        settings={{ ...emptySettings, chat_engine: 'prime' }}
+        onSave={onSave}
+        onClose={onClose}
+        aiAgentsStatus={status}
+      />,
+    )
+    expect(screen.queryByTestId('settings-prime-chat-engine')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('settings-chat-engine')).not.toBeInTheDocument()
+  })
+
+  /**
+   * jsdom has no layout, so visibility cannot prove a menu escaped a clip.
+   * Walk parents (not the menu itself — it uses overflow-y-auto) and require
+   * no overflow-hidden / overflow-clip ancestor, including inline overflow
+   * styles. Theme classes and CSS variables live on html (`data-theme`,
+   * `.dark`, `:root`), so a document.body portal still sits inside the
+   * themed element and keeps popover background, padding, and hover.
+   */
+  function clipsDescendants(node: HTMLElement): boolean {
+    if (node.classList.contains('overflow-hidden') || node.classList.contains('overflow-clip')) {
+      return true
+    }
+    const computed = window.getComputedStyle(node)
+    const values = [
+      node.style.overflow,
+      node.style.overflowX,
+      node.style.overflowY,
+      computed.overflow,
+      computed.overflowX,
+      computed.overflowY,
+    ]
+    return values.some((value) => value === 'hidden' || value === 'clip')
+  }
+
+  function isModelMenuChrome(el: HTMLElement): boolean {
+    const id = el.getAttribute('data-testid')
+    return (
+      id === 'native-chat-model-menu'
+      || id === 'native-chat-model-list'
+      || id === 'native-chat-model-filter-row'
+      || id === 'native-chat-model-footer'
+    )
+  }
+
+  function clippingAncestor(node: HTMLElement): HTMLElement | null {
+    let current = node.parentElement
+    while (current && current !== document.body && current !== document.documentElement) {
+      if (!isModelMenuChrome(current) && clipsDescendants(current)) return current
+      current = current.parentElement
+    }
+    return null
+  }
+
+  function expectMenuInThemedPortal(menu: HTMLElement, mode: 'dark' | 'light' = 'dark') {
+    const themed = document.documentElement
+    expect(themed).toHaveAttribute('data-theme', mode)
+    if (mode === 'dark') expect(themed).toHaveClass('dark')
+    else expect(themed).not.toHaveClass('dark')
+    expect(themed.contains(menu)).toBe(true)
+    expect(document.body.contains(menu)).toBe(true)
+    expect(clippingAncestor(menu)).toBeNull()
+  }
+
+  it('opens the model menu in a portal outside the settings overflow box and selects a model', async () => {
+    document.documentElement.setAttribute('data-theme', 'dark')
+    document.documentElement.classList.add('dark')
+    render(
+      <SettingsPanel
+        open={true}
+        settings={{ ...emptySettings, native_chat_target: 'gemini/gemini-2.5-flash' }}
+        onSave={onSave}
+        onClose={onClose}
+      />,
+    )
+
+    const trigger = screen.getByTestId('native-chat-model-trigger')
+    expect(trigger).toHaveTextContent('Gemini · gemini-2.5-flash')
+
+    fireEvent.pointerDown(
+      trigger,
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+
+    const menu = await screen.findByTestId('native-chat-model-menu')
+    expectMenuInThemedPortal(menu)
+    expect(menu).toHaveAttribute('data-settings-panel-portal', 'true')
+    expect(menu.className).toMatch(/z-\[12000\]/)
+
+    const settings = screen.getByTestId('settings-panel')
+    const dialog = settings.querySelector('[role="dialog"]')
+    const overflow = settings.querySelector('.overflow-auto')
+    const clipGroup = trigger.closest('.overflow-hidden')
+    expect(dialog).toBeInstanceOf(HTMLElement)
+    expect(overflow).not.toBeNull()
+    expect(clipGroup).not.toBeNull()
+    expect((dialog as HTMLElement).contains(menu)).toBe(false)
+    expect(overflow?.contains(menu)).toBe(false)
+    expect(clipGroup?.contains(menu)).toBe(false)
+    expect(settings.contains(menu)).toBe(false)
+
+    const option = await screen.findByTestId('native-chat-model-free_tier_auto')
+    expect(clippingAncestor(option)).toBeNull()
+    expect((dialog as HTMLElement).contains(option)).toBe(false)
+    expect(overflow?.contains(option)).toBe(false)
+    expect(clipGroup?.contains(option)).toBe(false)
+    await act(async () => {
+      fireEvent.click(option)
+    })
+    expect(trigger).toHaveTextContent('Taproot')
+  })
+
+  it('writes native when Settings saves', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+    expect(screen.queryByRole('switch', { name: 'Chat engine' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('settings-save'))
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ chat_engine: 'native' }))
+  })
+
+  it('does not offer a Prime engine switch', () => {
+    render(
+      <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
+    )
+    expect(screen.queryByRole('switch', { name: 'Chat engine' })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('settings-prime-chat-engine')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('settings-save'))
+    expect(onSave).not.toHaveBeenCalledWith(expect.objectContaining({ chat_engine: 'prime' }))
+  })
+
+  it('does not explain a Prime fallback engine', () => {
     render(
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
 
-    expect(screen.getByText(/On: new chats use Rhizome's engine/)).toBeInTheDocument()
-    expect(screen.getByText(/Off: new chats use Prime, and they switch to Rhizome's engine if Prime isn't installed/)).toBeInTheDocument()
-    expect(screen.getByText(/Changes apply to new chats, and an open chat keeps the engine it started with/)).toBeInTheDocument()
+    expect(screen.queryByText(/On: new chats use Rhizome's engine/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Off: new chats use Prime/)).not.toBeInTheDocument()
     expect(screen.queryByText(/Prime Agent runs Chat/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/skips Prime sessions and vault tools/)).not.toBeInTheDocument()
   })
 
-  it('replaces a stored direct-model default with Prime when Settings saves', () => {
+  it('does not replace a stored model default with Prime when Settings saves', () => {
     render(
       <SettingsPanel
         open={true}
@@ -989,7 +1237,7 @@ describe('SettingsPanel', () => {
                     tools: true,
                     vision: true,
                     json_mode: true,
-                    reasoning: false,
+                    reasoning: { state: 'unknown' as const },
                   },
                 },
               ],
@@ -1001,13 +1249,11 @@ describe('SettingsPanel', () => {
       />,
     )
 
-    expect(screen.getByTestId('settings-prime-chat-engine')).toHaveTextContent('Prime Agent')
-    expect(screen.queryByText(/My Anthropic.*Claude Sonnet/)).not.toBeInTheDocument()
+    expect(screen.queryByRole('switch', { name: 'Chat engine' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByTestId('settings-save'))
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
-      default_ai_agent: 'prime',
-      default_ai_target: 'agent:prime',
-    }))
+    const saved = onSave.mock.calls.at(-1)?.[0] as Settings
+    expect(saved.chat_engine).toBe('native')
+    expect(saved.default_ai_target).not.toBe('agent:prime')
   })
 
   it('treats a legacy beta release channel as stable', () => {
@@ -1277,7 +1523,7 @@ describe('SettingsPanel', () => {
       <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
     )
     const shortcut = getAppCommandShortcutDisplay(APP_COMMAND_IDS.appSettings)
-    expect(screen.getByText(`${shortcut} to open settings`)).toBeInTheDocument()
+    expect(screen.getByText(`Open settings ${shortcut}`)).toBeInTheDocument()
   })
 
   it('shows the Windows settings shortcut when the platform is Windows', () => {
@@ -1290,7 +1536,7 @@ describe('SettingsPanel', () => {
       render(
         <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
       )
-      expect(screen.getByText('Ctrl+, to open settings')).toBeInTheDocument()
+      expect(screen.getByText('Open settings Ctrl+,')).toBeInTheDocument()
     } finally {
       Object.defineProperty(window.navigator, 'userAgent', {
         configurable: true,
@@ -1309,7 +1555,7 @@ describe('SettingsPanel', () => {
       render(
         <SettingsPanel open={true} settings={emptySettings} onSave={onSave} onClose={onClose} />
       )
-      expect(screen.getByText('⌘, to open settings')).toBeInTheDocument()
+      expect(screen.getByText('Open settings ⌘,')).toBeInTheDocument()
     } finally {
       Object.defineProperty(window.navigator, 'userAgent', {
         configurable: true,

@@ -181,6 +181,8 @@ const GRAPHITE = {
   '--border-focus': 'var(--accent-blue)',
   '--state-hover': '#242321',
   '--state-hover-subtle': '#1A1917',
+  '--state-menu-hover': '#4A4948',
+  '--state-menu-selected': '#3F3E3C',
   '--state-selected': '#202B23',
   '--state-selected-strong': '#26382C',
   '--state-active': '#26382C',
@@ -232,6 +234,8 @@ const EARTH_DARK = {
   '--border-focus': 'var(--accent-blue)',
   '--state-hover': '#1C1D14',
   '--state-hover-subtle': '#16170F',
+  '--state-menu-hover': '#3B3828',
+  '--state-menu-selected': '#2A281D',
   '--state-selected': '#1A2619',
   '--state-selected-strong': '#1C291B',
   '--state-active': '#1C291B',
@@ -272,13 +276,15 @@ const EARTH_LIGHT = {
   '--text-heading': '#1E1A15',
   '--text-inverse': '#F8F5EE',
   '--border-default': '#DDD4C3',
-  '--border-subtle': '#E6DFD1',
+  '--border-subtle': '#DDD4C3',
   '--border-strong': '#C8BDA8',
   '--border-input': '#857B66',
   '--border-dialog': '#C8BDA8',
   '--border-focus': 'var(--accent-blue)',
   '--state-hover': '#EAE3D6',
   '--state-hover-subtle': '#EEE9DF',
+  '--state-menu-hover': '#EAE3D6',
+  '--state-menu-selected': '#DDD4C3',
   '--state-selected': '#E1E6DA',
   '--state-selected-strong': '#DCE3D5',
   '--state-active': '#DCE3D5',
@@ -309,8 +315,8 @@ const EARTH_LIGHT = {
   '--syntax-highlight-comment': '#5D6556',
   '--syntax-highlight-number': '#2C6977',
   '--syntax-highlight-type': '#90511E',
-  '--diff-added-text': '#296E46',
-  '--diff-removed-text': '#AD3B31',
+  '--diff-added-text': '#1E5536',
+  '--diff-removed-text': '#8F2C24',
 } as const
 
 const LOAM = {
@@ -868,7 +874,13 @@ describe('Earth theme tokens', () => {
     }
   })
 
-  it('replaces leftover Tolaria blues on sheet selection and block reorder with Earth tokens', () => {
+  it('gives Earth light chip-menu dividers 3:1 on the popover', () => {
+    expect(
+      contrastRatio(token(light, '--border-input'), token(light, '--surface-popover')),
+    ).toBeGreaterThanOrEqual(3)
+  })
+
+  it('replaces leftover Rhizome blues on sheet selection and block reorder with Earth tokens', () => {
     expect(sheetSelectionChrome).toContain("SHEET_SELECTION_ACCENT_FALLBACK = '#2C6A4D'")
     expect(sheetSelectionChrome).not.toContain('#155DFF')
     expect(blockReorder).not.toContain('21, 93, 255')

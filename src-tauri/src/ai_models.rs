@@ -8,6 +8,13 @@ mod openai_stream;
 #[cfg(test)]
 pub(crate) mod test_server;
 
+#[cfg(test)]
+pub(crate) use openai_stream::note_reasoning;
+pub(crate) use openai_stream::{
+    clear_reasoning_session, enter_reasoning_replay_session, recall_call_reasoning,
+    recall_text_reasoning,
+};
+
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum AiModelProviderKind {
@@ -32,9 +39,12 @@ pub enum AiModelApiKeyStorage {
 pub struct AiModelCapabilities {
     pub streaming: bool,
     pub tools: bool,
+    #[serde(deserialize_with = "flexible_vision")]
     pub vision: bool,
     pub json_mode: bool,
-    pub reasoning: bool,
+    /// Unknown, no, or a level list. A legacy bool loads as unknown.
+    #[serde(default)]
+    pub reasoning: crate::reasoning_levels::ReasoningSupport,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -71,7 +81,38 @@ pub struct AiModelStreamRequest {
     pub api_key_override: Option<String>,
     #[serde(default)]
     pub event_name: Option<String>,
+    /// Set on the user chat turn. Background callers leave this empty, and
+    /// `complete_text` never turns it into request fields.
+    #[serde(default)]
+    pub reasoning_level: Option<String>,
+    /// Live value for an open chat. Wins over `reasoning_level` when set.
+    #[serde(skip)]
+    pub reasoning_slot: Option<crate::reasoning_levels::ReasoningLevelSlot>,
+    #[serde(skip)]
+    pub reasoning_notice_tx:
+        Option<std::sync::mpsc::Sender<crate::reasoning_levels::ReasoningLevelNotice>>,
+    /// Notices already emitted for this chat. Shared across turns and routes.
+    #[serde(skip)]
+    pub reasoning_notices_seen:
+        Option<std::sync::Arc<std::sync::Mutex<std::collections::HashSet<String>>>>,
+    /// Images for each user turn, oldest first. Empty on calls that are not a chat turn.
+    #[serde(skip, default)]
+    pub chat_images: Vec<Vec<crate::chat_images::ChatImage>>,
+    #[serde(skip, default)]
+    pub vision_state: crate::chat_images::VisionState,
+    /// The user confirmed an unknown-vision model for this turn.
+    #[serde(skip, default)]
+    pub send_anyway: bool,
+    /// Free-tier routing decides the skip after failover, not on the first 400.
+    #[serde(skip, default)]
+    pub defer_image_skip: bool,
+    /// Session whose ledger should drop an image the provider rejected.
+    #[serde(skip, default)]
+    pub image_session_id: Option<String>,
 }
+
+/// Shown instead of a blank assistant bubble when a thinking level comes back empty.
+pub const REASONING_EMPTY_REPLY: &str = "The model spent this reply on reasoning and returned no text. Choose a lower reasoning level, or allow a longer reply.";
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct AiModelProviderTestRequest {
@@ -188,6 +229,15 @@ pub fn test_ai_model_provider(request: AiModelProviderTestRequest) -> Result<Str
         vault_paths: Vec::new(),
         api_key_override: normalize_optional_string(request.api_key_override),
         event_name: None,
+        reasoning_level: None,
+        reasoning_slot: None,
+        reasoning_notice_tx: None,
+        reasoning_notices_seen: None,
+        chat_images: Vec::new(),
+        vision_state: crate::chat_images::VisionState::Unknown,
+        send_anyway: false,
+        defer_image_skip: false,
+        image_session_id: None,
     };
     complete_text(&request)
 }
@@ -330,6 +380,15 @@ pub fn discover_ai_model_ids_with(
         vault_paths: Vec::new(),
         api_key_override: api_key_override.map(str::to_string),
         event_name: None,
+        reasoning_level: None,
+        reasoning_slot: None,
+        reasoning_notice_tx: None,
+        reasoning_notices_seen: None,
+        chat_images: Vec::new(),
+        vision_state: crate::chat_images::VisionState::Unknown,
+        send_anyway: false,
+        defer_image_skip: false,
+        image_session_id: None,
     };
     let endpoint = format!("{}/models", rejected_on_err(normalized_base_url(&request))?);
     let client = http_client(limits)?;
@@ -372,7 +431,29 @@ pub fn stream_chat_events_with(
     emit: &mut dyn FnMut(ModelEvent) -> bool,
 ) {
     let no_params = serde_json::Map::new();
-    stream_chat_events_with_params(request, messages, tools, &no_params, limits, emit);
+    stream_chat_events_with_params(
+        request,
+        messages,
+        tools,
+        &no_params,
+        &TurnExtras::default(),
+        limits,
+        emit,
+    );
+}
+
+pub struct TurnExtras {
+    pub body: serde_json::Map<String, serde_json::Value>,
+    pub system_prefix: Option<String>,
+}
+
+impl Default for TurnExtras {
+    fn default() -> Self {
+        Self {
+            body: serde_json::Map::new(),
+            system_prefix: None,
+        }
+    }
 }
 
 /// `stream_chat_events_with`, plus body fields that go out only when
@@ -383,6 +464,7 @@ pub fn stream_chat_events_with_params(
     messages: Vec<serde_json::Value>,
     tools: Vec<serde_json::Value>,
     tool_params: &serde_json::Map<String, serde_json::Value>,
+    extras: &TurnExtras,
     limits: HttpLimits,
     emit: &mut dyn FnMut(ModelEvent) -> bool,
 ) {
@@ -392,14 +474,220 @@ pub fn stream_chat_events_with_params(
         "model": request.model_id,
         "messages": system.into_iter().chain(messages).collect::<Vec<_>>(),
     });
+    if let Some(prefix) = extras.system_prefix.as_deref() {
+        apply_system_prefix(&mut payload, prefix);
+    }
+    for (key, value) in &extras.body {
+        payload[key] = value.clone();
+    }
+    let reasoning = crate::ai_model_tools::chat_tools_reasoning(
+        &request.provider.kind,
+        request.provider.base_url.as_deref(),
+        &request.model_id,
+        !tools.is_empty(),
+    );
+    if let crate::ai_model_tools::ChatToolsReasoning::OmitTools(message)
+    | crate::ai_model_tools::ChatToolsReasoning::Refuse(message) = &reasoning
+    {
+        emit(ModelEvent::Error(model_error(
+            ModelErrorKind::Rejected,
+            message.clone(),
+        )));
+        return;
+    }
     if !tools.is_empty() {
         payload["tools"] = serde_json::Value::Array(tools);
         payload["tool_choice"] = serde_json::Value::String("auto".into());
         for (key, value) in tool_params {
             payload[key] = value.clone();
         }
+        // After the user level and tool_params. Chat Completions rejects
+        // tools on gpt-5.4 through gpt-5.6, gpt-6-sol, and gpt-6-luna unless
+        // reasoning_effort is none (#236). A Responses-API path (#225 G1)
+        // may lift this later. The saved level stays as the user set it.
+        if reasoning == crate::ai_model_tools::ChatToolsReasoning::None {
+            notice_forced_off_for_tools(request);
+            payload["reasoning_effort"] = serde_json::Value::String("none".into());
+        }
     }
     stream_payload(request, payload, limits, emit);
+}
+
+fn apply_system_prefix(payload: &mut serde_json::Value, prefix: &str) {
+    let Some(messages) = payload
+        .get_mut("messages")
+        .and_then(|value| value.as_array_mut())
+    else {
+        return;
+    };
+    if let Some(first) = messages.first_mut() {
+        if first.get("role").and_then(|role| role.as_str()) == Some("system") {
+            let content = first
+                .get("content")
+                .and_then(|value| value.as_str())
+                .unwrap_or("");
+            let text = if content.is_empty() {
+                prefix.to_string()
+            } else {
+                format!("{prefix}\n{content}")
+            };
+            first["content"] = serde_json::Value::String(text);
+            return;
+        }
+    }
+    messages.insert(
+        0,
+        serde_json::json!({ "role": "system", "content": prefix }),
+    );
+}
+
+/// Body fields for the user chat turn. Empty unless this request carries a level.
+///
+/// A saved level that the model cannot use is stepped down or adjusted for
+/// this request only. The saved level stays. Unknown models send no fields.
+pub(crate) fn user_turn_reasoning(request: &AiModelStreamRequest) -> (TurnExtras, bool) {
+    let Some(level) = live_reasoning_level(request) else {
+        return (TurnExtras::default(), false);
+    };
+    let base = provider_base_url(&request.provider).unwrap_or_default();
+    let fields = crate::reasoning_levels::reasoning_levels_for_target(
+        &request.provider.id,
+        &base,
+        &request.model_id,
+        Some(&level),
+    );
+    if let (Some(from), Some(to)) = (
+        fields.downgraded_from.clone(),
+        fields.selected_level.clone(),
+    ) {
+        send_reasoning_notice(
+            request,
+            crate::reasoning_levels::ReasoningLevelNotice {
+                code: "downgraded".into(),
+                from: Some(from),
+                to: Some(to),
+            },
+        );
+    } else if let (Some(from), Some(to)) =
+        (fields.adjusted_from.clone(), fields.selected_level.clone())
+    {
+        send_reasoning_notice(
+            request,
+            crate::reasoning_levels::ReasoningLevelNotice {
+                code: "adjusted".into(),
+                from: Some(from),
+                to: Some(to),
+            },
+        );
+    } else if fields.selected_level.is_none() {
+        send_reasoning_notice(
+            request,
+            crate::reasoning_levels::ReasoningLevelNotice {
+                code: "unsupported".into(),
+                from: Some(level),
+                to: None,
+            },
+        );
+    }
+    let mut body = fields.body;
+    apply_configured_output_cap(request, &mut body);
+    let thinking = fields
+        .selected_level
+        .as_deref()
+        .is_some_and(|level| !matches!(level, "off" | "none" | "false" | "disabled"));
+    (
+        TurnExtras {
+            body,
+            system_prefix: fields.system_prefix,
+        },
+        thinking,
+    )
+}
+
+/// Send a token cap only when this model has one configured. Never invent or
+/// raise one. GPT-5 and later reject `max_tokens` on Chat Completions.
+fn apply_configured_output_cap(
+    request: &AiModelStreamRequest,
+    body: &mut serde_json::Map<String, serde_json::Value>,
+) {
+    let Some(limit) = request
+        .provider
+        .models
+        .iter()
+        .find(|model| model.id == request.model_id)
+        .and_then(|model| model.max_output_tokens)
+    else {
+        return;
+    };
+    let field = if openai_family_uses_completion_tokens(&request.model_id) {
+        "max_completion_tokens"
+    } else {
+        "max_tokens"
+    };
+    body.insert(field.to_string(), serde_json::json!(limit));
+}
+
+fn openai_family_uses_completion_tokens(model_id: &str) -> bool {
+    let bare = model_id
+        .rsplit('/')
+        .next()
+        .unwrap_or(model_id)
+        .trim()
+        .to_ascii_lowercase();
+    bare.starts_with("gpt-5")
+        || bare.starts_with("gpt-6")
+        || bare.starts_with("o1")
+        || bare.starts_with("o3")
+        || bare.starts_with("o4")
+}
+
+fn live_reasoning_level(request: &AiModelStreamRequest) -> Option<String> {
+    let raw = if let Some(slot) = &request.reasoning_slot {
+        slot.lock().expect("reasoning level").clone()
+    } else {
+        request.reasoning_level.clone()
+    };
+    raw.map(|level| level.trim().to_string())
+        .filter(|level| !level.is_empty())
+}
+
+fn notice_forced_off_for_tools(request: &AiModelStreamRequest) {
+    let Some(level) = live_reasoning_level(request) else {
+        return;
+    };
+    if matches!(level.as_str(), "none" | "off" | "false" | "disabled") {
+        return;
+    }
+    send_reasoning_notice(
+        request,
+        crate::reasoning_levels::ReasoningLevelNotice {
+            code: "forced_off_for_tools".into(),
+            from: Some(level),
+            to: Some("none".into()),
+        },
+    );
+}
+
+fn send_reasoning_notice(
+    request: &AiModelStreamRequest,
+    notice: crate::reasoning_levels::ReasoningLevelNotice,
+) {
+    if let Some(seen) = &request.reasoning_notices_seen {
+        let key = format!(
+            "{}|{}|{}|{}",
+            notice.code,
+            request.model_id,
+            notice.from.as_deref().unwrap_or(""),
+            notice.to.as_deref().unwrap_or("")
+        );
+        let mut seen = seen.lock().expect("reasoning notices");
+        if !seen.insert(key) {
+            return;
+        }
+    }
+    if let Some(tx) = &request.reasoning_notice_tx {
+        let _ = tx.send(notice);
+    }
 }
 
 fn open_model_event_stream(
@@ -560,6 +848,19 @@ fn send_openai_compatible_message<F>(
 where
     F: FnMut(AiAgentStreamEvent),
 {
+    // create_note is optional on this path. Astra and GPT-6.1 Sol cannot
+    // take the tool, so the payload omits it and the chat still goes out.
+    // A `-pro` id is not on Chat Completions at all.
+    if let crate::ai_model_tools::ChatToolsReasoning::Refuse(message) =
+        crate::ai_model_tools::chat_tools_reasoning(
+            &request.provider.kind,
+            request.provider.base_url.as_deref(),
+            &request.model_id,
+            crate::ai_model_tools::should_offer_openai_tools(request),
+        )
+    {
+        return Err(message);
+    }
     let endpoint = chat_completions_url(request)?;
     let payload = crate::ai_model_tools::openai_chat_payload(request);
     let json = send_json_request(request, endpoint, payload)?;
@@ -573,10 +874,21 @@ where
 
 fn send_anthropic_message(request: &AiModelStreamRequest) -> Result<String, String> {
     let endpoint = format!("{}/messages", normalized_base_url(request)?);
+    let accepts =
+        request.vision_state == crate::chat_images::VisionState::Yes || request.send_anyway;
+    let budgeted = crate::chat_images::budget_turns(&request.chat_images, accepts);
+    let turn = budgeted
+        .last()
+        .cloned()
+        .unwrap_or(crate::chat_images::BudgetedTurn {
+            images: Vec::new(),
+            omitted: false,
+        });
+    let content = crate::chat_images::anthropic_turn_content(&request.message, &turn);
     let mut payload = serde_json::json!({
         "model": request.model_id,
         "max_tokens": selected_max_tokens(request),
-        "messages": [{ "role": "user", "content": request.message }]
+        "messages": [{ "role": "user", "content": content }]
     });
 
     if let Some(system_prompt) = non_empty_option(request.system_prompt.as_deref()) {
@@ -780,6 +1092,14 @@ fn extract_anthropic_text(json: &serde_json::Value) -> Result<String, String> {
     }
 }
 
+fn flexible_vision<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = Option::<bool>::deserialize(deserializer)?;
+    Ok(value.unwrap_or(false))
+}
+
 fn non_empty_option(value: Option<&str>) -> Option<&str> {
     value.map(str::trim).filter(|value| !value.is_empty())
 }
@@ -808,7 +1128,7 @@ mod tests {
             tools: false,
             vision: false,
             json_mode: true,
-            reasoning: false,
+            reasoning: crate::reasoning_levels::ReasoningSupport::Unknown,
         }
     }
 
@@ -845,6 +1165,15 @@ mod tests {
             vault_paths: Vec::new(),
             api_key_override: None,
             event_name: None,
+            reasoning_level: None,
+            reasoning_slot: None,
+            reasoning_notice_tx: None,
+            reasoning_notices_seen: None,
+            chat_images: Vec::new(),
+            vision_state: crate::chat_images::VisionState::Unknown,
+            send_anyway: false,
+            defer_image_skip: false,
+            image_session_id: None,
         }
     }
 
@@ -1133,6 +1462,228 @@ mod tests {
         );
         assert!(body.get("tools").is_none());
         assert!(body.get("tool_choice").is_none());
+    }
+
+    fn echo_tool() -> Vec<serde_json::Value> {
+        vec![json!({ "type": "function", "function": { "name": "echo" } })]
+    }
+
+    fn stream_tool_body(
+        model_id: &str,
+        kind: AiModelProviderKind,
+        tools: Vec<serde_json::Value>,
+    ) -> (Vec<ModelEvent>, Vec<(String, String)>) {
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}"#,
+        ])]);
+        let mut request = compatible_request(&server.base_url);
+        request.provider.kind = kind;
+        request.model_id = model_id.into();
+        let mut events = Vec::new();
+        stream_chat_events_with_params(
+            &request,
+            user_message(&request),
+            tools,
+            &serde_json::Map::new(),
+            &TurnExtras::default(),
+            TEST_LIMITS,
+            &mut |event| {
+                events.push(event);
+                true
+            },
+        );
+        let requests = server.requests.lock().unwrap().clone();
+        (events, requests)
+    }
+
+    #[test]
+    fn stream_sends_reasoning_none_only_with_tools_on_the_gpt_family() {
+        for (model_id, kind) in [
+            ("gpt-6-sol", AiModelProviderKind::OpenAi),
+            ("gpt-6-luna", AiModelProviderKind::OpenAiCompatible),
+            ("GPT-6-LUNA", AiModelProviderKind::OpenAi),
+            ("gpt-5.4", AiModelProviderKind::LmStudio),
+            ("gpt-5.4-2026-03-01", AiModelProviderKind::OpenAi),
+            ("gpt-5.5", AiModelProviderKind::OpenAi),
+            ("gpt-5.6", AiModelProviderKind::OpenAi),
+            ("openai/gpt-6-luna", AiModelProviderKind::OpenAiCompatible),
+        ] {
+            let (events, requests) = stream_tool_body(model_id, kind, echo_tool());
+            assert!(
+                matches!(events.last(), Some(ModelEvent::Finish { .. })),
+                "{model_id}"
+            );
+            assert_eq!(requests.len(), 1, "{model_id}");
+            let body: serde_json::Value = serde_json::from_str(&requests[0].1).unwrap();
+            assert_eq!(body["reasoning_effort"], "none", "{model_id}");
+            assert_eq!(body["tools"][0]["function"]["name"], "echo", "{model_id}");
+            assert_eq!(body["model"], model_id, "{model_id}");
+        }
+
+        for model_id in [
+            "gpt-4.1",
+            "gpt-5-nano",
+            "gpt-5.3",
+            "gpt-5.40",
+            "gpt-5.55",
+            "gpt-6-lunatic",
+        ] {
+            let (events, requests) =
+                stream_tool_body(model_id, AiModelProviderKind::OpenAi, echo_tool());
+            assert!(
+                matches!(events.last(), Some(ModelEvent::Finish { .. })),
+                "{model_id}"
+            );
+            let body: serde_json::Value = serde_json::from_str(&requests[0].1).unwrap();
+            assert!(body.get("tools").is_some(), "{model_id}");
+            assert!(body.get("reasoning_effort").is_none(), "{model_id}");
+        }
+
+        for model_id in ["gpt-6-luna", "gpt-6-astra", "gpt-6.1-sol"] {
+            let (events, requests) =
+                stream_tool_body(model_id, AiModelProviderKind::OpenAi, Vec::new());
+            assert!(
+                matches!(events.last(), Some(ModelEvent::Finish { .. })),
+                "{model_id}"
+            );
+            let body: serde_json::Value = serde_json::from_str(&requests[0].1).unwrap();
+            assert!(body.get("tools").is_none(), "{model_id}");
+            assert!(body.get("reasoning_effort").is_none(), "{model_id}");
+        }
+
+        for model_id in ["openai/gpt-6-luna", "gpt-6-astra", "gpt-6.1-sol"] {
+            let (events, requests) =
+                stream_tool_body(model_id, AiModelProviderKind::OpenRouter, echo_tool());
+            assert!(
+                matches!(events.last(), Some(ModelEvent::Finish { .. })),
+                "{model_id}"
+            );
+            let body: serde_json::Value = serde_json::from_str(&requests[0].1).unwrap();
+            assert!(body.get("tools").is_some(), "{model_id}");
+            assert!(body.get("reasoning_effort").is_none(), "{model_id}");
+        }
+    }
+
+    #[test]
+    fn stream_refuses_tools_for_models_that_cannot_disable_reasoning() {
+        for (model_id, name) in [
+            ("gpt-6-astra", "GPT-6 Astra"),
+            ("gpt-6-astra-900k", "GPT-6 Astra"),
+            ("gpt-6.1-sol", "GPT-6.1 Sol"),
+            ("openai/gpt-6.1-sol", "GPT-6.1 Sol"),
+        ] {
+            let (events, requests) =
+                stream_tool_body(model_id, AiModelProviderKind::OpenAi, echo_tool());
+            assert!(requests.is_empty(), "{model_id}");
+            let error = only_error(&events);
+            assert_eq!(error.kind, ModelErrorKind::Rejected, "{model_id}");
+            assert_eq!(error.status, None, "{model_id}");
+            assert_eq!(
+                error.message,
+                format!(
+                    "{name} can't use vault tools in Rhizome yet. Switch to GPT-6 Luna or Sol, or chat without a vault."
+                ),
+                "{model_id}"
+            );
+        }
+
+        for (model_id, message) in [
+            (
+                "gpt-6-luna-pro",
+                "GPT-6 Luna Pro doesn't work in Rhizome chat yet. Pick GPT-6 Sol or Luna instead.",
+            ),
+            (
+                "GPT-5.4-pro",
+                "GPT-5.4 Pro doesn't work in Rhizome chat yet. Pick GPT-5.4 instead.",
+            ),
+            (
+                "gpt-6-luna-mini-pro",
+                "GPT-6 Luna Mini Pro doesn't work in Rhizome chat yet. Pick GPT-6 Sol or Luna instead.",
+            ),
+        ] {
+            let (events, requests) =
+                stream_tool_body(model_id, AiModelProviderKind::OpenAiCompatible, echo_tool());
+            assert!(requests.is_empty(), "{model_id}");
+            let error = only_error(&events);
+            assert_eq!(error.message, message, "{model_id}");
+        }
+    }
+
+    #[test]
+    fn stream_reasoning_none_overwrites_tool_params() {
+        let server = serve(vec![sse(&[
+            r#"{"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}"#,
+        ])]);
+        let mut request = compatible_request(&server.base_url);
+        request.model_id = "gpt-6-luna".into();
+        let mut tool_params = serde_json::Map::new();
+        tool_params.insert("parallel_tool_calls".into(), json!(false));
+        tool_params.insert("reasoning_effort".into(), json!("high"));
+
+        stream_chat_events_with_params(
+            &request,
+            user_message(&request),
+            echo_tool(),
+            &tool_params,
+            &TurnExtras::default(),
+            TEST_LIMITS,
+            &mut |_| true,
+        );
+
+        let requests = server.requests.lock().unwrap();
+        let body: serde_json::Value = serde_json::from_str(&requests[0].1).unwrap();
+        assert_eq!(body["parallel_tool_calls"], false);
+        assert_eq!(body["reasoning_effort"], "none");
+        assert_eq!(body["tools"][0]["function"]["name"], "echo");
+    }
+
+    #[test]
+    fn send_drops_astra_and_gpt61_tools_and_still_calls() {
+        for model_id in ["gpt-6-astra", "gpt-6.1-sol"] {
+            let server = serve(vec![http_response(
+                "200 OK",
+                &["Content-Type: application/json"],
+                r#"{"choices":[{"message":{"content":"hello"}}]}"#,
+            )]);
+            let mut request = request(provider(AiModelProviderKind::OpenAi));
+            request.model_id = model_id.into();
+            request.vault_path = Some("vault".into());
+            request.provider.base_url = Some(server.base_url.clone());
+            request.provider.api_key_env_var = None;
+            request.provider.api_key_storage = Some(AiModelApiKeyStorage::None);
+
+            let text = send_openai_compatible_message(&request, &mut |_| {}).unwrap();
+
+            assert_eq!(text, "hello", "{model_id}");
+            let requests = server.requests.lock().unwrap();
+            assert_eq!(requests.len(), 1, "{model_id}");
+            let body: serde_json::Value = serde_json::from_str(&requests[0].1).unwrap();
+            assert!(body.get("tools").is_none(), "{model_id}");
+            assert!(body.get("reasoning_effort").is_none(), "{model_id}");
+        }
+    }
+
+    #[test]
+    fn send_refuses_pro_models_before_any_http_call() {
+        let server = serve(vec![http_response(
+            "200 OK",
+            &["Content-Type: application/json"],
+            r#"{"choices":[{"message":{"content":"nope"}}]}"#,
+        )]);
+        let mut request = request(provider(AiModelProviderKind::OpenAi));
+        request.model_id = "gpt-6-sol-pro".into();
+        request.vault_path = Some("vault".into());
+        request.provider.base_url = Some(server.base_url.clone());
+        request.provider.api_key_env_var = None;
+        request.provider.api_key_storage = Some(AiModelApiKeyStorage::None);
+
+        let error = send_openai_compatible_message(&request, &mut |_| {}).unwrap_err();
+
+        assert_eq!(
+            error,
+            "GPT-6 Sol Pro doesn't work in Rhizome chat yet. Pick GPT-6 Sol or Luna instead."
+        );
+        assert!(server.requests.lock().unwrap().is_empty());
     }
 
     #[test]

@@ -7,7 +7,7 @@ import {
   removeFixtureVaultCopy,
 } from '../helpers/fixtureVault'
 import { dispatchShortcutEvent } from './testBridge'
-import { SMOKE_UI_READY_TIMEOUT } from './helpers'
+import { expectBreadcrumbFilename, SMOKE_UI_READY_TIMEOUT } from './helpers'
 
 let tempVaultDir: string
 
@@ -45,7 +45,7 @@ test('quick open creates a note when the typed title has no matches @smoke', asy
   await page.keyboard.press('Enter')
 
   await expect(page.getByTestId('quick-open-palette')).not.toBeVisible({ timeout: 5_000 })
-  await expect(page.getByTestId('breadcrumb-filename-trigger')).toContainText('new-research-brief', { timeout: SMOKE_UI_READY_TIMEOUT })
+  await expectBreadcrumbFilename(page, 'new-research-brief')
   await expect.poll(() => fs.existsSync(notePath), { timeout: SMOKE_UI_READY_TIMEOUT }).toBe(true)
   const content = fs.readFileSync(notePath, 'utf8')
   expect(content).toContain(`title: ${title}`)

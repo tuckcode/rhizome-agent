@@ -1,5 +1,8 @@
-const RELEASE_HISTORY_URL = 'https://github.com/tuckcode/rhizome-agent/releases'
-const DOWNLOAD_FRAME_NAME = 'tolaria-download-frame'
+/** Same URL the in-app updater copy calls the Releases page. */
+export const RELEASE_DOWNLOAD_PAGE_URL = 'https://github.com/tuckcode/rhizome-agent/releases'
+
+const RELEASE_HISTORY_URL = RELEASE_DOWNLOAD_PAGE_URL
+const DOWNLOAD_FRAME_NAME = 'rhizome-download-frame'
 const WINDOWS_MANAGED_INSTALL_NOTE =
   'Windows updater bundles are signed. Authenticode publisher signing is added when configured; managed devices may require IT approval before install.'
 

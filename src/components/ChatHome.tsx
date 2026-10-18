@@ -1,6 +1,9 @@
-import { useEffect, useRef, useState, useMemo } from 'react'
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react'
 import { AiPanel } from './AiPanel'
-import { PrimeSessionSubhead } from './PrimeSessionSubhead'
+import { CHAT_TOP_BAR_BAND_CLASS, PrimeSessionSubhead } from './PrimeSessionSubhead'
+import { overlayTitleBarBandStyle } from '../utils/trafficLights'
+import { SHEET_OFFSET_BAND_ATTR } from '../hooks/useNotesSheetOffset'
+import { useDragRegion } from '../hooks/useDragRegion'
 import { AgentActivityBand } from './AgentActivityBand'
 import { RlmFamilyBand } from './RlmFamilyBand'
 import { ChatComposerDeck } from './ChatComposerDeck'
@@ -13,8 +16,9 @@ import { ChatNotePane } from './ChatNotePane'
 import { useChatNoteContent } from '../hooks/useChatNoteContent'
 import { usePanelWidth } from '../hooks/usePanelWidth'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
-import { primeModelLabel, usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
+import { usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
 import { usePrimeActiveSessionTitle } from '../hooks/usePrimeActiveSessionTitle'
+import { sessionTitleRefreshKey } from '../lib/sessionHeaderTitle'
 import { resolveChatOpenNote } from '../utils/resolveChatOpenNote'
 import { agentTargets, type AiModelProvider, type AiTarget } from '../lib/aiTargets'
 import {
@@ -36,6 +40,8 @@ interface ChatHomeProps {
   defaultAiAgentReadiness: AiAgentReadiness
   defaultAiAgentReady: boolean
   chatEngine?: 'prime' | 'native'
+  /** False while Settings are still loading, so the open chat does not lock the empty default. */
+  chatEngineSettled?: boolean
   nativeTarget?: string | null
   onNativeTargetChange?: (target: string) => void
   aiModelProviders?: AiModelProvider[] | null
@@ -74,6 +80,7 @@ interface ChatHomeProps {
   /** Chat engine offer. The banner is the visible control. */
   chatEngineUpdate?: PrimeUpdateStatus
   onApplyChatEngineUpdate?: () => void
+  onOpenAiSettings?: () => void
 }
 
 /**
@@ -87,7 +94,8 @@ export default function ChatHome({
   defaultAiTarget,
   defaultAiAgentReadiness,
   defaultAiAgentReady,
-  chatEngine = 'prime',
+  chatEngine = 'native',
+  chatEngineSettled = true,
   nativeTarget,
   onNativeTargetChange,
   aiModelProviders,
@@ -111,6 +119,7 @@ export default function ChatHome({
   chatEngineUpdate,
   onApplyChatEngineUpdate,
   railLayoutWidth,
+  onOpenAiSettings,
 }: ChatHomeProps) {
   // Chat is Prime's home canvas (ADR-0166). A direct API model chosen as the
   // global default must not strip Prime chrome or route chat away from Prime.
@@ -139,7 +148,8 @@ export default function ChatHome({
     hostNotInstalled: false,
     startedEngine,
   })
-  const isPrimeTarget = isPrimeChatTarget && effectiveEngineForStatus === 'prime'
+  const engineChromeReady = chatEngineSettled
+  const isPrimeTarget = engineChromeReady && isPrimeChatTarget && effectiveEngineForStatus === 'prime'
   const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath)
   const hostKnown = Boolean(primeHost.known)
   const hostNotInstalled = primeHost.problem?.code === 'not_installed'
@@ -151,16 +161,43 @@ export default function ChatHome({
     startedEngine,
   }
   const effectiveEngine = resolveEffectiveChatEngine(engineInput)
-  const showPrimeChrome = isPrimeChat && chatTarget?.kind !== 'api_model' && effectiveEngine === 'prime'
-  const rhizomeCatalog = effectiveEngine === 'native'
-  if (startedEngine === null && shouldLockEffectiveChatEngine(engineInput)) {
+  const showPrimeChrome = engineChromeReady && isPrimeChat && chatTarget?.kind !== 'api_model' && effectiveEngine === 'prime'
+  // The title strip and Command Palette are Chat chrome, not Prime-only.
+  // Tying them to `effectiveEngine === 'prime'` hid the whole top bar on
+  // Rhizome's native engine, including the header.
+  const showChatTopBarSlot = isPrimeChat && chatTarget?.kind !== 'api_model'
+  const showChatTopBar = engineChromeReady && showChatTopBarSlot
+  const showChatTopBarPlaceholder = !engineChromeReady && showChatTopBarSlot
+  const rhizomeCatalog = engineChromeReady && effectiveEngine === 'native'
+  const showComposerDeck = engineChromeReady && isPrimeChat && (showPrimeChrome || rhizomeCatalog)
+  const panelEngine = engineChromeReady ? effectiveEngine : undefined
+  if (
+    chatEngineSettled
+    && startedEngine === null
+    && shouldLockEffectiveChatEngine(engineInput)
+  ) {
     setEngineLock({ engine: effectiveEngine, ...lockScope })
   }
   const clearEngineLock = () => {
     setConversationId(newChatConversationId())
     setEngineLock(null)
   }
-  const sessionTitle = usePrimeActiveSessionTitle(primeHost?.sessionPath ?? null, primeHost?.isStreaming)
+  const [sessionMeta, setSessionMeta] = useState<{ path: string | null; title: string | null }>({
+    path: null,
+    title: null,
+  })
+  const handleSessionHeader = useCallback((next: { path: string | null; title: string | null }) => {
+    setSessionMeta((current) => (
+      current.path === next.path && current.title === next.title ? current : next
+    ))
+  }, [])
+  const sessionPath = sessionMeta.path ?? primeHost?.sessionPath ?? null
+  const listedTitle = usePrimeActiveSessionTitle(
+    sessionPath,
+    sessionTitleRefreshKey(primeHost?.isStreaming, sessionPath),
+  )
+  const sessionTitle = listedTitle ?? sessionMeta.title
+  const { onMouseDown: onDragRegionMouseDown } = useDragRegion<HTMLDivElement>()
   const newChatRef = useRef<(() => void) | null>(null)
   const [openNote, setOpenNote] = useState<{ path: string; label: string } | null>(null)
   // One read of the open note, shared by the pane and the agent. Chat used to
@@ -198,9 +235,22 @@ export default function ChatHome({
     <div
       className="flex min-h-0 min-w-0 flex-1 flex-col"
       data-testid="chat-home"
-      data-chat-engine={effectiveEngine}
+      data-chat-engine={panelEngine ?? 'pending'}
     >
-      {showPrimeChrome ? (
+      {showChatTopBarPlaceholder ? (
+        <div
+          aria-hidden="true"
+          className={CHAT_TOP_BAR_BAND_CLASS}
+          data-chat-top-bar="placeholder"
+          data-testid="chat-top-bar"
+          {...{ [SHEET_OFFSET_BAND_ATTR]: 'content' }}
+          style={overlayTitleBarBandStyle(railLayoutWidth)}
+          onMouseDown={onDragRegionMouseDown}
+        >
+          <span className="h-[13px] w-24 max-w-[40%] rounded-sm bg-muted-foreground/20" />
+        </div>
+      ) : null}
+      {showChatTopBar ? (
         <PrimeSessionSubhead
           railLayoutWidth={railLayoutWidth}
           locale={locale}
@@ -210,8 +260,10 @@ export default function ChatHome({
           startedAt={primeHost?.startedAt ?? null}
           problem={primeHost?.problem ?? null}
           sessionTitle={sessionTitle}
+          showSessionStatus={effectiveEngine === 'prime'}
           onNewChat={() => {
             clearEngineLock()
+            setSessionMeta({ path: null, title: null })
             newChatRef.current?.()
           }}
           onOpenFootprint={
@@ -233,9 +285,9 @@ export default function ChatHome({
           locale={locale}
           defaultAiAgent={defaultAiAgent}
           defaultAiTarget={chatTarget}
-          defaultAiAgentReadiness={defaultAiAgentReadiness}
-          defaultAiAgentReady={defaultAiAgentReady}
-          chatEngine={effectiveEngine}
+          defaultAiAgentReadiness={engineChromeReady ? defaultAiAgentReadiness : 'checking'}
+          defaultAiAgentReady={engineChromeReady ? defaultAiAgentReady : false}
+          chatEngine={panelEngine}
           nativeTarget={nativeTarget ?? undefined}
           vaultPath={vaultPath}
           vaultPaths={vaultPaths}
@@ -256,7 +308,8 @@ export default function ChatHome({
           sessionsRailSlot={sessionsRailSlot}
           onRailSessionPicked={onRailSessionPicked}
           onConversationReset={clearEngineLock}
-          forkTargetsPrimeEntry={effectiveEngine === 'prime'}
+          onSessionHeader={handleSessionHeader}
+          forkTargetsPrimeEntry={panelEngine === 'prime'}
           newChatRef={newChatRef}
           onOpenMycelium={onOpenSessionFootprint}
           notePane={
@@ -306,32 +359,32 @@ export default function ChatHome({
             ) : undefined
           }
           composerDeck={
-            <ChatComposerDeck
-              locale={locale}
-              vaultPath={vaultPath}
-              hostReady={Boolean(primeHost?.running)}
-              catalog={rhizomeCatalog ? 'rhizome' : 'prime'}
-              nativeTarget={nativeTarget}
-              onNativeTargetChange={onNativeTargetChange}
-              providers={aiModelProviders}
-              contextLabel={openNote ? openNote.label.split('/').filter(Boolean).at(-1) ?? openNote.label : null}
-              onCloseContext={() => {
-                setOpenNote(null)
-              }}
-              model={primeModelLabel(primeHost)}
-              thinkingLevel={primeHost?.thinkingLevel ?? null}
-              activity={
-                // Idle agents are the normal state; only working ones earn
-                // a place on the row (native audit 2026-09-26).
-                rhizomeJobs.activeJobs.length > 0 ? (
-                  <AgentsPill
-                    jobs={rhizomeJobs.activeJobs}
-                    onCancelJob={rhizomeJobs.cancelJob}
-                    locale={locale}
-                  />
-                ) : null
-              }
-            />
+            showComposerDeck ? (
+              <ChatComposerDeck
+                locale={locale}
+                vaultPath={vaultPath}
+                catalog={rhizomeCatalog ? 'rhizome' : 'prime'}
+                nativeTarget={nativeTarget}
+                onNativeTargetChange={onNativeTargetChange}
+                providers={aiModelProviders}
+                onOpenProviders={onOpenAiSettings}
+                contextLabel={openNote ? openNote.label.split('/').filter(Boolean).at(-1) ?? openNote.label : null}
+                onCloseContext={() => {
+                  setOpenNote(null)
+                }}
+                activity={
+                  // Idle agents are the normal state; only working ones earn
+                  // a place on the row (native audit 2026-09-26).
+                  rhizomeJobs.activeJobs.length > 0 ? (
+                    <AgentsPill
+                      jobs={rhizomeJobs.activeJobs}
+                      onCancelJob={rhizomeJobs.cancelJob}
+                      locale={locale}
+                    />
+                  ) : null
+                }
+              />
+            ) : undefined
           }
           composerSkillsLabel="rhizome-vault"
           onClose={onExit}

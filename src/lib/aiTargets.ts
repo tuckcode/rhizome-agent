@@ -15,12 +15,26 @@ export type AiModelProviderKind = 'open_ai' | 'anthropic' | 'open_ai_compatible'
 export type AiTargetKind = 'agent' | 'api_model'
 export type AiModelApiKeyStorage = 'none' | 'env' | 'local_file'
 
+/** Unknown sends nothing. `no` is a known negative. `levels` is an ordered list. */
+export type ReasoningSupport =
+  | { state: 'unknown' }
+  | { state: 'no' }
+  | {
+      state: 'levels'
+      levels: { id: string; label: string }[]
+      wire: { name: string; send: string }
+      stated_default: string | null
+      source: string
+      mandatory: boolean
+    }
+
 export interface AiModelCapabilities {
   streaming: boolean
   tools: boolean
-  vision: boolean
+  /** `null` means the catalog has not said. That is not text-only. */
+  vision: boolean | null
   json_mode: boolean
-  reasoning: boolean
+  reasoning: ReasoningSupport
 }
 
 export interface AiModelDefinition {
@@ -74,9 +88,9 @@ export const LOCAL_AI_PROVIDER_KINDS: readonly AiModelProviderKind[] = AI_MODEL_
 export const DEFAULT_MODEL_CAPABILITIES: AiModelCapabilities = {
   streaming: false,
   tools: false,
-  vision: false,
+  vision: null,
   json_mode: false,
-  reasoning: false,
+  reasoning: { state: 'unknown' as const },
 }
 
 export function aiModelProviderCatalog(): readonly AiModelProviderCatalogEntry[] {

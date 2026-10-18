@@ -15,6 +15,7 @@ type AiAgentStreamEvent =
   | { kind: 'ToolStart'; tool_name: string; tool_id: string; input?: string }
   | { kind: 'ToolDone'; tool_id: string; output?: string }
   | { kind: 'Error'; message: string }
+  | { kind: 'Notice'; message: string }
   | { kind: 'QueueUpdate'; queued: number }
   | { kind: 'Compaction'; phase: string; reason?: string; tokens_before?: number }
   | { kind: 'TurnBoundary' }
@@ -37,6 +38,10 @@ export interface AgentStreamCallbacks {
    * (queued follow-up). Optional — non-Prime agents never emit it.
    */
   onTurnBoundary?: () => void
+  /** Native mutate tools. Optional so Prime/CLI callers stay unchanged. */
+  onApprovalRequested?: (prompt: import('../lib/nativeToolApproval').NativeApprovalPrompt) => void
+  onApprovalDismissed?: (promptId: string) => void
+  onToolDenied?: (toolId: string, reason: string) => void
   onDone: () => void
 }
 
@@ -75,9 +80,9 @@ function mockAgentResponse(agent: AiAgentId, message: string): string {
     const turnCount = allUserLines.length
     const lastLine = allUserLines.at(-1) ?? ''
     const lastUserMsg = lastLine.replace('[user]: ', '')
-    return `[mock-${agentLabel.toLowerCase()} turns=${turnCount}] You asked: "${lastUserMsg}" — This note is related to [[Build Laputa App]] and [[Matteo Cellini]].`
+    return `[mock-${agentLabel.toLowerCase()} turns=${turnCount}] You asked: "${lastUserMsg}" — This note is related to [[Build Rhizome App]] and [[Matteo Cellini]].`
   }
-  return `[mock-${agentLabel.toLowerCase()}] You said: "${message}" — This note is related to [[Build Laputa App]] and [[Matteo Cellini]].`
+  return `[mock-${agentLabel.toLowerCase()}] You said: "${message}" — This note is related to [[Build Rhizome App]] and [[Matteo Cellini]].`
 }
 
 function handleStreamEvent(data: AiAgentStreamEvent, callbacks: AgentStreamCallbacks): void {
@@ -96,6 +101,9 @@ function handleStreamEvent(data: AiAgentStreamEvent, callbacks: AgentStreamCallb
       return
     case 'Error':
       callbacks.onError(data.message)
+      return
+    case 'Notice':
+      callbacks.onNotice?.(data.message)
       return
     case 'Compaction':
       callbacks.onCompaction?.(data.phase, data.reason, data.tokens_before)

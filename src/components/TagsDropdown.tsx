@@ -8,6 +8,7 @@ import {
   useAutoFocus,
 } from './propertyDropdownUtils'
 import { AccentColorPicker } from './AccentColorPicker'
+import { SETTINGS_MENU_Z_CLASS } from '../lib/settingsMenuLayer'
 import { getAnchoredDropdownStyle, useAnchoredDropdownPosition } from './anchoredDropdown'
 
 const PROPERTY_DROPDOWN_WIDTH = 208
@@ -250,7 +251,7 @@ export function TagsDropdown({
           <button
             type="button"
             aria-label="Close tags menu"
-            className="fixed inset-0 z-[12000] cursor-default border-0 bg-transparent p-0"
+            className={`fixed inset-0 ${SETTINGS_MENU_Z_CLASS} cursor-default border-0 bg-transparent p-0`}
             onClick={onClose}
             data-testid="tags-dropdown-backdrop"
           />

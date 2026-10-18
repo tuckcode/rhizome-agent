@@ -2,17 +2,29 @@ import { CirclesThree, MagnifyingGlass, Plus } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { APP_COMMAND_IDS, getAppCommandShortcutDisplay } from '../hooks/appCommandCatalog'
-import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
+import { type CSSProperties, type MouseEvent as ReactMouseEvent } from 'react'
 import { cn } from '@/lib/utils'
 import { useDragRegion } from '../hooks/useDragRegion'
 import { createTranslator, type AppLocale } from '../lib/i18n'
 import type { PrimeConnectionProblem } from '../hooks/usePrimeHostStatus'
+import { SHEET_OFFSET_BAND_ATTR } from '../hooks/useNotesSheetOffset'
 import { hasNativeMacosTrafficLights, overlayTitleBarBandStyle } from '../utils/trafficLights'
 import {
   primeSessionUptime,
   shortPrimeSessionId,
   tildeVaultPath,
 } from '../lib/primeSubheadLabels'
+
+// New chat / Command Palette are h-[32px]. Band padding is pb-1.5 (6px at
+// a 16px rem, 5.25px at this app's 14px root). The title band paints a 1px
+// bottom border. box-border height = 32 + 6 + 1 so the buttons still fit
+// when rem is 16px, and have slack at 14px. Both the placeholder and the
+// real strip use this class, so they match by definition.
+export const CHAT_TOP_BAR_BAND_CLASS = [
+  'app-titlebar-band box-border flex h-[39px] min-h-[39px] shrink-0 items-center gap-2.5 pb-1.5 pr-3',
+  'select-none',
+  'pl-[var(--subhead-traffic-light-inset,0.75rem)]',
+].join(' ')
 
 interface PrimeSessionSubheadProps {
   locale?: AppLocale
@@ -44,6 +56,8 @@ interface PrimeSessionSubheadProps {
    * back to "New chat" rather than showing nothing.
    */
   sessionTitle?: string | null
+  /** Prime-only Idle/live dot and session popover. Hidden on native. */
+  showSessionStatus?: boolean
   /** Frame A hides AiPanelHeader — New chat lives here instead. */
   onNewChat?: () => void
   /** Open this session's footprint in Mycelium (#22). */
@@ -107,6 +121,7 @@ export function PrimeSessionSubhead({
   startedAt,
   problem,
   sessionTitle,
+  showSessionStatus = true,
   onNewChat,
   onOpenFootprint,
   onOpenCommandPalette,
@@ -137,13 +152,11 @@ export function PrimeSessionSubhead({
 
   return (
     <div
-      className={cn(
-        'app-titlebar-band flex min-h-[30px] shrink-0 items-center gap-2.5 pb-1.5 pr-3',
-        'select-none',
-        'pl-[var(--subhead-traffic-light-inset,0.75rem)]',
-      )}
+      className={cn(CHAT_TOP_BAR_BAND_CLASS)}
       style={titleBarBand}
       data-testid="prime-session-subhead"
+      data-chat-top-bar="ready"
+      {...{ [SHEET_OFFSET_BAND_ATTR]: 'content' }}
       onMouseDown={onDragRegionMouseDown}
     >
       <span
@@ -155,6 +168,7 @@ export function PrimeSessionSubhead({
       </span>
 
       <div className="ml-auto flex shrink-0 items-center gap-1.5">
+        {showSessionStatus ? (
         <Popover>
           <PopoverTrigger asChild>
             <Button
@@ -221,6 +235,7 @@ export function PrimeSessionSubhead({
             </div>
           </PopoverContent>
         </Popover>
+        ) : null}
 
         {showCommandPalette ? (
           <Button

@@ -1,4 +1,5 @@
 use chrono::Utc;
+use indexmap::IndexMap;
 use regex::{Regex, RegexBuilder};
 use serde::de::{self, MapAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -16,6 +17,7 @@ use super::view_value_conversions::{
     yaml_value_to_string_vec,
 };
 use super::VaultEntry;
+use crate::board::SUGGESTED_STATUSES;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ViewDefinition {
@@ -35,6 +37,85 @@ pub struct ViewDefinition {
     )]
     pub list_properties_display: Vec<String>,
     pub filters: FilterGroup,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub presentation: Option<Presentation>,
+    /// Keys this struct does not know, in file order. A save writes
+    /// them back, so a newer app's settings survive an older one.
+    #[serde(flatten)]
+    pub extra: IndexMap<String, serde_yaml::Value>,
+}
+
+pub const PRESENTATION_BOARD: &str = "board";
+/// The only property a board groups by.
+pub const BOARD_GROUP_BY: &str = "Status";
+
+/// A view's `presentation` block. The raw YAML is kept and written
+/// back as read, so a malformed or unknown presentation survives a
+/// save. Read it through [`Presentation::as_board`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Presentation {
+    raw: serde_yaml::Value,
+}
+
+/// Board settings. Frozen schema:
+/// `presentation: {type: board, groupBy: Status, columns: [...]}`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoardPresentation {
+    pub columns: Vec<String>,
+}
+
+impl Presentation {
+    /// A board presentation in the frozen schema.
+    pub fn board(columns: &[&str]) -> Self {
+        let mut map = serde_yaml::Mapping::new();
+        map.insert("type".into(), PRESENTATION_BOARD.into());
+        map.insert("groupBy".into(), BOARD_GROUP_BY.into());
+        let columns = columns
+            .iter()
+            .map(|c| serde_yaml::Value::from(*c))
+            .collect();
+        map.insert("columns".into(), serde_yaml::Value::Sequence(columns));
+        Presentation {
+            raw: serde_yaml::Value::Mapping(map),
+        }
+    }
+
+    /// Board settings, read leniently. `None` means "show as a list":
+    /// `type` is not `board`, or `groupBy` is set to anything other
+    /// than `Status` or `status`. Columns are trimmed and deduped
+    /// without regard to case. Missing, not a list, or empty after
+    /// cleanup gives [`SUGGESTED_STATUSES`].
+    pub fn as_board(&self) -> Option<BoardPresentation> {
+        let kind = self.raw.get("type")?.as_str()?;
+        if !kind.trim().eq_ignore_ascii_case(PRESENTATION_BOARD) {
+            return None;
+        }
+        if let Some(group_by) = self.raw.get("groupBy") {
+            if !matches!(group_by.as_str().map(str::trim), Some("Status" | "status")) {
+                return None;
+            }
+        }
+        Some(BoardPresentation {
+            columns: board_columns(self.raw.get("columns")),
+        })
+    }
+}
+
+fn board_columns(raw: Option<&serde_yaml::Value>) -> Vec<String> {
+    let mut columns: Vec<String> = Vec::new();
+    if let Some(items) = raw.and_then(serde_yaml::Value::as_sequence) {
+        for name in items.iter().filter_map(serde_yaml::Value::as_str) {
+            let name = name.trim();
+            if !name.is_empty() && !columns.iter().any(|c| c.eq_ignore_ascii_case(name)) {
+                columns.push(name.to_string());
+            }
+        }
+    }
+    if columns.is_empty() {
+        columns = SUGGESTED_STATUSES.iter().map(|s| s.to_string()).collect();
+    }
+    columns
 }
 
 #[derive(Debug, Clone)]

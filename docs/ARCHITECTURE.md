@@ -1,6 +1,6 @@
 # Architecture
 
-> This document describes Rhizome Agent (`ai.rhizome.agent`, `tuckcode/rhizome-agent`) — a chat UI plus Rhizome's own harness (ADR-0180). Prime and Hermes are optional engines. Not Rhizome Desktop (`knispo/rhizome`). See `docs/IDENTITY.md`. "Tolaria" below is the pre-fork product name, not renamed on every line; treat it as a synonym for "the app," not evidence of the wrong product.
+> This document describes Rhizome (`ai.rhizome.agent`, `tuckcode/rhizome-agent`) — a coding harness that runs its own agent loop (ADR-0180). Rhizome's own engine is the only chat engine. Prime and Hermes are no longer chat engines ([ADR-0189](adr/0189-no-ties-to-outside-harnesses.md)); leftover code is still in the repo until the follow-up PRs. Not Rhizome Desktop (`knispo/rhizome`). See `docs/IDENTITY.md`. "Tolaria" below is the pre-fork product name, not renamed on every line; treat it as a synonym for "the app," not evidence of the wrong product.
 
 Tolaria is a personal knowledge and life management desktop app. It reads a vault of markdown files with YAML frontmatter and presents them in a four-panel UI inspired by Bear Notes.
 
@@ -377,7 +377,8 @@ Agent main-window layout.
 - **Status bar** (30px footer): two shells, chosen by the `shell_command_rail` flag. The **legacy** shell is the pipe-separated badge strip — vault switcher, build number, and the git/MCP/graph/jobs badges from `status-bar/StatusBarBadges.tsx`. The **pill** shell collapses always-on git into a **vault·git pill** (`● <vault> · <branch> · <n>△`, green when clean / orange when dirty, behind, or in conflict) whose dropdown is the existing `VaultMenu` extended with sync/commit/history/conflict entries via its `extraActions` prop. Agent idle/working (`status-bar/AgentsPill.tsx`) sits on the composer next to thinking (`ChatHome.test.tsx` wires `<AgentsPill>` into `ChatComposerDeck` activity), reading the same `useRhizomeJobs` store the command rail's agent-avatar dot uses. Check-for-updates / build number sits next to the theme toggle on the right; Contribute and Docs live in Settings → About. In pill mode the command rail holds Sessions plus a Views group (Research, Graph, Mycelium, History) and Settings in the footer; Changes sits next to All Notes in the sidebar; the status bar hides those destination buttons and keeps state (vault, branch, change count, sync, agents). The exceptional badges (offline, vault reloading, no remote, missing git, MCP) survive in both shells because they only render in abnormal states.
 - **AI workspace** (docked panel or native window): `AiWorkspace` owns the multi-chat orchestration, sidebar tabs, installed-only target picker, permission-mode picker, and dock/pop-out controls. Header/guidance chrome lives in `AiWorkspaceChrome`, edge-resize handles in `AiWorkspaceResizeHandles`, conversation metadata/settings persistence in `aiWorkspaceConversations`, and sizing/class/style helpers in `aiWorkspaceSizing`. The status-bar AI affordance opens this workspace instead of changing the default target inline. Docked workspace mode renders as a compact bounded desktop tool inside the main app; users resize the anchored panel from its left/top edges and resize the chat-list sidebar separately from the transcript area. Pop-out mode opens a dedicated undecorated transparent Tauri webview window labeled `ai-workspace` and boots the lightweight `AiWorkspaceWindowApp` route instead of the full vault shell. The chat header and sidebar header are draggable in native-window mode; closing the pop-out only closes that window, while the dock control emits a dock request back to the main window before closing the pop-out. Chat sessions reuse `AiPanelView` for transcript/composer rendering with the old panel header disabled; target and permission controls live in the composer toolbar so there is one workspace header per active chat. AI workspace cross-window localStorage, BroadcastChannel, storage-event, and subscriber-set plumbing is owned by `createCrossWindowPersistedStore`; domain stores keep only sanitization, mutation, and native persistence behavior.
 
-Panels are separated by `ResizeHandle` components that support drag-to-resize. `useLayoutPanels` clamps the sidebar, note-list, and inspector widths before applying them, keeps the side panes from flex-shrinking below their protected widths, and persists the last chosen widths in installation-local localStorage under `rhizome:layout-panels`. The chat-centered Notes panel uses the same `noteList` width (220–500px) with a 12px trailing handle that stays on the overlay in compact mode; window-width collapse (`useShellCompactLayout`) does not hide or override the drag. Mycelium's session list persists separately under `rhizome:mycelium-sessions-width` (180–420px) via `usePanelWidth`. In the Command-Rail shell, the rail starts icon-first and expands as a whole on hover, mounting `PrimeSessionList` into its open middle above a Views group (Research, Graph, Mycelium, History) and Settings. Changes sits next to All Notes in the sidebar. Ctrl+Cmd+1–4 on Mac and Ctrl+Shift+1–4 on Windows/Linux, the Go menu, and ⌘K are the second path to those views. Pin on the collapsed rail **keeps it as a rail** (no hover expand). Pin after hover keeps it open. Settings and Pin sit in a footer that does not start hover-expand, so both work while the rail is collapsed. Unpin returns to hover. Its right edge drag-resizes the remembered open width from 180–360px and pins the rail at drag start so it cannot collapse under the cursor. The classic shell retains the older resizable Chat sessions column.
+Panels are separated by `ResizeHandle` components that support drag-to-resize. `useLayoutPanels` clamps the sidebar, note-list, and inspector widths before applying them, keeps the side panes from flex-shrinking below their protected widths, and persists the last chosen widths in installation-local localStorage under `rhizome:layout-panels`. The chat-centered Notes panel uses the same `noteList` width (220–500px) with a 12px trailing handle that stays on the overlay in compact mode; window-width collapse (`useShellCompactLayout`) does not hide or override the drag. Mycelium's session list persists separately under `rhizome:mycelium-sessions-width` (180–420px) via `usePanelWidth`. The chat-centered Notes column on the right mirrors that rail: Auto (46px, hover-expands over Chat after 150ms), Rail (46px pinned), or Open (in-flow, resizable). The mode is saved per window under `rhizome:notes-panel-mode:<window>`. A view switch can open the panel for that moment without writing Open over Auto or Rail. A narrow window folds Open to Auto first and the control still reads the stored choice (`Panel: Open (window too narrow)`). Cycle with `⌘⇧.` / `Ctrl+Shift+.`. Only one side may overlay Chat.
+In the Command-Rail shell, the rail starts icon-first and expands as a whole on hover, mounting `PrimeSessionList` into its open middle above a Views group (Research, Graph, Mycelium, History) and Settings. Changes sits next to All Notes in the sidebar. Ctrl+Cmd+1–4 on Mac and Ctrl+Shift+1–4 on Windows/Linux, the Go menu, and ⌘K are the second path to those views. Pin on the collapsed rail **keeps it as a rail** (no hover expand). Pin after hover keeps it open. Settings and Pin sit in a footer that does not start hover-expand, so both work while the rail is collapsed. Unpin returns to hover. Its right edge drag-resizes the remembered open width from 180–360px and pins the rail at drag start so it cannot collapse under the cursor. The classic shell retains the older resizable Chat sessions column.
 
 The main Tauri window derives its minimum width from the visible panes instead of a single fixed floor. `useMainWindowSizeConstraints` treats the editor-only shell as the 480px baseline, adds the current sidebar / note-list / expanded-inspector widths on top with minimum floors, and calls the native `update_current_window_min_size` command whenever view mode, inspector visibility, or restored pane widths change. That same native command can grow the current window back out when a wider pane combination is restored, but Windows keeps grow-to-fit disabled and skips min-size mutation while fullscreen or maximized so navigation/sidebar interactions do not unfullscreen or reposition the main window. Note windows skip this path and keep their dedicated 800×700 initial sizing.
 
@@ -496,14 +497,15 @@ worker expires after Prime's reconnect grace. Active close asks, with
 `promote_owned_session`. The daemon may stay available; that is not the same
 as an agent still working. ADR-0180 is the identity: Rhizome owns the loop.
 `src-tauri/src/engines/` holds the Phase 5 trait and the native / Prime /
-Hermes wrappers. Settings `chat_engine` chooses Prime or the native engine.
-Absent means Prime, so Chat stays on Prime until that switch is on.
-A native-engine chat can send when Prime is not installed. A Prime-targeted
-chat still shows the install-Prime guidance until Prime is present.
-Cmd+K uses the same native-or-ready gate. Native mode does not poll Prime
-or show Prime chrome. Native no-key errors point at Settings → AI Agents
-→ API models.
-`commands/native_chat.rs` is the backend for that toggle: start / send /
+Hermes wrappers. ADR-0187: native is the only chat engine; the picker is
+gone (#218). `readChatEngine` in `src/lib/chatEngine.ts` always returns
+`native`. Settings may still load a stored `chat_engine` value for
+compatibility; nothing writes a Prime choice for new chats. New chats call
+native paths only.
+Native chat can send when Prime is not installed. Cmd+K uses the same
+native-or-ready gate. Native mode does not poll Prime or show Prime chrome.
+Native no-key errors point at Settings → AI Agents → API models.
+`commands/native_chat.rs` is the backend for native chat: start / send /
 cancel / approval_reply / end / list / open / delete, events on
 `native-chat:<session_id>`. Native `Error` events carry `fatal`: log-save
 failures and the 100 MiB rollover notice are non-fatal; missing keys,
@@ -513,16 +515,84 @@ with a 2s bound. Native transcripts use `rhizome-native:<uuid>` and never
 write under `~/.prime`. Step 2c stores one append-only JSONL log per
 session at `<app config dir>/native-sessions/<id>.jsonl` (ADR-0183): flush
 every line, 100 MiB / 1 MiB caps, owner-only file, known-credential
-scrub, reopen as cancelled with no restored grants. The id is a UUID.
+scrub, reopen as cancelled with no restored grants. The id is a UUID. Pasted and attached images are not stored in that
+JSONL. They are written beside it as `{id}.images.json` plus
+`{id}-images/` (ADR-0190), capped at 4 images and 5 MB each, PNG JPEG
+GIF or WebP. A log from before that file still opens. The next turn
+sends the saved images again. A text-only model, or a model whose
+vision support is not in the catalog, refuses the turn instead of
+dropping the image.
 An OS file lock covers a second process and dies with it. Both windows
 may display a chat; only one turn runs. Damage and a full log keep the
-original and continue in a new session. With the Settings switch on,
-new chats call `native_chat_start` and pick a catalog model or Free tier (auto).
+original and continue in a new session. New native chats call
+`native_chat_start` and pick a catalog model or Taproot.
 `rhizome_provider_model.rs` is the native loop's OpenAI-compatible `Model`.
+The loop registry (`rhizome_loop/tools`) offers `echo`, read-only file tools
+(`read_file`, `list_dir`, `grep`, `glob`), mutate file tools (`edit_file`,
+`write_file`), `create_note`, and Power User `bash`.
+Read-only tools stay inside canonical vault and workspace roots and auto-run;
+they do not open an approval card. `edit_file` and `write_file` use the same
+roots, write through a temp file then rename (Unix xattrs copied onto
+the temp file first; ADR-0186), and ask in both permission modes unless
+a session grant already covers that tool and path. `edit_file` refuses
+files over 2 MiB rather than loading them whole. The Chat approval card
+shows the path and a unified-style preview computed once with `similar`
+(250ms deadline, 40/40 cap, leftover notes). A symlink target is labelled
+`real.md via link.md`.
+Power User `bash` runs one command with the vault root as its working
+directory (`sh -c` on Unix, `cmd /S /C` on Windows). The model cannot
+choose that directory. The child environment starts empty and keeps an
+allowlist (`PATH`, `HOME`, `USER`, `LANG`, `TERM`, `TMPDIR`, plus Windows
+system variables such as `SystemRoot`, `COMSPEC`, and `PATHEXT`). `HOME`
+is passed through, so a command can still read `~/.ssh` and `~/.aws`.
+stdin is closed. A child that calls `setsid` or `nohup` leaves the
+process group. On Linux it can outlive the group. After the leader
+exits or is killed, readers poll for 750ms. They use non-blocking
+reads and a stop flag, then they are joined, so a detached child does
+not leave a thread behind. The result's stderr then contains
+`[background process still holds output; detached]`. On Unix, timeout
+and cancel send SIGTERM and wait about 2s before SIGKILL. Windows has
+no SIGTERM for a Job Object, so timeout and cancel terminate the job
+immediately. An invalid `timeout_secs` (0, negative, a float, a string
+including `"7"`, or any other non-whole-number) uses the 60s default.
+stdout and stderr each keep the first 15360 bytes and a
+rolling last 15360 bytes (30720 bytes per stream). A trimmed stream
+inserts one marker, `\n… [N lines hidden] …\n`, between those parts.
+`N` is the number of lines fully dropped from the middle. A line
+the head or the tail still shows is not counted, even when the cut
+lands in the middle of it. The
+result is JSON: `{"kind":"bash_result","exit_code":number|null,"timed_out":boolean,"stopped":boolean,"stdout":string,"stderr":string,"stdout_truncated":boolean,"stderr_truncated":boolean}`
+plus `stdout_lines_hidden` and `stderr_lines_hidden` only when that
+stream was trimmed. `stopped` is true when the user cancelled the
+command. The default timeout is 60s and the hard cap is
+300s. Every call asks; there is no session grant. The approval card
+receives the full command string, and the run is bound to the tool-call
+id plus a hash of that command, checked again before spawn. Cancel kills
+the process group. On Unix the command is its own process group
+(`process-wrap`). On Windows it is a Job Object created suspended,
+assigned, then resumed, with `KILL_ON_JOB_CLOSE`.
+The Chat card title is Run command. The body is the command, shown through
+VisibleCommand (`\u{XXXX}` badges for hidden characters), not a diff.
+`ApprovalRequested.args` is that literal command (`shown_args` at
+driver.rs:664-669) and must never be JSON-parsed. Allow once and Deny are
+offered; Allow for session is hidden. The card matches a pending call on
+`ApprovalRequested.call_id`. After the tool finishes, Chat shows one row
+per call with the command and exit status, expandable to stdout and
+stderr. There is no live streaming in this view.
+Secret-path blocking (`.env*` except `.env.example`, `.git/`, `*.pem` /
+`*.key` / `*.p12` / `*.pfx`, known private-key basenames and their
+backups) is a safety net, not a wall. It covers the native file tools
+only. `bash` is not covered. Settings → AI Agents →
+Safety has a toggle (on by default) that disables the denylist for
+**reads** only (`sandbox::resolve_for_read`); write tools always apply
+it via `sandbox::resolve_for_write`.
+Root sandboxing still applies. When the toggle is off, `.git/config` is
+readable and can hold tokens in remote URLs.
 `rhizome_routing/` wraps it with free-tier fallback over a pinned OmniRoute
 catalog (ADR-0182). Anthropic models stay refused until step 6a.
-ADR-0168 (amended) is the borrow-care rule. Prime is an optional engine
-(ADR-0163). See `docs/design/harness-doctrine.md`.
+ADR-0168 (amended) is the borrow-care rule. Prime is no longer an engine
+(ADR-0189); ADR-0163 describes its leftover transport until that code is
+removed. See `docs/design/harness-doctrine.md`.
 
 #### The two modules, and why confusing them is the classic mistake
 
@@ -585,12 +655,13 @@ Each answers "nothing", which is true of a host with no session.
   locating the binary, checking GitHub for a newer Chat-engine release
   (`check_prime_update`), applying it only after a click
   (`apply_prime_update({ expectedVersion, chatBusy })`), and seeding the
-  Rhizome vault skill.   Apply refuses a busy chat (host `is_streaming()` is the guard; the
+  Rhizome vault skill when a Prime chat starts — never on vault open.
+  Apply refuses a busy chat (host `is_streaming()` is the guard; the
   client `chatBusy` flag is only a hint), a stale offer, or a
   missing binary. It runs `prime-agent update` (one `--force` retry when
   the CLI says it is already latest), then reloads the attached session.
-  It does not create a session. User-facing copy says Chat engine, not
-  Prime as a second product.
+  It does not create a session. User-facing Prime-update copy names the
+  engine, not Prime as a second product.
   The skill bakes `find_node()`'s absolute binary plus a GUI-safe `PATH`
   (`$HOME/.local/bin`, Homebrew, `/usr/local/bin`) and short chat manners
   (answer first, CLI not IPython, stop after one environment error).
@@ -614,28 +685,22 @@ Each answers "nothing", which is true of a host with no session.
   `PrimeScheduleDialog` (`heartbeat_set` / `cron_add`, #14 create),
   `PrimeSessionList` (the Command Rail's expanded history area; classic shell
   fallback is a Chat sidebar), `primeSessionMeta.ts` (row labels),
-  `PrimeModelPicker` + `primeModels.ts` (the chat model menu — see below),
-  `PrimeThinkingToggle` (composer reasoning menu — see below)
+  `NativeChatModelPicker` + `rhizomeChatModels.ts` (the composer model chip —
+  Rhizome catalog with live provider listing on the native engine; Prime
+  chats use Prime's catalog),   `primeModels.ts` (Prime allow-list
+  and Settings catalog helpers)
 
-#### Thinking levels (composer pill)
+#### Thinking levels (Prime daemon, not composer UI)
 
-The host owns the list. `get_prime_thinking_levels` returns Prime's
-`PRIME_THINKING_LEVELS`, and `get_prime_supported_thinking_levels` returns
-that scale filtered by the attached model's own `thinkingLevelMap`; the
-frontend must not hardcode Off → Max. `PrimeThinkingToggle` opens a menu of
-the levels the model can actually run and writes the pick with
-`set_prime_thinking_level`. The filter matters: Prime clamps every pick to the
-model's own set, so a menu drawn from the full scale offers clicks that apply
-nothing and then reads as a broken control (`deepseek-v4-flash` has no
-`medium`, and picking it landed back on High). `primeThinkingLevels.ts`
-renders labels (`xhigh` → “X-High”), filters the scale by the model's answer,
-and still has a quiet/loud helper for older one-click tests — the shipped pill
-is the menu, not a binary toggle. The model picker lists the same set.
-
-Constraint: opening the menu or changing a level still calls
-`ensure_prime_session_host` when a vault path is present, because those
-commands need an attached session. Session *switch* is the path that skips
-ensure once the host is already up.
+Rhizome no longer exposes a composer control to pick Prime thinking levels
+(the old `PrimeThinkingToggle` and the `get/set_prime_thinking_*` Tauri
+commands are gone). Prime still reads each model's `thinkingLevelMap` in
+`~/.prime/agent/models.json` and clamps levels per model. **Add to Chat
+list** (`PrimeProviderStatusSection`, no longer shown in Settings since #218)
+wrote those maps when Nous Portal (or similar) catalogs were merged into
+`models.json`; `merge_nous_portal`
+replaces the whole provider entry, so dropping `thinkingLevelMap` on write
+would wipe user maps on the next click.
 
 #### New-session names
 
@@ -686,16 +751,26 @@ message and offers **at most one** of:
 Case 2 (model-backed or app-state suggestions) is **not** built. Do not
 fire both mechanisms on the same turn.
 
-#### The chat model menu (#45)
+#### The chat model menu
 
-Prime publishes its whole catalog regardless of auth state — **501 models** on
-one measured machine, a fifth of them from a provider that account had never
-signed into — and exposes no price field. Four passes narrow it, in this
-order, and the order is load-bearing:
+The composer chip is `NativeChatModelPicker`. New chats list the Rhizome
+catalog from Settings, including live `list_ai_model_provider_models` rows.
+An open legacy Prime-locked chat may still list Prime's catalog
+(`get_available_prime_models`) until that chat closes. Providers without
+a key stay out of the native list except the current pick, and the footer
+links to Settings.
+
+The rest of this section describes the Prime catalog list that Settings
+showed before #218. The helpers stay until the Prime code is removed.
+
+Prime still publishes its whole catalog regardless of auth state —
+**501 models** on one measured machine, a fifth of them from a provider that
+account had never signed into — and exposes no price field. Four passes narrow
+that Settings list, in this order, and the order is load-bearing:
 
 1. **Curation** — `partitionModelsByAllowList` against the user's shortlist in
-   `settings.prime_model_allow_list` (`"provider/id"` keys, edited from the
-   picker or Settings → AI agents). Applied to the whole
+   `settings.prime_model_allow_list` (`"provider/id"` keys; Settings no longer
+   has an editor for it since #218). Applied to the whole
    catalog *before* the query, because the partition's stale-list refusal would
    otherwise read every narrow search as a stale list and drop the curation.
 2. **Free only** — `partitionModelsByFree`, a shared live preference on the
@@ -714,23 +789,10 @@ itself: an empty allow-list means *never curated* (normalized to `None` in
 Rust), and a list matching no live model shows everything. `activeModelKey`
 keeps whatever is running listed, since the picker only ever receives a label.
 
-#### Prime packages (Pi catalog)
-
-Settings → **Packages** is the Pi catalog hub. Prime is a
-distribution of Pi, so the catalog is npm's `pi-package` keyword — the same
-index as [pi.dev/packages](https://pi.dev/packages). Installed entries come
-from `~/.prime/agent/settings.json` via `list_prime_packages`. Install runs
-`prime-agent package install` in the background (`install_prime_package`), then
-reloads the attached Prime session (`reload`). Prime's own docs warn that
-packages run with full system access; Settings confirms that once per install.
-If the CLI is missing, Settings copies the command or asks Chat to run it
-(`primePackageAskAgentPrompt`). Kind tabs (extension / skill / prompt / theme)
-add a second keyword. Search hits the public npm registry from the renderer
-(`catalogSearchUrl`). Prime's **daemon has no install command**. Install is a
-180s background process (`prime_packages.rs`). Bare names become `npm:{name}`.
-Sources that start with `-` or contain whitespace are refused. Opening Settings
-does **not** search the catalog until Packages is visited or that section
-scrolls into view.
+Legacy Settings deep links (`packages`, `settings-section-extensions`,
+`settings-section-prime-engine`) resolve to Settings → AI Agents
+(`resolveSettingsSectionId`). **Copy MCP config** is on that page
+(`ai.panel.copyMcpConfig`).
 
 The allow-list is Rhizome's view of Prime's catalog, in the same sense as
 archiving below: Prime's CLI and every other client still see all 501.
@@ -786,16 +848,20 @@ The **Rhizome catalog** is the main list from Settings through the
 composer dropdown when Chat is on the native engine, or when Prime is
 not running after a rebuild. It seeds from
 `aiModelProviderCatalog.json` plus `settings.ai_model_providers`, then
-asks `discover_ai_models` (`GET {base_url}/models`) for local and
-configured providers. That command runs the blocking HTTP off the UI
-thread. A failed discover is dropped; the seed stays.
+asks `list_ai_model_provider_models` (`GET {base_url}/models` via
+`list_provider_models`) for local providers and remote providers that
+hold a key. The renderer caches that list per provider for the session
+and drops the cache when a key, base URL, or provider changes. A failed
+call keeps the seed. Offline headings are only for providers the user
+set up, or a local host that answered. Catalog Ollama and LM Studio stay
+quiet when they were never set up. `discover_ai_models` still
+accepts an API-key override for Settings tests.
 Catalog defaults keep kind-keyed ids (`open_ai/…`, `open_router/…`).
 Configured providers key on the provider id (`work-openai/gpt-4o`) so
 two accounts of the same kind stay distinct. An old kind-keyed
-selection still resolves when it uniquely matches. Prime’s
-`models.json` is only the Prime engine’s list. Native fallback is only
-for Prime-targeted chats, and only after a real host status says Prime
-is not installed; an open chat stays on the engine it started on.
+selection still resolves when it uniquely matches. Prime’s `models.json`
+applies only while a legacy Prime-locked chat stays open. New chats use
+the Rhizome catalog from Settings (`ai_models.rs` and provider rows).
 
 Native hide/reopen live-check is still **NOT RUN**. Do not mass-kill
 Prime-spawned `mcp-server/index.js` (ADR-0163). Do not recode hide to
@@ -832,7 +898,7 @@ Large active notes are compacted into a head/tail body snapshot before they ente
 
 ### Direct Model Targets
 
-Tolaria also supports direct model targets for local servers and API providers. These targets are stored as app-level provider metadata and can be selected in Settings or the status bar alongside coding agents. `src/shared/aiModelProviderCatalog.json` is the shared source for provider defaults, local/API grouping, API-key environment placeholders, and runtime fallback base URLs; the renderer imports it through `aiTargets.ts`, and Tauri includes the same JSON in `ai_models.rs`. Direct model targets run in Chat mode: they receive the same note-context snapshot and conversation history, but they do not receive shell access. OpenAI-compatible direct targets can use Tolaria's narrow native `create_note` tool when an active vault is loaded; the tool calls the same create-only, active-vault-bounded note write command as the UI and emits tool events so the renderer refreshes and opens the created note. The backend `stream_ai_model` command supports OpenAI-compatible chat completions and Anthropic Messages-compatible calls, including Ollama, LM Studio, OpenRouter, OpenAI, Anthropic, Gemini, and custom compatible endpoints. Callers that need one plain reply with no tools — the Settings connection test (`test_ai_model_provider`) and chat titles (`complete_ai_model_text`, from `src/utils/completeAiModelText.ts`) — go through `ai_models::complete_text`. It streams OpenAI-compatible providers through `stream_chat_events_with` with no tools, and keeps the blocking Anthropic call until Anthropic streaming lands.
+Tolaria also supports direct model targets for local servers and API providers. These targets are stored as app-level provider metadata and can be selected in Settings or the status bar alongside coding agents. `src/shared/aiModelProviderCatalog.json` is the shared source for provider defaults, local/API grouping, API-key environment placeholders, and runtime fallback base URLs; the renderer imports it through `aiTargets.ts`, and Tauri includes the same JSON in `ai_models.rs`. Settings API setup also prefills popular hosted providers from `src/lib/providerPresets.ts` (id, label, base URL, key-page URL, API style, per-vendor `apiKeyEnvVar`, and a real model id). Switching between named presets always takes the new row's URL, env var, model id, and name. An edited URL is kept when entering Custom or changing API style inside Custom, including when the URL was never touched. After a save the draft rebuilds from the selected preset, not the shared catalog kind. Custom starts with a blank env var and keeps it blank when the API style changes. A pasted API key is cleared on switch. Get API key sits under the key field and opens the official key page through `openExternalUrl`, with a copyable URL if the opener fails. Anthropic stays in the preset list with an inline “Not in Rhizome chat yet” note; Rhizome chat filtering is unchanged. Storage and kinds are unchanged. Direct model targets run in Chat mode: they receive the same note-context snapshot and conversation history, but they do not receive shell access. OpenAI-compatible direct targets can use Tolaria's narrow native `create_note` tool when an active vault is loaded; the tool calls the same create-only, active-vault-bounded note write command as the UI and emits tool events so the renderer refreshes and opens the created note. The backend `stream_ai_model` command supports OpenAI-compatible chat completions and Anthropic Messages-compatible calls, including Ollama, LM Studio, OpenRouter, OpenAI, Anthropic, Gemini, and custom compatible endpoints. Callers that need one plain reply with no tools — the Settings connection test (`test_ai_model_provider`) and chat titles (`complete_ai_model_text`, from `src/utils/completeAiModelText.ts`) — go through `ai_models::complete_text`. It streams OpenAI-compatible providers through `stream_chat_events_with` with no tools, and keeps the blocking Anthropic call until Anthropic streaming lands.
 
 Provider secrets are not written to `settings.json`. Hosted API targets keep their key in the OS keychain (service `ai.rhizome.agent`, account = provider id; ADR-0185) through `provider_keys::ProviderKeys`, or reference an environment variable name. Keys still in the legacy app-data file `ai-provider-secrets.json` move into the keychain on first read (write, read back, then remove from the file; ADR-0183). That legacy file and `settings.json` (bridge token) are written through `secure_fs::write_owner_only_atomic` — Unix `0o600`, replace a symlink, do not follow it. Env-backed provider keys are resolved from the app process first, then from exported values in the user's zsh/bash startup files on Unix so GUI-launched sessions can still use shell-managed secrets. Local endpoints can omit authentication.
 
@@ -970,8 +1036,6 @@ flowchart LR
 |----------|---------|
 | `spawn_ws_bridge(vault_path)` | Spawns `ws-bridge.js` as child process with `VAULT_PATH`/`VAULT_PATHS` env |
 | `sync_mcp_bridge_vault(vault_path?)` | Starts, restarts, or stops the desktop WebSocket bridge as the selected vault changes |
-| `list_prime_packages` | Installed Prime packages from `~/.prime/agent/settings.json` |
-| `install_prime_package` | Run `prime-agent package install`, then reload the attached session |
 | `get_prime_provider_status` | Read-only connection status per provider (no keys). Settings waits until Agents is visible |
 | `sign_in_prime_provider` | OAuth sign-in in the system browser via `mcp-server/prime-login.mjs` and Prime's `AuthStorage`, then reload the session (ADR-0176) |
 | `save_prime_provider_key` | Store a pasted API key through Prime's `AuthStorage` (key on stdin), then reload the session (ADR-0176) |
@@ -1771,8 +1835,7 @@ The vault backend (`src-tauri/src/vault/`) is split into focused submodules:
 | `ai_agents.rs` | CLI-agent request normalization and adapter dispatch |
 | `cli_agent_runtime.rs` | Shared CLI-agent request, prompt, subprocess, version, and MCP path helpers |
 | `acp_client/` | Generic Agent Client Protocol stdio JSON-RPC client (ADR-0178). Not Hermes-specific. |
-| `claude_cli.rs`, `codex_cli.rs`, `opencode_cli.rs`, `pi_cli.rs`, `antigravity_cli.rs`, `hermes_cli.rs` | CLI-agent command/config/event adapters. Hermes prefers ACP (`hermes acp`) and falls back to one-shot `hermes chat`. |
-| `pi_cli.rs`, `pi_config.rs`, `pi_discovery.rs`, `pi_events.rs` | Pi subprocess launch, user-config-seeded transient MCP adapter config, discovery, and JSON stream parsing |
+| `claude_cli.rs`, `codex_cli.rs`, `opencode_cli.rs`, `antigravity_cli.rs`, `hermes_cli.rs` | CLI-agent command/config/event adapters. Hermes prefers ACP (`hermes acp`) and falls back to one-shot `hermes chat`. |
 | `mcp.rs` | MCP server spawning + explicit config registration/removal |
 | `commands/` | Tauri command handlers (split into submodules) |
 | `settings.rs` | App settings persistence |
@@ -2129,20 +2192,24 @@ sequenceDiagram
 
 **Origin:** Cursor Grok 4.6 · 2026-09-20 · #26 Chat-engine apply
 
-Rhizome Agent has two update paths. The **app** path (`app_updater.rs`,
-`useUpdater`, `UpdateBanner`) is still a stub: `check_for_app_update`
-returns none, and `download_and_install_app_update` errors, because there
-is no signed Rhizome feed yet (`tauri.conf.json` `endpoints` is empty).
-The **Chat-engine** path (`prime_update.rs`, `usePrimeUpdate`) checks
-GitHub, then `apply_prime_update` runs the resolved `prime-agent update`
-only after Update now. The host refuses when `is_streaming()` is true.
-The client `chatBusy` flag is only a hint. It does not start a new session.
-
-The app-update chrome is still wired for a future signed feed:
+Rhizome has two update paths. The **app** path (`app_updater.rs`,
+`useUpdater`, `UpdateBanner`) checks the moving GitHub release tag for
+the selected channel (`alpha-latest` or `stable-latest`), then downloads
+and installs through the Tauri updater plugin. Restart stays on the
+existing Restart control. Production `tauri.conf.json` carries the
+minisign public key; the test fixture still uses
+`PLACEHOLDER_KNISPO_TAURI_UPDATER_PUBKEY` so unit tests refuse before
+any feed request. Generate signing material outside the repo with
+`pnpm tauri signer generate -w ~/.tauri/rhizome-updater.key`. The
+**Chat-engine** path
+(`prime_update.rs`, `usePrimeUpdate`) checks GitHub, then
+`apply_prime_update` runs the resolved `prime-agent update` only after
+Update now. The host refuses when `is_streaming()` is true. The client
+`chatBusy` flag is only a hint. It does not start a new session.
 
 - `useUpdater(releaseChannel, automaticChecksEnabled)` waits 3 seconds after launch when automatic checks are enabled, then calls the Rust commands
 - `automatic_update_checks_enabled` is an installation-local Settings flag that defaults to enabled; disabling it skips only the startup probe, not a manual status-bar check
-- `download_and_install_app_update` would stream progress into `UpdateBanner` once a feed exists. Today it returns the stub error.
+- `download_and_install_app_update` streams progress into `UpdateBanner` and installs through the updater plugin
 
 ### Feature Flags (PostHog + Release Channels)
 

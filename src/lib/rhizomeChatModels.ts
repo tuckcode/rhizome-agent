@@ -8,7 +8,7 @@ import {
 import { callHost } from './callHost'
 
 const FREE_TIER_AUTO_TARGET = 'free_tier_auto'
-const FREE_TIER_AUTO_LABEL = 'Free tier (auto)'
+const FREE_TIER_AUTO_LABEL = 'Taproot'
 
 export const REMOVED_PROVIDER_LABEL = 'Provider removed'
 export const REMOVED_PROVIDER_ERROR =
@@ -61,6 +61,7 @@ export interface RhizomeChatModel {
   providerKind: string
   providerName: string
   modelId: string
+  displayName: string
   label: string
 }
 
@@ -129,6 +130,7 @@ export function includeRemovedProviderModel(
       providerKind: parts.provider,
       providerName: REMOVED_PROVIDER_LABEL,
       modelId: parts.modelId,
+      displayName: parts.modelId,
       label: REMOVED_PROVIDER_LABEL,
     },
     ...models,
@@ -160,19 +162,22 @@ export function seedRhizomeChatModels(
       providerKind: entry.kind,
       providerName: entry.name,
       modelId: entry.default_model_id,
+      displayName: entry.default_model_id,
       label: `${entry.name} · ${entry.default_model_id}`,
     })
   }
   for (const provider of normalizeAiModelProviders(providers)) {
     const key = providerKey(provider)
     for (const model of provider.models) {
+      const displayName = model.display_name || model.id
       addModel(into, {
         id: `${key}/${model.id}`,
         providerId: key,
         providerKind: provider.kind,
         providerName: provider.name,
         modelId: model.id,
-        label: `${provider.name} · ${model.display_name || model.id}`,
+        displayName,
+        label: `${provider.name} · ${displayName}`,
       })
     }
   }
@@ -183,6 +188,7 @@ export function seedRhizomeChatModels(
     providerKind: 'free_tier',
     providerName: 'Free tier',
     modelId: FREE_TIER_AUTO_TARGET,
+    displayName: FREE_TIER_AUTO_LABEL,
     label: FREE_TIER_AUTO_LABEL,
   })
   return listed
@@ -214,6 +220,7 @@ export function filterRhizomeChatModels(
   return models.filter((model) => {
     return (
       model.label.toLowerCase().includes(needle) ||
+      model.displayName.toLowerCase().includes(needle) ||
       model.modelId.toLowerCase().includes(needle) ||
       model.providerName.toLowerCase().includes(needle)
     )
@@ -233,6 +240,16 @@ export function isWellFormedRhizomeTarget(
 
 function catalogEntry(kind: string): CatalogEntry | undefined {
   return CATALOG.find((entry) => entry.kind === kind)
+}
+
+/** Remote catalog kinds with no configured provider still need a Settings key. */
+export function rhizomeProviderNeedsApiKey(
+  providerKind: string,
+  providers?: AiModelProvider[] | null,
+): boolean {
+  const entry = catalogEntry(providerKind)
+  if (!entry || entry.local || entry.api_key_storage === 'none') return false
+  return !normalizeAiModelProviders(providers).some((provider) => provider.kind === providerKind)
 }
 
 export function providerForDiscover(
@@ -299,6 +316,7 @@ export async function discoverRhizomeChatModels(
             providerKind: provider.kind,
             providerName: provider.name,
             modelId: id,
+            displayName: id,
             label: `${provider.name} · ${id}`,
           })
         }
@@ -324,7 +342,51 @@ export async function loadRhizomeChatModels(
     providerKind: 'free_tier',
     providerName: 'Free tier',
     modelId: FREE_TIER_AUTO_TARGET,
+    displayName: FREE_TIER_AUTO_LABEL,
     label: FREE_TIER_AUTO_LABEL,
   })
   return listed
+}
+
+/** Display name when the catalog has one, otherwise the model id. */
+export function rhizomeModelVisibleName(model: RhizomeChatModel): string {
+  if (model.label === REMOVED_PROVIDER_LABEL) return REMOVED_PROVIDER_LABEL
+  return model.displayName.trim() || model.modelId
+}
+
+/** Prefix the provider when two listed rows share a display name. */
+export function rhizomeModelRowLabel(
+  model: RhizomeChatModel,
+  peers: RhizomeChatModel[],
+): string {
+  const name = rhizomeModelVisibleName(model)
+  if (model.label === REMOVED_PROVIDER_LABEL) return name
+  const collided = peers.some(
+    (other) => other.id !== model.id && rhizomeModelVisibleName(other) === name,
+  )
+  return collided ? `${model.providerName} · ${name}` : name
+}
+
+/** Providers with no key stay out of the picker list, except the current pick. */
+export function excludeKeylessRhizomeModels(
+  models: RhizomeChatModel[],
+  providers?: AiModelProvider[] | null,
+  selectedId?: string | null,
+): RhizomeChatModel[] {
+  const selected = resolveRhizomeChatModel(models, selectedId)
+  return models.filter((model) => {
+    if (selected && model.id === selected.id) return true
+    return !rhizomeProviderNeedsApiKey(model.providerKind, providers)
+  })
+}
+
+export function countKeylessRhizomeProviders(
+  models: RhizomeChatModel[],
+  providers?: AiModelProvider[] | null,
+): number {
+  return new Set(
+    models
+      .filter((model) => rhizomeProviderNeedsApiKey(model.providerKind, providers))
+      .map((model) => model.providerName),
+  ).size
 }
