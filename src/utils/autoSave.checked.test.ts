@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushEditorContent } from './autoSave'
 import { clearSaveBaselines, getSaveBaseline, setSaveBaseline } from '../hooks/noteContentCache'
-import { clearStashedConflict, stashSaveConflict, subscribeSaveConflicts, type SaveConflict } from '../hooks/useSaveNote'
+import { clearStashedConflict, emitSaveConflict, stashSaveConflict, subscribeSaveConflicts, type SaveConflict } from '../hooks/useSaveNote'
 
 const invokeFn = vi.fn<(cmd: string, args?: Record<string, unknown>) => Promise<unknown>>()
 vi.mock('@tauri-apps/api/core', () => ({ invoke: (c: string, a?: Record<string, unknown>) => invokeFn(c, a) }))
@@ -84,6 +84,31 @@ describe('flushEditorContent fallback', () => {
     const checks = invokeFn.mock.calls.filter(([cmd]) => cmd === 'save_note_content_checked')
     expect(checks).toHaveLength(1)
     expect(onSaved).toHaveBeenCalledWith(PATH, 'typed\n')
+  })
+
+  it('a conflict on another note does not drop this note unsaved', async () => {
+    const plan = '/vault/plan.md'
+    setSaveBaseline(plan, 'opened\n')
+    clearStashedConflict(plan)
+    invokeFn.mockResolvedValue({ contentHash: 'x', splicedContent: null })
+    const onSaved = vi.fn()
+    await flushEditorContent(plan, {
+      savePendingForPath: async () => {
+        emitSaveConflict({ path: '/vault/other.md', content: 'other\n', copyPath: '/vault/other (conflict).md' })
+        return false
+      },
+      getTabContent: () => 'typed\n',
+      isUnsaved: () => true,
+      onSaved,
+    })
+    expect(invokeFn).toHaveBeenCalledWith('save_note_content_checked', {
+      path: plan,
+      content: 'typed\n',
+      expectedContent: 'opened\n',
+    })
+    expect(onSaved).toHaveBeenCalledWith(plan, 'typed\n')
+    expect(invokeFn).not.toHaveBeenCalledWith('create_note_content', expect.anything())
+    expect(getSaveBaseline(plan)).toBe('typed\n')
   })
 
   it('a failed conflict copy still blocks the flush', async () => {

@@ -1,5 +1,6 @@
 import { setSaveBaseline } from '../hooks/noteContentCache'
 import { persistContentChecked, stashSaveConflict, subscribeSaveConflicts } from '../hooks/useSaveNote'
+import { notePathsMatch } from '../utils/notePathIdentity'
 
 export interface FlushDeps {
   savePendingForPath: (path: string) => Promise<boolean>
@@ -17,7 +18,9 @@ export interface FlushDeps {
  */
 export async function flushEditorContent(path: string, deps: FlushDeps): Promise<void> {
   let conflicted = false
-  const unsubscribe = subscribeSaveConflicts(() => { conflicted = true })
+  const unsubscribe = subscribeSaveConflicts((conflict) => {
+    if (notePathsMatch(conflict.path, path)) conflicted = true
+  })
   try {
     const flushed = await deps.savePendingForPath(path)
     if (flushed) return

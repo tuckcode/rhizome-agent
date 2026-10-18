@@ -1005,7 +1005,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
       },
       secondary: { label: 'Reload', onClick: settle },
     })
-  }), [clearVaultUnsaved, handleReplaceActiveTab, holdPendingSave, notes, setToastMessage])
+  }), [clearVaultUnsaved, handleReplaceActiveTab, holdPendingSave, notes.activeTabPathRef, setToastMessage])
 
   const handleChangeWorkspace = useCallback(async (entry: VaultEntry, workspace: WorkspaceIdentity) => {
     const sourceVaultPath = vaultPathForEntry(entry, resolvedPath)
