@@ -133,6 +133,7 @@ DARK_SKIN_DUMP = (
     ('Gruvbox dark', {'class': 'dark', 'data-theme': 'dark', 'data-color-theme': 'gruvbox-dark'}),
     ('Solarized dark', {'class': 'dark', 'data-theme': 'dark', 'data-color-theme': 'solarized-dark'}),
     ('Catppuccin mocha', {'class': 'dark', 'data-theme': 'dark', 'data-color-theme': 'catppuccin-mocha'}),
+    ("Ozz's Blizzard", {'class': 'dark', 'data-theme': 'dark', 'data-color-theme': 'ozzs-blizzard'}),
     ('Tokyo night', {'class': 'dark', 'data-theme': 'dark', 'data-color-theme': 'tokyo-night'}),
     ('One dark', {'class': 'dark', 'data-theme': 'dark', 'data-color-theme': 'one-dark'}),
     ('Rosé pine', {'class': 'dark', 'data-theme': 'dark', 'data-color-theme': 'rose-pine'}),

@@ -201,6 +201,7 @@ export const COLOR_THEMES: readonly ColorThemeDefinition[] = [
   { slug: 'loam', name: 'Loam', polarity: 'dark', swatch: ['#15110C', '#1D1811', '#6FE3A0'] },
   { slug: 'mycelium', name: 'Mycelium', polarity: 'dark', swatch: ['#10150E', '#0E120C', '#6FE3A0'] },
   { slug: 'dracula', name: 'Dracula', polarity: 'dark', swatch: ['#21222C', '#282A36', '#BD93F9'] },
+  { slug: 'ozzs-blizzard', name: "Ozz's Blizzard", polarity: 'dark', swatch: ['#0F1626', '#0A0F1A', '#4CC9F0'] },
   { slug: 'nord', name: 'Nord', polarity: 'dark', swatch: ['#3B4252', '#2E3440', '#88C0D0'] },
   { slug: 'gruvbox-dark', name: 'Gruvbox dark', polarity: 'dark', swatch: ['#32302F', '#282828', '#FE8019'] },
   { slug: 'gruvbox-light', name: 'Gruvbox light', polarity: 'light', swatch: ['#F2E5BC', '#FBF1C7', '#D65D0E'] },

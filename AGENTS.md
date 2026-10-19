@@ -39,26 +39,8 @@
   Uncommitted files are not "someone else's mess" — they are the last session's unfinished commit. Unpushed commits are not "already done" — another clone will not see them. If either is present, finish that first (commit, push, or surface it in your handoff) before starting new work. Demo-vault dirt is the exception already covered below; everything else counts.
 
   **Why:** this has now bitten three times in about a day. GPT-5.6 Luna's handoff sat uncommitted across a session boundary and was recovered only because a later session happened to run `git status` before wrapping up. The option-2 harness-composition slice plus Grok's C47 work then sat local-only while origin was still at the doctrine commit. The third was the C47 follow-up that skipped Tauri `listen` outside the native app — it was sitting uncommitted in the working tree, and without it `git push` failed the frontend coverage lane and a Playwright smoke on `transformCallback`. This file already warns agents about *creating* unpushed work and checks `git status` only for demo-vault dirt. Nothing told a fresh agent to look for work stranded by a previous session.
-- **Prime adapter work: check the snapshot, do not ingest Prime.** `docs/prime-adapter-surface.json` is the last mechanical read of `DAEMON_COMMAND_TYPES` vs the `"type"` strings we send. Before changing the host:
+- **Prime adapter work: check the snapshot, do not ingest Prime.** Run `pnpm prime:surface` (and `pnpm prime:surface:github`) before changing the host. Do **not** clone `PrimeIntellect-ai/prime-agent`. The snapshot lists command names only. For behaviour, read Prime's installed docs at `~/.local/lib/node_modules/prime-agent/docs/`. Order of trust: **live daemon > Prime's docs > this repo's notes.** Full rule and the incidents behind it: [`docs/agents/prime-adapter.md`](docs/agents/prime-adapter.md).
 
-  ```bash
-  pnpm prime:surface            # installed package vs snapshot
-  pnpm prime:surface:github     # GitHub latest release tag vs snapshot
-  ```
-
-  If it drifts, `--update` after you have understood the diff. Do **not** clone `PrimeIntellect-ai/prime-agent`. User-facing "a newer Prime is out" is already `check_prime_update` / `usePrimeUpdate`; this is the adapter check.
-
-  **The snapshot answers "does this command exist". It never answers "what does this command do".** It is a list of names, and a name is not a meaning. When you need the behaviour, read Prime's own docs — they are installed at `~/.local/lib/node_modules/prime-agent/docs/` (`usage.md`, `models.md`, `rpc.md`, `rlm.md`, `daemon.md`, and ~30 more). Reading one file is not dumping the package; it is the difference between knowing and guessing.
-
-  **Why this is in the rule and not left to judgement.** On 2026-08-29 an agent needed to know what `set_scoped_models` does. The snapshot gave the name; this rule read as "do not look further"; so the meaning was taken from a *repo design note* that called it "a routing halfway house". Prime's own `usage.md` says `/scoped-models` means **"Enable/disable models for Ctrl+P cycling"** — a filter on the model picker, not routing at all. That single wrong assumption was then used to argue against adopting an external router, in a decision document, in front of the owner. One `grep` would have caught it.
-
-  **And Prime's docs are not the last word either.** A 2026-08-16 session found
-  Prime's *documented* behaviour diverging from its *actual* behaviour four
-  separate times in one day, and probing the live daemon caught it every time.
-  So the order of trust is: **live daemon > Prime's docs > this repo's notes.**
-  Read `usage.md` before believing a repo note; probe the daemon before
-  shipping anything that depends on the answer. `pnpm test:live-prime` and a
-  one-off `prime-agent` call are both cheap.
 
   The general failure is worth naming: **a document written by a previous agent in this repo is not a primary source.** `HANDOFF.md`, `NEXT.md`, the design notes and the ADRs are all agent-authored, confident in tone, and cited by later agents as if they were verified. Three separate errors on 2026-08-29 had exactly this shape. When a claim about *external* behaviour matters — Prime's, macOS's, a library's — go to that thing's own documentation or run it, and cite what you actually read.
 
@@ -87,46 +69,7 @@
   `prototype/*` branches skip the gates, and only when every pushed ref is a prototype ref. They never merge. The ref check is `.husky/push-refs.sh`, tested by `src/lib/prePushRefs.test.ts`.
 - **Everything committed is published.** Write `~/…`, `<repo>/…` or `%LOCALAPPDATA%\…`, never your home path; use made-up names (`mock`, `test`) in fixtures; no personal email addresses. Keep screenshots, traces and probe output out of the tree (`docs/design/*-ui-audit/` is ignored). `scripts/check-personal-info.mjs` blocks this machine's username in added lines at pre-commit; set `PERSONAL_INFO_NAMES` for other names. A line that must keep a real value carries `personal-info: allow`.
   **⛔ Never add `knispo/rhizome` as a remote in this repo.** That is Rhizome Desktop — a different product with a different bundle id and its own history. See the STOP block at the top of this file and `docs/IDENTITY.md`. (This line said `knispo/rhizome` until 2026-08-09; it was inherited verbatim from the Desktop rules during the fork and directly contradicted both.)
-- **The pre-push hook now sets `LLVM_COV` / `LLVM_PROFDATA` itself** on macOS
-  (`ensure_llvm_coverage_tooling`), so exporting them by hand is no longer
-  required. It only fills them in when they are unset, so an explicit export
-  still wins.
-
-  This used to be a manual ritual before every push:
-  ```
-  export LLVM_COV="$(brew --prefix llvm)/bin/llvm-cov"
-  export LLVM_PROFDATA="$(brew --prefix llvm)/bin/llvm-profdata"
-  ```
-  Forgetting it failed the Rust lane *after* every other gate had passed,
-  costing a full re-run — which is what prompted moving it into the hook on
-  2026-08-22. Agents in particular could not win here: shell state does not
-  persist between tool calls, so the export had to be repeated in the same
-  command as every single push.
-  See `docs/CROSS-MODEL-HANDOFF.md` §13 for the full sequence and `cargo llvm-cov` flags.
-
-  **Corrected 2026-08-28:** the hook checked `brew --prefix llvm`, which
-  answers with a path whether or not the formula is installed. On a machine
-  where Homebrew's llvm had been removed the check passed and the push then
-  failed inside cargo with `could not execute process … No such file or
-  directory` — an error naming llvm-profdata and not the reason. The hook now
-  verifies the binaries exist and falls back to Xcode Command Line Tools
-  (`/Library/Developer/CommandLineTools/usr/bin`), which every macOS machine
-  that can build this project already has. Rust here is Homebrew's rather than
-  rustup's, so `llvm-tools-preview` is not available as a fallback on macOS.
-
-  **On Windows** those two exports are wrong — there is no `brew`. Install the
-  toolchain through rustup instead, once per machine:
-  ```
-  rustup component add llvm-tools-preview
-  ```
-  `cargo llvm-cov` finds them itself after that, and no environment variables
-  are needed. The hook has no platform branch, so this is the first thing a
-  Windows push trips on.
-
-  **On Windows, Prime speaks a named pipe** (`\\.\pipe\prime-agent-daemon`). Setup
-  and troubleshooting: **`docs/WINDOWS-DEV.md`**. Chat/sessions/goals need a
-  live `prime-agent` daemon on that machine. Everything else works, and
-  `pnpm dev` against `mock-tauri` drives the session list without a daemon.
+- **The pre-push hook sets `LLVM_COV` / `LLVM_PROFDATA` itself** on macOS. On Windows, run `rustup component add llvm-tools-preview` once per machine. On Windows, Prime uses a named pipe: see **`docs/WINDOWS-DEV.md`**. History and fallbacks: [`docs/agents/push-tooling.md`](docs/agents/push-tooling.md).
 - **Stage your own files by name. Never `git add -A`, `git add .`, or `git add <dir>`** when anything else might be running — another agent, another session, a watch task. Use `git add path/to/one.ts path/to/two.ts`.
 
   **Why:** on 2026-08-29 three agents worked in one tree. One ran a broad `git add`, and its commit swallowed 591 lines of another agent's in-progress Rust plus three frontend files from a third task — all under a message about none of them. Nothing was lost, but the history now says one agent wrote work it never touched, and a second agent's changes were committed mid-edit, before it considered them finished. The commit that swept them up was then no longer the newest, so the instruction its author had been given — "amend your commit" — would have rewritten a *different* agent's commit instead.
@@ -291,43 +234,7 @@ No CodeScene gate — dropped 2026-07-09 because every layer we could use (cloud
 
 ### Security scan with Codacy (mandatory)
 
-Use Codacy as a security and static-analysis gate before a task is considered releasable.
-
-- **Run the local CLI. It needs no Codacy account and no payment** (corrected
-  2026-08-23 — see below):
-  ```bash
-  codacy-cli analyze --tool trivy                 # vulnerable deps, whole repo
-  codacy-cli analyze --tool opengrep <path>        # security patterns
-  codacy-cli analyze --tool lizard <path>          # complexity
-  codacy-cli analyze --tool trivy --format sarif -o trivy.sarif
-  ```
-  Per machine, once: `brew install codacy/codacy-cli-v2/codacy-cli-v2` then
-  `codacy-cli init` (local mode) and `codacy-cli install`. `.codacy/` is
-  gitignored, so every machine and every fresh clone repeats those three
-  commands; `.codacy.yaml` at the repo root (tracked) holds the shared
-  exclude list.
-- **`codacy-cli init` defaults to every language it can find** — Dart, Go,
-  Java, and Python runtimes for a TypeScript-and-Rust repo. Trim
-  `.codacy/codacy.yaml` to `lizard`, `opengrep`, `trivy` (runtime:
-  `python`). Codacy's `eslint` is deliberately excluded: it pins eslint 8,
-  ignores plugin rules, and this repo's own `pnpm lint` (eslint 9, flat
-  config, typescript-eslint) is strictly stronger. Rust is not covered by
-  any Codacy tool — `cargo clippy` is that lane.
-- **The MCP server is the part that costs money, and it is optional.**
-  `@codacy/codacy-mcp` refuses to start without `CODACY_ACCOUNT_TOKEN`, and
-  an account covering a **private** repo (`tuckcode/rhizome-agent`) is paid.
-  Its `codacy_cli_analyze` tool just shells out to the same CLI, so the gate
-  loses nothing by running the CLI directly. What the token would add is the
-  hosted dashboard and trend history — not analysis capability.
-- **This gate reported itself unrunnable for months, and that was wrong.** The
-  rule used to say the paid-tier blocker applied to the whole gate and told
-  agents to write "Codacy: not run" in the completion comment, so every
-  session dutifully skipped it. The CLI's own README says it runs "for local
-  code analysis without a Codacy account." The first real run (2026-08-23)
-  found 95 advisories across the three lockfiles, two of which directly
-  contradicted a prior security review's reasoning — C45. A gate nobody can
-  run is indistinguishable from a gate that finds nothing, which is exactly
-  how it read until someone checked the claim instead of repeating it.
+- **Run the local CLI** (`codacy-cli analyze --tool trivy|opengrep|lizard`). It needs no Codacy account. Setup, tool choice, and why this gate was once wrongly skipped: [`docs/agents/codacy.md`](docs/agents/codacy.md).
 - **Always fix Critical and High severity findings introduced by your change** before considering the change releasable.
 - Review Medium findings. Fix them when they are real defects or security-sensitive; otherwise explain why they are acceptable in the completion comment.
 - Never silence a Codacy rule just to pass the scan. Prefer small code changes that remove the finding.
@@ -391,30 +298,8 @@ Coverage is a release gate, not a vanity metric:
 
 ### UI and native QA
 
-**Phase 1 — Playwright (only for core user flows):**
+Playwright smoke tests (`tests/smoke/<slug>.spec.ts`) are only for core flows: vault open, note create/save/delete, search, wikilink navigation, git commit/push, conflict resolution. Tag `@smoke` only for core pre-push workflows. Native QA: test the mouse path first, then keyboard. Record ✅ or ❌ in the commit message or completion comment. `mock-tauri.ts` is not a substitute for native testing. Commands and tooling: [`docs/agents/qa.md`](docs/agents/qa.md).
 
-Write Playwright test in `tests/smoke/<slug>.spec.ts` only if feature touches: vault open, note create/save/delete, search, wikilink navigation, git commit/push, conflict resolution. Tag a test with `@smoke` only if it protects a core pre-push workflow. Do NOT tag cosmetic or mock-heavy checks — keep those in the full regression lane. Prefer `.chunk/run-playwright-smoke.sh` on a Chunk sidecar for the curated smoke lane because local Playwright is expensive; keep `pnpm playwright:smoke` available for focused local reproduction. The curated smoke suite must stay under **5 minutes** when sharded on sidecars; use `pnpm playwright:regression` for the full Playwright pass.
-
-```bash
-pnpm dev --port 5201 &
-sleep 3
-BASE_URL="http://localhost:5201" npx playwright test tests/smoke/<slug>.spec.ts
-```
-
-### Phase 2 — Native app QA:
-
-Native QA requires either Accessibility permission for osascript or a real `.app` bundle built with `pnpm tauri build`. See §3 "QA scripts" for the local-script gotcha. Use `computer-use` for native UI interaction (click, hover, drag, scroll, type) and Playwright for deterministic text-input coverage.
-
-```bash
-pnpm tauri dev &
-sleep 10
-# Use computer-use to interact with the native app window
-# Focus: click the tray mark → type in the search field → verify results
-```
-
-Use computer-use/browser-control style interaction for native UI QA when available: click, hover, drag, select, scroll, and type the way a real user would with the mouse and trackpad. For every UI feature, test the primary mouse-driven path first, then verify any relevant keyboard shortcut or keyboard-first workflow still works. Rhizome is still a keyboard-first app, but QA must not assume users only interact by keyboard.
-
-Use `osascript` for app focus, keyboard shortcuts, and keyboard-specific checks. **⚠️ WKWebView:** `osascript keystroke` can be blocked inside editor content — use computer use for native editor interaction when possible, and rely on Playwright for deterministic text-input coverage. Record the result (✅ or ❌) in the commit message or completion comment.
 
 ### Release-readiness checklist
 
@@ -523,7 +408,7 @@ Before UI work, read `docs/design/ui-rules.md`, then `docs/design/components.md`
 
 ### QA scripts
 
-Use `computer-use` for native app focus, keyboard shortcuts, and screenshot capture. For keyboard-first checks: use Playwright for text input and deterministic assertions; use `osascript` only for app-focus and menu-shortcut verification (note: WKWebView blocks `osascript keystroke` inside editor content).
+See [`docs/agents/qa.md`](docs/agents/qa.md#qa-scripts).
 
 ### Diagrams
 
