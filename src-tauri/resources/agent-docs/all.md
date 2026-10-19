@@ -283,7 +283,7 @@ Chat runs on Rhizome's own engine (ADR-0187). Prime and Hermes are no longer cha
 
 ## Terms on this page
 
-- **Agent loop:** the cycle that sends your message to a model, runs the tools the model asks for, and repeats until the answer is done.
+- **Agent loop:** the cycle that sends your message to a model, runs the tools the model asks for, and repeats until the answer is done or the step limit pauses the turn.
 - **Engine:** what runs that loop for Chat.
 - **Model:** the language model the engine talks to, hosted or running locally.
 - **Tool:** an action the agent can take, such as reading a note or running a command.
@@ -298,6 +298,8 @@ New chats use **Rhizome's engine**: the loop built into the app. It does not nee
 - **Tools:** see the table below. Read and search tools run without asking. Edits and shell commands ask first.
 - **Saved chats:** each chat is saved as it goes and can be reopened after you quit. Chats get a title automatically from the first exchange.
 - **Errors:** a problem that doesn't stop the turn shows as a notice in the chat. A problem that does stop it, such as a missing key, ends the turn with a message that says what to fix.
+- **Step limit:** an ordinary turn stops after **Agent max steps** model rounds (50 unless you change it). That pause is **Continue**, not a failed turn. Each Continue adds 50 rounds. The next message you type uses the setting again. See [Chat with the agent](../guides/use-ai-panel.md#when-a-turn-reaches-its-step-limit).
+- **Images:** PNG, JPEG, GIF, or WebP, up to 4 per message and 5 MB each. A text-only model refuses the turn. The words are not sent with the image removed. See [Chat with the agent](../guides/use-ai-panel.md#attach-an-image).
 
 | Tool | What it does | When it runs |
 |---|---|---|
@@ -1267,6 +1269,12 @@ Click **Test model** on the provider. It sends one short request with no tools. 
 
 Choose a model, or **Taproot**, in the picker. The choice is saved with your settings.
 
+## Limit how long one turn runs
+
+**Agent max steps**, on the same Settings → AI Agents screen, is the number of model rounds in one ordinary turn. The default is 50. The minimum is 1. The field has no upper limit.
+
+**Continue** on a paused reply always adds 50 rounds. It does not add the number in this field. See [Chat with the agent](use-ai-panel.md#when-a-turn-reaches-its-step-limit).
+
 ## If it doesn't connect
 
 See [Model provider connection](../troubleshooting/model-provider-connection.md).
@@ -1486,6 +1494,8 @@ For chats on Rhizome's engine:
 - **One turn at a time.** Two windows can show the same chat, but only one turn can run.
 - **A damaged log** opens up to the last good line, with a warning that some history is missing. The original file is kept, and you continue in a new chat that starts from the good part.
 - **A very long chat** (100 MiB of log) continues in a new chat. History isn't dropped.
+- **A turn that reached the step limit** reopens with **Continue** still on that message. See [Chat with the agent](use-ai-panel.md#when-a-turn-reaches-its-step-limit).
+- **Images** are stored beside the log, as `<id>.images.json` and a folder `<id>-images/`. They are not inside the JSONL file. A chat saved before that file existed still opens.
 
 ## Fork and archive
 
@@ -1607,6 +1617,37 @@ The message box stays open, so you can write your next message while the agent w
 Enter does nothing until the reply finishes. Your text stays in the box; send it when the turn ends.
 
 Press Stop to end the run. With VoiceOver, Rhizome announces when a run starts, when a tool starts or fails, and when the reply is complete or stopped.
+
+## When a turn reaches its step limit
+
+One turn is a series of model rounds. A round is one reply from the model, including the tool calls that follow it.
+
+Settings → AI Agents → **Agent max steps** is how many rounds an ordinary turn may use. The default is 50. The smallest value is 1. The field has no maximum.
+
+When the limit is reached, the reply pauses. It is not a failure, and it is not a finished answer. The message shows **Continue (steps/max)**. VoiceOver says "Paused at step limit. Continue available."
+
+Continue sends that same request again on the same chat. Earlier text and tool results stay. Each Continue gets 50 new rounds. That 50 does not follow the setting: a limit of 10 still continues in blocks of 50, and a limit of 200 still continues in blocks of 50. The next message you type uses the setting again.
+
+Continue is on the latest turn, and only while Chat is idle. If it cannot start, the chat shows `Continue couldn't start:` and the reason. The paused turn can be tried again. Reopening the chat keeps Continue on that turn.
+
+## Attach an image
+
+Paste, drop, or use the plus menu. Rhizome accepts PNG, JPEG, GIF, and WebP. A message can carry 4 images. Each file must be 5 MB or smaller.
+
+A file that fails says `<name> wasn't attached.` and the reason:
+
+| You see | What it means |
+|---|---|
+| `Images must be 5 MB or smaller.` | That file is over the per-image cap |
+| `Use a PNG, JPEG, GIF or WebP image.` | The type is not one of those four |
+| `Only the first 4 images were attached.` | Extra images were left off this message |
+| `<model> can't read images. Remove the image or switch to a model that can.` | The catalog says this model is text-only. Send stays off. The text is not sent without the image |
+| `Rhizome doesn't know if <model> can read images.` | This model has no catalog row. **Send anyway** remembers it on this machine until you click **Undo** |
+| `Checking image support…` | The catalog lookup is still running. Send waits |
+| `This message's images are … MB encoded together. The limit is 12 MB.` | This message is too large together, even when each file is under 5 MB |
+| `Every model that can read images is cooling down. Try again shortly.` | Taproot will not fall through to a text-only model |
+
+Images are saved next to the chat log, not inside it. A later request includes images from the last two turns. Older images stay on disk. In that later request they are marked `[image from earlier turn omitted]`.
 
 ## Ask from the editor or about a note
 
@@ -2523,6 +2564,10 @@ New chats use Rhizome's own engine (ADR-0187).
 | A notice appears, but the reply goes on | Something went wrong that didn't stop the turn, such as part of the chat not being saved. Read the notice; the chat still works |
 | The model can't be reached | Click **Test model** on the provider. See [Model provider connection](model-provider-connection.md) |
 | Enter does nothing while a reply runs | Rhizome's engine takes one turn at a time. Wait for the reply, or press Stop |
+| **Continue (12/50)** (your numbers may differ) | The step limit paused the turn. It is not a failure. Click Continue for 50 more rounds. **Agent max steps** changes the next message you type, not the size of Continue. See [Chat with the agent](../guides/use-ai-panel.md#when-a-turn-reaches-its-step-limit) |
+| `Continue couldn't start:` | Read the reason on that line. The paused turn is still there and can be tried again |
+| `<model> can't read images` | Remove the image, or pick a model that can read images. The message is not sent as text only |
+| `Every model that can read images is cooling down. Try again shortly.` | Wait, then send again. Taproot does not switch to a text-only model to get an answer |
 | Another window is already running this chat | Only one turn can run at a time. Wait, or continue in that window |
 
 ## Prime Agent

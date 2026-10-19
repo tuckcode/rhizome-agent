@@ -43,6 +43,12 @@ Click **Test model** on the provider. It sends one short request with no tools. 
 
 Choose a model, or **Taproot**, in the picker. The choice is saved with your settings.
 
+## Limit how long one turn runs
+
+**Agent max steps**, on the same Settings → AI Agents screen, is the number of model rounds in one ordinary turn. The default is 50. The minimum is 1. The field has no upper limit.
+
+**Continue** on a paused reply always adds 50 rounds. It does not add the number in this field. See [Chat with the agent](use-ai-panel.md#when-a-turn-reaches-its-step-limit).
+
 ## If it doesn't connect
 
 See [Model provider connection](../troubleshooting/model-provider-connection.md).
