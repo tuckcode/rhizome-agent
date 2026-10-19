@@ -63,6 +63,7 @@ vi.mock('./telemetry', () => ({
 
 import {
   clearAgentConversation,
+  continueAgentMessage,
   sendAgentMessage,
   stopAgentMessage,
   type AiAgentSessionRuntime,
@@ -230,6 +231,60 @@ describe('aiAgentSession', () => {
     streamNativeChatMock.mockResolvedValue(undefined)
     hydrateNoteReferencesMock.mockImplementation(async (references: unknown) => references)
     trackEventMock.mockClear()
+  })
+
+  it('continues only the latest capped native turn, preserving the transcript and original request', async () => {
+    const capped: AiAgentMessage = { id: 'capped', userMessage: 'Keep working', response: 'Partial', actions: [], capped: { steps: 10, max_steps: 10 } }
+    const session = createRuntime([completedHistory, capped])
+    const context = { agent: 'prime' as const, ready: true, vaultPath: '/vault', permissionMode: 'safe' as const, chatEngine: 'native' as const, nativeSessionId: 'same-session' }
+    nextMessageIdMock.mockReturnValue('continued')
+    await continueAgentMessage({ runtime: session.runtime, context, messageId: 'capped' })
+    expect(session.getMessages().slice(0, 2)).toEqual([completedHistory, capped])
+    expect(streamNativeChatMock).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'same-session', message: 'Keep working', continuation: true }))
+    await continueAgentMessage({ runtime: session.runtime, context, messageId: 'capped' })
+    expect(streamNativeChatMock).toHaveBeenCalledTimes(1)
+    session.runtime.statusRef.current = 'idle'
+    session.runtime.setMessages((current) => current.map((message) => message.id === 'continued' ? { ...message, isStreaming: false, capped: { steps: 50, max_steps: 50 } } : message))
+    await continueAgentMessage({ runtime: session.runtime, context, messageId: 'continued' })
+    expect(streamNativeChatMock).toHaveBeenCalledTimes(2)
+    expect(session.getMessages()).toHaveLength(4)
+  })
+
+  it('refuses Continue for read-only sessions and turns that are not capped', async () => {
+    const session = createRuntime([completedHistory])
+    const context = { agent: 'prime' as const, ready: true, vaultPath: '/vault', permissionMode: 'safe' as const, chatEngine: 'native' as const, nativeSessionId: 'same-session' }
+    await continueAgentMessage({ runtime: session.runtime, context, messageId: 'msg-1' })
+    session.runtime.setMessages([{ ...completedHistory, capped: { steps: 10, max_steps: 10 } }])
+    await continueAgentMessage({ runtime: session.runtime, context: { ...context, nativeReadOnly: true }, messageId: 'msg-1' })
+    expect(streamNativeChatMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps Continue retryable when the native submission is rejected', async () => {
+    const capped: AiAgentMessage = { id: 'capped', userMessage: 'Work', response: 'Partial', actions: [], capped: { steps: 10, max_steps: 10 } }
+    const session = createRuntime([capped])
+    const context = { agent: 'prime' as const, ready: true, vaultPath: '/vault', permissionMode: 'safe' as const, chatEngine: 'native' as const, nativeSessionId: 'same-session' }
+    nextMessageIdMock.mockReturnValueOnce('rejected').mockReturnValueOnce('retry')
+    streamNativeChatMock.mockRejectedValueOnce(new Error('another turn is already running'))
+    await expect(continueAgentMessage({ runtime: session.runtime, context, messageId: 'capped' })).resolves.toBeUndefined()
+    expect(session.getMessages().filter((turn) => !turn.localMarker)).toEqual([capped])
+    expect(session.getMessages().at(-1)?.localMarker).toContain('another turn is already running')
+    await continueAgentMessage({ runtime: session.runtime, context, messageId: 'capped' })
+    expect(streamNativeChatMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not touch a switched conversation when a pending Continue rejects', async () => {
+    const capped: AiAgentMessage = { id: 'capped', userMessage: 'Work', actions: [], capped: { steps: 10, max_steps: 10 } }
+    const session = createRuntime([capped])
+    const switched: AiAgentMessage = { id: 'other-session', userMessage: 'Other work', response: 'In progress', actions: [], isStreaming: true }
+    nextMessageIdMock.mockReturnValue('pending')
+    streamNativeChatMock.mockImplementationOnce(async () => {
+      session.runtime.setMessages([switched])
+      session.runtime.setStatus('thinking')
+      throw new Error('submission rejected')
+    })
+    await continueAgentMessage({ runtime: session.runtime, context: { agent: 'prime', ready: true, vaultPath: '/vault', permissionMode: 'safe', chatEngine: 'native', nativeSessionId: 'old-session' }, messageId: 'capped' })
+    expect(session.getMessages()).toEqual([switched])
+    expect(session.getStatus()).toBe('thinking')
   })
 
   async function expectLocalResponse(options: {

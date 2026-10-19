@@ -14,7 +14,7 @@ use crate::ai_agents::AiAgentPermissionMode;
 use crate::ai_models::{
     AiModelApiKeyStorage, AiModelProvider, AiModelProviderKind, AiModelStreamRequest, HttpLimits,
 };
-use crate::engines::{Engine, EngineEvent, NativeControl, NativeEngine};
+use crate::engines::{EngineEvent, NativeControl, NativeEngine};
 use crate::provider_keys::ProviderKeys;
 use crate::rhizome_loop::{AgentLoop, ApprovalReply, Model};
 use crate::rhizome_provider_model::ProviderModel;
@@ -49,7 +49,7 @@ pub enum NativeChatTarget {
 }
 
 enum ChatOp {
-    Turn(String),
+    Turn(String, bool),
     End,
 }
 
@@ -186,7 +186,7 @@ impl NativeChats {
             }
             while let Ok(op) = op_rx.recv() {
                 match op {
-                    ChatOp::Turn(prompt) => {
+                    ChatOp::Turn(prompt, continuation) => {
                         let emit = Arc::clone(&emit);
                         let index_path = index_path.clone();
                         let index_id = index_id.clone();
@@ -194,12 +194,14 @@ impl NativeChats {
                         let user_text = prompt.clone();
                         let assistant = Arc::new(Mutex::new(String::new()));
                         let busy = Arc::clone(&worker_busy);
-                        let _ = engine.start(
+                        let _ = engine.start_turn(
                             &prompt,
+                            continuation,
                             Box::new(move |event| {
                                 if matches!(
                                     event,
                                     EngineEvent::TurnEnd
+                                        | EngineEvent::TurnCapped { .. }
                                         | EngineEvent::Cancelled { .. }
                                         | EngineEvent::Error { fatal: true, .. }
                                 ) {
@@ -237,7 +239,7 @@ impl NativeChats {
             turn_busy.store(false, Ordering::SeqCst);
             return Err(error);
         }
-        if ops.send(ChatOp::Turn(prompt.to_string())).is_err() {
+        if ops.send(ChatOp::Turn(prompt.to_string(), false)).is_err() {
             let _ = crate::chat_images::rollback_turn(&id);
             turn_busy.store(false, Ordering::SeqCst);
             return Err("native chat worker closed".into());
@@ -260,6 +262,7 @@ impl NativeChats {
         self.send_with_reasoning(session_id, text, ReasoningLevelUpdate::Keep, &[], false)
     }
 
+    #[cfg(test)]
     pub fn send_with_reasoning(
         &self,
         session_id: &str,
@@ -267,6 +270,25 @@ impl NativeChats {
         reasoning_level: ReasoningLevelUpdate,
         images: &[crate::chat_images::ChatImage],
         send_anyway: bool,
+    ) -> Result<(), String> {
+        self.send_turn(
+            session_id,
+            text,
+            reasoning_level,
+            images,
+            send_anyway,
+            false,
+        )
+    }
+
+    fn send_turn(
+        &self,
+        session_id: &str,
+        text: &str,
+        reasoning_level: ReasoningLevelUpdate,
+        images: &[crate::chat_images::ChatImage],
+        send_anyway: bool,
+        continuation: bool,
     ) -> Result<(), String> {
         if self
             .read_only
@@ -295,7 +317,11 @@ impl NativeChats {
             session.turn_busy.store(false, Ordering::SeqCst);
             return Err(error);
         }
-        if session.ops.send(ChatOp::Turn(text.to_string())).is_err() {
+        if session
+            .ops
+            .send(ChatOp::Turn(text.to_string(), continuation))
+            .is_err()
+        {
             let _ = crate::chat_images::rollback_turn(session_id);
             session.turn_busy.store(false, Ordering::SeqCst);
             return Err("native chat worker closed".into());
@@ -349,7 +375,7 @@ impl NativeChats {
             }
             while let Ok(op) = op_rx.recv() {
                 match op {
-                    ChatOp::Turn(prompt) => {
+                    ChatOp::Turn(prompt, continuation) => {
                         let emit = Arc::clone(&emit);
                         let index_path = index_path.clone();
                         let index_id = index_id.clone();
@@ -357,12 +383,14 @@ impl NativeChats {
                         let user_text = prompt.clone();
                         let assistant = Arc::new(Mutex::new(String::new()));
                         let busy = Arc::clone(&worker_busy);
-                        let _ = engine.start(
+                        let _ = engine.start_turn(
                             &prompt,
+                            continuation,
                             Box::new(move |event| {
                                 if matches!(
                                     event,
                                     EngineEvent::TurnEnd
+                                        | EngineEvent::TurnCapped { .. }
                                         | EngineEvent::Cancelled { .. }
                                         | EngineEvent::Error { fatal: true, .. }
                                 ) {
@@ -1203,13 +1231,15 @@ pub fn native_chat_send(
     reasoning_level: ReasoningLevelUpdate,
     images: NativeChatImages,
     send_anyway: Option<bool>,
+    continuation: Option<bool>,
 ) -> Result<(), String> {
-    chats.send_with_reasoning(
+    chats.send_turn(
         &session_id,
         &text,
         reasoning_level,
         &images.0,
         send_anyway.unwrap_or(false),
+        continuation.unwrap_or(false),
     )
 }
 
@@ -1883,6 +1913,84 @@ mod tests {
                 .turns
                 .iter()
                 .any(|turn| { turn.role == "assistant" && turn.text == "ok" }));
+        });
+    }
+
+    #[test]
+    fn step_cap_live_chat_persists_and_indexes_each_capped_continuation() {
+        with_temp_home_and_cache(|_| {
+            let chats = NativeChats::new();
+            let seen = Arc::new(Mutex::new(Vec::<ModelView>::new()));
+            let model = FakeModel::script(
+                (0..120)
+                    .map(|i| {
+                        vec![
+                            ScriptPart::Text(format!("round {i}")),
+                            ScriptPart::Tool {
+                                name: "echo".into(),
+                                args: i.to_string(),
+                            },
+                        ]
+                    })
+                    .collect(),
+            )
+            .share_seen(Arc::clone(&seen));
+            let mut engine = NativeEngine::new(model);
+            engine.set_step_cap(10);
+            let (tx, rx) = mpsc::channel();
+            let id = chats
+                .start_with_engine("work", engine, move |event| {
+                    let _ = tx.send(event);
+                })
+                .unwrap();
+            for (turn, cap) in [10, 50, 50].into_iter().enumerate() {
+                if turn > 0 {
+                    chats
+                        .send_turn(&id, "work", ReasoningLevelUpdate::Keep, &[], false, true)
+                        .unwrap();
+                }
+                loop {
+                    let event = rx
+                        .recv_timeout(Duration::from_secs(5))
+                        .expect("capped event");
+                    assert!(!matches!(
+                        event,
+                        EngineEvent::Error { .. } | EngineEvent::TurnEnd
+                    ));
+                    if let EngineEvent::TurnCapped { steps, max_steps } = event {
+                        assert_eq!((steps, max_steps), (cap, cap));
+                        break;
+                    }
+                }
+            }
+            let events = crate::engines::native_log::open_session_log(&id)
+                .unwrap()
+                .events;
+            assert_eq!(
+                events
+                    .iter()
+                    .filter(|event| matches!(event, DurableEvent::TurnCapped { .. }))
+                    .count(),
+                3
+            );
+            assert!(!events.iter().any(|event| matches!(
+                event,
+                DurableEvent::TurnEnd
+                    | DurableEvent::ModelFailed { .. }
+                    | DurableEvent::Cancelled { .. }
+            )));
+            let indexed = wait_for_indexed_session(&format!("{NATIVE_SESSION_PREFIX}{id}"));
+            assert_eq!(indexed.turns.len(), 6);
+            assert_eq!(
+                indexed
+                    .turns
+                    .iter()
+                    .map(|turn| turn.message_index)
+                    .collect::<Vec<_>>(),
+                vec![0, 1, 2, 3, 4, 5]
+            );
+            assert_eq!(seen.lock().unwrap().len(), 110);
+            chats.end(&id).unwrap();
         });
     }
 

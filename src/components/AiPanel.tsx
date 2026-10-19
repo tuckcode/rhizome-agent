@@ -613,6 +613,7 @@ export function AiPanelView({
         onOpenNote={onOpenNote}
         onNavigateWikilink={handleNavigateWikilink}
         onRegenerateMessage={agent.regenerateMessage}
+        onContinueMessage={agent.getNativeSession().readOnly ? undefined : agent.continueMessage}
         onPromoteToVault={
           onPromoteToVault
             ? (text) => onPromoteToVault(text, promoteSessionFromHost(primeHost.sessionId, primeHost.sessionPath))

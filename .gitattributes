@@ -1,0 +1,5 @@
+# These files are executed or compared byte-for-byte by validation tools.
+/scripts/check-personal-info.mjs text eol=lf
+/scripts/edit-tools-previews/*.diff text eol=lf
+/src/index.css text eol=lf
+/src/themes.css text eol=lf

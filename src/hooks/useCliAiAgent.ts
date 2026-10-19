@@ -15,6 +15,7 @@ import type { AgentFileCallbacks } from '../lib/aiAgentFileOperations'
 import {
   addAgentLocalMarker,
   clearAgentConversation,
+  continueAgentMessage,
   regenerateAgentMessage,
   sendAgentMessage,
   stopAgentMessage,
@@ -210,6 +211,10 @@ export function useCliAiAgent(
     })
   }
 
+  async function continueMessage(messageId: string): Promise<void> {
+    await continueAgentMessage({ runtime, context: await buildAgentContext(), messageId })
+  }
+
   function stopMessage(): void {
     stopAgentMessage(runtime, { agent, locale })
   }
@@ -264,6 +269,7 @@ export function useCliAiAgent(
     sendMessage,
     stopMessage,
     regenerateMessage,
+    continueMessage,
     clearConversation,
     addLocalMarker,
     appendQueuedFollowUp,

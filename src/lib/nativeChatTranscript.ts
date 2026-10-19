@@ -132,7 +132,7 @@ export function conversationToNativeEvents(
     if (leftover.trim()) {
       events.push({ Assistant: { text: leftover } })
     }
-    events.push('TurnEnd')
+    events.push(message.capped ? { TurnCapped: message.capped } : 'TurnEnd')
   }
   return events
 }
@@ -264,7 +264,7 @@ function isNativeChatListItem(value: unknown): value is NativeChatListItem {
   return typeof item.sessionId === 'string' && item.sessionId.length > 0
 }
 
-type NativeEventObject = Record<string, { text?: string; id?: string; name?: string; args?: string; output?: string; reason?: string; message?: string; cause?: string } | undefined>
+type NativeEventObject = Record<string, { steps?: number; max_steps?: number; text?: string; id?: string; name?: string; args?: string; output?: string; reason?: string; message?: string; cause?: string } | undefined>
 
 /**
  * Fold a native session log into the panel's turn shape so a restored or
@@ -294,15 +294,18 @@ export function nativeEventsToConversation(
       flush()
       continue
     }
-    if (event && typeof event === 'object' && (event as { TurnCapped?: { steps: number; max_steps: number } }).TurnCapped) {
+    if (!event || typeof event !== 'object') continue
+    const record = event as NativeEventObject
+    if (record.TurnCapped) {
       if (current) {
-        current = { ...(current as AiAgentMessage), capped: (event as { TurnCapped: { steps: number; max_steps: number } }).TurnCapped }
+        const { steps, max_steps } = record.TurnCapped
+        if (typeof steps === 'number' && typeof max_steps === 'number' && Number.isSafeInteger(steps) && Number.isSafeInteger(max_steps) && steps >= 1 && max_steps >= 1) {
+          current = { ...(current as AiAgentMessage), capped: { steps, max_steps } }
+        }
       }
       flush()
       continue
     }
-    if (!event || typeof event !== 'object') continue
-    const record = event as NativeEventObject
     if (record.User) {
       flush()
       const turnImages = images?.[userIndex] ?? []

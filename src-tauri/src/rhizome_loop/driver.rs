@@ -195,7 +195,9 @@ impl AgentLoop {
                     log.push(event.clone());
                     turn_closed = false;
                 }
-                DurableEvent::TurnEnd | DurableEvent::TurnCapped { .. } | DurableEvent::Cancelled { .. } => {
+                DurableEvent::TurnEnd
+                | DurableEvent::TurnCapped { .. }
+                | DurableEvent::Cancelled { .. } => {
                     close_open_tool_calls(&mut open_calls, &mut history, &mut log);
                     log.push(event.clone());
                     turn_closed = true;
@@ -284,11 +286,6 @@ impl AgentLoop {
         self.dismiss_live_prompt();
     }
 
-    /// Clears the stopped flag so a new turn can run after a stop.
-    pub fn clear_stopped(&self) {
-        self.lock().stopped = false;
-    }
-
     pub fn set_permission_mode(&self, mode: AiAgentPermissionMode) {
         self.lock().mode = mode;
     }
@@ -356,7 +353,7 @@ impl AgentLoop {
     }
 
     pub fn set_step_cap(&self, cap: usize) {
-        self.lock().step_cap = cap;
+        self.lock().step_cap = cap.max(1);
     }
 
     pub fn on_after_tool_for_test(&self, hook: impl FnMut(&str, &str) + Send + 'static) {

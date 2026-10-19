@@ -38,6 +38,7 @@ export interface AgentStreamCallbacks {
    * (queued follow-up). Optional — non-Prime agents never emit it.
    */
   onTurnBoundary?: () => void
+  onTurnCapped?: (cap: { steps: number; max_steps: number }) => void
   /** Native mutate tools. Optional so Prime/CLI callers stay unchanged. */
   onApprovalRequested?: (prompt: import('../lib/nativeToolApproval').NativeApprovalPrompt) => void
   onApprovalDismissed?: (promptId: string) => void

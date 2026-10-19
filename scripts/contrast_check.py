@@ -704,7 +704,7 @@ def dump_resolved(text: str) -> dict[str, dict[str, str]]:
 def run(paths: list[Path]) -> int:
     text = read_files(paths)
     kind = 'design' if all(is_design_css(path.read_text()) for path in paths) else 'app'
-    print(f'contrast_check  kind={kind}  files={", ".join(os.path.relpath(path, REPO_ROOT) for path in paths)}')
+    print(f'contrast_check  kind={kind}  files={", ".join(Path(os.path.relpath(path, REPO_ROOT)).as_posix() for path in paths)}')
     all_fails: list[str] = []
     if kind == 'app':
         rules = iter_style_rules(text)

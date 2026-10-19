@@ -182,7 +182,7 @@ function changedSettings(): Settings {
     all_notes_show_unsupported: true,
     agent_profile: null,
     chat_engine: 'native',
-  agent_max_steps: null,
+    agent_max_steps: null,
   }
 }
 

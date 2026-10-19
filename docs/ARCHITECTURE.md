@@ -510,7 +510,23 @@ cancel / approval_reply / end / list / open / delete, events on
 `native-chat:<session_id>`. Native `Error` events carry `fatal`: log-save
 failures and the 100 MiB rollover notice are non-fatal; missing keys,
 provider failures, and `ensure_log` failures are fatal. The Chat stream
-ends only on a fatal error or `TurnEnd`. Quit settles every native engine before Prime,
+ends on a fatal error, `TurnEnd`, `Cancelled`, or `TurnCapped`.
+
+The installation setting `agent_max_steps` defaults to 50 model rounds per
+turn, with a minimum of 1. Settings → AI Agents exposes it as an integer
+input without an upper-bound control. `TurnCapped { steps, max_steps }` is
+a durable pause boundary, separate from a successful `TurnEnd` and failure.
+Native replay and transcript search indexing preserve that boundary.
+Chat shows `Continue (steps/max_steps)` on capped messages; only the latest
+writable, idle turn can continue. Continue submits the same request on the
+same session through `native_chat_send` with `continuation: true`, preserving
+prior text and tool results. Each Continue gets 50 fresh rounds; subsequent
+normal sends retain the configured cap. Fork serialization preserves capped
+state. The live listener is installed before submitting a continuation so
+a fast terminal event cannot be missed. Capped streams stop without a
+completion placeholder, auto-distill, or success/error status.
+
+Quit settles every native engine before Prime,
 with a 2s bound. Native transcripts use `rhizome-native:<uuid>` and never
 write under `~/.prime`. Step 2c stores one append-only JSONL log per
 session at `<app config dir>/native-sessions/<id>.jsonl` (ADR-0183): flush

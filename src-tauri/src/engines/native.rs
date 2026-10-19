@@ -197,7 +197,23 @@ impl<M: Model> NativeEngine<M> {
     }
 
     pub fn set_step_cap(&mut self, cap: usize) {
-        self.step_cap = cap;
+        self.step_cap = cap.max(1);
+    }
+
+    /// Continue gets a fresh default budget; later normal turns keep the setting.
+    pub fn start_turn(
+        &mut self,
+        prompt: &str,
+        continuation: bool,
+        sink: Box<dyn FnMut(EngineEvent) + Send>,
+    ) -> Result<(), String> {
+        let configured_cap = self.step_cap;
+        if continuation {
+            self.step_cap = crate::rhizome_loop::DEFAULT_STEP_CAP;
+        }
+        let result = self.start(prompt, sink);
+        self.step_cap = configured_cap;
+        result
     }
 
     pub fn set_approval_timeout(&mut self, timeout: Duration) {
@@ -512,6 +528,101 @@ mod tests {
     use crate::model_events::{ModelError, ModelErrorKind};
     use crate::rhizome_loop::{AgentLoop, FakeModel, ScriptPart};
     use std::panic::{catch_unwind, AssertUnwindSafe};
+
+    fn looping_model(rounds: usize) -> FakeModel {
+        FakeModel::script(
+            (0..rounds)
+                .map(|i| {
+                    vec![ScriptPart::Tool {
+                        name: "echo".into(),
+                        args: i.to_string(),
+                    }]
+                })
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn step_cap_defaults_to_50_and_can_be_configured_to_10() {
+        for cap in [50, 10] {
+            let mut engine = NativeEngine::new(looping_model(200));
+            if cap == 10 {
+                engine.set_step_cap(cap);
+            }
+            engine.start("work", Box::new(|_| {})).unwrap();
+            assert_eq!(engine.model.seen.len(), cap);
+            assert_eq!(
+                engine.events().last(),
+                Some(&EngineEvent::TurnCapped {
+                    steps: cap,
+                    max_steps: cap
+                })
+            );
+            assert!(!engine
+                .events()
+                .iter()
+                .any(|event| matches!(event, EngineEvent::TurnEnd | EngineEvent::Error { .. })));
+        }
+    }
+
+    #[test]
+    fn step_cap_two_continues_get_50_rounds_and_keep_history() {
+        let mut engine = NativeEngine::new(looping_model(200));
+        engine.set_step_cap(10);
+        engine.start("work", Box::new(|_| {})).unwrap();
+        for expected in [60, 110] {
+            engine.start_turn("work", true, Box::new(|_| {})).unwrap();
+            assert_eq!(engine.model.seen.len(), expected);
+            assert_eq!(
+                engine.events().last(),
+                Some(&EngineEvent::TurnCapped {
+                    steps: 50,
+                    max_steps: 50
+                })
+            );
+            assert!(engine.model.seen.last().unwrap().history.len() > 10);
+        }
+        // A normal send still uses the saved cap after continuing.
+        engine.start("next task", Box::new(|_| {})).unwrap();
+        assert_eq!(engine.model.seen.len(), 120);
+    }
+
+    #[test]
+    fn step_cap_replay_is_closed_and_preserves_the_transcript() {
+        let mut engine = NativeEngine::new(looping_model(60));
+        engine.start("work", Box::new(|_| {})).unwrap();
+        let events = engine.agent.events();
+        let replay = AgentLoop::from_log(events.clone());
+        assert_eq!(replay.events(), events);
+        let mut resumed = NativeEngine::from_parts(replay, FakeModel::saying("finished"));
+        resumed.start_turn("work", true, Box::new(|_| {})).unwrap();
+        assert!(resumed.model.seen[0].history.len() > 50);
+        assert_eq!(resumed.events().last(), Some(&EngineEvent::TurnEnd));
+    }
+
+    #[test]
+    fn step_cap_natural_finish_on_last_round_is_not_capped() {
+        let mut engine = NativeEngine::new(FakeModel::saying("finished"));
+        engine.set_step_cap(1);
+        engine.start("work", Box::new(|_| {})).unwrap();
+        assert_eq!(engine.events().last(), Some(&EngineEvent::TurnEnd));
+    }
+
+    #[test]
+    fn step_cap_cancel_after_cap_does_not_brick_continue() {
+        let mut engine = NativeEngine::new(looping_model(200));
+        engine.set_step_cap(10);
+        engine.start("work", Box::new(|_| {})).unwrap();
+        engine.control().cancel("user");
+        engine.start_turn("work", true, Box::new(|_| {})).unwrap();
+        assert_eq!(
+            engine.events().last(),
+            Some(&EngineEvent::TurnCapped {
+                steps: 50,
+                max_steps: 50
+            })
+        );
+    }
 
     fn with_temp_home<T>(body: impl FnOnce() -> T) -> T {
         let _lock = crate::app_config::TEST_CONFIG_ENV

@@ -277,12 +277,15 @@ pub async fn download_and_install_app_update<R: Runtime>(
 #[cfg(test)]
 mod tests {
     use super::{
-        endpoint_for_release_channel, ensure_expected_version, find_update,
-        in_app_updates_unavailable_message, interpret_feed_response, refuse_placeholder_pubkey,
-        updater_user_messages, AppUpdateDownloadEvent, AppUpdateMetadata, ALPHA_UPDATE_FEED,
-        FEED_FETCHES, STABLE_UPDATE_FEED, UPDATER_PUBKEY_PLACEHOLDER,
+        endpoint_for_release_channel, ensure_expected_version, in_app_updates_unavailable_message,
+        interpret_feed_response, refuse_placeholder_pubkey, updater_user_messages,
+        AppUpdateDownloadEvent, AppUpdateMetadata, ALPHA_UPDATE_FEED, STABLE_UPDATE_FEED,
+        UPDATER_PUBKEY_PLACEHOLDER,
     };
+    #[cfg(not(windows))]
+    use super::{find_update, FEED_FETCHES};
     use serde_json::json;
+    #[cfg(not(windows))]
     use std::sync::atomic::Ordering;
 
     #[test]

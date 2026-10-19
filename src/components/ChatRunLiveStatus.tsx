@@ -11,6 +11,7 @@ interface ChatRunLiveStatusProps {
     id?: string
     actions?: Array<{ tool: string; toolId?: string; status: string }>
     response?: string
+    capped?: { steps: number; max_steps: number }
     localMarker?: string
     localMarkerTone?: 'warning'
   }>

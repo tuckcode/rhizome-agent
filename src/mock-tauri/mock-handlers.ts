@@ -1179,7 +1179,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
       agent_profile: s.agent_profile?.trim() || null,
       chat_engine: s.chat_engine ?? null,
       native_chat_target: s.native_chat_target ?? null,
-  agent_max_steps: s.agent_max_steps ?? null,
+      agent_max_steps: s.agent_max_steps == null ? null : Math.max(1, Math.floor(s.agent_max_steps)),
     }
     return null
   },
