@@ -209,7 +209,7 @@ impl NativeChats {
                                     EngineEvent::TextDelta { text } => {
                                         assistant.lock().expect("assistant").push_str(text);
                                     }
-                                    EngineEvent::TurnEnd => {
+                                    EngineEvent::TurnEnd | EngineEvent::TurnCapped { .. } => {
                                         let assistant =
                                             assistant.lock().expect("assistant").clone();
                                         index_native_turn(
@@ -372,7 +372,7 @@ impl NativeChats {
                                     EngineEvent::TextDelta { text } => {
                                         assistant.lock().expect("assistant").push_str(text);
                                     }
-                                    EngineEvent::TurnEnd => {
+                                    EngineEvent::TurnEnd | EngineEvent::TurnCapped { .. } => {
                                         let assistant =
                                             assistant.lock().expect("assistant").clone();
                                         index_native_turn(
@@ -1111,6 +1111,13 @@ fn start_named_request(
             engine.set_vault(vault_path.clone(), vault_paths.clone());
             engine.set_permission_mode(mode);
             engine.set_reasoning_notice_rx(reasoning.notice_rx);
+            engine.set_step_cap(
+                crate::settings::get_settings()
+                    .ok()
+                    .and_then(|s| s.agent_max_steps)
+                    .map(|v| v as usize)
+                    .unwrap_or(crate::rhizome_loop::DEFAULT_STEP_CAP),
+            );
             engine.set_log_meta(
                 &id,
                 FREE_TIER_TARGET,
@@ -1159,6 +1166,13 @@ fn start_named_request(
             engine.set_vault(vault_path.clone(), vault_paths.clone());
             engine.set_permission_mode(mode);
             engine.set_reasoning_notice_rx(reasoning.notice_rx);
+            engine.set_step_cap(
+                crate::settings::get_settings()
+                    .ok()
+                    .and_then(|s| s.agent_max_steps)
+                    .map(|v| v as usize)
+                    .unwrap_or(crate::rhizome_loop::DEFAULT_STEP_CAP),
+            );
             engine.set_log_meta(
                 &id,
                 &request.target,
@@ -1412,6 +1426,13 @@ where
             engine.set_vault(request.vault_path.clone(), request.vault_paths.clone());
             engine.set_permission_mode(request.permission_mode);
             engine.set_reasoning_notice_rx(reasoning.notice_rx);
+            engine.set_step_cap(
+                crate::settings::get_settings()
+                    .ok()
+                    .and_then(|s| s.agent_max_steps)
+                    .map(|v| v as usize)
+                    .unwrap_or(crate::rhizome_loop::DEFAULT_STEP_CAP),
+            );
             engine.set_log_meta(
                 &live_id,
                 FREE_TIER_TARGET,
@@ -1455,6 +1476,13 @@ where
             engine.set_vault(request.vault_path.clone(), request.vault_paths.clone());
             engine.set_permission_mode(request.permission_mode);
             engine.set_reasoning_notice_rx(reasoning.notice_rx);
+            engine.set_step_cap(
+                crate::settings::get_settings()
+                    .ok()
+                    .and_then(|s| s.agent_max_steps)
+                    .map(|v| v as usize)
+                    .unwrap_or(crate::rhizome_loop::DEFAULT_STEP_CAP),
+            );
             engine.set_log_meta(
                 &live_id,
                 &request.target,

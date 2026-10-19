@@ -68,6 +68,10 @@ pub enum EngineEvent {
     },
     Provider(ProviderAttempt),
     TurnEnd,
+    TurnCapped {
+        steps: usize,
+        max_steps: usize,
+    },
     Cancelled {
         cause: String,
     },

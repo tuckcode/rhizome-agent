@@ -1585,7 +1585,7 @@ mod tests {
 
     #[test]
     fn step_cap_stops_a_runaway_turn() {
-        assert_eq!(DEFAULT_STEP_CAP, 8);
+        assert_eq!(DEFAULT_STEP_CAP, 50);
         let agent = AgentLoop::new();
         agent.set_step_cap(2);
         let mut model = FakeModel::script(vec![
@@ -1621,7 +1621,7 @@ mod tests {
         assert!(agent
             .events()
             .iter()
-            .any(|event| matches!(event, DurableEvent::TurnEnd)));
+            .any(|event| matches!(event, DurableEvent::TurnCapped { .. })));
         assert_eq!(model.seen.len(), 2);
     }
 

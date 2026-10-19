@@ -33,6 +33,10 @@ pub enum DurableEvent {
         message: String,
     },
     TurnEnd,
+    TurnCapped {
+        steps: usize,
+        max_steps: usize,
+    },
     Cancelled {
         cause: String,
     },

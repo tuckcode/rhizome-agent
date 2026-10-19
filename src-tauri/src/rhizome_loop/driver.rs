@@ -23,7 +23,7 @@ pub enum ApprovalReply {
 }
 
 /// Default model rounds in one turn. A runaway tool loop stops here.
-pub const DEFAULT_STEP_CAP: usize = 8;
+pub const DEFAULT_STEP_CAP: usize = 50;
 
 type ApprovalWaiter =
     Arc<dyn Fn(&str, &str, Option<&tools::ApprovalPreview>, &str) -> ApprovalReply + Send + Sync>;
@@ -195,7 +195,7 @@ impl AgentLoop {
                     log.push(event.clone());
                     turn_closed = false;
                 }
-                DurableEvent::TurnEnd | DurableEvent::Cancelled { .. } => {
+                DurableEvent::TurnEnd | DurableEvent::TurnCapped { .. } | DurableEvent::Cancelled { .. } => {
                     close_open_tool_calls(&mut open_calls, &mut history, &mut log);
                     log.push(event.clone());
                     turn_closed = true;
@@ -282,6 +282,11 @@ impl AgentLoop {
         drop(shared);
         self.cancel_notify.notify_waiters();
         self.dismiss_live_prompt();
+    }
+
+    /// Clears the stopped flag so a new turn can run after a stop.
+    pub fn clear_stopped(&self) {
+        self.lock().stopped = false;
     }
 
     pub fn set_permission_mode(&self, mode: AiAgentPermissionMode) {
@@ -443,11 +448,13 @@ impl AgentLoop {
 
         let cap = self.lock().step_cap;
         let mut steps = 0;
+        let mut capped = false;
         loop {
             if self.is_cancelled() {
                 break;
             }
             if steps >= cap {
+                capped = true;
                 break;
             }
             let view = self.model_view(&admitted);
@@ -471,6 +478,11 @@ impl AgentLoop {
         };
         if let Some(cause) = cause {
             self.push_log(DurableEvent::Cancelled { cause });
+        } else if capped {
+            self.push_log(DurableEvent::TurnCapped {
+                steps,
+                max_steps: cap,
+            });
         } else {
             self.push_log(DurableEvent::TurnEnd);
         }

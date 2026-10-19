@@ -26,6 +26,7 @@ pub struct NativeEngine<M: Model> {
     vault_path: Option<String>,
     vault_paths: Vec<String>,
     mode: AiAgentPermissionMode,
+    step_cap: usize,
     approval_timeout: Duration,
     approval_tx: ApprovalTx,
     live_prompt: Arc<Mutex<Option<String>>>,
@@ -79,6 +80,7 @@ impl<M: Model> NativeEngine<M> {
             vault_path: None,
             vault_paths: Vec::new(),
             mode: AiAgentPermissionMode::Safe,
+            step_cap: crate::rhizome_loop::DEFAULT_STEP_CAP,
             approval_timeout: DEFAULT_APPROVAL_TIMEOUT,
             approval_tx: Arc::new(Mutex::new(None)),
             live_prompt: Arc::new(Mutex::new(None)),
@@ -194,6 +196,10 @@ impl<M: Model> NativeEngine<M> {
         self.mode = mode;
     }
 
+    pub fn set_step_cap(&mut self, cap: usize) {
+        self.step_cap = cap;
+    }
+
     pub fn set_approval_timeout(&mut self, timeout: Duration) {
         self.approval_timeout = timeout;
     }
@@ -221,6 +227,9 @@ impl<M: Model> NativeEngine<M> {
             }
             DurableEvent::ModelFailed { message } => Some(EngineEvent::error(message, true)),
             DurableEvent::TurnEnd => Some(EngineEvent::TurnEnd),
+            DurableEvent::TurnCapped { steps, max_steps } => {
+                Some(EngineEvent::TurnCapped { steps, max_steps })
+            }
             DurableEvent::Cancelled { cause } => Some(EngineEvent::Cancelled { cause }),
             DurableEvent::User { .. } => None,
         }
@@ -260,6 +269,7 @@ impl<M: Model> Engine for NativeEngine<M> {
         self.agent
             .set_vault(self.vault_path.clone(), self.vault_paths.clone());
         self.agent.set_permission_mode(self.mode);
+        self.agent.set_step_cap(self.step_cap);
 
         let live_emit = emit.clone();
         let session_log = self.session_log.clone();
