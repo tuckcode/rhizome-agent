@@ -38,7 +38,7 @@ export type NativeDurableEvent =
   | { ModelFailed: { message: string } }
   | { Cancelled: { cause: string } }
   | 'TurnEnd'
-
+  | { TurnCapped: { steps: number; max_steps: number } }
 export interface LiveNativeChat {
   sessionId: string | null
   readOnly: boolean
@@ -291,6 +291,13 @@ export function nativeEventsToConversation(
   let userIndex = 0
   for (const event of events ?? []) {
     if (event === 'TurnEnd') {
+      flush()
+      continue
+    }
+    if (event && typeof event === 'object' && (event as { TurnCapped?: { steps: number; max_steps: number } }).TurnCapped) {
+      if (current) {
+        current = { ...(current as AiAgentMessage), capped: (event as { TurnCapped: { steps: number; max_steps: number } }).TurnCapped }
+      }
       flush()
       continue
     }

@@ -27,6 +27,7 @@ export interface AiAgentMessage {
   actions: AiAction[]
   response?: string
   isStreaming?: boolean
+  capped?: { steps: number; max_steps: number }
   id?: string
   /**
    * Prime's entry id for this turn, when it came from a session log.
