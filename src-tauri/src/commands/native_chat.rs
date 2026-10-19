@@ -1564,8 +1564,15 @@ mod tests {
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         let home = tempfile::tempdir().unwrap();
         let previous = std::env::var("HOME").ok();
+        let previous_config = std::env::var_os("XDG_CONFIG_HOME");
         std::env::set_var("HOME", home.path());
+        std::env::set_var("XDG_CONFIG_HOME", home.path().join(".config"));
         let result = catch_unwind(AssertUnwindSafe(|| body(&home)));
+        if let Some(value) = previous_config {
+            std::env::set_var("XDG_CONFIG_HOME", value);
+        } else {
+            std::env::remove_var("XDG_CONFIG_HOME");
+        }
         if let Some(value) = previous {
             std::env::set_var("HOME", value);
         } else {
@@ -1575,6 +1582,15 @@ mod tests {
             Ok(value) => value,
             Err(panic) => std::panic::resume_unwind(panic),
         }
+    }
+
+    #[test]
+    fn temp_home_isolates_the_config_directory() {
+        with_temp_home(|home| {
+            let path = crate::app_config::preferred_app_config_path("native-sessions")
+                .expect("fixture config directory");
+            assert!(path.starts_with(home.path()), "config escaped the fixture");
+        });
     }
 
     #[test]
