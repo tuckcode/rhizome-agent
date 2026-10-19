@@ -2,6 +2,7 @@ use std::path::Path;
 use std::process::{Command, Output, Stdio};
 
 use super::git_command;
+use super::remote_url::validate_remote_url;
 
 struct CloneRequest<'a> {
     url: &'a str,
@@ -10,6 +11,7 @@ struct CloneRequest<'a> {
 
 /// Clone a git repository to a local path using the system git configuration.
 pub fn clone_repo(url: &str, local_path: &str) -> Result<String, String> {
+    validate_remote_url(url)?;
     let dest = Path::new(local_path);
     let request = CloneRequest { url, dest };
     prepare_clone_destination(dest)?;
@@ -96,7 +98,8 @@ fn run_clone(request: &CloneRequest<'_>) -> Result<(), String> {
 fn build_clone_command(request: &CloneRequest<'_>, destination: &str) -> Command {
     let mut command = git_command();
     command
-        .args(["clone", "--quiet", request.url, destination])
+        .args(["-c", "protocol.ext.allow=never"])
+        .args(["clone", "--quiet", "--", request.url, destination])
         .env("GIT_TERMINAL_PROMPT", "0")
         .env("SSH_ASKPASS_REQUIRE", "never")
         .stdin(Stdio::null());
@@ -182,6 +185,17 @@ mod tests {
     }
 
     #[test]
+    fn test_clone_repo_rejects_option_url() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let dest = dir.path().join("dest");
+
+        let err = clone_repo("--upload-pack=touch /tmp/pwned", dest.to_str().unwrap()).unwrap_err();
+
+        assert!(err.contains("cannot start with '-'"));
+        assert!(!dest.exists());
+    }
+
+    #[test]
     fn test_clone_repo_nonempty_dest() {
         let dir = tempfile::TempDir::new().unwrap();
         fs::write(dir.path().join("existing.txt"), "data").unwrap();
@@ -249,8 +263,11 @@ mod tests {
             vec![
                 "-c".to_string(),
                 "core.quotePath=false".to_string(),
+                "-c".to_string(),
+                "protocol.ext.allow=never".to_string(),
                 "clone".to_string(),
                 "--quiet".to_string(),
+                "--".to_string(),
                 "https://example.com/repo.git".to_string(),
                 "/tmp/repo".to_string(),
             ]

@@ -11,6 +11,7 @@ mod history;
 mod pulse;
 mod remote;
 mod remote_config;
+mod remote_url;
 mod status;
 
 use std::ffi::{OsStr, OsString};
