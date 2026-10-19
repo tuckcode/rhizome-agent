@@ -10,12 +10,14 @@ export interface ChatRunTool {
 export interface ChatRunSnapshot {
   isActive: boolean
   hasResponse: boolean
+  capped?: { steps: number; max_steps: number }
   tools: ChatRunTool[]
   notice?: string
   noticeId?: string
 }
 
 interface ChatRunMessage {
+  capped?: { steps: number; max_steps: number }
   id?: string
   actions?: Array<{ tool: string; toolId?: string; status: string; approval?: unknown }>
   response?: string
@@ -50,7 +52,7 @@ export function nextChatRunAnnouncement(
     lines.push(next.notice)
   }
   if (previous.isActive && !next.isActive) {
-    lines.push(next.hasResponse ? 'Response complete' : 'Stopped')
+    lines.push(next.capped ? 'Paused at step limit. Continue available.' : next.hasResponse ? 'Response complete' : 'Stopped')
   }
   if (lines.length > 0) {
     return lines.join(' ')
@@ -99,6 +101,7 @@ export function chatRunSnapshotFromMessages(
   return {
     isActive,
     hasResponse: Boolean(latestTurn?.response?.trim()),
+    ...(latestTurn?.capped ? { capped: latestTurn.capped } : {}),
     tools: (latestTurn?.actions ?? []).map((action) => ({
       id: action.toolId || action.tool,
       name: action.tool,

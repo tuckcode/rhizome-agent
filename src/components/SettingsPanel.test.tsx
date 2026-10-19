@@ -146,6 +146,18 @@ describe('SettingsPanel', () => {
     expect(JSON.stringify(trackEventMock.mock.calls)).not.toContain('Use short answers.')
   })
 
+  it('defaults agent max steps to 50 and saves a custom integer without an HTML upper limit', () => {
+    renderOpenSettings()
+    const field = screen.getByRole('spinbutton', { name: 'Agent max steps' })
+    expect(field).toHaveValue(50)
+    expect(field).toHaveAttribute('min', '1')
+    expect(field).toHaveAttribute('step', '1')
+    expect(field).not.toHaveAttribute('max')
+    fireEvent.change(field, { target: { value: '10' } })
+    saveSettingsPanel()
+    expectSettingsSaved({ agent_max_steps: 10 })
+  })
+
   it('renders nothing when not open', () => {
     const { container } = render(
       <SettingsPanel open={false} settings={emptySettings} onSave={onSave} onClose={onClose} />

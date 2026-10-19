@@ -42,6 +42,7 @@ export interface StreamNativeChatRequest {
   permissionMode?: AiAgentPermissionMode
   /** Continue this live native session instead of starting a new log. */
   sessionId?: string | null
+  continuation?: boolean
   /** Panel or workspace slot. Accept clears only that composer's images. */
   acceptKey?: string | null
   /** Saved on this chat and sent on the user turn. Omitted keeps the saved level. */
@@ -75,6 +76,8 @@ export interface NativeEngineEvent {
   overwrite?: boolean
   call_id?: string
   reason?: string
+  steps?: number
+  max_steps?: number
 }
 
 export function applyNativeEvent(event: NativeEngineEvent, callbacks: AgentStreamCallbacks): boolean {
@@ -119,6 +122,9 @@ export function applyNativeEvent(event: NativeEngineEvent, callbacks: AgentStrea
       callbacks.onError(message)
       return true
     }
+    case 'turn_capped':
+      callbacks.onTurnCapped?.({ steps: event.steps ?? 0, max_steps: event.max_steps ?? 50 })
+      return true
     case 'turn_end':
     case 'cancelled':
       return true
@@ -153,6 +159,7 @@ export async function streamNativeChat(request: StreamNativeChatRequest): Promis
   const { invoke } = await import('@tauri-apps/api/core')
   const { listen } = await import('@tauri-apps/api/event')
   try {
+    let submitContinuation: (() => Promise<void>) | undefined
     const sessionId = request.sessionId
       ? request.sessionId
       : await invoke<string>('native_chat_start', {
@@ -177,6 +184,7 @@ export async function streamNativeChat(request: StreamNativeChatRequest): Promis
         reasoningLevel?: string | null
         images?: PrimeImageContent[]
         sendAnyway?: boolean
+        continuation?: boolean
       } = {
         sessionId,
         text: request.message,
@@ -185,25 +193,37 @@ export async function streamNativeChat(request: StreamNativeChatRequest): Promis
         send.reasoningLevel = request.reasoningLevel
       }
       send.sendAnyway = sendAnyway
+      if (request.continuation) send.continuation = true
       if (request.images && request.images.length > 0) {
         send.images = request.images
       }
-      await invoke('native_chat_send', send)
+      if (request.continuation) {
+        submitContinuation = () => invoke('native_chat_send', send)
+      } else {
+        await invoke('native_chat_send', send)
+      }
     }
     rememberNativeSessionTarget(sessionId, target)
-    notifyNativeTurnAccepted(request.acceptKey)
-    await new Promise<void>((resolve) => {
+    if (!submitContinuation) notifyNativeTurnAccepted(request.acceptKey)
+    await new Promise<void>((resolve, reject) => {
       let settled = false
       let unlisten: (() => void) | undefined
       const finish = () => {
         if (settled) return
         settled = true
+        request.signal?.removeEventListener('abort', onAbort)
         if (unlisten) cleanupTauriEventListener(unlisten)
         request.callbacks.onDone()
         resolve()
       }
       const onAbort = () => {
         void invoke('native_chat_cancel', { sessionId }).catch(() => {})
+        finish()
+      }
+      const failSubmission = (error: unknown) => {
+        if (settled) return
+        request.callbacks.onError(nativeChatUserError(error instanceof Error ? error.message : String(error)))
+        if (request.continuation) reject(error)
         finish()
       }
       request.signal?.addEventListener('abort', onAbort, { once: true })
@@ -231,11 +251,20 @@ export async function streamNativeChat(request: StreamNativeChatRequest): Promis
         if (applyNativeEvent(event.payload, callbacks)) finish()
       }).then((stop) => {
         unlisten = stop
-        if (settled) cleanupTauriEventListener(stop)
-      })
+        if (settled) {
+          cleanupTauriEventListener(stop)
+          return
+        }
+        if (submitContinuation) {
+          void submitContinuation().then(() => {
+            notifyNativeTurnAccepted(request.acceptKey)
+          }).catch(failSubmission)
+        }
+      }).catch(failSubmission)
     })
     return sessionId
   } catch (error) {
+    if (request.continuation) throw error
     request.callbacks.onError(
       nativeChatUserError(error instanceof Error ? error.message : String(error)),
     )

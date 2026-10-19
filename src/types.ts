@@ -186,6 +186,8 @@ export interface Settings {
   chat_engine?: string | null
   /** Native picker value. Absent uses the catalog default. */
   native_chat_target?: string | null
+  /** Agent step cap per turn. Absent defaults to 50. */
+  agent_max_steps?: number | null
   /** Models shown first in Chat, as `provider/id`. Empty means the whole catalog. */
   prime_model_allow_list?: string[] | null
 }

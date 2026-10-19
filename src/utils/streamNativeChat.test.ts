@@ -182,6 +182,43 @@ describe('native stream listen', () => {
     isTauriState.value = true
   })
 
+  it('registers the listener before submitting Continue so an immediate cap cannot be lost', async () => {
+    const order: string[] = []
+    let receive: ((event: { payload: unknown }) => void) | undefined
+    const stop = vi.fn()
+    listenMock.mockImplementation(async (_name: string, handler: (event: { payload: unknown }) => void) => {
+      order.push('listen')
+      receive = handler
+      return stop
+    })
+    invokeMock.mockImplementation(async (command: string) => { order.push(command) })
+    const next = { ...callbacks(), onTurnCapped: vi.fn() }
+    const running = streamNativeChat({ target: 'free_tier_auto', sessionId: 'capped', continuation: true, message: 'Work', vaultPath: '/vault', callbacks: next })
+    await vi.waitFor(() => expect(order).toHaveLength(2))
+    expect(order).toEqual(['listen', 'native_chat_send'])
+    receive?.({ payload: { kind: 'turn_capped', steps: 50, max_steps: 50 } })
+    await running
+    expect(next.onTurnCapped).toHaveBeenCalledWith({ steps: 50, max_steps: 50 })
+    expect(next.onDone).toHaveBeenCalledOnce()
+    expect(stop).toHaveBeenCalledOnce()
+    expect(invokeMock).toHaveBeenCalledWith('native_chat_send', expect.objectContaining({ continuation: true, text: 'Work' }))
+  })
+
+  it.each(['listener', 'send'])('reports a rejected Continue %s once and releases the stream', async (failure) => {
+    const error = new Error('another turn is already running')
+    const stop = vi.fn()
+    listenMock.mockImplementation(async () => {
+      if (failure === 'listener') throw error
+      return stop
+    })
+    invokeMock.mockRejectedValue(error)
+    const next = callbacks()
+    await expect(streamNativeChat({ target: 'free_tier_auto', sessionId: 'capped', continuation: true, message: 'Work', vaultPath: '/vault', callbacks: next })).rejects.toThrow(error)
+    expect(next.onError).toHaveBeenCalledExactlyOnceWith(error.message)
+    expect(next.onDone).toHaveBeenCalledOnce()
+    expect(stop).toHaveBeenCalledTimes(failure === 'send' ? 1 : 0)
+  })
+
   it('keeps the stream open after a non-fatal error so later text still appends', async () => {
     const next = callbacks()
     listenMock.mockImplementation(async (_name: string, handler: (event: { payload: unknown }) => void) => {

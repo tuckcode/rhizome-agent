@@ -144,18 +144,14 @@ fn open_exclusive_tmp(
     }
 }
 
+#[cfg(unix)]
 fn copy_xattr_value(to: &Path, name: &std::ffi::OsStr, value: &[u8]) {
-    #[cfg(unix)]
     if let Err(error) = xattr::set(to, name, value) {
         log::warn!(
             "Could not copy extended attribute {} onto {}: {error}",
             name.to_string_lossy(),
             to.display()
         );
-    }
-    #[cfg(not(unix))]
-    {
-        let _ = (to, name, value);
     }
 }
 

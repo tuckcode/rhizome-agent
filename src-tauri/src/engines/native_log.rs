@@ -1531,7 +1531,9 @@ impl NativeSessionWriter {
             .map_err(|error| AppendError::Io(format!("serialize native log line: {error}")))?;
         let add = encoded.len() as u64 + 1;
         let reserve = match event {
-            DurableEvent::TurnEnd | DurableEvent::Cancelled { .. } => 0,
+            DurableEvent::TurnEnd
+            | DurableEvent::TurnCapped { .. }
+            | DurableEvent::Cancelled { .. } => 0,
             _ => COMPLETION_RESERVE,
         };
         if self.len + add + reserve > SESSION_SIZE_CAP {

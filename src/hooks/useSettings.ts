@@ -79,6 +79,7 @@ const EMPTY_SETTINGS: Settings = {
   all_notes_show_unsupported: null,
   multi_workspace_enabled: null,
   agent_profile: null,
+  agent_max_steps: null,
 }
 
 function normalizeSettings(settings: Settings): Settings {

@@ -58,6 +58,7 @@ import {
 } from '../lib/themeMode'
 import { cn } from '@/lib/utils'
 import { Textarea } from './ui/textarea'
+import { Input } from './ui/input'
 import { AccentColorPicker } from './AccentColorPicker'
 import { normalizeReleaseChannel, serializeReleaseChannel, type ReleaseChannel } from '../lib/releaseChannel'
 import { shouldHideGitignoredFiles } from '../lib/gitignoredVisibility'
@@ -160,6 +161,7 @@ interface SettingsDraft {
   celebrationsEnabled: boolean
   keepInTaskbarOnClose: boolean
   agentProfile: string
+  agentMaxSteps: number
   nativeChatTarget: string | null
   aiModelProviders: AiModelProvider[]
   releaseChannel: ReleaseChannel
@@ -203,7 +205,9 @@ interface SettingsBodyProps {
   keepInTaskbarOnClose: boolean
   setKeepInTaskbarOnClose: (value: boolean) => void
   agentProfile: string
+  agentMaxSteps: number
   setAgentProfile: (value: string) => void
+  setAgentMaxSteps: (value: number) => void
   nativeChatTarget: string | null
   setNativeChatTarget: (value: string) => void
   aiAgentsStatus: AiAgentsStatus
@@ -299,6 +303,7 @@ function createSettingsDraft(
     celebrationsEnabled: readCelebrationsEnabled(settings.celebrations_enabled),
     keepInTaskbarOnClose: settings.keep_in_taskbar_on_close === true,
     agentProfile: settings.agent_profile?.trim() ?? '',
+    agentMaxSteps: settings.agent_max_steps ?? 50,
     nativeChatTarget: settings.native_chat_target ?? null,
     aiModelProviders: normalizeAiModelProviders(settings.ai_model_providers),
     releaseChannel: normalizeReleaseChannel(settings.release_channel),
@@ -383,6 +388,7 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     celebrations_enabled: draft.celebrationsEnabled,
     keep_in_taskbar_on_close: draft.keepInTaskbarOnClose ? true : null,
     agent_profile: draft.agentProfile.trim() || null,
+    agent_max_steps: draft.agentMaxSteps,
     chat_engine: 'native',
     native_chat_target: draft.nativeChatTarget,
     ai_model_providers: draft.aiModelProviders.length > 0 ? draft.aiModelProviders : null,
@@ -902,6 +908,8 @@ function SettingsBodyFromDraft({
       setCelebrationsEnabled={(value) => updateDraft('celebrationsEnabled', value)}
       keepInTaskbarOnClose={draft.keepInTaskbarOnClose}
       setKeepInTaskbarOnClose={(value) => updateDraft('keepInTaskbarOnClose', value)}
+      agentMaxSteps={draft.agentMaxSteps}
+      setAgentMaxSteps={(value) => updateDraft('agentMaxSteps', value)}
       agentProfile={draft.agentProfile}
       setAgentProfile={(value) => updateDraft('agentProfile', value)}
       nativeChatTarget={draft.nativeChatTarget}
@@ -1139,6 +1147,8 @@ function SettingsAgentWorkflowSections({
   celebrationsEnabled,
   setCelebrationsEnabled,
   agentProfile,
+  agentMaxSteps,
+  setAgentMaxSteps,
   setAgentProfile,
   blockSecretFiles,
   setBlockSecretFiles,
@@ -1169,6 +1179,8 @@ function SettingsAgentWorkflowSections({
           locale={locale}
           celebrationsEnabled={celebrationsEnabled}
           setCelebrationsEnabled={setCelebrationsEnabled}
+          agentMaxSteps={agentMaxSteps}
+          setAgentMaxSteps={setAgentMaxSteps}
           agentProfile={agentProfile}
           setAgentProfile={setAgentProfile}
           blockSecretFiles={blockSecretFiles}
@@ -1552,6 +1564,8 @@ function AiAgentSettingsSection({
   celebrationsEnabled,
   setCelebrationsEnabled,
   agentProfile,
+  agentMaxSteps,
+  setAgentMaxSteps,
   setAgentProfile,
   blockSecretFiles,
   setBlockSecretFiles,
@@ -1569,6 +1583,8 @@ function AiAgentSettingsSection({
   | 'celebrationsEnabled'
   | 'setCelebrationsEnabled'
   | 'agentProfile'
+  | 'agentMaxSteps'
+  | 'setAgentMaxSteps'
   | 'setAgentProfile'
   | 'blockSecretFiles'
   | 'setBlockSecretFiles'
@@ -1603,6 +1619,23 @@ function AiAgentSettingsSection({
             onChange={setNativeChatTarget}
             providers={aiModelProviders}
             showLabel={false}
+          />
+        </SettingsRow>
+        <SettingsRow
+          label="Agent max steps"
+          description="Model rounds per turn. When the limit is reached, Continue adds 50 more rounds."
+          controlWidth="compact"
+        >
+          <Input
+            type="number"
+            min={1}
+            step={1}
+            value={agentMaxSteps}
+            aria-label="Agent max steps"
+            onChange={(event) => {
+              const value = Number(event.target.value)
+              if (Number.isSafeInteger(value) && value >= 1) setAgentMaxSteps(value)
+            }}
           />
         </SettingsRow>
         <AutoSaveSettingRow

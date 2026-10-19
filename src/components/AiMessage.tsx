@@ -105,6 +105,10 @@ export interface AiMessageProps {
   actions: AiAction[]
   response?: string
   isStreaming?: boolean
+  /** When this turn hit the agent step cap. */
+  capped?: { steps: number; max_steps: number }
+  onContinue?: (messageId: string) => void
+  continueDisabled?: boolean
   /** When this turn was created (ms). Shown as a small clock under the ask. */
   createdAtMs?: number
   /** Images pasted with this turn. Shown in the user bubble. */
@@ -937,7 +941,7 @@ export function AiMessage(props: AiMessageProps) {
   return <ConversationMessage {...props} />
 }
 
-function ConversationMessage({ userMessage, images, references, locale = 'en', messageId, forkTargetId, reasoning, reasoningDone, actions, response, isStreaming, createdAtMs, isLatestReply = false, transcriptUserIndex, transcriptAssistantIndex, focusedTranscriptIndex, onFork, onOpenNote, onNavigateWikilink, onPromoteToVault, onRegenerate }: AiMessageProps) {
+function ConversationMessage({ userMessage, images, references, locale = 'en', messageId, forkTargetId, reasoning, reasoningDone, actions, response, isStreaming, createdAtMs, isLatestReply = false, transcriptUserIndex, transcriptAssistantIndex, focusedTranscriptIndex, onFork, onOpenNote, onNavigateWikilink, onPromoteToVault, onRegenerate, capped, onContinue, continueDisabled }: AiMessageProps) {
   // Manual override: null = follow auto behavior, true/false = user forced
   const [userOverride, setUserOverride] = useState<boolean | null>(null)
   const [expandedActions, setExpandedActions] = useState<Set<string>>(new Set())
@@ -1021,6 +1025,19 @@ function ConversationMessage({ userMessage, images, references, locale = 'en', m
             isStreaming={isStreaming}
           />
         </TranscriptHitAnchor>
+      )}
+      {capped && (
+        <div className="mt-2">
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="continue-button"
+            disabled={continueDisabled || isStreaming || !messageId || !onContinue}
+            onClick={() => messageId && onContinue?.(messageId)}
+          >
+            Continue ({capped.steps}/{capped.max_steps})
+          </Button>
+        </div>
       )}
       {isStreaming && !response && <StreamingIndicator isLatestReply={isLatestReply} />}
     </div>

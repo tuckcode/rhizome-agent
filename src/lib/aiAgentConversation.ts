@@ -27,6 +27,7 @@ export interface AiAgentMessage {
   actions: AiAction[]
   response?: string
   isStreaming?: boolean
+  capped?: { steps: number; max_steps: number }
   id?: string
   /**
    * Prime's entry id for this turn, when it came from a session log.
@@ -81,6 +82,7 @@ export interface AgentExecutionContext {
   nativeTarget?: string
   /** Live native session to continue. Absent starts a new log. */
   nativeSessionId?: string | null
+  nativeContinuation?: boolean
   /** Opened native logs that cannot accept another turn. */
   nativeReadOnly?: boolean
   /** Panel or workspace slot that owns `nativeSessionId`. */

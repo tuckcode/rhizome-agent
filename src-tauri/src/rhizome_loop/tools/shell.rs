@@ -907,7 +907,7 @@ mod win_ffi {
     pub(super) fn own_handle(handle: HANDLE) -> OwnedHandle {
         // SAFETY: `handle` is an owned kernel object. `OwnedHandle` closes
         // it exactly once on drop.
-        unsafe { OwnedHandle::from_raw_handle(handle.0 as *mut std::ffi::c_void) }
+        unsafe { OwnedHandle::from_raw_handle(handle.0) }
     }
 
     pub(super) fn process_id(process: HANDLE) -> u32 {

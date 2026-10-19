@@ -24,6 +24,7 @@ import { rememberNativeSession } from './nativeChatTranscript'
 import { hydrateNoteReferences } from '../utils/ai-reference-content'
 import { formatPromptWithReferences } from '../utils/ai-context'
 import { createTranslator } from './i18n'
+import { trackEvent } from './telemetry'
 
 export interface AiAgentAbortState {
   aborted: boolean
@@ -45,6 +46,7 @@ interface SendAgentMessageOptions {
   runtime: AiAgentSessionRuntime
   context: AgentExecutionContext
   prompt: PendingUserPrompt
+  onMessageCreated?: (messageId: string) => void
 }
 
 interface RegenerateAgentMessageOptions {
@@ -62,6 +64,8 @@ interface SelectedTargetStreamRequest {
   callbacks: ReturnType<typeof createStreamCallbacks>
   signal?: AbortSignal
 }
+
+const continuingNativeSessions = new Set<string>()
 
 function normalizePrompt(prompt: PendingUserPrompt): PendingUserPrompt {
   return {
@@ -126,6 +130,7 @@ async function streamWithSelectedTarget({
       vaultPaths: context.vaultPaths,
       permissionMode: context.permissionMode,
       sessionId: context.nativeSessionId,
+      ...(context.nativeContinuation ? { continuation: true } : {}),
       acceptKey: context.nativeLiveSlot,
       images,
       callbacks,
@@ -160,6 +165,7 @@ export async function sendAgentMessage({
   runtime,
   context,
   prompt,
+  onMessageCreated,
 }: SendAgentMessageOptions): Promise<void> {
   const currentStatus = runtime.statusRef.current
   const normalizedPrompt = normalizePrompt(prompt)
@@ -202,6 +208,7 @@ export async function sendAgentMessage({
   runtime.toolInputMapRef.current = new Map()
 
   const messageId = appendStreamingMessage(runtime.setMessages, normalizedPrompt)
+  onMessageCreated?.(messageId)
   runtime.setStatus('thinking')
   const promptForAgent = {
     ...normalizedPrompt,
@@ -241,6 +248,38 @@ export async function sendAgentMessage({
     callbacks,
     signal: controller.signal,
   })
+}
+
+export async function continueAgentMessage({ runtime, context, messageId }: RegenerateAgentMessageOptions): Promise<void> {
+  const message = runtime.messagesRef.current.filter((turn) => !turn.localMarker).at(-1)
+  if (!message?.capped || message.id !== messageId || context.nativeReadOnly || !context.nativeSessionId) return
+  if (runtime.statusRef.current === 'thinking' || runtime.statusRef.current === 'tool-executing') return
+  const sessionId = context.nativeSessionId
+  if (continuingNativeSessions.has(sessionId)) return
+  continuingNativeSessions.add(sessionId)
+  trackEvent('chat_native_continued', { steps: message.capped.steps, max_steps: message.capped.max_steps })
+  let pendingId: string | undefined
+  try {
+    await sendAgentMessage({
+      runtime,
+      context: { ...context, nativeContinuation: true },
+      prompt: { text: message.userMessage, references: message.references, images: message.images },
+      onMessageCreated: (id) => { pendingId = id },
+    })
+  } catch (error) {
+    if (!pendingId || !runtime.messagesRef.current.some((turn) => turn.id === pendingId)) return
+    // An unaccepted turn is a notice, so the capped request stays retryable.
+    const reason = error instanceof Error ? error.message : String(error)
+    runtime.setMessages((current) => current.map((turn) => (
+      turn.id === pendingId
+        ? { ...turn, userMessage: '', response: undefined, actions: [], isStreaming: false, localMarker: `Continue couldn't start: ${reason}`, localMarkerTone: 'warning' as const }
+        : turn
+    )))
+    runtime.statusRef.current = 'idle'
+    runtime.setStatus('idle')
+  } finally {
+    continuingNativeSessions.delete(sessionId)
+  }
 }
 
 export async function regenerateAgentMessage({

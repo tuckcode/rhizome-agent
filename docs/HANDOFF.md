@@ -9,10 +9,8 @@ is why #142, #143, #145, and #148 conflicted on merge.
 ls docs/plans/handoffs | grep -v archive | tail -1    # the latest handoff
 ```
 ## Adding your session
-
 Write **one new file** in `docs/plans/handoffs/`, named
 `YYYY-MM-DD-HHMM-<model-slug>-<topic>.md`, with frontmatter:
-
 ```yaml
 ---
 session: 2026-08-21T16:40Z

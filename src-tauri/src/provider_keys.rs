@@ -846,6 +846,8 @@ mod tests {
         parent: PathBuf,
         #[cfg(unix)]
         mode: u32,
+        #[cfg(not(unix))]
+        permissions: std::fs::Permissions,
     }
 
     fn lock_legacy_updates(parent: &Path) -> LegacyUpdateLock {
@@ -865,10 +867,12 @@ mod tests {
         {
             let file = parent.join(LEGACY_FILE_NAME);
             let mut perms = std::fs::metadata(&file).unwrap().permissions();
+            let permissions = perms.clone();
             perms.set_readonly(true);
             std::fs::set_permissions(&file, perms).unwrap();
             LegacyUpdateLock {
                 parent: parent.to_path_buf(),
+                permissions,
             }
         }
     }
@@ -885,11 +889,7 @@ mod tests {
             #[cfg(not(unix))]
             {
                 let file = self.parent.join(LEGACY_FILE_NAME);
-                if let Ok(metadata) = std::fs::metadata(&file) {
-                    let mut perms = metadata.permissions();
-                    perms.set_readonly(false);
-                    let _ = std::fs::set_permissions(&file, perms);
-                }
+                let _ = std::fs::set_permissions(&file, self.permissions.clone());
             }
         }
     }

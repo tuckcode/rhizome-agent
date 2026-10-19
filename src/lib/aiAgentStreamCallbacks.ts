@@ -192,6 +192,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
   } = context
   let failureTracked = false
   let streamFailed = false
+  let turnCapped = false
   let workerFailureReason: string | null = null
   const noticesThisTurn = new Set<string>()
   // Retargeted after each Prime TurnBoundary so a queued follow-up owns its
@@ -484,11 +485,26 @@ export function createStreamCallbacks(context: StreamMutationContext) {
       setStatus('thinking')
     },
 
+    onTurnCapped: (capped: { steps: number; max_steps: number }) => {
+      if (abortRef.current.aborted || streamFailed) return
+      turnCapped = true
+      setStatus('idle')
+      updateMessage(setMessages, activeMessageId, (message) => ({
+        ...message,
+        capped,
+        isStreaming: false,
+        reasoningDone: true,
+        response: normalizeAssistantResponseText(responseAccRef.current),
+        actions: sealPendingActions(message),
+      }))
+      fileCallbacksRef.current?.onVaultChanged?.()
+    },
+
     onDone: () => {
       if (abortRef.current.aborted) return
       // A worker that failed to start already explained itself. Do not replace
       // that reason with "finished without returning a reply".
-      if (streamFailed || workerFailureReason) return
+      if (streamFailed || workerFailureReason || turnCapped) return
 
       setStatus('done')
       // TurnBoundary already sealed the last agent_end and cleared the

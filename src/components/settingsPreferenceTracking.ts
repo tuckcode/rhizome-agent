@@ -25,6 +25,7 @@ export interface SettingsPreferenceDraft {
   dateDisplayFormat: DateDisplayFormat
   displayTimeZone: string | null
   agentProfile: string
+  agentMaxSteps?: number
   defaultNoteWidth: NoteWidthMode
   gitFeaturesEnabled: boolean
   multiWorkspaceEnabled: boolean
@@ -61,6 +62,11 @@ export function trackTelemetryConsentChange(previousAnalytics: boolean, nextAnal
 }
 
 export function trackSettingsPreferenceChanges(settings: Settings, draft: SettingsPreferenceDraft): void {
+  if (draft.agentMaxSteps !== undefined) {
+    trackPreferenceChange(settings.agent_max_steps ?? 50, draft.agentMaxSteps, (maxSteps) => {
+      trackEvent('agent_max_steps_changed', { max_steps: maxSteps })
+    })
+  }
   trackPreferenceChange(areGitFeaturesEnabled(settings), draft.gitFeaturesEnabled, trackGitFeaturesEnabledChanged)
   trackEnabledPreferenceChange(
     areAutomaticUpdateChecksEnabled(settings),

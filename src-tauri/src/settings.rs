@@ -238,6 +238,9 @@ pub struct Settings {
     /// Absent uses the catalog default. Anthropic ids are dropped until 6a.
     #[serde(default)]
     pub native_chat_target: Option<String>,
+    /// Agent step cap per turn. Absent defaults to 50.
+    #[serde(default)]
+    pub agent_max_steps: Option<u32>,
 }
 
 fn deserialize_optional_bool_on_malformed<'de, D>(deserializer: D) -> Result<Option<bool>, D::Error>
@@ -535,6 +538,7 @@ fn normalize_settings(settings: Settings) -> Settings {
         agent_profile: normalize_agent_profile(settings.agent_profile),
         chat_engine: normalize_chat_engine(settings.chat_engine),
         native_chat_target: normalize_native_chat_target(settings.native_chat_target),
+        agent_max_steps: settings.agent_max_steps.map(|steps| steps.max(1)),
     }
 }
 
@@ -820,6 +824,27 @@ mod tests {
             ..Settings::default()
         });
         assert_eq!(cleared.agent_profile, None);
+    }
+
+    #[test]
+    fn agent_step_cap_roundtrips_and_normalizes_zero() {
+        let absent: Settings = serde_json::from_str("{}").unwrap();
+        assert_eq!(absent.agent_max_steps, None);
+        let custom = normalize_settings(Settings {
+            agent_max_steps: Some(10),
+            ..Settings::default()
+        });
+        let parsed: Settings =
+            serde_json::from_str(&serde_json::to_string(&custom).unwrap()).unwrap();
+        assert_eq!(parsed.agent_max_steps, Some(10));
+        assert_eq!(
+            normalize_settings(Settings {
+                agent_max_steps: Some(0),
+                ..Settings::default()
+            })
+            .agent_max_steps,
+            Some(1)
+        );
     }
 
     #[test]
@@ -1249,6 +1274,7 @@ mod tests {
             agent_profile: Some("Be brief.".to_string()),
             chat_engine: None,
             native_chat_target: None,
+            agent_max_steps: None,
         };
         let json = serde_json::to_string(&settings).unwrap();
         let parsed: Settings = serde_json::from_str(&json).unwrap();

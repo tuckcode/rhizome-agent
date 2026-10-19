@@ -19,6 +19,10 @@ function snap(partial: Partial<ChatRunSnapshot> = {}): ChatRunSnapshot {
 }
 
 describe('nextChatRunAnnouncement', () => {
+  it('announces a capped turn as paused rather than complete', () => {
+    const next = chatRunSnapshotFromMessages([{ response: 'Partial', capped: { steps: 10, max_steps: 10 } }], false)
+    expect(nextChatRunAnnouncement(snap({ isActive: true }), next)).toBe('Paused at step limit. Continue available.')
+  })
   it('stays silent on the first snapshot so the region can mount empty', () => {
     expect(nextChatRunAnnouncement(null, snap({ isActive: true }))).toBeNull()
   })
