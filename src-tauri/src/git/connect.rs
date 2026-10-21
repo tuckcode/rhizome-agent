@@ -8,6 +8,7 @@ use super::command::{
 use super::credentials::request_remote_credentials;
 use super::ensure_author_config;
 use super::remote_config::{configure_origin_remote, list_configured_remotes};
+use super::remote_url::validate_remote_url;
 
 const DEFAULT_REMOTE_NAME: &str = "origin";
 
@@ -109,6 +110,9 @@ pub fn git_add_remote(vault_path: &str, remote_url: &str) -> Result<GitAddRemote
     let connection = RemoteConnection::new(branch);
 
     let trimmed_url = remote_url.trim();
+    if let Err(message) = validate_remote_url(trimmed_url) {
+        return Ok(connect_result(ConnectStatus::Error, &message));
+    }
     configure_origin_remote(vault, trimmed_url)?;
     request_remote_credentials(vault, trimmed_url);
 
