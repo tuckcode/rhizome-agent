@@ -474,32 +474,6 @@ pub async fn download_and_install_app_update(
     Err("App updates are not available on mobile".into())
 }
 
-/// Checks GitHub's real release feed for a Chat-engine version newer than
-/// what's currently connected. Never installs anything on its own.
-#[tauri::command]
-pub async fn check_prime_update(
-    installed_version: Option<String>,
-) -> Result<Option<crate::prime_update::PrimeReleaseInfo>, String> {
-    tokio::task::spawn_blocking(move || {
-        crate::prime_update::check_prime_update(installed_version.as_deref())
-    })
-    .await
-    .map_err(|error| format!("Chat engine update check panicked: {error}"))?
-}
-
-/// Apply a Chat-engine CLI update after the user clicks. Never auto-runs.
-#[tauri::command]
-pub async fn apply_prime_update(
-    expected_version: String,
-    chat_busy: bool,
-) -> Result<crate::prime_update::ApplyPrimeUpdateResult, String> {
-    tokio::task::spawn_blocking(move || {
-        crate::prime_update::apply_prime_update(&expected_version, chat_busy)
-    })
-    .await
-    .map_err(|error| format!("Chat engine update panicked: {error}"))?
-}
-
 #[tauri::command]
 pub fn reinit_telemetry() {
     crate::telemetry::reinit_sentry();

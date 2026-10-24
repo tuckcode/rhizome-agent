@@ -675,17 +675,6 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     modelId: 'mock-model',
     modelName: 'Mock model',
   }),
-  check_prime_update: () => ({
-    version: '0.9.4',
-    notes: '- Mock Chat engine release so Update now can be clicked in the browser.',
-    url: 'https://github.com/PrimeIntellect-ai/prime-agent/releases/tag/v0.9.4',
-  }),
-  apply_prime_update: (args?: { chatBusy?: boolean }) => {
-    if (args?.chatBusy) {
-      throw new Error('Chat is still answering. Wait until the reply finishes, then update.')
-    }
-    return { previousVersion: '0.9.3', installedVersion: '0.9.4', method: 'npm' }
-  },
   ensure_prime_session_host: () => 'mock-session',
   prime_session_new_session: () => 'mock-session',
   abort_prime_session_turn: () => false,

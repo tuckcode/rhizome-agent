@@ -9,7 +9,7 @@
   pnpm prime:surface:github     # GitHub latest release tag vs snapshot
   ```
 
-  If it drifts, `--update` after you have understood the diff. Do **not** clone `PrimeIntellect-ai/prime-agent`. User-facing "a newer Prime is out" is already `check_prime_update` / `usePrimeUpdate`; this is the adapter check.
+  If it drifts, `--update` after you have understood the diff. Do **not** clone `PrimeIntellect-ai/prime-agent`. Rhizome has no user-facing Prime update offer since ADR-0189 removed `check_prime_update`; this is the adapter check only.
 
   **The snapshot answers "does this command exist". It never answers "what does this command do".** It is a list of names, and a name is not a meaning. When you need the behaviour, read Prime's own docs — they are installed at `~/.local/lib/node_modules/prime-agent/docs/` (`usage.md`, `models.md`, `rpc.md`, `rlm.md`, `daemon.md`, and ~30 more). Reading one file is not dumping the package; it is the difference between knowing and guessing.
 

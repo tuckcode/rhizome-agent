@@ -614,7 +614,9 @@ describe('App', () => {
     expect(await screen.findByText('All Notes')).toBeInTheDocument()
   })
 
-  it('starts Prime once when Chat first opens', async () => {
+  // ADR-0189: Prime is not a chat engine. App used to start the Prime host on
+  // launch only to feed the removed Chat-engine update check.
+  it('does not start Prime when Chat first opens', async () => {
     sessionStorage.removeItem(AGENT_CHAT_OPENED_SESSION_KEY)
     mockCommandResults.get_prime_session_host_status = {
       installed: true,
@@ -631,17 +633,6 @@ describe('App', () => {
     render(<App />)
     expect(await screen.findByTestId('chat-home', {}, { timeout: 5000 })).toBeInTheDocument()
 
-    await waitFor(() => {
-      const ensures = vi.mocked(mockInvoke).mock.calls.filter(([cmd]) => cmd === 'ensure_prime_session_host')
-      expect(ensures.length).toBeGreaterThan(0)
-    })
-    // Vault list can change the path once on boot. That is a second connect,
-    // not one poll per Chat widget (that used to be three).
-    expect(
-      vi.mocked(mockInvoke).mock.calls.filter(([cmd]) => cmd === 'ensure_prime_session_host').length,
-    ).toBeLessThanOrEqual(2)
-
-    vi.mocked(mockInvoke).mockClear()
     await new Promise((resolve) => setTimeout(resolve, 80))
     expect(
       vi.mocked(mockInvoke).mock.calls.filter(([cmd]) => cmd === 'ensure_prime_session_host'),

@@ -667,17 +667,11 @@ Each answers "nothing", which is true of a host with no session.
 - **`prime_agent_activity.rs`** — goal, heartbeats and schedules for the activity band
 - **`prime_events.rs`**, **`prime_tool_unwrap.rs`** — normalising the daemon's
   event stream into the shared `AiAgentStreamEvent` shape
-- **`prime_discovery.rs`**, **`prime_update.rs`**, **`prime_vault_skill.rs`** —
-  locating the binary, checking GitHub for a newer Chat-engine release
-  (`check_prime_update`), applying it only after a click
-  (`apply_prime_update({ expectedVersion, chatBusy })`), and seeding the
+- **`prime_discovery.rs`**, **`prime_vault_skill.rs`** —
+  locating the binary and seeding the
   Rhizome vault skill when a Prime chat starts — never on vault open.
-  Apply refuses a busy chat (host `is_streaming()` is the guard; the
-  client `chatBusy` flag is only a hint), a stale offer, or a
-  missing binary. It runs `prime-agent update` (one `--force` retry when
-  the CLI says it is already latest), then reloads the attached session.
-  It does not create a session. User-facing Prime-update copy names the
-  engine, not Prime as a second product.
+  The Prime update check (`prime_update.rs`, `usePrimeUpdate`) was removed
+  under ADR-0189: Rhizome no longer offers to update `prime-agent`.
   The skill bakes `find_node()`'s absolute binary plus a GUI-safe `PATH`
   (`$HOME/.local/bin`, Homebrew, `/usr/local/bin`) and short chat manners
   (answer first, CLI not IPython, stop after one environment error).
@@ -2216,12 +2210,8 @@ existing Restart control. Production `tauri.conf.json` carries the
 minisign public key; the test fixture still uses
 `PLACEHOLDER_KNISPO_TAURI_UPDATER_PUBKEY` so unit tests refuse before
 any feed request. Generate signing material outside the repo with
-`pnpm tauri signer generate -w ~/.tauri/rhizome-updater.key`. The
-**Chat-engine** path
-(`prime_update.rs`, `usePrimeUpdate`) checks GitHub, then
-`apply_prime_update` runs the resolved `prime-agent update` only after
-Update now. The host refuses when `is_streaming()` is true. The client
-`chatBusy` flag is only a hint. It does not start a new session.
+`pnpm tauri signer generate -w ~/.tauri/rhizome-updater.key`. `VersionUpdateIndicator` covers the Rhizome app only. The Prime
+(Chat-engine) update path was removed under ADR-0189.
 
 - `useUpdater(releaseChannel, automaticChecksEnabled)` waits 3 seconds after launch when automatic checks are enabled, then calls the Rust commands
 - `automatic_update_checks_enabled` is an installation-local Settings flag that defaults to enabled; disabling it skips only the startup probe, not a manual status-bar check
