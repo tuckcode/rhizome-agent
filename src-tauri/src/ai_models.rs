@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
+pub(crate) mod openai_responses;
 mod openai_stream;
 #[cfg(test)]
 pub(crate) mod test_server;
