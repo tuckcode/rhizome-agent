@@ -7,6 +7,7 @@ import { NATIVE_CHAT_MODEL_CHIP_MAX_WIDTH_CLASS } from '../lib/composerMenuSide'
 import { resetPrimeHostStatus } from '../hooks/usePrimeHostStatus'
 import { resetPrimeModelCatalog } from '../lib/primeModelCatalog'
 import { resetListProviderModelsCache } from '../lib/listProviderModels'
+import { consumeProviderSettingsFocus } from '../lib/providerSettingsFocus'
 import { SETTINGS_MENU_Z_CLASS } from '../lib/settingsMenuLayer'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { NativeChatModelPicker } from './NativeChatModelPicker'
@@ -50,6 +51,10 @@ vi.mock('../lib/callHost', () => ({
         modelId: 'grok-4.5',
         modelName: 'Grok 4.5',
       }
+    }
+    if (cmd === 'native_model_vision') {
+      const target = String(args?.target ?? '')
+      return target.includes('gpt-4o') ? 'yes' : 'unknown'
     }
     if (cmd !== 'list_ai_model_provider_models' && cmd !== 'discover_ai_models') return []
     const provider = args?.provider as { kind?: string; id?: string } | undefined
@@ -166,6 +171,7 @@ describe('NativeChatModelPicker', () => {
     })
     expect(screen.getByTestId('native-chat-model-work-openai/gpt-4o')).toHaveTextContent('GPT-4o')
     expect(screen.getByTestId('native-chat-model-work-openai/gpt-4o')).not.toHaveTextContent('Work OpenAI ·')
+    expect(await screen.findByTestId('native-chat-model-vision')).toHaveTextContent('Vision')
     expect(screen.getByTestId('native-chat-model-free_tier_auto')).toHaveTextContent('Taproot')
     expect(screen.getByTestId('native-chat-model-free_tier_auto')).not.toHaveTextContent('free_tier_auto')
   })
@@ -278,17 +284,17 @@ describe('NativeChatModelPicker', () => {
     openMenu()
     await waitFor(() => {
       const note = screen.getByTestId('native-chat-model-new-chats')
-      expect(note).toHaveTextContent('Applies to new chats')
+      expect(note).toHaveTextContent('New chats use this model.')
       expect(note).toHaveClass('px-2')
       expect(note).toHaveClass('py-1.5')
       expect(note).toHaveClass('text-[12px]')
       expect(note).toHaveClass('text-muted-foreground')
       expect(note.className).not.toMatch(/text-\[11px\]/)
       expect(note.className).not.toMatch(/border-t/)
-      expect(screen.getByTestId('native-chat-model-footer-sep')).toHaveClass('my-1')
+      expect(screen.getByTestId('native-chat-model-footer-sep')).toHaveClass('my-2')
       expect(screen.getByTestId('native-chat-model-footer-sep')).toHaveClass('h-px')
       expect(screen.getByTestId('native-chat-model-footer-sep')).toHaveClass('w-full')
-      expect(screen.getByTestId('native-chat-model-footer-sep')).toHaveClass('bg-[var(--border-input)]')
+      expect(screen.getByTestId('native-chat-model-footer-sep')).toHaveClass('bg-border-subtle')
     })
   })
 
@@ -384,10 +390,10 @@ describe('NativeChatModelPicker', () => {
     expect(screen.getByTestId('native-chat-model-selected-check')).toHaveClass('text-foreground')
     expect(screen.getByTestId('native-chat-model-selected-check')).not.toHaveClass('text-primary')
     const sep = screen.getAllByTestId('native-chat-model-group-sep')[0]
-    expect(sep).toHaveClass('my-1')
+    expect(sep).toHaveClass('my-2')
     expect(sep).toHaveClass('h-px')
     expect(sep).toHaveClass('w-full')
-    expect(sep).toHaveClass('bg-[var(--border-input)]')
+    expect(sep).toHaveClass('bg-border-subtle')
     expect(menu).toHaveClass('overflow-hidden')
     expect(menu).toHaveClass('overflow-y-hidden')
     expect(screen.getByTestId('native-chat-model-filter-row')).toHaveClass('border-b')
@@ -397,7 +403,7 @@ describe('NativeChatModelPicker', () => {
     expect(screen.getByTestId('native-chat-model-filter')).toHaveFocus()
   })
 
-  it('omits keyless providers and opens Settings from the footer', async () => {
+  it('shows keyless providers as disabled rows and links the footer to Connected', async () => {
     const onOpenProviders = vi.fn()
     render(
       <NativeChatModelPicker
@@ -410,16 +416,15 @@ describe('NativeChatModelPicker', () => {
     )
     openMenu()
     await waitFor(() => {
-      expect(screen.queryByTestId('native-chat-models-add-key')).not.toBeInTheDocument()
-      expect(screen.queryByTestId('native-chat-model-gemini/gemini-2.5-flash')).not.toBeInTheDocument()
+      const gemini = screen.getByTestId('native-chat-model-gemini/gemini-2.5-flash')
+      expect(gemini).toHaveAttribute('aria-disabled', 'true')
+      expect(gemini).toHaveTextContent('Needs an API key')
       expect(screen.getByTestId('native-chat-model-open-providers')).toHaveTextContent(
-        'providers need a key · Open settings',
+        "providers aren't set up",
       )
       expect(screen.getByTestId('native-chat-model-keyless-note').textContent).not.toMatch(
         /1 providers/,
       )
-      expect(screen.getByTestId('native-chat-model-keyless-note')).toHaveClass('text-muted-foreground')
-      expect(screen.getByTestId('native-chat-model-open-settings')).toHaveTextContent('Open settings')
       expect(screen.getByTestId('native-chat-model-open-settings').tagName).toBe('BUTTON')
       expect(screen.getByTestId('native-chat-model-open-settings')).toHaveClass('text-[var(--link-color)]')
       expect(screen.getByTestId('native-chat-model-open-settings')).toHaveClass('hover:underline')
@@ -429,6 +434,10 @@ describe('NativeChatModelPicker', () => {
       fireEvent.click(screen.getByTestId('native-chat-model-open-settings'))
     })
     expect(onOpenProviders).toHaveBeenCalledOnce()
+    expect(consumeProviderSettingsFocus()).toEqual({
+      tab: 'agents',
+      rowId: 'connected-providers',
+    })
 
     openMenu()
     await waitFor(() => {
@@ -443,7 +452,7 @@ describe('NativeChatModelPicker', () => {
     expect(screen.queryByTestId('native-chat-models-empty')).not.toBeInTheDocument()
   })
 
-  it('says 1 provider needs a key when only one remote catalog kind is missing a key', async () => {
+  it('counts providers that are not set up, including one missing key', async () => {
     render(
       <NativeChatModelPicker
         variant="chip"
@@ -455,7 +464,7 @@ describe('NativeChatModelPicker', () => {
     )
     openMenu()
     const note = await screen.findByTestId('native-chat-model-keyless-note')
-    expect(note).toHaveTextContent('1 provider needs a key')
+    expect(note.textContent).toMatch(/providers aren't set up|1 provider isn't set up/)
     expect(note.textContent).not.toMatch(/1 providers/)
   })
 
@@ -508,10 +517,11 @@ describe('NativeChatModelPicker', () => {
       />,
     )
     openMenu()
-    const offline = await screen.findAllByTestId('native-chat-model-offline')
-    expect(offline[0]).toHaveTextContent('offline, showing saved list')
-    expect(offline[0]).toHaveClass('text-muted-foreground')
-    expect(screen.getByTestId('native-chat-model-work-openai/gpt-4o')).toHaveTextContent('GPT-4o')
+    const row = await screen.findByTestId('native-chat-model-work-openai/gpt-4o')
+    expect(row).toHaveAttribute('aria-disabled', 'true')
+    expect(row).toHaveTextContent("Couldn't load models. Retry.")
+    expect(row).toHaveTextContent('GPT-4o')
+    expect(screen.getByTestId('native-chat-model-ollama/llama3.2')).toHaveTextContent("Ollama isn't running")
   })
 
   it('keeps cached rows usable while Loading… is muted', async () => {
@@ -550,9 +560,8 @@ describe('NativeChatModelPicker', () => {
       />,
     )
     openMenu()
-    const note = await screen.findByTestId('native-chat-model-keyless-note')
-    const link = screen.getByTestId('native-chat-model-open-settings')
-    expect(note).toHaveClass('text-muted-foreground')
+    const link = await screen.findByTestId('native-chat-model-open-settings')
+    const note = screen.getByTestId('native-chat-model-keyless-note')
     expect(note).not.toHaveClass('text-primary')
     expect(link).toHaveClass('text-[var(--link-color)]')
     expect(link.className).toMatch(/underline/)
@@ -608,9 +617,13 @@ describe('NativeChatModelPicker', () => {
     )
     openMenu()
     await waitFor(() => {
-      expect(screen.getByTestId('native-chat-model-openai/gpt-4o')).toHaveTextContent('OpenAI · GPT-4o')
+      expect(screen.getByTestId('native-chat-model-openai/gpt-4o')).toHaveTextContent('GPT-4o')
+      expect(screen.getByTestId('native-chat-model-openai/gpt-4o')).not.toHaveTextContent('OpenAI ·')
     })
-    expect(screen.getByTestId('native-chat-model-azure/gpt-4o')).toHaveTextContent('Azure · GPT-4o')
+    expect(screen.getByTestId('native-chat-model-azure/gpt-4o')).toHaveTextContent('GPT-4o')
+    expect(screen.getAllByTestId('native-chat-model-provider').map((node) => node.textContent)).toEqual(
+      expect.arrayContaining(['OpenAI', 'Azure']),
+    )
   })
 
   it('paints group dividers with the input-border token', async () => {
@@ -625,10 +638,10 @@ describe('NativeChatModelPicker', () => {
     openMenu()
     await waitFor(() => {
       expect(screen.getAllByTestId('native-chat-model-group-sep')[0]).toHaveClass(
-        'bg-[var(--border-input)]',
+        'bg-border-subtle',
       )
     })
-    expect(screen.getByTestId('native-chat-model-footer-sep')).toHaveClass('bg-[var(--border-input)]')
+    expect(screen.getByTestId('native-chat-model-footer-sep')).toHaveClass('bg-border-subtle')
   })
 
   it('keeps the selected keyless model in the list, not only on the chip', async () => {
@@ -651,7 +664,9 @@ describe('NativeChatModelPicker', () => {
       'data-selected',
       'true',
     )
-    expect(screen.queryByTestId('native-chat-model-open_ai/gpt-4.1-mini')).not.toBeInTheDocument()
+    const hidden = screen.getByTestId('native-chat-model-open_ai/gpt-4.1-mini')
+    expect(hidden).toHaveAttribute('aria-disabled', 'true')
+    expect(hidden).toHaveTextContent('Needs an API key')
   })
 
   it('opens the chip menu upward when there is room above', async () => {

@@ -242,7 +242,8 @@ describe('SettingsPanel', () => {
       />,
     )
     expect(screen.queryByTestId('settings-advanced-prime-engine')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Copy MCP config' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Copy MCP config' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('settings-connected-summary')).toBeInTheDocument()
     expect(screen.queryByText('Packages')).not.toBeInTheDocument()
   })
 
@@ -310,7 +311,8 @@ describe('SettingsPanel', () => {
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'API model' }), { button: 0, ctrlKey: false })
     expect(screen.getByRole('button', { name: 'Add API model' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add local model' })).not.toBeInTheDocument()
-    fireEvent.pointerDown(screen.getByText('OpenAI').closest('button')!, { button: 0, pointerType: 'mouse' })
+    const apiSettings = screen.getByTestId('ai-provider-settings')
+    fireEvent.pointerDown(within(apiSettings).getByText('OpenAI').closest('button')!, { button: 0, pointerType: 'mouse' })
     fireEvent.click(screen.getByRole('option', { name: 'Google Gemini' }))
     expect(screen.getByDisplayValue('Google Gemini')).toBeInTheDocument()
     expect(screen.getByDisplayValue('https://generativelanguage.googleapis.com/v1beta/openai')).toBeInTheDocument()
@@ -1024,8 +1026,10 @@ describe('SettingsPanel', () => {
     expect(within(status).getByText('Kiro')).toBeInTheDocument()
     expect(within(status).queryByText('Prime Agent')).not.toBeInTheDocument()
     expect(within(status).queryByText('Hermes Agent')).not.toBeInTheDocument()
-    expect(within(status).getByText('installed')).toBeInTheDocument()
-    expect(within(status).getAllByText('missing').length).toBeGreaterThan(0)
+    expect(within(status).getByText('Installed')).toBeInTheDocument()
+    expect(within(status).getAllByText('Not installed').length).toBeGreaterThan(0)
+    expect(within(status).getByText('v2.1.90')).toBeInTheDocument()
+    expect(within(status).queryByText('No version detected')).not.toBeInTheDocument()
   })
 
   it('hides secret files by default, warns when off, and reloads the saved value', () => {
@@ -1673,19 +1677,27 @@ describe('SettingsPanel', () => {
     expect(screen.getByTestId('settings-save')).not.toHaveFocus()
   })
 
-  it('copies the MCP config from the AI Agents section', () => {
+  it('copies the MCP config from the installed agent card', () => {
     const onCopyMcpConfig = vi.fn()
+    const aiAgentsStatus: AiAgentsStatus = {
+      ...createMissingAiAgentsStatus(),
+      claude_code: createAiAgentAvailability('installed', '2.1.289 (Claude Code)'),
+    }
     render(
       <SettingsPanel
         open={true}
         settings={emptySettings}
+        aiAgentsStatus={aiAgentsStatus}
         onSave={onSave}
         onCopyMcpConfig={onCopyMcpConfig}
         onClose={onClose}
       />
     )
+    expect(screen.getByTestId('settings-agent-version-claude_code')).toHaveTextContent('v2.1.289')
+    expect(screen.queryByTestId('settings-copy-mcp-config-codex')).not.toBeInTheDocument()
+    expect(screen.getByTestId('settings-agent-install-codex')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Copy MCP config' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Copy MCP config for Claude Code' }))
 
     expect(onCopyMcpConfig).toHaveBeenCalledOnce()
   })

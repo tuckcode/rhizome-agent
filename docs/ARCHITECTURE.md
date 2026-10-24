@@ -702,9 +702,12 @@ Each answers "nothing", which is true of a host with no session.
   `PrimeSessionList` (the Command Rail's expanded history area; classic shell
   fallback is a Chat sidebar), `primeSessionMeta.ts` (row labels),
   `NativeChatModelPicker` + `rhizomeChatModels.ts` (the composer model chip —
-  Rhizome catalog with live provider listing on the native engine; Prime
-  chats use Prime's catalog),   `primeModels.ts` (Prime allow-list
-  and Settings catalog helpers)
+  Rhizome catalog with live provider listing on the native engine. A provider
+  that is not set up stays in the menu as a disabled row with the reason.
+  Settings `ConnectedProvidersSummary` lists each agent and provider above
+  the Local agent, Local model, and API model tabs. Prime
+  chats still use Prime's catalog),   `primeModels.ts` (Prime catalog helpers;
+  the Settings allow-list and Prime provider cards are gone)
 
 #### Thinking levels (Prime daemon, not composer UI)
 
@@ -712,9 +715,7 @@ Rhizome no longer exposes a composer control to pick Prime thinking levels
 (the old `PrimeThinkingToggle` and the `get/set_prime_thinking_*` Tauri
 commands are gone). Prime still reads each model's `thinkingLevelMap` in
 `~/.prime/agent/models.json` and clamps levels per model. **Add to Chat
-list** (`PrimeProviderStatusSection`, no longer shown in Settings since #218)
-wrote those maps when Nous Portal (or similar) catalogs were merged into
-`models.json`; `merge_nous_portal`
+list** used to live in Settings. That section is removed. `merge_nous_portal`
 replaces the whole provider entry, so dropping `thinkingLevelMap` on write
 would wipe user maps on the next click.
 

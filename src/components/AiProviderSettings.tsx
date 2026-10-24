@@ -368,7 +368,12 @@ function ProviderList({
   return (
     <div className="space-y-2">
       {configuredModelTargets(visible).map((target) => (
-        <div key={target.id} className="flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2 text-sm">
+        <div
+          key={target.id}
+          id={`provider-row-${target.provider.id}`}
+          data-testid={`ai-provider-row-${target.provider.id}`}
+          className="flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2 text-sm"
+        >
           <div className="min-w-0">
             <div className="truncate font-medium text-foreground">{target.label}</div>
             <div className="truncate text-xs text-muted-foreground">

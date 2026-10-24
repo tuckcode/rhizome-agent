@@ -783,6 +783,9 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   },
   list_ai_model_provider_models: (args: { provider?: { kind?: string; id?: string } }) => {
     const kind = args?.provider?.kind
+    // Harness provider used to show the model-list timeout. A real host that
+    // never answers takes the same path.
+    if (args?.provider?.id === 'scrub-test') return new Promise(() => {})
     if (kind === 'ollama') return ['llama3.2', 'qwen2.5']
     if (kind === 'lm_studio') return ['llama3.2']
     if (args?.provider?.id === 'work-openai') return ['gpt-4o', 'gpt-5']

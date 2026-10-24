@@ -77,19 +77,17 @@ describe('leftover chrome 1616', () => {
     expect(breadcrumb).toContain('testId="breadcrumb-note-lock"')
   })
 
-  it('keeps Grok Reconnect and the Nous Terminal paste notice', () => {
-    const providers = readFileSync(
-      `${process.cwd()}/src/components/PrimeProviderStatusSection.tsx`,
-      'utf8',
-    )
+  it('keeps the xAI label and does not paste a Nous key from Settings', () => {
     const labels = readFileSync(
       `${process.cwd()}/src/lib/primeProviderLabels.ts`,
       'utf8',
     )
-    expect(labels).toContain("xai: 'xAI (Grok)'")
-    expect(providers).toContain(
-      "Copied the NOUS_API_KEY line. Paste it in Terminal, then Add to Chat list.",
+    const settings = readFileSync(
+      `${process.cwd()}/src/components/SettingsPanel.tsx`,
+      'utf8',
     )
+    expect(labels).toContain("xai: 'xAI (Grok)'")
+    expect(settings).not.toContain('Copied the NOUS_API_KEY line')
   })
 
   it('keeps Check for updates as a Rhizome command, not Prime install', () => {
@@ -127,8 +125,9 @@ describe('leftover chrome 1616', () => {
     )
     const en = readFileSync(`${process.cwd()}/src/lib/locales/en.json`, 'utf8')
     expect(picker).not.toContain('${keylessCount} providers need a key')
-    expect(picker).toContain("t('ai.composer.providerNeedsKey')")
-    expect(picker).toContain("t('ai.composer.providersNeedKey'")
-    expect(en).toContain('"ai.composer.providerNeedsKey": "1 provider needs a key"')
+    expect(picker).toContain("t('ai.composer.providerNotSetUp')")
+    expect(picker).toContain("t('ai.composer.providersNotSetUp'")
+    expect(en).toContain('"ai.composer.providerNotSetUp": "1 provider isn\'t set up"')
+    expect(en).toContain('"ai.composer.providersNotSetUp": "{count} providers aren\'t set up"')
   })
 })

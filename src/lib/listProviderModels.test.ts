@@ -2,11 +2,15 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AiModelProvider } from './aiTargets'
 import { callHost } from './callHost'
 import {
+  forgetListedProviderModels,
   listAiModelProviderModels,
   liveModelDisplayName,
   liveProviderHeadingNames,
   loadLiveRhizomeChatModels,
+  MODEL_LIST_TIMEOUT_MS,
+  normalizeListedProviderModels,
   offlineLiveProviderNames,
+  providerListFailure,
   providerModelsCacheKey,
   providersToListLive,
   resetListProviderModelsCache,
@@ -115,6 +119,43 @@ describe('listAiModelProviderModels', () => {
     vi.mocked(callHost).mockResolvedValue(['grok-5'])
     await expect(listAiModelProviderModels(moved)).resolves.toEqual(['grok-5'])
     expect(callHost).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('normalizeListedProviderModels', () => {
+  it('keeps a one-character id from an array and does not split a string body', () => {
+    expect(normalizeListedProviderModels(['m'])).toEqual([{ id: 'm', displayName: 'm' }])
+    expect(normalizeListedProviderModels('models')).toEqual([])
+  })
+})
+
+describe('model list timeout', () => {
+  it('stops a hung list after 10s and lets Retry ask again', async () => {
+    vi.useFakeTimers()
+    let calls = 0
+    vi.mocked(callHost).mockImplementation(() => {
+      calls += 1
+      if (calls === 1) return new Promise(() => {})
+      return Promise.resolve(['llama3.2'])
+    })
+    const provider = {
+      id: 'ollama',
+      name: 'Ollama',
+      kind: 'ollama' as const,
+      base_url: 'http://localhost:11434/v1',
+      api_key_storage: 'none' as const,
+      models: [{ id: 'llama3.2', display_name: 'llama3.2', capabilities }],
+    }
+    const pending = listAiModelProviderModels(provider)
+    await vi.advanceTimersByTimeAsync(MODEL_LIST_TIMEOUT_MS)
+    await expect(pending).resolves.toEqual(['llama3.2'])
+    expect(providerListFailure(provider)).toBe('timeout')
+    expect(MODEL_LIST_TIMEOUT_MS).toBe(10_000)
+
+    forgetListedProviderModels(provider)
+    await expect(listAiModelProviderModels(provider)).resolves.toEqual(['llama3.2'])
+    expect(providerListFailure(provider)).toBeNull()
+    vi.useRealTimers()
   })
 })
 

@@ -21,11 +21,47 @@ export interface ListedProviderModel {
 const cached = new Map<string, ListedProviderModel[]>()
 const inflight = new Map<string, Promise<ListedProviderModel[]>>()
 const failed = new Set<string>()
+const failureKind = new Map<string, ProviderListFailure>()
+const failureName = new Map<string, ProviderListFailure>()
+
+/** A live `/models` call that is still pending after this shows Retry. */
+export const MODEL_LIST_TIMEOUT_MS = 10_000
+
+export type ProviderListFailure = 'timeout' | 'unreachable' | 'empty'
 
 export function resetListProviderModelsCache(): void {
   cached.clear()
   inflight.clear()
   failed.clear()
+  failureKind.clear()
+  failureName.clear()
+}
+
+export function providerListFailure(provider: Pick<AiModelProvider, 'id' | 'kind' | 'base_url'>): ProviderListFailure | null {
+  return failureKind.get(providerModelsCacheKey(provider)) ?? null
+}
+
+export function cachedProviderModelLabels(provider: Pick<AiModelProvider, 'id' | 'kind' | 'base_url'>): string[] | null {
+  const hit = cached.get(providerModelsCacheKey(provider))
+  if (!hit) return null
+  return hit.map((model) => model.displayName || model.id)
+}
+
+export function providerListFailureByName(name: string): ProviderListFailure | null {
+  return failureName.get(name) ?? null
+}
+
+export function listProviderFailures(): Array<{ providerName: string; kind: ProviderListFailure }> {
+  return [...failureName.entries()].map(([providerName, kind]) => ({ providerName, kind }))
+}
+
+export function forgetListedProviderModels(provider: Pick<AiModelProvider, 'id' | 'kind' | 'base_url' | 'name'>): void {
+  const key = providerModelsCacheKey(provider)
+  cached.delete(key)
+  inflight.delete(key)
+  failed.delete(key)
+  failureKind.delete(key)
+  failureName.delete(provider.name)
 }
 
 export function providerModelsCacheKey(provider: Pick<AiModelProvider, 'id' | 'kind' | 'base_url'>): string {
@@ -104,6 +140,8 @@ export function liveModelDisplayName(id: string, apiName?: string | null): strin
 }
 
 export function normalizeListedProviderModels(raw: unknown): ListedProviderModel[] {
+  // A string body such as "models" is not a list. Splitting it would invent
+  // one-letter ids. A real id of "m" only survives when the payload is an array.
   if (!Array.isArray(raw)) return []
   const listed: ListedProviderModel[] = []
   for (const entry of raw) {
@@ -122,6 +160,43 @@ export function normalizeListedProviderModels(raw: unknown): ListedProviderModel
     listed.push({ id, displayName: liveModelDisplayName(id, apiName) })
   }
   return listed
+}
+
+function rememberListFailure(key: string, name: string, kind: ProviderListFailure): void {
+  failed.add(key)
+  failureKind.set(key, kind)
+  failureName.set(name, kind)
+}
+
+function clearListFailure(key: string, name: string): void {
+  failed.delete(key)
+  failureKind.delete(key)
+  if (failureName.get(name)) failureName.delete(name)
+}
+
+export function classifyListFailure(error: unknown, local: boolean): ProviderListFailure {
+  const message = error instanceof Error ? error.message : String(error)
+  if (message === "Couldn't load models") return 'timeout'
+  if (local && /refused|unreachable|econnrefused|failed to connect|connection|offline|network/i.test(message)) {
+    return 'unreachable'
+  }
+  return 'timeout'
+}
+
+function withModelListTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("Couldn't load models")), ms)
+    promise.then(
+      (value) => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      (error) => {
+        clearTimeout(timer)
+        reject(error instanceof Error ? error : new Error(String(error)))
+      },
+    )
+  })
 }
 
 function staticProviderModels(provider: AiModelProvider): ListedProviderModel[] {
@@ -146,14 +221,22 @@ async function listProviderModelEntries(provider: AiModelProvider): Promise<List
 
   const request = (async () => {
     try {
-      const raw = await callHost<unknown>('list_ai_model_provider_models', { provider })
+      const raw = await withModelListTimeout(
+        callHost<unknown>('list_ai_model_provider_models', { provider }),
+        MODEL_LIST_TIMEOUT_MS,
+      )
       const live = normalizeListedProviderModels(raw)
-      const listed = live.length > 0 ? live : fallback
-      cached.set(key, listed)
-      failed.delete(key)
-      return listed
-    } catch {
-      failed.add(key)
+      if (live.length === 0) {
+        rememberListFailure(key, provider.name, 'empty')
+        cached.set(key, fallback)
+        return fallback
+      }
+      cached.set(key, live)
+      clearListFailure(key, provider.name)
+      return live
+    } catch (error) {
+      const kind = classifyListFailure(error, isLocalAiProvider(provider))
+      rememberListFailure(key, provider.name, kind)
       return fallback
     } finally {
       inflight.delete(key)

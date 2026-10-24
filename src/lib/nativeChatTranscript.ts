@@ -3,6 +3,7 @@ import type { AiAgentMessage } from './aiAgentConversation'
 import type { AiAgentPermissionMode } from './aiAgentPermissionMode'
 import type { PrimeSessionSummary } from './primeSessionMeta'
 import { callHost } from './callHost'
+import { nativeSessionTarget } from './nativeSessionTarget'
 import { trackEvent } from './telemetry'
 import { nextMessageId } from '../utils/ai-chat'
 
@@ -198,6 +199,16 @@ export function rememberNativeSession(
 
 export function currentNativeSession(slot: string): LiveNativeChat {
   return liveNativeBySlot.get(slot) ?? { sessionId: null, readOnly: false }
+}
+
+/** Model stored on a live writable session, if a chat has already sent. */
+export function activeNativeSessionTarget(): string | null {
+  for (const live of liveNativeBySlot.values()) {
+    if (!live.sessionId || live.readOnly) continue
+    const target = nativeSessionTarget(live.sessionId)
+    if (target) return target
+  }
+  return null
 }
 
 export function retainNativeLiveSlot(slot: string): void {
