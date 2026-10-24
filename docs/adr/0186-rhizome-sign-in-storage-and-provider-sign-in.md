@@ -16,14 +16,14 @@ supersedes: "0176 (sign-in part only)"
 
 ## Decision
 
-1. **Rhizome owns its sign-in storage.** OAuth tokens live in the OS keychain (macOS Keychain first) through `provider_keys` / `keyring`, service `ai.rhizome.agent`, account `<provider id>:oauth`. This supersedes the sign-in part of ADR-0176. Prime login stays only as a fallback behind the Prime engine toggle.
+1. **Rhizome owns its sign-in storage.** OAuth tokens live in the OS keychain (macOS Keychain first) through `provider_keys` / `keyring`, service `ai.rhizome.agent`, account `<provider id>:oauth`. This supersedes the sign-in part of ADR-0176. Prime login is gone with the Prime engine (ADR-0189).
 2. **OpenAI first:** "Sign in with ChatGPT" through OpenAI's documented open-source flow (system browser, loopback on 127.0.0.1, PKCE, `client_id=dynamic_agent_client`, `agent_name_hint=Rhizome`, scopes incl. `offline_access` and `resource.invoke chatgpt.tokens.use.direct`, resource `https://api.openai.com/v1`). Do **not** reuse the Codex CLI client id, `~/.codex/auth.json`, or `chatgpt.com/backend-api/codex`. If Rhizome ever ships as a paid or hosted app, join OpenAI's waitlist first.
 3. **xAI first, with a caveat:** SuperGrok / X Premium+ browser sign-in (PKCE, loopback) or device code against `auth.x.ai`, calling `https://api.x.ai/v1`. xAI publicly endorses this for open-source agents, but publishes no client registration; current tools reuse a shared public client id with `referrer=hermes-agent`. Rhizome asks xAI for its own client id; the client id is a setting, never presented as another product. Handle 403 entitlement errors with a clear "use an API key" message.
-4. **Claude: API key or official Claude Code engine only.** Anthropic's terms forbid third-party apps from offering Claude.ai login or holding Claude.ai tokens. Rhizome builds no Claude OAuth. The extra-usage opt-in does not change this (see Provider terms). Claude subscription users run the unmodified Claude Code binary as an engine.
+4. **Claude: API key only.** Anthropic's terms forbid third-party apps from offering Claude.ai login or holding Claude.ai tokens. Rhizome builds no Claude OAuth. The extra-usage opt-in does not change this (see Provider terms). There is no Claude Code engine either: ADR-0189 removed outside engines, and knispo confirmed on 2026-10-24 that Claude stays out of sign-in.
 5. **API key import from other harnesses:** keys only, never another app's OAuth tokens. The user ticks each key, sees it masked, Rhizome copies it into the keychain, makes one test call, and never writes back to the source app.
 6. **OpenRouter (optional):** OpenRouter's PKCE flow returns a user-owned API key; store it like any key (ADR-0185).
 
-**Builder:** Dank.bot, after #183.
+**Builder:** G-baby (changed from Dank.bot on 2026-10-24, when knispo approved Julian's four-PR sign-in plan in Builders). v1 keeps one signed-in account per provider; switching accounts is sign out, then sign in.
 
 ## Provider terms (checked 2026-10-16)
 
@@ -50,6 +50,6 @@ Sources:
 
 ## Consequences
 
-- Claude subscription use in Rhizome goes through the Claude Code engine only.
+- Claude in Rhizome is API key only; there is no Claude subscription path.
 - xAI sign-in depends on a shared client id until xAI issues one; re-evaluate when it does.
 - Re-check terms before each sign-in release.
