@@ -4,17 +4,13 @@ import { CHAT_TOP_BAR_BAND_CLASS, PrimeSessionSubhead } from './PrimeSessionSubh
 import { overlayTitleBarBandStyle } from '../utils/trafficLights'
 import { SHEET_OFFSET_BAND_ATTR } from '../hooks/useNotesSheetOffset'
 import { useDragRegion } from '../hooks/useDragRegion'
-import { AgentActivityBand } from './AgentActivityBand'
-import { RlmFamilyBand } from './RlmFamilyBand'
 import { ChatComposerDeck } from './ChatComposerDeck'
-import { ChatPreflightBanner } from './ChatPreflightBanner'
 import { AgentsPill } from './status-bar/AgentsPill'
 import { useRhizomeJobs } from '../hooks/useRhizomeJobs'
 import { ChatNotePane } from './ChatNotePane'
 import { useChatNoteContent } from '../hooks/useChatNoteContent'
 import { usePanelWidth } from '../hooks/usePanelWidth'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
-import { usePrimeHostStatus } from '../hooks/usePrimeHostStatus'
 import { usePrimeActiveSessionTitle } from '../hooks/usePrimeActiveSessionTitle'
 import { sessionTitleRefreshKey } from '../lib/sessionHeaderTitle'
 import { resolveChatOpenNote } from '../utils/resolveChatOpenNote'
@@ -132,37 +128,20 @@ export default function ChatHome({
     target: chatEngineLockTarget(isPrimeChatTarget, defaultAiAgent),
   }
   const startedEngine = startedEngineFromLock(engineLock, lockScope)
-  // Poll from the open chat's engine, not the Settings switch. Host is still
-  // unknown here; an already-started Prime chat must keep its live status.
-  const effectiveEngineForStatus = resolveEffectiveChatEngine({
-    requestedEngine: chatEngine,
-    isPrimeTarget: isPrimeChatTarget,
-    hostKnown: false,
-    hostNotInstalled: false,
-    startedEngine,
-  })
   const engineChromeReady = chatEngineSettled
-  const isPrimeTarget = engineChromeReady && isPrimeChatTarget && effectiveEngineForStatus === 'prime'
-  const primeHost = usePrimeHostStatus(isPrimeTarget, vaultPath)
-  const hostKnown = Boolean(primeHost.known)
-  const hostNotInstalled = primeHost.problem?.code === 'not_installed'
   const engineInput = {
     requestedEngine: chatEngine,
     isPrimeTarget: isPrimeChatTarget,
-    hostKnown,
-    hostNotInstalled,
     startedEngine,
   }
-  const effectiveEngine = resolveEffectiveChatEngine(engineInput)
-  const showPrimeChrome = engineChromeReady && isPrimeChat && chatTarget?.kind !== 'api_model' && effectiveEngine === 'prime'
+  const effectiveEngine = resolveEffectiveChatEngine()
   // The title strip and Command Palette are Chat chrome, not Prime-only.
   // Tying them to `effectiveEngine === 'prime'` hid the whole top bar on
   // Rhizome's native engine, including the header.
   const showChatTopBarSlot = isPrimeChat && chatTarget?.kind !== 'api_model'
   const showChatTopBar = engineChromeReady && showChatTopBarSlot
   const showChatTopBarPlaceholder = !engineChromeReady && showChatTopBarSlot
-  const rhizomeCatalog = engineChromeReady && effectiveEngine === 'native'
-  const showComposerDeck = engineChromeReady && isPrimeChat && (showPrimeChrome || rhizomeCatalog)
+  const showComposerDeck = engineChromeReady && isPrimeChat && effectiveEngine === 'native'
   const panelEngine = engineChromeReady ? effectiveEngine : undefined
   if (
     chatEngineSettled
@@ -184,10 +163,10 @@ export default function ChatHome({
       current.path === next.path && current.title === next.title ? current : next
     ))
   }, [])
-  const sessionPath = sessionMeta.path ?? primeHost?.sessionPath ?? null
+  const sessionPath = sessionMeta.path
   const listedTitle = usePrimeActiveSessionTitle(
     sessionPath,
-    sessionTitleRefreshKey(primeHost?.isStreaming, sessionPath),
+    sessionTitleRefreshKey(false, sessionPath),
   )
   const sessionTitle = listedTitle ?? sessionMeta.title
   const { onMouseDown: onDragRegionMouseDown } = useDragRegion<HTMLDivElement>()
@@ -247,11 +226,8 @@ export default function ChatHome({
         <PrimeSessionSubhead
           railLayoutWidth={railLayoutWidth}
           locale={locale}
-          live={Boolean(primeHost?.running)}
-          sessionId={primeHost?.sessionId ?? null}
+          live={false}
           vaultPath={vaultPath}
-          startedAt={primeHost?.startedAt ?? null}
-          problem={primeHost?.problem ?? null}
           sessionTitle={sessionTitle}
           showSessionStatus={effectiveEngine === 'prime'}
           onNewChat={() => {
@@ -259,20 +235,9 @@ export default function ChatHome({
             setSessionMeta({ path: null, title: null })
             newChatRef.current?.()
           }}
-          onOpenFootprint={
-            onOpenSessionFootprint && primeHost?.sessionPath
-              ? () => onOpenSessionFootprint(primeHost.sessionPath as string)
-              : undefined
-          }
           onOpenCommandPalette={onOpenCommandPalette}
         />
       ) : null}
-      <AgentActivityBand locale={locale} enabled={showPrimeChrome} />
-      <RlmFamilyBand
-        locale={locale}
-        enabled={showPrimeChrome}
-        liveSessionId={primeHost?.sessionId ?? null}
-      />
       <div className="flex min-h-0 flex-1">
         <AiPanel
           locale={locale}
@@ -334,25 +299,12 @@ export default function ChatHome({
               </div>
             ) : null
           }
-          composerControls={
-            showPrimeChrome ? (
-              <>
-              {/* Above the pills, not below: a reason the turn will fail is
-                  worth more than the controls it sits over. */}
-              <ChatPreflightBanner
-                locale={locale}
-                vaultPath={vaultPath}
-                provider={primeHost?.modelProvider ?? null}
-              />
-              </>
-            ) : undefined
-          }
           composerDeck={
             showComposerDeck ? (
               <ChatComposerDeck
                 locale={locale}
                 vaultPath={vaultPath}
-                catalog={rhizomeCatalog ? 'rhizome' : 'prime'}
+                catalog="rhizome"
                 nativeTarget={nativeTarget}
                 onNativeTargetChange={onNativeTargetChange}
                 providers={aiModelProviders}

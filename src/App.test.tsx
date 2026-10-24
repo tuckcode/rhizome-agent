@@ -540,8 +540,6 @@ import { panePresetStorageKey } from './lib/panePresetStorage'
 import { notesPanelModeStorageKey } from './lib/notesPanelMode'
 import { viewShortcutEventModifiers } from './lib/railViewShortcuts'
 
-const AI_AGENTS_ONBOARDING_DISMISSED_STORAGE_NAME = 'rhizome:ai-agents-onboarding-dismissed'
-const CLAUDE_CODE_ONBOARDING_DISMISSED_STORAGE_NAME = 'tolaria:claude-code-onboarding-dismissed'
 const SLOW_APP_READY_TIMEOUT_MS = 10_000
 
 function setPanePreset(id: 'chat' | 'notes' | 'read' | 'workbench', scope = '/vault'): void {
@@ -599,7 +597,6 @@ describe('App', () => {
     // session — mark it done so these stay on the four-panel layout.
     sessionStorage.setItem(AGENT_CHAT_OPENED_SESSION_KEY, '1')
     window.history.replaceState({}, '', '/')
-    localStorage.setItem(CLAUDE_CODE_ONBOARDING_DISMISSED_STORAGE_NAME, '1')
   })
 
   it('renders the four-panel layout', async () => {
@@ -1090,8 +1087,6 @@ describe('App', () => {
   })
 
   it('opens a fresh launch on the app and skips the Prime setup screen', async () => {
-    localStorage.removeItem(AI_AGENTS_ONBOARDING_DISMISSED_STORAGE_NAME)
-    localStorage.removeItem(CLAUDE_CODE_ONBOARDING_DISMISSED_STORAGE_NAME)
     mockCommandResults.get_ai_agents_status = {
       prime: { installed: true, version: 'mock' },
       claude_code: { installed: true, version: '2.1.90' },
@@ -1653,7 +1648,6 @@ describe('App', () => {
     const saveVaultList = vi.fn()
     const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('file:///Users/mock/Documents/Work%20Vault')
 
-    localStorage.removeItem(CLAUDE_CODE_ONBOARDING_DISMISSED_STORAGE_NAME)
     mockCommandResults.load_vault_list = { vaults: [], active_vault: null, hidden_defaults: [] }
     mockCommandResults.check_vault_exists = (args?: { path?: string }) => args?.path === selectedVaultPath
     mockCommandResults.get_ai_agents_status = {}

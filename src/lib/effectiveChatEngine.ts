@@ -4,8 +4,6 @@ import type { AiAgentId } from './aiAgents'
 export interface EffectiveChatEngineInput {
   requestedEngine: ChatEngine
   isPrimeTarget: boolean
-  hostKnown: boolean
-  hostNotInstalled: boolean
   startedEngine: ChatEngine | null
 }
 
@@ -41,12 +39,11 @@ export function startedEngineFromLock(
  * Which engine Chat should send on.
  *
  * Rhizome's own engine is the only chat engine (ADR-0189). A saved Prime
- * or Hermes choice, an unknown host, and an already-open lock all resolve
- * to native. External CLI sends still go through `usesNativeChatStream`,
- * which reads the target rather than this value.
+ * or Hermes choice and an already-open lock both resolve to native.
+ * External CLI sends still go through `usesNativeChatStream`, which reads
+ * the target rather than this value.
  */
-export function resolveEffectiveChatEngine(input: EffectiveChatEngineInput): ChatEngine {
-  void input
+export function resolveEffectiveChatEngine(): ChatEngine {
   return 'native'
 }
 

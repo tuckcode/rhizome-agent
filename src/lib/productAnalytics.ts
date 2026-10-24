@@ -517,14 +517,6 @@ export function trackCelebration({
 }
 
 /**
- * The chat model menu's curated allow-list changed (#45).
- *
- * Counts only. The question this answers is whether people curate at all and
- * how far down they cut — 501 models is the complaint the feature exists for,
- * so "curated to 6 of 501" is the signal. Which models they picked is a
- * per-user preference, and shipping 501 ids per event would bury it anyway.
- */
-/**
  * The one app-wide Chat profile was saved.
  *
  * Length only. The text is instructions the person wrote, so it stays off
@@ -532,20 +524,6 @@ export function trackCelebration({
  */
 export function trackAgentProfileSaved(length: number): void {
   trackEvent('agent_profile_saved', { length })
-}
-
-export function trackPrimeModelAllowListChanged(selected: number, available: number): void {
-  trackEvent('prime_model_allow_list_changed', { selected, available })
-}
-
-/**
- * The name filter (`-free` or `:free` in the model id) was toggled.
- * On/off only. Never a price, a key, or a note.
- *
- * `trackEvent` accepts string or number, so the boolean is `yes` / `no`.
- */
-export function trackPrimeModelsFreeOnly(on: boolean): void {
-  trackEvent('prime_models_free_only', { on: on ? 'yes' : 'no' })
 }
 
 /**
@@ -574,27 +552,4 @@ export function trackComposerReplyCompletionAccepted(): void {
 
 export function trackComposerReplyCompletionDismissed(): void {
   trackEvent('composer_reply_completion_dismissed')
-}
-
-/**
- * Settings added Nous Portal into Prime's catalog so Chat can list it with
- * the other providers. Count only — never model ids.
- */
-export function trackNousPortalAddedToChat(modelCount: number): void {
-  trackEvent('nous_portal_added_to_chat', { model_count: modelCount })
-}
-
-export type PrimeSignInMethod = 'browser' | 'api_key'
-export type PrimeSignInOutcome = 'success' | 'failed'
-
-/**
- * Settings signed Prime in to a provider (ADR-0176). Provider slug, method
- * and outcome only — never the key, token, or error text.
- */
-export function trackPrimeProviderSignIn(
-  provider: string,
-  method: PrimeSignInMethod,
-  outcome: PrimeSignInOutcome,
-): void {
-  trackEvent('prime_provider_sign_in', { provider, method, outcome })
 }
