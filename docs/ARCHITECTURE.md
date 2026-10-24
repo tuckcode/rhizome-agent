@@ -543,6 +543,10 @@ may display a chat; only one turn runs. Damage and a full log keep the
 original and continue in a new session. New native chats call
 `native_chat_start` and pick a catalog model or Taproot.
 `rhizome_provider_model.rs` is the native loop's OpenAI-compatible `Model`.
+Signed-in ChatGPT will call `POST /v1/responses` through
+`ai_models/openai_responses.rs` (`store: false`, `stream: true`).
+`chat_auth_kind_for_provider` keeps every provider on chat completions
+until the sign-in core marks that provider as signed-in ChatGPT.
 The loop registry (`rhizome_loop/tools`) offers `echo`, read-only file tools
 (`read_file`, `list_dir`, `grep`, `glob`), mutate file tools (`edit_file`,
 `write_file`), `create_note`, and Power User `bash`.
