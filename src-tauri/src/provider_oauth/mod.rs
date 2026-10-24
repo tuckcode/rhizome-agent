@@ -38,6 +38,8 @@ pub struct OauthStatus {
     pub signed_in: bool,
     pub usable: bool,
     pub email: Option<String>,
+    /// False when sign-out deleted the local record but remote revoke failed.
+    pub revoked: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -85,6 +87,13 @@ impl Record {
             id_token: String::new(),
             usable: false,
             ..self.clone()
+        }
+    }
+
+    fn cleared_client(&self) -> Self {
+        Self {
+            client_id: String::new(),
+            ..self.cleared()
         }
     }
 }
@@ -227,7 +236,7 @@ pub(crate) fn fresh_access_token_with(env: &Env, provider: &str) -> Result<Strin
     let Some(record) = load_record(env, &provider)? else {
         return Err(SIGN_IN_AGAIN.into());
     };
-    if record.access_token.is_empty() || record.refresh_token.is_empty() {
+    if record.refresh_token.is_empty() {
         return Err(SIGN_IN_AGAIN.into());
     }
     if !record.usable
@@ -242,25 +251,74 @@ pub(crate) fn fresh_access_token_with(env: &Env, provider: &str) -> Result<Strin
         return Err(turned_off(&provider));
     }
     let remaining = record.expires_at.saturating_sub(unix_now());
-    if remaining > REFRESH_WINDOW_SECS {
+    if !record.access_token.is_empty() && remaining > REFRESH_WINDOW_SECS {
         return Ok(record.access_token);
     }
-    match openai::refresh(env, &record) {
-        Ok(updated) => {
-            // The rotated pair is stored before this token is returned.
-            save_record(env, &provider, &updated)?;
-            Ok(updated.access_token.clone())
-        }
+    let parsed = match openai::refresh(env, &record) {
+        Ok(parsed) => parsed,
         Err(openai::RefreshFail::Again(cleared)) => {
-            let _ = save_record(env, &provider, &cleared);
-            Err(SIGN_IN_AGAIN.into())
+            let _ = save_rotated(env, &provider, &cleared);
+            return Err(SIGN_IN_AGAIN.into());
         }
-        Err(openai::RefreshFail::NotUsable(record)) => {
-            let _ = save_record(env, &provider, &record);
-            Err(NOT_USABLE.into())
-        }
-        Err(openai::RefreshFail::Temporary) => Err("The token request failed.".into()),
+        Err(openai::RefreshFail::Temporary) => return Err("The token request failed.".into()),
+    };
+    let mut updated = record.clone();
+    if !parsed.access_token.is_empty() {
+        updated.access_token = parsed.access_token;
     }
+    updated.refresh_token = parsed
+        .refresh_token
+        .filter(|token| !token.is_empty())
+        .unwrap_or_else(|| record.refresh_token.clone());
+    updated.expires_at = unix_now() + parsed.expires_in.unwrap_or(3600).max(0);
+    updated.saved_at = unix_now();
+    if let Some(scope) = parsed.scope.as_deref() {
+        updated.scopes = openai::split_scopes(scope);
+        updated.usable = updated
+            .scopes
+            .iter()
+            .any(|scope| scope == openai::DIRECT_SCOPE);
+    }
+    // The server may already have burned the previous refresh token.
+    save_rotated(env, &provider, &updated)?;
+    if updated.access_token.is_empty() {
+        return Err("The token request failed.".into());
+    }
+    if !parsed.id_token.is_empty() {
+        match openai::check_id_token(env, &parsed.id_token, &updated.client_id) {
+            Ok(openai::IdCheck::Match(identity)) if identity.subject == updated.subject => {
+                updated.email = identity.email.or(updated.email);
+                updated.id_token = parsed.id_token;
+                save_rotated(env, &provider, &updated)?;
+            }
+            Ok(openai::IdCheck::Match(_)) => {
+                let _ = save_rotated(env, &provider, &record.cleared());
+                return Err(SIGN_IN_AGAIN.into());
+            }
+            Ok(openai::IdCheck::Failed) | Err(_) => {}
+        }
+    }
+    if !updated.usable {
+        return Err(NOT_USABLE.into());
+    }
+    Ok(updated.access_token)
+}
+
+/// Retries a rotated record so a single keychain miss does not drop it.
+fn save_rotated(env: &Env, provider: &str, record: &Record) -> Result<(), String> {
+    let mut last = String::new();
+    for attempt in 0..3 {
+        match save_record(env, provider, record) {
+            Ok(()) => return Ok(()),
+            Err(error) => {
+                last = error;
+                if attempt < 2 {
+                    log::warn!("keychain write failed after rotation");
+                }
+            }
+        }
+    }
+    Err(last)
 }
 
 pub(crate) fn sign_out_with(env: &Env, provider: &str) -> Result<OauthStatus, String> {
@@ -273,12 +331,9 @@ pub(crate) fn sign_out_with(env: &Env, provider: &str) -> Result<OauthStatus, St
     };
     env.keys.delete_account(&oauth_account(&provider))?;
     set_provider_enabled(env, &provider, false)?;
-    if !revoke_ok {
-        return Err(
-            "Sign-out removed the saved sign-in. Remote revocation was not confirmed.".into(),
-        );
-    }
-    status_of(env, &provider)
+    let mut status = status_of(env, &provider)?;
+    status.revoked = revoke_ok;
+    Ok(status)
 }
 
 pub(crate) fn status_of(env: &Env, provider: &str) -> Result<OauthStatus, String> {
@@ -294,6 +349,7 @@ pub(crate) fn status_of(env: &Env, provider: &str) -> Result<OauthStatus, String
         signed_in,
         usable,
         email: record.and_then(|record| record.email),
+        revoked: true,
     })
 }
 
@@ -363,10 +419,12 @@ pub(super) fn save_record(env: &Env, provider: &str, record: &Record) -> Result<
     let json =
         serde_json::to_string(record).map_err(|_| "The sign-in could not be saved.".to_string())?;
     let account = oauth_account(provider);
-    env.keys.write_account(&account, &json)?;
+    env.keys
+        .write_account(&account, &json)
+        .map_err(|_| "The sign-in could not be saved to the keychain.".to_string())?;
     match env.keys.read_account(&account)? {
         Some(stored) if stored == json => Ok(()),
-        _ => Err(SIGN_IN_AGAIN.into()),
+        _ => Err("The sign-in could not be saved to the keychain.".into()),
     }
 }
 
@@ -396,6 +454,38 @@ pub(super) fn unix_now() -> i64 {
         .duration_since(UNIX_EPOCH)
         .map(|duration| i64::try_from(duration.as_secs()).unwrap_or(i64::MAX))
         .unwrap_or(0)
+}
+
+/// Built-in OpenAI row from the provider presets. ChatGPT sign-in is stored
+/// under this id. A custom OpenAI-compatible provider keeps its API key.
+pub const BUILTIN_OPENAI_PROVIDER_ID: &str = "openai";
+
+/// True when `provider_id` is the built-in OpenAI provider, ChatGPT sign-in
+/// is switched on, and the keychain holds a usable token. PR 2 calls this
+/// to choose the Responses API. Custom providers never match.
+pub fn provider_is_signed_in_chatgpt(provider_id: &str) -> bool {
+    current()
+        .map(|env| provider_is_signed_in_with(&env, provider_id))
+        .unwrap_or(false)
+}
+
+pub(crate) fn provider_is_signed_in_with(env: &Env, provider_id: &str) -> bool {
+    let Ok(id) = normalize_provider(provider_id) else {
+        return false;
+    };
+    if id != BUILTIN_OPENAI_PROVIDER_ID || !provider_enabled(env, &id) {
+        return false;
+    }
+    let Ok(Some(record)) = load_record(env, &id) else {
+        return false;
+    };
+    !record.access_token.is_empty()
+        && !record.refresh_token.is_empty()
+        && record.usable
+        && record
+            .scopes
+            .iter()
+            .any(|scope| scope == openai::DIRECT_SCOPE)
 }
 
 fn normalize_provider(provider: &str) -> Result<String, String> {

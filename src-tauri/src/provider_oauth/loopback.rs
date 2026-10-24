@@ -17,15 +17,30 @@ pub(crate) const FORBIDDEN_PORT: u16 = 1455;
 pub(crate) const CALLBACK_PATH: &str = "/auth/callback";
 
 const CLOSE_PAGE: &str = "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Rhizome</title></head><body><p>You can close this tab.</p></body></html>";
+const ERROR_PAGE: &str = "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Rhizome</title></head><body><p>Sign-in could not be verified.</p></body></html>";
 
 pub(crate) struct Loopback {
     listener: TcpListener,
     pub port: u16,
 }
 
-#[derive(Debug)]
 pub(crate) struct Callback {
     pub params: BTreeMap<String, String>,
+}
+
+impl std::fmt::Debug for Callback {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut params = self.params.clone();
+        for secret in ["code", "state"] {
+            if params.contains_key(secret) {
+                params.insert(secret.to_string(), "[redacted]".to_string());
+            }
+        }
+        formatter
+            .debug_struct("Callback")
+            .field("params", &params)
+            .finish()
+    }
 }
 
 pub(crate) fn port_is_allowed(port: u16) -> bool {
@@ -56,8 +71,14 @@ impl Loopback {
         format!("http://127.0.0.1:{}{CALLBACK_PATH}", self.port)
     }
 
-    /// Blocks until the callback, a cancel, or `timeout`.
-    pub(crate) fn wait(self, timeout: Duration, cancel: &AtomicBool) -> Result<Callback, String> {
+    /// Blocks until a callback whose state matches, a cancel, or `timeout`.
+    /// A callback with a different state stays open.
+    pub(crate) fn wait(
+        self,
+        timeout: Duration,
+        cancel: &AtomicBool,
+        expected_state: &str,
+    ) -> Result<Callback, String> {
         self.listener
             .set_nonblocking(true)
             .map_err(|_| "The sign-in callback could not be started.".to_string())?;
@@ -74,7 +95,7 @@ impl Loopback {
                     let _ = stream.set_nonblocking(false);
                     let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
                     let _ = stream.set_write_timeout(Some(Duration::from_secs(2)));
-                    match handle_connection(stream) {
+                    match handle_connection(stream, expected_state) {
                         Connection::KeepWaiting => {}
                         Connection::Callback(callback) => return Ok(callback),
                         Connection::Cancelled => return Err("Sign-in was cancelled.".into()),
@@ -95,7 +116,7 @@ enum Connection {
     Cancelled,
 }
 
-fn handle_connection(mut stream: TcpStream) -> Connection {
+fn handle_connection(mut stream: TcpStream, expected_state: &str) -> Connection {
     let mut buffer = [0u8; 8192];
     let Ok(read) = stream.read(&mut buffer) else {
         return Connection::KeepWaiting;
@@ -115,13 +136,20 @@ fn handle_connection(mut stream: TcpStream) -> Connection {
         return Connection::Cancelled;
     }
     if path != CALLBACK_PATH {
-        let _ = write_response(&mut stream, 404, CLOSE_PAGE);
+        let _ = write_response(&mut stream, 404, ERROR_PAGE);
+        return Connection::KeepWaiting;
+    }
+    let params = query_params(target);
+    let state = params.get("state").map(String::as_str).unwrap_or("");
+    let state_ok = super::pkce::same_secret(state, expected_state);
+    let finished =
+        params.get("code").is_some_and(|code| !code.is_empty()) || params.contains_key("error");
+    if !state_ok || !finished {
+        let _ = write_response(&mut stream, 400, ERROR_PAGE);
         return Connection::KeepWaiting;
     }
     let _ = write_response(&mut stream, 200, CLOSE_PAGE);
-    Connection::Callback(Callback {
-        params: query_params(target),
-    })
+    Connection::Callback(Callback { params })
 }
 
 fn request_target(request: &str) -> Option<&str> {
@@ -138,41 +166,39 @@ fn query_params(target: &str) -> BTreeMap<String, String> {
         .split('&')
         .filter_map(|pair| {
             let (name, value) = pair.split_once('=').unwrap_or((pair, ""));
-            let name = percent_decode(name);
+            let name = percent_decode(name.as_bytes());
             if name.is_empty() {
                 None
             } else {
-                Some((name, percent_decode(value)))
+                Some((name, percent_decode(value.as_bytes())))
             }
         })
         .collect()
 }
 
-fn percent_decode(value: &str) -> String {
-    let bytes = value.as_bytes();
+fn percent_decode(bytes: &[u8]) -> String {
     let mut out = Vec::with_capacity(bytes.len());
     let mut index = 0;
     while index < bytes.len() {
-        match bytes[index] {
-            b'+' => {
-                out.push(b' ');
-                index += 1;
-            }
-            b'%' if index + 2 < bytes.len() => {
-                let hex = &value[index + 1..index + 3];
-                if let Ok(byte) = u8::from_str_radix(hex, 16) {
+        if bytes[index] == b'+' {
+            out.push(b' ');
+            index += 1;
+            continue;
+        }
+        if bytes[index] == b'%' && index + 2 < bytes.len() {
+            let hex = [bytes[index + 1], bytes[index + 2]];
+            if hex.iter().all(u8::is_ascii_hexdigit) {
+                let text = [hex[0] as char, hex[1] as char];
+                let text: String = text.iter().collect();
+                if let Ok(byte) = u8::from_str_radix(&text, 16) {
                     out.push(byte);
                     index += 3;
-                } else {
-                    out.push(bytes[index]);
-                    index += 1;
+                    continue;
                 }
             }
-            byte => {
-                out.push(byte);
-                index += 1;
-            }
         }
+        out.push(bytes[index]);
+        index += 1;
     }
     String::from_utf8_lossy(&out).into_owned()
 }
@@ -210,7 +236,7 @@ mod tests {
         let loopback = Loopback::bind().unwrap();
         let uri = loopback.redirect_uri();
         let cancel = Arc::new(AtomicBool::new(false));
-        let handle = thread::spawn(move || loopback.wait(Duration::from_secs(2), &cancel));
+        let handle = thread::spawn(move || loopback.wait(Duration::from_secs(2), &cancel, "two"));
         let page = reqwest::blocking::get(format!("{uri}?code=one&state=two"))
             .unwrap()
             .text()
@@ -230,7 +256,8 @@ mod tests {
         let loopback = Loopback::bind().unwrap();
         let port = loopback.port;
         let cancel = Arc::new(AtomicBool::new(false));
-        let handle = thread::spawn(move || loopback.wait(Duration::from_secs(2), &cancel));
+        let handle =
+            thread::spawn(move || loopback.wait(Duration::from_secs(2), &cancel, "unused"));
         let page = reqwest::blocking::get(format!("http://127.0.0.1:{port}/cancel"))
             .unwrap()
             .text()
@@ -245,7 +272,7 @@ mod tests {
         let loopback = Loopback::bind().unwrap();
         let cancel = Arc::new(AtomicBool::new(false));
         let error = loopback
-            .wait(Duration::from_millis(80), &cancel)
+            .wait(Duration::from_millis(80), &cancel, "unused")
             .unwrap_err();
         assert_eq!(error, "Sign-in timed out.");
     }
@@ -254,7 +281,38 @@ mod tests {
     fn the_cancel_flag_ends_the_wait() {
         let loopback = Loopback::bind().unwrap();
         let cancel = Arc::new(AtomicBool::new(true));
-        let error = loopback.wait(Duration::from_secs(2), &cancel).unwrap_err();
+        let error = loopback
+            .wait(Duration::from_secs(2), &cancel, "unused")
+            .unwrap_err();
         assert_eq!(error, "Sign-in was cancelled.");
+    }
+
+    #[test]
+    fn a_wrong_state_stays_open_and_non_ascii_decoding_does_not_panic() {
+        assert_eq!(percent_decode(b"%C3%A9"), "é");
+        let mixed = b"a%\xC3\xA9";
+        assert_eq!(percent_decode(mixed), "a%\u{00e9}");
+
+        let loopback = Loopback::bind().unwrap();
+        let uri = loopback.redirect_uri();
+        let cancel = Arc::new(AtomicBool::new(false));
+        let handle = thread::spawn(move || loopback.wait(Duration::from_secs(2), &cancel, "good"));
+        let bad = reqwest::blocking::get(format!("{uri}?code=secret-code&state=bad"))
+            .unwrap()
+            .text()
+            .unwrap();
+        assert!(bad.contains("could not be verified"));
+        assert!(!bad.contains("You can close this tab."));
+        assert!(!bad.contains("secret-code"));
+        let good = reqwest::blocking::get(format!("{uri}?code=one&state=good"))
+            .unwrap()
+            .text()
+            .unwrap();
+        assert!(good.contains("You can close this tab."));
+        let callback = handle.join().unwrap().unwrap();
+        let rendered = format!("{callback:?}");
+        assert!(!rendered.contains("one"));
+        assert!(!rendered.contains("good"));
+        assert!(rendered.contains("[redacted]"));
     }
 }

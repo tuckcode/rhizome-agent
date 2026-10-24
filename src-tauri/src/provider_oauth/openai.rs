@@ -70,8 +70,21 @@ impl Endpoints {
 
 pub(super) enum RefreshFail {
     Again(Box<super::Record>),
-    NotUsable(Box<super::Record>),
     Temporary,
+}
+
+/// Tokens from a 2xx refresh body. Verification happens after this is saved.
+pub(super) struct RefreshTokens {
+    pub access_token: String,
+    pub refresh_token: Option<String>,
+    pub id_token: String,
+    pub expires_in: Option<i64>,
+    pub scope: Option<String>,
+}
+
+pub(super) enum IdCheck {
+    Match(Identity),
+    Failed,
 }
 
 struct Attempt<'a> {
@@ -123,8 +136,9 @@ pub(super) fn sign_in(
     );
     let (sender, receiver) = std::sync::mpsc::channel();
     let cancel = Arc::clone(&flag);
+    let expected_state = pkce.state.clone();
     std::thread::spawn(move || {
-        let _ = sender.send(loopback.wait(timeout, &cancel));
+        let _ = sender.send(loopback.wait(timeout, &cancel, &expected_state));
     });
     if !open_url(&url) {
         flag.store(true, Ordering::SeqCst);
@@ -199,7 +213,7 @@ pub(super) fn sign_in(
     super::status_of(env, &provider)
 }
 
-pub(super) fn refresh(env: &Env, record: &super::Record) -> Result<super::Record, RefreshFail> {
+pub(super) fn refresh(env: &Env, record: &super::Record) -> Result<RefreshTokens, RefreshFail> {
     let endpoints = resolve(env).map_err(|_| RefreshFail::Temporary)?;
     let response = env
         .http
@@ -218,7 +232,12 @@ pub(super) fn refresh(env: &Env, record: &super::Record) -> Result<super::Record
     if !response.status().is_success() {
         let code = oauth_error_code(response);
         if unusable_refresh(&code) {
-            return Err(RefreshFail::Again(Box::new(record.cleared())));
+            let cleared = if clears_client(&code) {
+                record.cleared_client()
+            } else {
+                record.cleared()
+            };
+            return Err(RefreshFail::Again(Box::new(cleared)));
         }
         return Err(RefreshFail::Temporary);
     }
@@ -226,35 +245,25 @@ pub(super) fn refresh(env: &Env, record: &super::Record) -> Result<super::Record
         Ok(body) => body,
         Err(_) => return Err(RefreshFail::Temporary),
     };
-    let Some(refresh_token) = body.refresh_token.filter(|token| !token.is_empty()) else {
-        return Err(RefreshFail::Again(Box::new(record.cleared())));
-    };
-    if body.access_token.is_empty() {
-        return Err(RefreshFail::Temporary);
+    Ok(RefreshTokens {
+        access_token: body.access_token,
+        refresh_token: body.refresh_token.filter(|token| !token.is_empty()),
+        id_token: body.id_token,
+        expires_in: body.expires_in,
+        scope: body.scope,
+    })
+}
+
+pub(super) fn check_id_token(
+    env: &Env,
+    id_token: &str,
+    client_id: &str,
+) -> Result<IdCheck, String> {
+    let endpoints = resolve(env)?;
+    match verify_id_token(env, &endpoints, id_token, "", client_id) {
+        Ok(identity) => Ok(IdCheck::Match(identity)),
+        Err(_) => Ok(IdCheck::Failed),
     }
-    let mut updated = record.clone();
-    updated.access_token = body.access_token;
-    updated.refresh_token = refresh_token;
-    updated.expires_at = unix_now() + body.expires_in.unwrap_or(3600).max(0);
-    updated.saved_at = unix_now();
-    if let Some(scope) = body.scope {
-        updated.scopes = split_scopes(&scope);
-        updated.usable = updated.scopes.iter().any(|scope| scope == DIRECT_SCOPE);
-    }
-    if !body.id_token.is_empty() {
-        let id_token = body.id_token;
-        match verify_id_token(env, &endpoints, &id_token, "", &updated.client_id) {
-            Ok(identity) if identity.subject == updated.subject => {
-                updated.email = identity.email.or(updated.email);
-                updated.id_token = id_token;
-            }
-            _ => return Err(RefreshFail::Temporary),
-        }
-    }
-    if !updated.usable {
-        return Err(RefreshFail::NotUsable(Box::new(updated)));
-    }
-    Ok(updated)
 }
 
 pub(super) fn revoke(env: &Env, record: &super::Record) -> Result<(), ()> {
@@ -327,13 +336,11 @@ fn authorize_url(
     ];
     if client_id == DYNAMIC_CLIENT {
         pairs.push(("agent_name_hint", AGENT_NAME.into()));
-    } else if let Some(previous) = previous {
-        if !previous.id_token.is_empty() {
-            pairs.push(("id_token_hint", previous.id_token.clone()));
-        }
-        if let Some(email) = previous.email.as_ref().filter(|email| !email.is_empty()) {
-            pairs.push(("login_hint", email.clone()));
-        }
+    } else if let Some(email) = previous
+        .and_then(|previous| previous.email.as_ref())
+        .filter(|email| !email.is_empty())
+    {
+        pairs.push(("login_hint", email.clone()));
     }
     let query = pairs
         .iter()
@@ -421,10 +428,16 @@ fn unusable_refresh(code: &str) -> bool {
             | "refresh_token_expired"
             | "refresh_token_invalidated"
             | "refresh_token_reused"
+            | "invalid_client"
+            | "unauthorized_client"
     )
 }
 
-fn split_scopes(scope: &str) -> Vec<String> {
+fn clears_client(code: &str) -> bool {
+    matches!(code, "invalid_client" | "unauthorized_client")
+}
+
+pub(super) fn split_scopes(scope: &str) -> Vec<String> {
     scope
         .split(|character: char| character.is_whitespace() || character == '+')
         .filter(|scope| !scope.is_empty())
@@ -432,9 +445,9 @@ fn split_scopes(scope: &str) -> Vec<String> {
         .collect()
 }
 
-struct Identity {
-    subject: String,
-    email: Option<String>,
+pub(super) struct Identity {
+    pub(super) subject: String,
+    pub(super) email: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -543,6 +556,12 @@ fn resolve(env: &Env) -> Result<Endpoints, String> {
     if !env.endpoints.discover {
         return Ok(env.endpoints.clone());
     }
+    static CACHE: std::sync::Mutex<Option<Endpoints>> = std::sync::Mutex::new(None);
+    let cache = CACHE.lock().unwrap_or_else(|poison| poison.into_inner());
+    if let Some(cached) = cache.clone() {
+        return Ok(cached);
+    }
+    drop(cache);
     let response = env
         .http
         .get(DISCOVERY)
@@ -557,14 +576,16 @@ fn resolve(env: &Env) -> Result<Endpoints, String> {
     if document.issuer != ISSUER {
         return Err("Sign-in could not be verified.".into());
     }
-    Ok(Endpoints {
+    let endpoints = Endpoints {
         issuer: document.issuer,
         authorize: document.authorization_endpoint,
         token: document.token_endpoint,
         jwks: document.jwks_uri,
         revoke: document.revocation_endpoint,
         discover: false,
-    })
+    };
+    *CACHE.lock().unwrap_or_else(|poison| poison.into_inner()) = Some(endpoints.clone());
+    Ok(endpoints)
 }
 
 #[derive(Deserialize)]
@@ -596,7 +617,7 @@ mod tests {
     use super::*;
     use crate::provider_keys::SecretBackend;
     use crate::provider_oauth::{
-        fresh_access_token_with, lock_refresh, sign_out_with, Record, TURNED_OFF,
+        fresh_access_token_with, lock_refresh, sign_out_with, Record, SIGN_IN_AGAIN, TURNED_OFF,
     };
     use std::collections::HashMap;
     use std::sync::Mutex;
@@ -612,6 +633,7 @@ mod tests {
         values: Mutex<HashMap<String, String>>,
         /// Rejects the rotated access token so a refresh cannot be saved.
         reject_rotated: bool,
+        fail_first_rotated: std::sync::atomic::AtomicBool,
     }
 
     impl Keys {
@@ -619,6 +641,7 @@ mod tests {
             Self {
                 values: Mutex::new(HashMap::new()),
                 reject_rotated: false,
+                fail_first_rotated: std::sync::atomic::AtomicBool::new(false),
             }
         }
     }
@@ -629,7 +652,9 @@ mod tests {
         }
 
         fn set(&self, account: &str, value: &str) -> Result<(), String> {
-            if self.reject_rotated && value.contains(ACCESS_2) {
+            if value.contains(ACCESS_2)
+                && (self.reject_rotated || self.fail_first_rotated.swap(false, Ordering::SeqCst))
+            {
                 return Err("keychain write failed".into());
             }
             self.values
@@ -659,7 +684,12 @@ mod tests {
         Denied,
         WrongState,
         InvalidGrant,
+        InvalidClient,
         MissingScope,
+        OmitRefreshToken,
+        RefreshJwksFails,
+        SubjectMismatch,
+        RevokeFails,
     }
 
     impl Mock {
@@ -669,10 +699,12 @@ mod tests {
             let requests = Arc::new(Mutex::new(Vec::new()));
             let mode = Arc::new(Mutex::new(mode));
             let nonce = Arc::new(Mutex::new(None));
+            let jwks_hits = Arc::new(std::sync::atomic::AtomicU32::new(0));
             let shutdown = Arc::new(AtomicBool::new(false));
             let seen = Arc::clone(&requests);
             let stop = Arc::clone(&shutdown);
-            let handle = std::thread::spawn(move || serve(listener, seen, mode, nonce, stop));
+            let hits = Arc::clone(&jwks_hits);
+            let handle = std::thread::spawn(move || serve(listener, seen, mode, nonce, hits, stop));
             Self {
                 base: format!("http://{addr}"),
                 requests,
@@ -709,6 +741,7 @@ mod tests {
         requests: Arc<Mutex<Vec<(String, String)>>>,
         mode: Arc<Mutex<Mode>>,
         nonce: Arc<Mutex<Option<String>>>,
+        jwks_hits: Arc<std::sync::atomic::AtomicU32>,
         shutdown: Arc<AtomicBool>,
     ) {
         listener.set_nonblocking(true).unwrap();
@@ -722,7 +755,7 @@ mod tests {
                         .lock()
                         .unwrap()
                         .push((target.clone(), body.clone()));
-                    let response = route(&target, &body, &mode, &nonce);
+                    let response = route(&target, &body, &mode, &nonce, &jwks_hits);
                     let _ = stream.write_all(response.as_bytes());
                 }
                 Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
@@ -767,6 +800,7 @@ mod tests {
         body: &str,
         mode: &Mutex<Mode>,
         nonce: &Mutex<Option<String>>,
+        jwks_hits: &std::sync::atomic::AtomicU32,
     ) -> String {
         let path = target.split('?').next().unwrap_or(target);
         let mode = mode.lock().unwrap().clone();
@@ -774,12 +808,19 @@ mod tests {
             return authorize_redirect(target, &mode, nonce);
         }
         if path == "/jwks" {
+            let hit = jwks_hits.fetch_add(1, Ordering::SeqCst);
+            if matches!(mode, Mode::RefreshJwksFails) && hit > 0 {
+                return http(500, "text/plain", "");
+            }
             return http(200, "application/json", &jwks_json());
         }
         if path == "/token" {
             return token_response(body, &mode, nonce);
         }
         if path == "/revoke" {
+            if matches!(mode, Mode::RevokeFails) {
+                return http(500, "text/plain", "");
+            }
             return http(200, "text/plain", "");
         }
         http(404, "text/plain", "")
@@ -809,11 +850,16 @@ mod tests {
                 std::thread::sleep(Duration::from_millis(*delay_ms));
             }
         }
-        if matches!(mode, Mode::InvalidGrant) && body.contains("grant_type=refresh_token") {
-            let payload = format!(
-                "{{\"error\":\"invalid_grant\",\"error_description\":\"{REFRESH} {ACCESS}\"}}"
-            );
-            return http(400, "application/json", &payload);
+        if body.contains("grant_type=refresh_token") {
+            if matches!(mode, Mode::InvalidGrant) {
+                let payload = format!(
+                    "{{\"error\":\"invalid_grant\",\"error_description\":\"{REFRESH} {ACCESS}\"}}"
+                );
+                return http(400, "application/json", &payload);
+            }
+            if matches!(mode, Mode::InvalidClient) {
+                return http(400, "application/json", r#"{"error":"invalid_client"}"#);
+            }
         }
         let nonce = nonce.lock().unwrap().clone().unwrap_or_default();
         let scope = match mode {
@@ -821,14 +867,25 @@ mod tests {
             Mode::Happy { scope, .. } => scope.as_str(),
             _ => "openid profile email offline_access resource.invoke chatgpt.tokens.use.direct",
         };
-        let (access, refresh) = if body.contains("grant_type=refresh_token") {
+        let refreshing = body.contains("grant_type=refresh_token");
+        let (access, refresh) = if refreshing {
             (ACCESS_2, REFRESH_2)
         } else {
             (ACCESS, REFRESH)
         };
-        let id_token = mint_id_token(&nonce, CLIENT);
+        let subject = if refreshing && matches!(mode, Mode::SubjectMismatch) {
+            "other-subject"
+        } else {
+            "user-subject"
+        };
+        let id_token = mint_id_token(&nonce, CLIENT, subject);
+        let refresh_field = if refreshing && matches!(mode, Mode::OmitRefreshToken) {
+            String::new()
+        } else {
+            format!(r#","refresh_token":"{refresh}""#)
+        };
         let payload = format!(
-            "{{\"access_token\":\"{access}\",\"refresh_token\":\"{refresh}\",\"id_token\":\"{id_token}\",\"token_type\":\"Bearer\",\"expires_in\":3600,\"scope\":\"{scope}\"}}"
+            r#"{{"access_token":"{access}"{refresh_field},"id_token":"{id_token}","token_type":"Bearer","expires_in":3600,"scope":"{scope}"}}"#
         );
         http(200, "application/json", &payload)
     }
@@ -838,6 +895,8 @@ mod tests {
             "OK"
         } else if status == 400 {
             "Bad Request"
+        } else if status == 500 {
+            "Error"
         } else {
             "Not Found"
         };
@@ -913,7 +972,7 @@ mod tests {
         )
     }
 
-    fn mint_id_token(nonce: &str, client_id: &str) -> String {
+    fn mint_id_token(nonce: &str, client_id: &str, subject: &str) -> String {
         #[derive(serde::Serialize)]
         struct Claims<'a> {
             iss: &'a str,
@@ -932,7 +991,7 @@ mod tests {
             &Claims {
                 iss: ISSUER,
                 aud: client_id,
-                sub: "user-subject",
+                sub: subject,
                 nonce,
                 email: "ada@example.com",
                 exp: now + 3600,
@@ -1022,27 +1081,35 @@ mod tests {
     }
 
     #[test]
-    fn state_mismatch_does_not_exchange_the_code() {
+    fn a_wrong_state_callback_is_ignored() {
         let mock = Mock::start(Mode::WrongState);
         let (_dir, env) = env_for(&mock);
-        let error = sign_in(
+        let status = sign_in(
             &env,
             "openai",
             |url| {
                 browser(url);
+                let params = query_map(url.split_once('?').unwrap().1);
+                let redirect = params.get("redirect_uri").cloned().unwrap();
+                let state = params.get("state").cloned().unwrap();
+                reqwest::blocking::get(format!(
+                    "{redirect}?code={CODE}&state={state}&client_id={CLIENT}"
+                ))
+                .unwrap();
                 true
             },
             Duration::from_secs(5),
         )
-        .unwrap_err();
-        assert_eq!(error, "Sign-in could not be verified.");
-        assert_clean(&error);
-        assert!(mock
+        .unwrap();
+        assert!(status.usable);
+        let token_hits = mock
             .requests
             .lock()
             .unwrap()
             .iter()
-            .all(|(target, _)| !target.starts_with("/token")));
+            .filter(|(target, _)| target.starts_with("/token"))
+            .count();
+        assert_eq!(token_hits, 1);
     }
 
     #[test]
@@ -1381,6 +1448,112 @@ mod tests {
         );
     }
 
+    fn expire_for_refresh(env: &Env) {
+        let _lock = lock_refresh(env).unwrap();
+        let mut record = load_record(env, "openai").unwrap().unwrap();
+        record.expires_at = unix_now();
+        save_record(env, "openai", &record).unwrap();
+    }
+
+    fn signed_in(env: &Env) {
+        sign_in(
+            env,
+            "openai",
+            |url| {
+                browser(url);
+                true
+            },
+            Duration::from_secs(5),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn a_refresh_without_a_new_refresh_token_keeps_the_old_one() {
+        let mock = Mock::start(Mode::OmitRefreshToken);
+        let (_dir, env) = env_for(&mock);
+        signed_in(&env);
+        expire_for_refresh(&env);
+        assert_eq!(fresh_access_token_with(&env, "openai").unwrap(), ACCESS_2);
+        let stored = load_record(&env, "openai").unwrap().unwrap();
+        assert_eq!(stored.refresh_token, REFRESH);
+        assert_eq!(stored.access_token, ACCESS_2);
+    }
+
+    #[test]
+    fn a_jwks_failure_after_rotation_keeps_the_new_tokens() {
+        let mock = Mock::start(Mode::RefreshJwksFails);
+        let (_dir, env) = env_for(&mock);
+        signed_in(&env);
+        let before = load_record(&env, "openai").unwrap().unwrap();
+        expire_for_refresh(&env);
+        assert_eq!(fresh_access_token_with(&env, "openai").unwrap(), ACCESS_2);
+        let stored = load_record(&env, "openai").unwrap().unwrap();
+        assert_eq!(stored.access_token, ACCESS_2);
+        assert_eq!(stored.refresh_token, REFRESH_2);
+        assert_eq!(stored.id_token, before.id_token);
+        assert_eq!(stored.email, before.email);
+    }
+
+    #[test]
+    fn a_subject_mismatch_clears_the_record() {
+        let mock = Mock::start(Mode::SubjectMismatch);
+        let (_dir, env) = env_for(&mock);
+        signed_in(&env);
+        expire_for_refresh(&env);
+        let error = fresh_access_token_with(&env, "openai").unwrap_err();
+        assert_eq!(error, SIGN_IN_AGAIN);
+        let stored = load_record(&env, "openai").unwrap().unwrap();
+        assert!(stored.access_token.is_empty());
+        assert!(stored.refresh_token.is_empty());
+        assert_eq!(stored.client_id, CLIENT);
+    }
+
+    #[test]
+    fn invalid_client_clears_the_stored_client_id() {
+        let mock = Mock::start(Mode::InvalidClient);
+        let (_dir, env) = env_for(&mock);
+        signed_in(&env);
+        expire_for_refresh(&env);
+        let error = fresh_access_token_with(&env, "openai").unwrap_err();
+        assert_eq!(error, SIGN_IN_AGAIN);
+        assert_clean(&error);
+        let stored = load_record(&env, "openai").unwrap().unwrap();
+        assert!(stored.client_id.is_empty());
+        assert!(stored.access_token.is_empty());
+        assert!(stored.refresh_token.is_empty());
+    }
+
+    #[test]
+    fn a_keychain_write_is_retried_after_rotation() {
+        let mock = Mock::start(Mode::Happy {
+            scope: DIRECT_SCOPE.into(),
+            delay_ms: 0,
+        });
+        let dir = tempfile::tempdir().unwrap();
+        let keys = Keys::new();
+        keys.fail_first_rotated.store(true, Ordering::SeqCst);
+        let env = Env::in_dir_with(dir.path(), mock.endpoints(), Box::new(keys));
+        signed_in(&env);
+        expire_for_refresh(&env);
+        assert_eq!(fresh_access_token_with(&env, "openai").unwrap(), ACCESS_2);
+        assert_eq!(
+            load_record(&env, "openai").unwrap().unwrap().refresh_token,
+            REFRESH_2
+        );
+    }
+
+    #[test]
+    fn sign_out_succeeds_when_revoke_fails() {
+        let mock = Mock::start(Mode::RevokeFails);
+        let (_dir, env) = env_for(&mock);
+        signed_in(&env);
+        let status = sign_out_with(&env, "openai").unwrap();
+        assert!(!status.revoked);
+        assert!(!status.signed_in);
+        assert!(env.read_account("openai:oauth").unwrap().is_none());
+    }
+
     #[test]
     fn a_second_sign_in_reuses_the_issued_client_and_the_host() {
         let mock = Mock::start(Mode::Happy {
@@ -1405,7 +1578,8 @@ mod tests {
             |url| {
                 assert!(url.contains(&format!("client_id={CLIENT}")));
                 assert!(!url.contains("agent_name_hint"));
-                assert!(url.contains("id_token_hint="));
+                assert!(!url.contains("id_token_hint="));
+                assert!(url.contains("login_hint="));
                 assert!(url.contains(&percent_encode(&host)));
                 browser(url);
                 true

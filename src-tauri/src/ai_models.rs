@@ -33,9 +33,11 @@ pub enum AiModelApiKeyStorage {
     None,
     Env,
     LocalFile,
-    /// A browser sign-in held in the OS keychain. `api_key_from_provider`
-    /// returns a fresh access token. The API-key variants are unchanged.
-    Oauth,
+    /// An unknown value from a newer build. It parses so Settings still
+    /// loads, then normalizes to the safe default. ChatGPT sign-in is not
+    /// stored here.
+    #[serde(other)]
+    Unknown,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -175,9 +177,10 @@ fn normalize_ai_model_provider(mut provider: AiModelProvider) -> Option<AiModelP
 
 fn normalize_api_key_storage(provider: &AiModelProvider) -> Option<AiModelApiKeyStorage> {
     match provider.api_key_storage {
-        Some(AiModelApiKeyStorage::Oauth) => Some(AiModelApiKeyStorage::Oauth),
         Some(AiModelApiKeyStorage::LocalFile) => Some(AiModelApiKeyStorage::LocalFile),
-        Some(AiModelApiKeyStorage::Env) | None if provider.api_key_env_var.is_some() => {
+        Some(AiModelApiKeyStorage::Env) | None | Some(AiModelApiKeyStorage::Unknown)
+            if provider.api_key_env_var.is_some() =>
+        {
             Some(AiModelApiKeyStorage::Env)
         }
         _ => Some(AiModelApiKeyStorage::None),
@@ -1066,18 +1069,18 @@ fn api_key_from_provider(request: &AiModelStreamRequest) -> Result<Option<String
         return Ok(Some(api_key));
     }
 
+    if crate::provider_oauth::provider_is_signed_in_chatgpt(&request.provider.id) {
+        return crate::provider_oauth::fresh_access_token(
+            crate::provider_oauth::BUILTIN_OPENAI_PROVIDER_ID,
+        )
+        .map(Some);
+    }
+
     match request.provider.api_key_storage {
         Some(AiModelApiKeyStorage::LocalFile) => api_key_from_local_file(request),
         Some(AiModelApiKeyStorage::Env) => api_key_from_env(request),
-        Some(AiModelApiKeyStorage::Oauth) => api_key_from_oauth(request),
-        Some(AiModelApiKeyStorage::None) | None => Ok(None),
+        Some(AiModelApiKeyStorage::None) | Some(AiModelApiKeyStorage::Unknown) | None => Ok(None),
     }
-}
-
-/// Access token for a provider whose storage is `oauth`. Empty when the
-/// provider's own sign-in setting is off, so a saved API key is unaffected.
-fn api_key_from_oauth(request: &AiModelStreamRequest) -> Result<Option<String>, String> {
-    crate::provider_oauth::fresh_access_token(&request.provider.id).map(Some)
 }
 
 fn extract_openai_text(json: &serde_json::Value) -> Result<String, String> {
@@ -1226,43 +1229,67 @@ mod tests {
     }
 
     #[test]
-    fn oauth_storage_stays_oauth_and_a_saved_key_still_resolves() {
-        let mut provider = provider(AiModelProviderKind::OpenAi);
-        provider.id = "oauth-gate".into();
-        provider.api_key_storage = Some(AiModelApiKeyStorage::Oauth);
-        provider.api_key_env_var = Some("OPENAI_API_KEY".into());
-        let normalized = normalize_ai_model_provider(provider).expect("provider");
-        assert_eq!(
-            normalized.api_key_storage,
-            Some(AiModelApiKeyStorage::Oauth)
-        );
+    fn an_unknown_api_key_storage_parses_and_chatgpt_stays_off_settings() {
+        let raw = r#"{
+            "id":"openai",
+            "name":"OpenAI",
+            "kind":"open_ai",
+            "api_key_storage":"oauth",
+            "api_key_env_var":"OPENAI_API_KEY",
+            "models":[{"id":"gpt","capabilities":{"streaming":true,"tools":false,"vision":false,"json_mode":false}}]
+        }"#;
+        let parsed: AiModelProvider = serde_json::from_str(raw).expect("unknown storage parses");
+        assert_eq!(parsed.api_key_storage, Some(AiModelApiKeyStorage::Unknown));
+        let normalized = normalize_ai_model_provider(parsed).expect("provider");
+        assert_eq!(normalized.api_key_storage, Some(AiModelApiKeyStorage::Env));
+        let settings: crate::settings::Settings =
+            serde_json::from_str(&format!(r#"{{"ai_model_providers":[{raw}]}}"#))
+                .expect("settings still parse");
+        assert!(settings.ai_model_providers.is_some());
 
+        let future = raw.replace("oauth", "future_storage");
+        let future: AiModelProvider = serde_json::from_str(&future).unwrap();
+        assert_eq!(future.api_key_storage, Some(AiModelApiKeyStorage::Unknown));
+    }
+
+    #[test]
+    fn chatgpt_sign_in_is_the_builtin_openai_provider_and_keys_still_work() {
         let _guard = crate::provider_oauth::test_support::install_usable_sign_in(
-            "oauth-gate",
+            "openai",
             "oat-secret-access",
         );
-        let mut request = request(normalized);
-        request.provider.id = "oauth-gate".into();
-        request.provider.api_key_storage = Some(AiModelApiKeyStorage::Oauth);
+        let mut openai = provider(AiModelProviderKind::OpenAi);
+        openai.id = "openai".into();
+        openai.api_key_env_var = None;
+        openai.api_key_storage = Some(AiModelApiKeyStorage::LocalFile);
+        let mut openai_request = request(openai);
+        assert!(crate::provider_oauth::provider_is_signed_in_chatgpt(
+            "openai"
+        ));
         assert_eq!(
-            api_key_from_provider(&request).unwrap().as_deref(),
+            api_key_from_provider(&openai_request).unwrap().as_deref(),
             Some("oat-secret-access")
         );
-
-        request.api_key_override = Some("sk-override".into());
+        openai_request.api_key_override = Some("sk-override".into());
         assert_eq!(
-            api_key_from_provider(&request).unwrap().as_deref(),
+            api_key_from_provider(&openai_request).unwrap().as_deref(),
             Some("sk-override")
         );
-        request.api_key_override = None;
 
+        let mut custom = provider(AiModelProviderKind::OpenAiCompatible);
+        custom.id = "my-gateway".into();
+        custom.api_key_env_var = None;
+        custom.api_key_storage = Some(AiModelApiKeyStorage::LocalFile);
         crate::provider_keys::ProviderKeys::for_app()
             .unwrap()
-            .save("oauth-gate", "sk-local-unchanged")
+            .save("my-gateway", "sk-local-unchanged")
             .unwrap();
-        request.provider.api_key_storage = Some(AiModelApiKeyStorage::LocalFile);
+        let custom_request = request(custom);
+        assert!(!crate::provider_oauth::provider_is_signed_in_chatgpt(
+            "my-gateway"
+        ));
         assert_eq!(
-            api_key_from_provider(&request).unwrap().as_deref(),
+            api_key_from_provider(&custom_request).unwrap().as_deref(),
             Some("sk-local-unchanged")
         );
     }
