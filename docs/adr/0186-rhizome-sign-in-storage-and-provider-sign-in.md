@@ -35,6 +35,7 @@ knispo approved Julian's four-PR plan in Builders ("go", 2026-10-24 1:07 PM CT).
 4. **Reasoning replay** between tool steps is kept per chat and cleared when the chat closes.
 5. **Accounts:** one account per provider. Sign-out revokes the token. Each sign-in has its own on/off setting, and the API key path always keeps working.
 6. **xAI login (PR 4)** follows decision 3: a preview on the Grok CLI's public client id, which is a setting, with the API key as the fallback.
+7. **Tests and redaction:** CI uses only a mock OAuth server and a mock Responses stream, with no live provider calls. Tokens are redacted from logs, Sentry and error messages, and a test proves it. A sign-in PR that breaks either rule is held.
 
 ## Provider terms (checked 2026-10-16)
 
