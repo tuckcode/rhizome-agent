@@ -26,8 +26,11 @@ export interface ConnectedRow {
   statusLabel: string
   action: ConnectionAction
   tab: ProviderSettingsTab
+  /** The tab row to scroll to. Distinct from the summary element's id. */
+  targetRowId: string
   models: string[]
   showKeyField: boolean
+  installUrl: string | null
   provider: AiModelProvider | null
 }
 
@@ -37,6 +40,10 @@ export function agentRowId(agentId: string): string {
 
 export function providerRowId(providerId: string): string {
   return `provider-row-${providerId}`
+}
+
+export function summaryRowId(targetRowId: string): string {
+  return `summary-${targetRowId}`
 }
 
 export function probeToConnection(input: {
@@ -64,17 +71,20 @@ export function buildConnectedRows(input: {
   for (const agentId of KEPT_EXTERNAL_AGENT_IDS) {
     const definition = getAiAgentDefinition(agentId as AiAgentId)
     const installed = getAiAgentAvailability(input.agents, definition.id).status === 'installed'
+    const targetRowId = agentRowId(definition.id)
     rows.push({
       id: `agent:${definition.id}`,
-      rowId: agentRowId(definition.id),
+      rowId: summaryRowId(targetRowId),
+      targetRowId,
       name: definition.label,
       kind: 'agent',
       status: installed ? 'ready' : 'not_running',
       statusLabel: installed ? 'Ready' : 'Not installed',
-      action: 'open',
+      action: installed ? 'open' : 'install',
       tab: 'agents',
       models: [],
       showKeyField: false,
+      installUrl: installed ? null : definition.installUrl,
       provider: null,
     })
   }
@@ -92,9 +102,11 @@ export function buildConnectedRows(input: {
       probe: probeToConnection({ needsKey, local, failure, models }),
     })
     const readyModels = status === 'ready' ? (models ?? []) : []
+    const targetRowId = providerRowId(provider.id)
     rows.push({
       id: `provider:${provider.id}`,
-      rowId: providerRowId(provider.id),
+      rowId: summaryRowId(targetRowId),
+      targetRowId,
       name: provider.name,
       kind: 'provider',
       status,
@@ -103,6 +115,7 @@ export function buildConnectedRows(input: {
       tab: local ? 'local' : 'api',
       models: readyModels,
       showKeyField: !local && provider.kind !== 'anthropic',
+      installUrl: null,
       provider,
     })
   }
@@ -112,9 +125,11 @@ export function buildConnectedRows(input: {
     if (seenKinds.has(entry.kind)) continue
     if (!rhizomeProviderNeedsApiKey(entry.kind, providers)) continue
     const provider = providerForDiscover(entry.kind)
+    const targetRowId = providerRowId(provider.id)
     rows.push({
       id: `provider:${provider.id}`,
-      rowId: providerRowId(provider.id),
+      rowId: summaryRowId(targetRowId),
+      targetRowId,
       name: provider.name,
       kind: 'provider',
       status: 'needs_key',
@@ -123,6 +138,7 @@ export function buildConnectedRows(input: {
       tab: 'api',
       models: [],
       showKeyField: true,
+      installUrl: null,
       provider,
     })
   }
@@ -152,6 +168,7 @@ function providerRows(providers: AiModelProvider[]): AiModelProvider[] {
 }
 
 function statusLabel(status: ConnectionStatus): string {
+  if (status === 'checking') return 'Checking…'
   if (status === 'ready') return 'Ready'
   if (status === 'needs_key') return 'Needs a key'
   if (status === 'not_running') return 'Not running'

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { AiAgentsStatus } from '../lib/aiAgents'
-import type { AiModelProvider } from '../lib/aiTargets'
+import { normalizeAiModelProviders, type AiModelProvider } from '../lib/aiTargets'
 import { buildConnectedRows, type ConnectedRow } from '../lib/connectedProviders'
 import {
   cachedProviderModelLabels,
@@ -11,6 +11,8 @@ import {
 } from '../lib/listProviderModels'
 import type { createTranslator } from '../lib/i18n'
 import { connectionErrorMessage } from '../lib/providerConnection'
+import { cn } from '@/lib/utils'
+import { openExternalUrl } from '../utils/url'
 import { trackEvent } from '../lib/telemetry'
 import { saveAiModelProviderApiKey, testAiModelProvider } from '../utils/aiProviderSecrets'
 import { Button } from './ui/button'
@@ -25,6 +27,7 @@ interface ConnectedProvidersSummaryProps {
   onChange: (providers: AiModelProvider[]) => void
   onOpen: (row: ConnectedRow) => void
   focusRowId?: string | null
+  onFocusConsumed?: () => void
 }
 
 export function ConnectedProvidersSummary({
@@ -34,6 +37,7 @@ export function ConnectedProvidersSummary({
   onChange,
   onOpen,
   focusRowId,
+  onFocusConsumed,
 }: ConnectedProvidersSummaryProps) {
   const [probe, setProbe] = useState(0)
   const [, setRevision] = useState(0)
@@ -68,7 +72,8 @@ export function ConnectedProvidersSummary({
     document.getElementById(focusRowId)?.scrollIntoView({ block: 'nearest' })
     const field = document.querySelector<HTMLInputElement>(`[data-key-for="${CSS.escape(focusRowId)}"]`)
     field?.focus()
-  }, [focusRowId, rows.length])
+    onFocusConsumed?.()
+  }, [focusRowId, onFocusConsumed])
 
   const retry = async (row: ConnectedRow) => {
     if (!row.provider) return
@@ -88,10 +93,10 @@ export function ConnectedProvidersSummary({
       if (!modelId) throw new Error('Add a model id first.')
       await testAiModelProvider(provider, modelId, secret || null)
       if (secret) {
-        await saveAiModelProviderApiKey(provider.id, secret)
-        if (!providers.some((item) => item.id === provider.id)) {
-          onChange([...providers, { ...provider, api_key_storage: 'local_file' }])
-        }
+        const saved = providerWithLocalKey(provider)
+        await saveAiModelProviderApiKey(saved.id, secret)
+        const rest = providers.filter((item) => item.id.trim().toLowerCase() !== saved.id)
+        onChange(normalizeAiModelProviders([...rest, saved]))
       }
       forgetListedProviderModels(provider)
       trackEvent('provider_connection_tested', { provider_kind: provider.kind, outcome: 'success' })
@@ -109,9 +114,16 @@ export function ConnectedProvidersSummary({
   }
 
   const actionLabel = (row: ConnectedRow) => {
-    if (row.action === 'add_key') return t('settings.connected.addKey')
+    if (row.action === 'install') return t('settings.connected.howToInstall')
     if (row.action === 'retry') return t('settings.connected.retry')
-    return t('settings.connected.open')
+    if (row.action === 'open') return t('settings.connected.manage')
+    return t('settings.connected.addKey')
+  }
+
+  const statusClass = (status: ConnectedRow['status']) => {
+    if (status === 'ready') return 'bg-[var(--feedback-success-bg)] text-feedback-success-text'
+    if (status === 'needs_key' || status === 'load_failed') return 'bg-[var(--feedback-warning-bg)] text-[var(--feedback-warning-text)]'
+    return 'bg-muted text-muted-foreground'
   }
 
   return (
@@ -136,8 +148,10 @@ export function ConnectedProvidersSummary({
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium text-foreground">{row.name}</div>
-                  <div className="text-xs text-muted-foreground" data-testid={`settings-connected-status-${row.id}`}>
-                    {row.statusLabel}
+                  <div data-testid={`settings-connected-status-${row.id}`}>
+                    <span className={cn('inline-flex rounded-full px-1.5 py-0.5 text-[11px] font-medium', statusClass(row.status))}>
+                      {row.statusLabel}
+                    </span>
                   </div>
                   {row.models.length > 0 ? (
                     <div className="mt-1 text-xs text-foreground" data-testid={`settings-connected-models-${row.id}`}>
@@ -145,6 +159,7 @@ export function ConnectedProvidersSummary({
                     </div>
                   ) : null}
                 </div>
+                {row.action === 'none' || row.action === 'add_key' ? null : (
                 <Button
                   type="button"
                   variant="outline"
@@ -155,15 +170,16 @@ export function ConnectedProvidersSummary({
                       void retry(row)
                       return
                     }
-                    if (row.action === 'add_key') {
-                      document.querySelector<HTMLInputElement>(`[data-key-for="${CSS.escape(row.rowId)}"]`)?.focus()
+                    if (row.action === 'install' && row.installUrl) {
+                      void openExternalUrl(row.installUrl)
                       return
                     }
-                    onOpen(row)
+                    onOpen({ ...row, rowId: row.targetRowId })
                   }}
                 >
                   {actionLabel(row)}
                 </Button>
+                )}
               </div>
               {row.showKeyField ? (
                 <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -189,7 +205,7 @@ export function ConnectedProvidersSummary({
                     disabled={busyId === row.id || (row.status === 'needs_key' && secret.trim() === '')}
                     onClick={() => { void testConnection(row) }}
                   >
-                    {busyId === row.id ? t('settings.connected.testing') : t('settings.connected.test')}
+                    {busyId === row.id ? t('settings.connected.testing') : t('settings.connected.saveAndTest')}
                   </Button>
                 </div>
               ) : null}
@@ -202,4 +218,13 @@ export function ConnectedProvidersSummary({
       </ul>
     </div>
   )
+}
+
+function providerWithLocalKey(provider: AiModelProvider): AiModelProvider {
+  const [saved] = normalizeAiModelProviders([{
+    ...provider,
+    api_key_storage: 'local_file',
+    api_key_env_var: null,
+  }])
+  return saved ?? { ...provider, api_key_storage: 'local_file', api_key_env_var: null }
 }

@@ -9,6 +9,7 @@ const root = path.dirname(fileURLToPath(import.meta.url))
 export default defineConfig({
   root,
   plugins: [react(), tailwindcss()],
+  publicDir: path.resolve(root, '../../../public'),
   resolve: {
     alias: { '@': path.resolve(root, '../../../src') },
   },

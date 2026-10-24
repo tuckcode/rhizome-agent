@@ -5,7 +5,7 @@ import {
   connectionErrorMessage,
   connectionStatus,
   connectionStatusLabel,
-  unsetProvidersLabel,
+  providersNeedAttentionLabel,
 } from './providerConnection'
 
 describe('connectionStatus', () => {
@@ -39,7 +39,14 @@ describe('connectionStatus', () => {
     expect(connectionAction('not_running')).toBe('retry')
   })
 
-  it('says Couldn\'t load models when the list fails, times out, or is empty', () => {
+  it('says Checking until a probe exists, then Couldn\'t load models when it fails or is empty', () => {
+    expect(connectionStatus({
+      needsKey: false,
+      local: true,
+      probe: null,
+    })).toBe('checking')
+    expect(connectionStatusLabel('checking')).toBe('Checking…')
+    expect(connectionAction('checking')).toBe('none')
     expect(connectionStatus({
       needsKey: false,
       local: false,
@@ -49,11 +56,6 @@ describe('connectionStatus', () => {
       needsKey: false,
       local: true,
       probe: { models: [] },
-    })).toBe('load_failed')
-    expect(connectionStatus({
-      needsKey: false,
-      local: false,
-      probe: null,
     })).toBe('load_failed')
     expect(connectionStatusLabel('load_failed')).toBe("Couldn't load models")
     expect(connectionAction('load_failed')).toBe('retry')
@@ -75,10 +77,10 @@ describe('agentConnectionStatus', () => {
   })
 })
 
-describe('unsetProvidersLabel', () => {
+describe('providersNeedAttentionLabel', () => {
   it('pluralizes the picker footer', () => {
-    expect(unsetProvidersLabel(1)).toBe("1 provider isn't set up")
-    expect(unsetProvidersLabel(3)).toBe("3 providers aren't set up")
+    expect(providersNeedAttentionLabel(1)).toBe('1 provider needs attention')
+    expect(providersNeedAttentionLabel(3)).toBe('3 providers need attention')
   })
 })
 
@@ -87,6 +89,8 @@ describe('connectionErrorMessage', () => {
     const secret = 'sk-test-secret'
     expect(connectionErrorMessage(new Error(`rejected ${secret}`), secret)).toBe('Could not connect.')
     expect(connectionErrorMessage(new Error('connection refused'), secret)).toBe('connection refused')
-    expect(connectionErrorMessage('nope', secret)).toBe('Could not connect.')
+    expect(connectionErrorMessage('bad gateway', secret)).toBe('bad gateway')
+    expect(connectionErrorMessage(`rejected ${secret}`, secret)).toBe('Could not connect.')
+    expect(connectionErrorMessage(null, secret)).toBe('Could not connect.')
   })
 })

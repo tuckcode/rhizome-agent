@@ -16,6 +16,10 @@ const params = new URLSearchParams(window.location.search)
 const theme = params.get('theme') === 'earth' ? 'earth' : 'graphite'
 const view = params.get('view') ?? 'settings'
 
+if (view === 'checking') {
+  ;(window as Window & { __RHIZOME_HOLD_MODEL_LIST__?: boolean }).__RHIZOME_HOLD_MODEL_LIST__ = true
+}
+
 if (theme === 'earth') {
   document.documentElement.setAttribute('data-theme', 'light')
   document.documentElement.removeAttribute('data-color-theme')
@@ -89,17 +93,7 @@ if (!root) throw new Error('missing root')
 createRoot(root).render(
   <StrictMode>
     <TooltipProvider>
-      {view === 'settings' ? (
-        <SettingsPanel
-          open
-          settings={settings}
-          aiAgentsStatus={agents}
-          initialSectionId={SETTINGS_SECTION_IDS.ai}
-          onSave={() => {}}
-          onClose={() => {}}
-          onCopyMcpConfig={() => {}}
-        />
-      ) : (
+      {view === 'picker' || view === 'timeout' ? (
         <Frame>
           <NativeChatModelPicker
             variant="chip"
@@ -109,12 +103,22 @@ createRoot(root).render(
             onOpenProviders={() => {}}
           />
         </Frame>
+      ) : (
+        <SettingsPanel
+          open
+          settings={settings}
+          aiAgentsStatus={agents}
+          initialSectionId={SETTINGS_SECTION_IDS.ai}
+          onSave={() => {}}
+          onClose={() => {}}
+          onCopyMcpConfig={() => {}}
+        />
       )}
     </TooltipProvider>
   </StrictMode>,
 )
 
-if (view !== 'settings') {
+if (view === 'picker' || view === 'timeout') {
   window.setTimeout(() => {
     window.dispatchEvent(new Event('rhizome-open-model-picker'))
   }, 300)

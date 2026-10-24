@@ -418,9 +418,10 @@ describe('NativeChatModelPicker', () => {
     await waitFor(() => {
       const gemini = screen.getByTestId('native-chat-model-gemini/gemini-2.5-flash')
       expect(gemini).toHaveAttribute('aria-disabled', 'true')
-      expect(gemini).toHaveTextContent('Needs an API key')
+      expect(gemini).not.toHaveTextContent('Needs an API key')
+      expect(screen.getAllByTestId('native-chat-model-reason').some((node) => node.textContent === 'Needs an API key')).toBe(true)
       expect(screen.getByTestId('native-chat-model-open-providers')).toHaveTextContent(
-        "providers aren't set up",
+        'need attention',
       )
       expect(screen.getByTestId('native-chat-model-keyless-note').textContent).not.toMatch(
         /1 providers/,
@@ -464,7 +465,7 @@ describe('NativeChatModelPicker', () => {
     )
     openMenu()
     const note = await screen.findByTestId('native-chat-model-keyless-note')
-    expect(note.textContent).toMatch(/providers aren't set up|1 provider isn't set up/)
+    expect(note.textContent).toMatch(/need attention/)
     expect(note.textContent).not.toMatch(/1 providers/)
   })
 
@@ -518,10 +519,10 @@ describe('NativeChatModelPicker', () => {
     )
     openMenu()
     const row = await screen.findByTestId('native-chat-model-work-openai/gpt-4o')
-    expect(row).toHaveAttribute('aria-disabled', 'true')
-    expect(row).toHaveTextContent("Couldn't load models. Retry.")
+    expect(row).not.toHaveAttribute('aria-disabled')
     expect(row).toHaveTextContent('GPT-4o')
-    expect(screen.getByTestId('native-chat-model-ollama/llama3.2')).toHaveTextContent("Ollama isn't running")
+    expect(screen.getAllByTestId('native-chat-model-offline').some((node) => node.textContent === "Couldn't load models")).toBe(true)
+    expect(screen.getByTestId('native-chat-model-ollama/llama3.2')).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('keeps cached rows usable while Loading… is muted', async () => {
@@ -621,9 +622,9 @@ describe('NativeChatModelPicker', () => {
       expect(screen.getByTestId('native-chat-model-openai/gpt-4o')).not.toHaveTextContent('OpenAI ·')
     })
     expect(screen.getByTestId('native-chat-model-azure/gpt-4o')).toHaveTextContent('GPT-4o')
-    expect(screen.getAllByTestId('native-chat-model-provider').map((node) => node.textContent)).toEqual(
-      expect.arrayContaining(['OpenAI', 'Azure']),
-    )
+    const headers = screen.getAllByTestId('native-chat-model-provider').map((node) => node.textContent ?? '')
+    expect(headers.some((text) => text.startsWith('OpenAI'))).toBe(true)
+    expect(headers.some((text) => text.startsWith('Azure'))).toBe(true)
   })
 
   it('paints group dividers with the input-border token', async () => {
@@ -666,7 +667,7 @@ describe('NativeChatModelPicker', () => {
     )
     const hidden = screen.getByTestId('native-chat-model-open_ai/gpt-4.1-mini')
     expect(hidden).toHaveAttribute('aria-disabled', 'true')
-    expect(hidden).toHaveTextContent('Needs an API key')
+    expect(screen.getAllByTestId('native-chat-model-reason').some((node) => node.textContent === 'Needs an API key')).toBe(true)
   })
 
   it('opens the chip menu upward when there is room above', async () => {

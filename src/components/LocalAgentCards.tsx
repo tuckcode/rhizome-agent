@@ -36,7 +36,6 @@ export function LocalAgentCards({ t, aiAgentsStatus, onCopyMcpConfig }: LocalAge
 
   useEffect(() => {
     setStatuses(aiAgentsStatus)
-    setCheckedAt(Date.now())
   }, [aiAgentsStatus])
 
   useEffect(() => {

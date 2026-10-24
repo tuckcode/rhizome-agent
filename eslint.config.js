@@ -47,6 +47,9 @@ export default defineConfig([
     'site/.astro/',
     'site/dist/',
     'site/node_modules/',
+    // Screenshot harness for the provider-settings PR. It is a Vite page,
+    // not an app module, and react-refresh rejects a file that exports nothing.
+    'docs/screenshots/',
   ]),
   {
     files: ['**/*.{ts,tsx}'],

@@ -1620,6 +1620,7 @@ function AiAgentSettingsSection({
     setProviderTab(row.tab)
     setProviderFocus(row.rowId)
   }
+  const clearProviderFocus = useCallback(() => setProviderFocus(null), [])
 
   return (
     <>
@@ -1704,6 +1705,7 @@ function AiAgentSettingsSection({
         providers={aiModelProviders}
         onChange={setAiModelProviders}
         focusRowId={providerFocus}
+        onFocusConsumed={clearProviderFocus}
         onOpen={openProviderRow}
       />
 

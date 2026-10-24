@@ -122,6 +122,27 @@ describe('listAiModelProviderModels', () => {
   })
 })
 
+describe('replaced model list requests', () => {
+  it('does not let a slow request erase the one that replaced it', async () => {
+    const provider = keyedOpenAi()
+    let releaseFirst: (value: string[]) => void = () => {}
+    const first = new Promise<string[]>((resolve) => {
+      releaseFirst = resolve
+    })
+    vi.mocked(callHost)
+      .mockImplementationOnce(() => first)
+      .mockResolvedValue(['next-model'])
+
+    const stale = listAiModelProviderModels(provider)
+    forgetListedProviderModels(provider)
+    const fresh = listAiModelProviderModels(provider)
+    releaseFirst(['stale-model'])
+    await expect(fresh).resolves.toEqual(['next-model'])
+    await stale
+    await expect(listAiModelProviderModels(provider)).resolves.toEqual(['next-model'])
+  })
+})
+
 describe('normalizeListedProviderModels', () => {
   it('keeps a one-character id from an array and does not split a string body', () => {
     expect(normalizeListedProviderModels(['m'])).toEqual([{ id: 'm', displayName: 'm' }])

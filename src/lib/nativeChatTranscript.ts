@@ -201,14 +201,12 @@ export function currentNativeSession(slot: string): LiveNativeChat {
   return liveNativeBySlot.get(slot) ?? { sessionId: null, readOnly: false }
 }
 
-/** Model stored on a live writable session, if a chat has already sent. */
-export function activeNativeSessionTarget(): string | null {
-  for (const live of liveNativeBySlot.values()) {
-    if (!live.sessionId || live.readOnly) continue
-    const target = nativeSessionTarget(live.sessionId)
-    if (target) return target
-  }
-  return null
+/** Model stored on one chat slot. Other slots are not consulted. */
+export function nativeSessionTargetForSlot(slot: string | null | undefined): string | null {
+  if (!slot) return null
+  const live = currentNativeSession(slot)
+  if (!live.sessionId || live.readOnly) return null
+  return nativeSessionTarget(live.sessionId)
 }
 
 export function retainNativeLiveSlot(slot: string): void {

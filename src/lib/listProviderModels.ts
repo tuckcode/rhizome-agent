@@ -22,7 +22,6 @@ const cached = new Map<string, ListedProviderModel[]>()
 const inflight = new Map<string, Promise<ListedProviderModel[]>>()
 const failed = new Set<string>()
 const failureKind = new Map<string, ProviderListFailure>()
-const failureName = new Map<string, ProviderListFailure>()
 
 /** A live `/models` call that is still pending after this shows Retry. */
 export const MODEL_LIST_TIMEOUT_MS = 10_000
@@ -34,7 +33,6 @@ export function resetListProviderModelsCache(): void {
   inflight.clear()
   failed.clear()
   failureKind.clear()
-  failureName.clear()
 }
 
 export function providerListFailure(provider: Pick<AiModelProvider, 'id' | 'kind' | 'base_url'>): ProviderListFailure | null {
@@ -47,12 +45,8 @@ export function cachedProviderModelLabels(provider: Pick<AiModelProvider, 'id' |
   return hit.map((model) => model.displayName || model.id)
 }
 
-export function providerListFailureByName(name: string): ProviderListFailure | null {
-  return failureName.get(name) ?? null
-}
-
-export function listProviderFailures(): Array<{ providerName: string; kind: ProviderListFailure }> {
-  return [...failureName.entries()].map(([providerName, kind]) => ({ providerName, kind }))
+export function listProviderFailures(): Array<{ cacheKey: string; kind: ProviderListFailure }> {
+  return [...failureKind.entries()].map(([cacheKey, kind]) => ({ cacheKey, kind }))
 }
 
 export function forgetListedProviderModels(provider: Pick<AiModelProvider, 'id' | 'kind' | 'base_url' | 'name'>): void {
@@ -61,7 +55,6 @@ export function forgetListedProviderModels(provider: Pick<AiModelProvider, 'id' 
   inflight.delete(key)
   failed.delete(key)
   failureKind.delete(key)
-  failureName.delete(provider.name)
 }
 
 export function providerModelsCacheKey(provider: Pick<AiModelProvider, 'id' | 'kind' | 'base_url'>): string {
@@ -162,16 +155,20 @@ export function normalizeListedProviderModels(raw: unknown): ListedProviderModel
   return listed
 }
 
-function rememberListFailure(key: string, name: string, kind: ProviderListFailure): void {
+function rememberListFailure(key: string, kind: ProviderListFailure): void {
   failed.add(key)
   failureKind.set(key, kind)
-  failureName.set(name, kind)
 }
 
-function clearListFailure(key: string, name: string): void {
+function clearListFailure(key: string): void {
   failed.delete(key)
   failureKind.delete(key)
-  if (failureName.get(name)) failureName.delete(name)
+}
+
+function modelListHeld(): boolean {
+  return typeof window !== 'undefined' && Boolean(
+    (window as Window & { __RHIZOME_HOLD_MODEL_LIST__?: boolean }).__RHIZOME_HOLD_MODEL_LIST__,
+  )
 }
 
 export function classifyListFailure(error: unknown, local: boolean): ProviderListFailure {
@@ -219,29 +216,33 @@ async function listProviderModelEntries(provider: AiModelProvider): Promise<List
   const pending = inflight.get(key)
   if (pending) return pending
 
+  const slot: { current?: Promise<ListedProviderModel[]> } = {}
   const request = (async () => {
+    const stillMine = () => inflight.get(key) === slot.current
     try {
-      const raw = await withModelListTimeout(
-        callHost<unknown>('list_ai_model_provider_models', { provider }),
-        MODEL_LIST_TIMEOUT_MS,
-      )
+      const hostCall = modelListHeld()
+        ? new Promise<unknown>(() => {})
+        : callHost<unknown>('list_ai_model_provider_models', { provider })
+      const raw = await withModelListTimeout(hostCall, MODEL_LIST_TIMEOUT_MS)
+      if (!stillMine()) return fallback
       const live = normalizeListedProviderModels(raw)
       if (live.length === 0) {
-        rememberListFailure(key, provider.name, 'empty')
+        rememberListFailure(key, 'empty')
         cached.set(key, fallback)
         return fallback
       }
       cached.set(key, live)
-      clearListFailure(key, provider.name)
+      clearListFailure(key)
       return live
     } catch (error) {
-      const kind = classifyListFailure(error, isLocalAiProvider(provider))
-      rememberListFailure(key, provider.name, kind)
+      if (!stillMine()) return fallback
+      rememberListFailure(key, classifyListFailure(error, isLocalAiProvider(provider)))
       return fallback
     } finally {
-      inflight.delete(key)
+      if (inflight.get(key) === slot.current) inflight.delete(key)
     }
   })()
+  slot.current = request
   inflight.set(key, request)
   return request
 }

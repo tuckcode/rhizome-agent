@@ -8,10 +8,12 @@ import {
 } from './pickerModelMenu'
 
 function model(overrides: Partial<PickerMenuModel> & Pick<PickerMenuModel, 'id' | 'providerName' | 'providerKind'>): PickerMenuModel {
+  const providerId = overrides.providerId ?? overrides.providerKind
   return {
     modelId: overrides.modelId ?? overrides.id,
     displayName: overrides.displayName ?? overrides.modelId ?? overrides.id,
-    providerId: overrides.providerId ?? overrides.providerKind,
+    providerId,
+    cacheKey: overrides.cacheKey ?? providerId,
     baseUrl: null,
     ...overrides,
   }
@@ -30,7 +32,7 @@ describe('pickerBlockReason', () => {
     expect(pickerBlockReason('Ollama', 'needs_key')).toBe('Needs an API key')
     expect(pickerBlockReason('Ollama', 'not_running')).toBe("Ollama isn't running")
     expect(pickerBlockReason('Ollama', 'no_models')).toBe('No models found')
-    expect(pickerBlockReason('Ollama', 'load_failed')).toBe("Couldn't load models. Retry.")
+    expect(pickerBlockReason('Ollama', 'load_failed')).toBe("Couldn't load models")
   })
 })
 
@@ -90,7 +92,7 @@ describe('buildPickerMenu', () => {
   it('disables Ollama when it is not running and keeps a model row', () => {
     const groups = buildPickerMenu({
       models: [ollama],
-      failures: [{ providerName: 'Ollama', kind: 'unreachable' }],
+      failures: [{ cacheKey: 'ollama', kind: 'unreachable' }],
       loadingNames: [],
       needsKey: () => false,
     })
@@ -102,7 +104,7 @@ describe('buildPickerMenu', () => {
     })
   })
 
-  it('says no models found and could not load, and does not count a loading group', () => {
+  it('keeps saved rows selectable when the list times out or is empty', () => {
     const scrub = model({
       id: 'scrub/m',
       modelId: 'm',
@@ -114,8 +116,8 @@ describe('buildPickerMenu', () => {
     })
     const loading = buildPickerMenu({
       models: [scrub],
-      failures: [{ providerName: 'Scrub test', kind: 'timeout' }],
-      loadingNames: ['Scrub test'],
+      failures: [{ cacheKey: 'scrub', kind: 'timeout' }],
+      loadingNames: ['scrub'],
       needsKey: () => false,
     })
     expect(loading[0].rows[0].disabled).toBe(false)
@@ -123,20 +125,23 @@ describe('buildPickerMenu', () => {
 
     const failed = buildPickerMenu({
       models: [scrub],
-      failures: [{ providerName: 'Scrub test', kind: 'timeout' }],
+      failures: [{ cacheKey: 'scrub', kind: 'timeout' }],
       loadingNames: [],
       needsKey: () => false,
     })
     expect(failed[0].label).toBe('Scrub test')
-    expect(failed[0].rows[0].reason).toBe("Couldn't load models. Retry.")
+    expect(failed[0].rows[0].disabled).toBe(false)
+    expect(failed[0].hint).toBe("Couldn't load models")
+    expect(unsetProviderGroupCount(failed)).toBe(1)
 
     const empty = buildPickerMenu({
       models: [studio],
-      failures: [{ providerName: 'LM Studio', kind: 'empty' }],
+      failures: [{ cacheKey: 'lm_studio', kind: 'empty' }],
       loadingNames: [],
       needsKey: () => false,
     })
-    expect(empty[0].rows[0].reason).toBe('No models found')
+    expect(empty[0].rows[0].disabled).toBe(false)
+    expect(empty[0].hint).toBe('No models found')
     expect(unsetProviderGroupCount(empty)).toBe(1)
   })
 

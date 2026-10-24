@@ -55,7 +55,7 @@ describe('buildConnectedRows', () => {
     })
     expect(rows.find((row) => row.name === 'Codex')).toMatchObject({
       statusLabel: 'Not installed',
-      action: 'open',
+      action: 'install',
     })
     expect(rows.find((row) => row.name === 'Ollama')).toMatchObject({
       status: 'not_running',
@@ -97,6 +97,6 @@ describe('buildConnectedRows', () => {
       models: ['llama3.2', 'qwen2.5'],
       action: 'open',
     })
-    expect(rows.find((row) => row.name === 'LM Studio')?.status).toBe('load_failed')
+    expect(rows.find((row) => row.name === 'LM Studio')?.status).toBe('checking')
   })
 })

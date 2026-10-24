@@ -210,7 +210,6 @@ const DEFAULT_MOCK_VAULT_PATH = '/Users/mock/demo-vault-v2'
 const mockArchivedSessions = new Set<string>()
 const mockArchivedNativeSessions = new Set<string>()
 let mockForkedNative: { sessionId: string; events: unknown[] } | null = null
-let mockPrimeModelAllowList: string[] = ['mock/mock-model']
 
 const mockSessionNames = new Map<string, string>()
 
@@ -695,7 +694,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   native_model_vision: (args?: Record<string, unknown>) => {
     const target = String(args?.target ?? '')
     if (target.includes('gpt-3.5') || target.includes('text-only')) return 'no'
-    if (target.includes('gpt-4o') || target.includes('qwen3.6') || target.includes('gemini')) return 'yes'
+    if (target.includes('gpt-4o') || target.includes('gpt-4.1') || target.includes('qwen3.6') || target.includes('gemini')) return 'yes'
     return 'unknown'
   },
   native_chat_cancel: () => null,
@@ -1055,7 +1054,6 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   // Curated by default so `pnpm dev` renders the shortlist *and* the
   // "hidden by your list" disclosure — the uncurated case is the one that
   // looks identical to having no feature at all.
-  get_prime_model_allow_list: () => [...mockPrimeModelAllowList],
   ensure_nous_portal_models: () => ({
     provider: 'nous-portal',
     modelCount: 1,
@@ -1063,10 +1061,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   }),
   sign_in_prime_provider: () => null,
   save_prime_provider_key: () => null,
-  set_prime_model_allow_list: (args: { models?: string[] }) => {
-    mockPrimeModelAllowList = (args?.models ?? []).map((key) => key.trim()).filter(Boolean)
-    return null
-  },
+  set_prime_model_allow_list: () => null,
   fork_prime_session: () => ({ sessionId: 'mock-fork', branchedFrom: 'branch point' }),
   settle_prime_session: () => ({ outcome: 'keep_session_running' }),
   finish_main_window_close: () => null,

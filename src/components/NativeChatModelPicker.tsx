@@ -29,6 +29,7 @@ import {
   listProviderFailures,
   loadLiveRhizomeChatModels,
   pendingLiveProviderNames,
+  providerModelsCacheKey,
   providersToListLive,
 } from '../lib/listProviderModels'
 import {
@@ -44,8 +45,8 @@ import {
 } from '../lib/rhizomeChatModels'
 import { buildPickerMenu, unsetProviderGroupCount, type PickerMenuGroup } from '../lib/pickerModelMenu'
 import { requestProviderSettingsFocus, CONNECTED_SUMMARY_ROW_ID } from '../lib/providerSettingsFocus'
-import { activeNativeSessionTarget } from '../lib/nativeChatTranscript'
-import { nativeModelVision } from '../lib/nativeVision'
+import { nativeSessionTargetForSlot } from '../lib/nativeChatTranscript'
+import { nativeModelsVision } from '../lib/nativeVision'
 import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
 import { SETTINGS_MENU_Z_CLASS } from '../lib/settingsMenuLayer'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -91,12 +92,13 @@ function menuModel(
   providerName: string
   providerKind: string
   providerId: string
+  cacheKey: string
   baseUrl?: string | null
 } {
-  const configured = (providers ?? []).find((provider) => {
-    return provider.id === model.providerId || provider.kind === model.providerKind
-  })
+  const configured = (providers ?? []).find((provider) => provider.id === model.providerId)
   const discovered = providerForDiscover(model.providerKind)
+  const source = configured ?? discovered
+  const baseUrl = configured ? configured.base_url : discovered.base_url
   return {
     id: model.id,
     modelId: model.modelId,
@@ -106,7 +108,12 @@ function menuModel(
     providerName: model.providerName,
     providerKind: model.providerKind,
     providerId: model.providerId,
-    baseUrl: configured?.base_url ?? discovered.base_url,
+    cacheKey: providerModelsCacheKey({
+      id: model.providerId,
+      kind: source.kind,
+      base_url: baseUrl,
+    }),
+    baseUrl,
   }
 }
 
@@ -129,6 +136,7 @@ export function NativeChatModelPicker({
   engine = 'native',
   vaultPath,
   showLabel = true,
+  nativeLiveSlot,
 }: {
   value: string | null | undefined
   onChange: (target: string) => void
@@ -139,6 +147,8 @@ export function NativeChatModelPicker({
   engine?: 'native' | 'prime'
   vaultPath?: string
   showLabel?: boolean
+  /** The chat panel that owns this picker. Other sessions are ignored. */
+  nativeLiveSlot?: string | null
 }) {
   const t = createTranslator(locale)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -216,7 +226,7 @@ export function NativeChatModelPicker({
       needsKey: (kind) => kind !== 'free_tier' && rhizomeProviderNeedsApiKey(kind, providers),
     })
   const unsetCount = unsetProviderGroupCount(rhizomeMenu)
-  const sessionTarget = prime ? null : activeNativeSessionTarget()
+  const sessionTarget = prime ? null : nativeSessionTargetForSlot(nativeLiveSlot)
   const sessionModel = sessionTarget ? resolveRhizomeChatModel(listed, sessionTarget) : undefined
   const sessionLabel = sessionModel
     ? (sessionModel.displayName.trim() || sessionModel.modelId)
@@ -264,9 +274,8 @@ export function NativeChatModelPicker({
     if (!open || prime) return
     let cancelled = false
     const ids = models.map((model) => model.id)
-    void Promise.all(ids.map(async (id) => [id, await nativeModelVision(id)] as const)).then((pairs) => {
-      if (cancelled) return
-      setVisionById(Object.fromEntries(pairs))
+    void nativeModelsVision(ids).then((next) => {
+      if (!cancelled) setVisionById(next)
     })
     return () => {
       cancelled = true
@@ -489,39 +498,77 @@ export function NativeChatModelPicker({
               ))
             ) : (
               rhizomeMenu.map((group, index) => {
-                const loading = loadingNames.includes(group.label)
+                const loading = loadingNames.includes(group.label) || loadingNames.includes(group.cacheKey)
+                const headerReason = group.blocked ? group.rows.find((row) => row.reason)?.reason : group.hint
+                const headerAction = group.blocked ? group.rows.find((row) => row.action)?.action : null
+                const openFix = () => {
+                  if (headerAction === 'retry') {
+                    const provider = providersToListLive(providers).find((item) => providerModelsCacheKey(item) === group.cacheKey || item.id === group.providerId)
+                    if (provider) forgetListedProviderModels(provider)
+                    setReloadToken((token) => token + 1)
+                    return
+                  }
+                  requestProviderSettingsFocus({
+                    tab: group.tab === 'agents' ? 'api' : group.tab,
+                    rowId: headerAction === 'add_key' ? `summary-provider-row-${group.providerId}` : CONNECTED_SUMMARY_ROW_ID,
+                  })
+                  onOpenProviders?.()
+                  setOpen(false)
+                }
                 return (
                   <div key={group.id}>
                     {index > 0 ? (
                       <div className={GROUP_SEP_CLASS} data-testid="native-chat-model-group-sep" />
                     ) : null}
                     <DropdownMenuLabel
-                      className="px-2 pb-1 pt-2 text-[11px] font-medium text-muted-foreground normal-case tracking-normal"
+                      className="flex items-center gap-2 px-2 pb-1 pt-2 text-[11px] font-medium text-muted-foreground normal-case tracking-normal"
                       data-testid="native-chat-model-provider"
                     >
-                      <span>{group.label}</span>
+                      <span className="min-w-0 truncate">{group.label}</span>
                       {loading ? (
-                        <span className="ml-1.5 font-normal text-muted-foreground" data-testid="native-chat-model-loading">
+                        <span className="font-normal text-muted-foreground" data-testid="native-chat-model-loading">
                           {LOADING_STATUS}
                         </span>
+                      ) : null}
+                      {headerReason ? (
+                        <span
+                          className="min-w-0 truncate font-normal text-muted-foreground"
+                          data-testid={group.hint ? 'native-chat-model-offline' : 'native-chat-model-reason'}
+                        >
+                          {headerReason}
+                        </span>
+                      ) : null}
+                      {headerAction === 'add_key' ? (
+                        <button
+                          type="button"
+                          className={cn('ml-auto shrink-0 text-[12px] font-normal text-[var(--link-color)] underline-offset-2 hover:underline', CHAT_FOCUS_RING_CLASS)}
+                          data-testid="native-chat-model-add-key"
+                          onPointerDown={(event) => event.preventDefault()}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            openFix()
+                          }}
+                        >
+                          {t('ai.composer.addKey')}
+                        </button>
+                      ) : null}
+                      {headerAction === 'retry' ? (
+                        <button
+                          type="button"
+                          className={cn('ml-auto shrink-0 text-[12px] font-normal text-[var(--link-color)] underline-offset-2 hover:underline', CHAT_FOCUS_RING_CLASS)}
+                          data-testid="native-chat-model-retry"
+                          onPointerDown={(event) => event.preventDefault()}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            openFix()
+                          }}
+                        >
+                          {t('ai.composer.retryModels')}
+                        </button>
                       ) : null}
                     </DropdownMenuLabel>
                     {group.rows.filter((row) => row.modelId).map((row) => {
                       const isSelected = row.id === selectedId
-                      const openFix = () => {
-                        if (row.action === 'retry') {
-                          const provider = providersToListLive(providers).find((item) => item.name === group.label || item.id === row.providerId)
-                          if (provider) forgetListedProviderModels(provider)
-                          setReloadToken((token) => token + 1)
-                          return
-                        }
-                        requestProviderSettingsFocus({
-                          tab: row.tab === 'agents' ? 'api' : row.tab,
-                          rowId: row.action === 'add_key' ? `provider-row-${row.providerId}` : CONNECTED_SUMMARY_ROW_ID,
-                        })
-                        onOpenProviders?.()
-                        setOpen(false)
-                      }
                       return (
                         <DropdownMenuItem
                           key={row.id}
@@ -534,6 +581,7 @@ export function NativeChatModelPicker({
                           onSelect={(event) => {
                             if (row.disabled) {
                               event.preventDefault()
+                              if (row.action) openFix()
                               return
                             }
                             void pick(row.id, row.providerKind)
@@ -542,43 +590,10 @@ export function NativeChatModelPicker({
                           <span className={cn('min-w-0 flex-1 truncate', row.disabled ? 'text-muted-foreground' : 'text-foreground')} title={row.modelId}>
                             {row.label}
                           </span>
-                          {visionById[row.id] === 'yes' && !row.disabled ? (
+                          {visionById[row.id] === 'yes' ? (
                             <span className="shrink-0 rounded-full bg-muted px-1.5 text-[11px] text-muted-foreground" data-testid="native-chat-model-vision">
                               {t('ai.composer.vision')}
                             </span>
-                          ) : null}
-                          {row.reason ? (
-                            <span className="shrink-0 text-[11px] text-muted-foreground" data-testid="native-chat-model-reason">
-                              {row.reason}
-                            </span>
-                          ) : null}
-                          {row.action === 'add_key' ? (
-                            <button
-                              type="button"
-                              className={cn('shrink-0 text-[12px] text-[var(--link-color)] underline-offset-2 hover:underline', CHAT_FOCUS_RING_CLASS)}
-                              data-testid="native-chat-model-add-key"
-                              onPointerDown={(event) => event.preventDefault()}
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                openFix()
-                              }}
-                            >
-                              {t('ai.composer.addKey')}
-                            </button>
-                          ) : null}
-                          {row.action === 'retry' ? (
-                            <button
-                              type="button"
-                              className={cn('shrink-0 text-[12px] text-[var(--link-color)] underline-offset-2 hover:underline', CHAT_FOCUS_RING_CLASS)}
-                              data-testid="native-chat-model-retry"
-                              onPointerDown={(event) => event.preventDefault()}
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                openFix()
-                              }}
-                            >
-                              {t('ai.composer.retryModels')}
-                            </button>
                           ) : null}
                           {isSelected ? (
                             <Check
@@ -620,8 +635,8 @@ export function NativeChatModelPicker({
                   >
                     <span data-testid="native-chat-model-keyless-note">
                       {unsetCount === 1
-                        ? t('ai.composer.providerNotSetUp')
-                        : t('ai.composer.providersNotSetUp', { count: String(unsetCount) })}
+                        ? t('ai.composer.providerNeedsAttention')
+                        : t('ai.composer.providersNeedAttention', { count: String(unsetCount) })}
                     </span>
                   </button>
                 </div>

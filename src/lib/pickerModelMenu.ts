@@ -13,11 +13,12 @@ export interface PickerMenuModel {
   providerName: string
   providerKind: string
   providerId: string
+  cacheKey: string
   baseUrl?: string | null
 }
 
 export interface PickerMenuFailure {
-  providerName: string
+  cacheKey: string
   kind: 'timeout' | 'unreachable' | 'empty'
 }
 
@@ -38,8 +39,13 @@ export interface PickerMenuGroup {
   label: string
   providerKind: string
   providerId: string
+  cacheKey: string
   tab: 'local' | 'api' | 'agents'
+  /** Rows cannot be picked. Needs a key, or a local server that is not running. */
   blocked: boolean
+  /** Shown once on the group header. Saved rows stay selectable. */
+  hint: string | null
+  attention: boolean
   rows: PickerMenuRow[]
 }
 
@@ -77,7 +83,7 @@ export function pickerBlockReason(
   if (block === 'needs_key') return 'Needs an API key'
   if (block === 'not_running') return `${providerName} isn't running`
   if (block === 'no_models') return 'No models found'
-  return "Couldn't load models. Retry."
+  return "Couldn't load models"
 }
 
 function settingsTab(kind: string): 'local' | 'api' {
@@ -94,27 +100,29 @@ export function buildPickerMenu(input: {
   loadingNames: string[]
   needsKey: (providerKind: string, providerId: string) => boolean
 }): PickerMenuGroup[] {
-  const failureByName = new Map(input.failures.map((failure) => [failure.providerName, failure.kind]))
+  const failureByKey = new Map(input.failures.map((failure) => [failure.cacheKey, failure.kind]))
   const groups: PickerMenuGroup[] = []
   const index = new Map<string, number>()
 
   for (const model of input.models) {
     if (model.providerKind === 'free_tier') {
-      pushModel(groups, index, model, null)
+      pushModel(groups, index, model, null, null)
       continue
     }
     if (isCatalogCustomSeed(model)) continue
     if (model.providerKind === 'anthropic') continue
 
-    const loading = input.loadingNames.includes(model.providerName)
+    const loading = input.loadingNames.includes(model.providerName) || input.loadingNames.includes(model.cacheKey)
     const needsKey = input.needsKey(model.providerKind, model.providerId)
-    const failure = failureByName.get(model.providerName)
+    const failure = failureByKey.get(model.cacheKey)
+    const local = LOCAL_KINDS.has(model.providerKind)
     let block: PickerBlock | null = null
+    let hint: string | null = null
     if (needsKey) block = 'needs_key'
-    else if (!loading && failure === 'unreachable') block = 'not_running'
-    else if (!loading && failure === 'empty') block = 'no_models'
-    else if (!loading && failure === 'timeout') block = 'load_failed'
-    pushModel(groups, index, model, block)
+    else if (!loading && failure === 'unreachable' && local) block = 'not_running'
+    else if (!loading && failure === 'empty') hint = pickerBlockReason(model.providerName, 'no_models')
+    else if (!loading && failure === 'timeout') hint = pickerBlockReason(model.providerName, 'load_failed')
+    pushModel(groups, index, model, block, hint)
   }
 
   return groups
@@ -125,8 +133,9 @@ function pushModel(
   index: Map<string, number>,
   model: PickerMenuModel,
   block: PickerBlock | null,
+  hint: string | null = null,
 ): void {
-  const key = `${model.providerKind}:${model.providerId}:${model.providerName}`
+  const key = model.cacheKey || `${model.providerKind}:${model.providerId}`
   let at = index.get(key)
   if (at === undefined) {
     at = groups.length
@@ -139,13 +148,18 @@ function pushModel(
         : chatProviderGroupLabel(model.providerName, model.providerKind, model.baseUrl),
       providerKind: model.providerKind,
       providerId: model.providerId,
+      cacheKey: key,
       tab,
-      blocked: block !== null,
+      blocked: false,
+      hint: null,
+      attention: false,
       rows: [],
     })
   }
   const group = groups[at]
   if (block) group.blocked = true
+  if (hint) group.hint = hint
+  group.attention = group.blocked || group.hint !== null
   const reason = block ? pickerBlockReason(group.label, block) : null
   group.rows.push({
     id: model.id,
@@ -160,8 +174,9 @@ function pushModel(
   })
 }
 
+/** Needs a key, not running, or a list that failed. Loading groups are not counted. */
 export function unsetProviderGroupCount(groups: PickerMenuGroup[]): number {
-  return groups.filter((group) => group.blocked && group.providerKind !== 'free_tier').length
+  return groups.filter((group) => group.attention && group.providerKind !== 'free_tier').length
 }
 
 export function providerKindForTab(kind: string): 'local' | 'api' {
