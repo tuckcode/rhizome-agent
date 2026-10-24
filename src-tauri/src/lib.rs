@@ -71,6 +71,7 @@ pub mod rhizome_loop;
 pub mod chat_images;
 pub mod hermes_reasoning;
 pub mod provider_keys;
+pub mod provider_oauth;
 #[cfg(test)]
 mod reasoning_chat;
 pub mod reasoning_levels;
@@ -828,6 +829,10 @@ macro_rules! app_invoke_handler {
             commands::save_free_tier_settings,
             commands::save_ai_model_provider_api_key,
             commands::delete_ai_model_provider_api_key,
+            commands::oauth_sign_in,
+            commands::oauth_status,
+            commands::oauth_sign_out,
+            commands::oauth_cancel,
             commands::test_ai_model_provider,
             commands::discover_ai_models,
             commands::list_ai_model_provider_models,

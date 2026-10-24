@@ -67,6 +67,9 @@ uuid = { version = "1", features = ["v4"] }
 tempfile = "3"
 fs4 = "0.8"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+# ID-token checks for Sign in with ChatGPT. JWKS RSA keys in, claims out.
+# MIT. No live call in tests: the suite signs tokens locally.
+jsonwebtoken = "9"
 tauri-plugin-deep-link = "2.4.9"
 tauri-plugin-single-instance = { version = "2.4.2", features = ["deep-link"] }
 tantivy = "0.22.1"
@@ -122,3 +125,8 @@ xattr = "1"
 # before any test runs, so the mock app stays off that target.
 [target.'cfg(not(windows))'.dev-dependencies]
 tauri = { version = "2.10.0", features = ["test"] }
+
+# Test-only RSA key for the mock OpenAI JWKS. Not linked into the app.
+[dev-dependencies]
+rsa = { version = "0.9", features = ["pem"] }
+rand = "0.8"
