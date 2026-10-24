@@ -1030,6 +1030,12 @@
   container-type: inline-size;
   container-name: chat-transcript;
 }
+/* Black marks disappear on a Graphite card. Invert them only while the theme is dark. */
+[data-theme="dark"] .agent-mark-invert,
+:root.dark .agent-mark-invert {
+  filter: invert(1);
+}
+
 .chat-transcript .ai-markdown pre,
 .chat-transcript .ai-markdown table {
   position: relative;

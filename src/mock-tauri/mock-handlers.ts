@@ -782,6 +782,11 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   },
   list_ai_model_provider_models: (args: { provider?: { kind?: string; id?: string } }) => {
     const kind = args?.provider?.kind
+    // Screenshot harness only. The production list path does not read this.
+    const hold = typeof window !== 'undefined' && Boolean(
+      (window as Window & { __RHIZOME_HOLD_MODEL_LIST__?: boolean }).__RHIZOME_HOLD_MODEL_LIST__,
+    )
+    if (hold) return new Promise(() => {})
     // Harness provider used to show the model-list timeout. A real host that
     // never answers takes the same path.
     if (args?.provider?.id === 'scrub-test') return new Promise(() => {})

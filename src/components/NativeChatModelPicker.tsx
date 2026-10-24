@@ -46,7 +46,8 @@ import {
 import { buildPickerMenu, unsetProviderGroupCount, type PickerMenuGroup } from '../lib/pickerModelMenu'
 import { requestProviderSettingsFocus, CONNECTED_SUMMARY_ROW_ID } from '../lib/providerSettingsFocus'
 import { nativeSessionTargetForSlot } from '../lib/nativeChatTranscript'
-import { nativeModelsVision } from '../lib/nativeVision'
+import { useNativeLiveSlot } from '../lib/nativeLiveSlot'
+import { visionForTargets } from '../lib/nativeVision'
 import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
 import { SETTINGS_MENU_Z_CLASS } from '../lib/settingsMenuLayer'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -150,6 +151,8 @@ export function NativeChatModelPicker({
   /** The chat panel that owns this picker. Other sessions are ignored. */
   nativeLiveSlot?: string | null
 }) {
+  const contextSlot = useNativeLiveSlot()
+  const liveSlot = nativeLiveSlot ?? contextSlot
   const t = createTranslator(locale)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const filterRef = useRef<HTMLInputElement>(null)
@@ -226,7 +229,7 @@ export function NativeChatModelPicker({
       needsKey: (kind) => kind !== 'free_tier' && rhizomeProviderNeedsApiKey(kind, providers),
     })
   const unsetCount = unsetProviderGroupCount(rhizomeMenu)
-  const sessionTarget = prime ? null : nativeSessionTargetForSlot(nativeLiveSlot)
+  const sessionTarget = prime ? null : nativeSessionTargetForSlot(liveSlot)
   const sessionModel = sessionTarget ? resolveRhizomeChatModel(listed, sessionTarget) : undefined
   const sessionLabel = sessionModel
     ? (sessionModel.displayName.trim() || sessionModel.modelId)
@@ -274,7 +277,7 @@ export function NativeChatModelPicker({
     if (!open || prime) return
     let cancelled = false
     const ids = models.map((model) => model.id)
-    void nativeModelsVision(ids).then((next) => {
+    void visionForTargets(ids).then((next) => {
       if (!cancelled) setVisionById(next)
     })
     return () => {
@@ -500,7 +503,9 @@ export function NativeChatModelPicker({
               rhizomeMenu.map((group, index) => {
                 const loading = loadingNames.includes(group.label) || loadingNames.includes(group.cacheKey)
                 const headerReason = group.blocked ? group.rows.find((row) => row.reason)?.reason : group.hint
-                const headerAction = group.blocked ? group.rows.find((row) => row.action)?.action : null
+                const headerAction = group.blocked
+                  ? group.rows.find((row) => row.action)?.action ?? null
+                  : group.hint ? 'retry' : null
                 const openFix = () => {
                   if (headerAction === 'retry') {
                     const provider = providersToListLive(providers).find((item) => providerModelsCacheKey(item) === group.cacheKey || item.id === group.providerId)
@@ -521,21 +526,23 @@ export function NativeChatModelPicker({
                       <div className={GROUP_SEP_CLASS} data-testid="native-chat-model-group-sep" />
                     ) : null}
                     <DropdownMenuLabel
-                      className="flex items-center gap-2 px-2 pb-1 pt-2 text-[11px] font-medium text-muted-foreground normal-case tracking-normal"
+                      className="flex items-start gap-2 px-2 pb-1 pt-2 text-[11px] font-medium text-muted-foreground normal-case tracking-normal"
                       data-testid="native-chat-model-provider"
                     >
-                      <span className="min-w-0 truncate">{group.label}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate">{group.label}</span>
+                        {headerReason ? (
+                          <span
+                            className="mt-0.5 block whitespace-normal font-normal text-muted-foreground"
+                            data-testid={group.hint ? 'native-chat-model-offline' : 'native-chat-model-reason'}
+                          >
+                            {headerReason}
+                          </span>
+                        ) : null}
+                      </span>
                       {loading ? (
                         <span className="font-normal text-muted-foreground" data-testid="native-chat-model-loading">
                           {LOADING_STATUS}
-                        </span>
-                      ) : null}
-                      {headerReason ? (
-                        <span
-                          className="min-w-0 truncate font-normal text-muted-foreground"
-                          data-testid={group.hint ? 'native-chat-model-offline' : 'native-chat-model-reason'}
-                        >
-                          {headerReason}
                         </span>
                       ) : null}
                       {headerAction === 'add_key' ? (

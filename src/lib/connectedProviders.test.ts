@@ -99,4 +99,50 @@ describe('buildConnectedRows', () => {
     })
     expect(rows.find((row) => row.name === 'LM Studio')?.status).toBe('checking')
   })
+
+  it('marks a configured Anthropic provider Ready with its saved models', () => {
+    const claude = provider({
+      id: 'work-claude',
+      name: 'Work Claude',
+      kind: 'anthropic',
+      api_key_storage: 'local_file',
+      models: [{ id: 'claude-sonnet', display_name: 'Claude Sonnet', capabilities }],
+    })
+    const rows = buildConnectedRows({
+      agents: createMissingAiAgentsStatus(),
+      providers: [claude],
+      failureFor: () => null,
+      modelsFor: () => null,
+    })
+    expect(rows.find((row) => row.name === 'Work Claude')).toMatchObject({
+      status: 'ready',
+      statusLabel: 'Ready',
+      models: ['Claude Sonnet'],
+      action: 'open',
+    })
+  })
+
+  it('marks a configured keyless remote provider Ready with its saved models', () => {
+    const lab = provider({
+      id: 'lab',
+      name: 'Lab',
+      kind: 'open_ai_compatible',
+      base_url: 'https://lab.example/v1',
+      api_key_storage: 'none',
+      api_key_env_var: null,
+      models: [{ id: 'lab-1', display_name: 'Lab 1', capabilities }],
+    })
+    const rows = buildConnectedRows({
+      agents: createMissingAiAgentsStatus(),
+      providers: [lab],
+      failureFor: () => null,
+      modelsFor: () => null,
+    })
+    expect(rows.find((row) => row.name === 'Lab')).toMatchObject({
+      status: 'ready',
+      statusLabel: 'Ready',
+      models: ['Lab 1'],
+    })
+    expect(rows.find((row) => row.name === 'Lab')?.status).not.toBe('checking')
+  })
 })

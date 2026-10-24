@@ -4,6 +4,7 @@ import '../../../src/index.css'
 import { TooltipProvider } from '../../../src/components/ui/tooltip'
 import { SettingsPanel } from '../../../src/components/SettingsPanel'
 import { NativeChatModelPicker } from '../../../src/components/NativeChatModelPicker'
+import { noteAiAgentsChecked } from '../../../src/lib/aiAgentsCheckedAt'
 import {
   createAiAgentAvailability,
   createMissingAiAgentsStatus,
@@ -72,6 +73,10 @@ const settings = {
   ai_model_providers: view === 'timeout' ? [scrub] : null,
   native_chat_target: 'free_tier_auto',
 } as Settings
+
+if (view === 'settings' || view === 'settings-top' || view === 'checking') {
+  noteAiAgentsChecked(Date.now())
+}
 
 const agents = {
   ...createMissingAiAgentsStatus(),

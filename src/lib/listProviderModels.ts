@@ -165,12 +165,6 @@ function clearListFailure(key: string): void {
   failureKind.delete(key)
 }
 
-function modelListHeld(): boolean {
-  return typeof window !== 'undefined' && Boolean(
-    (window as Window & { __RHIZOME_HOLD_MODEL_LIST__?: boolean }).__RHIZOME_HOLD_MODEL_LIST__,
-  )
-}
-
 export function classifyListFailure(error: unknown, local: boolean): ProviderListFailure {
   const message = error instanceof Error ? error.message : String(error)
   if (message === "Couldn't load models") return 'timeout'
@@ -220,9 +214,7 @@ async function listProviderModelEntries(provider: AiModelProvider): Promise<List
   const request = (async () => {
     const stillMine = () => inflight.get(key) === slot.current
     try {
-      const hostCall = modelListHeld()
-        ? new Promise<unknown>(() => {})
-        : callHost<unknown>('list_ai_model_provider_models', { provider })
+      const hostCall = callHost<unknown>('list_ai_model_provider_models', { provider })
       const raw = await withModelListTimeout(hostCall, MODEL_LIST_TIMEOUT_MS)
       if (!stillMine()) return fallback
       const live = normalizeListedProviderModels(raw)

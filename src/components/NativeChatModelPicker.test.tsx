@@ -24,6 +24,7 @@ const host = vi.hoisted(() => ({
   hold: null as Promise<void> | null,
   release: null as (() => void) | null,
   fail: false,
+  emptyOnce: false,
 }))
 
 vi.mock('../lib/callHost', () => ({
@@ -58,6 +59,10 @@ vi.mock('../lib/callHost', () => ({
     }
     if (cmd !== 'list_ai_model_provider_models' && cmd !== 'discover_ai_models') return []
     const provider = args?.provider as { kind?: string; id?: string } | undefined
+    if (host.emptyOnce && provider?.id === 'work-openai') {
+      host.emptyOnce = false
+      return []
+    }
     if (provider?.kind === 'ollama') return ['llama3.2', 'qwen2.5']
     if (provider?.id === 'work-openai') return ['gpt-4o', 'gpt-5']
     return []
@@ -74,6 +79,7 @@ beforeEach(() => {
   host.hold = null
   host.release = null
   host.fail = false
+  host.emptyOnce = false
   resetPrimeModelCatalog()
   resetPrimeHostStatus()
   resetListProviderModelsCache()
@@ -522,7 +528,30 @@ describe('NativeChatModelPicker', () => {
     expect(row).not.toHaveAttribute('aria-disabled')
     expect(row).toHaveTextContent('GPT-4o')
     expect(screen.getAllByTestId('native-chat-model-offline').some((node) => node.textContent === "Couldn't load models")).toBe(true)
+    expect(screen.getAllByTestId('native-chat-model-offline')[0]).toHaveClass('block')
+    expect(screen.getAllByTestId('native-chat-model-retry').length).toBeGreaterThan(0)
     expect(screen.getByTestId('native-chat-model-ollama/llama3.2')).toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('retries a cached empty list from the group header', async () => {
+    host.emptyOnce = true
+    render(
+      <NativeChatModelPicker
+        variant="chip"
+        value="work-openai/gpt-4o"
+        onChange={vi.fn()}
+        providers={configured}
+      />,
+    )
+    openMenu()
+    const header = (await screen.findAllByTestId('native-chat-model-provider'))
+      .find((node) => node.textContent?.includes('Work OpenAI'))
+    expect(header).toBeTruthy()
+    expect(within(header as HTMLElement).getByTestId('native-chat-model-offline')).toHaveTextContent('No models found')
+    fireEvent.click(within(header as HTMLElement).getByTestId('native-chat-model-retry'))
+    await waitFor(() => {
+      expect(screen.getByTestId('native-chat-model-work-openai/gpt-5')).toBeInTheDocument()
+    })
   })
 
   it('keeps cached rows usable while Loading… is muted', async () => {

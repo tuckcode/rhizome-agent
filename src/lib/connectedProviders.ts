@@ -14,7 +14,7 @@ import {
   type ConnectionProbe,
   type ConnectionStatus,
 } from './providerConnection'
-import type { ProviderListFailure } from './listProviderModels'
+import { canListProviderModelsLive, type ProviderListFailure } from './listProviderModels'
 import type { ProviderSettingsTab } from './providerSettingsFocus'
 
 export interface ConnectedRow {
@@ -94,8 +94,9 @@ export function buildConnectedRows(input: {
     seenKinds.add(provider.kind)
     const local = isLocalAiProvider(provider)
     const needsKey = !local && rhizomeProviderNeedsApiKey(provider.kind, providers)
-    const failure = needsKey ? null : input.failureFor(provider)
-    const models = needsKey ? null : input.modelsFor(provider)
+    const listable = provider.kind !== 'anthropic' && canListProviderModelsLive(provider)
+    const failure = needsKey || !listable ? null : input.failureFor(provider)
+    const models = needsKey ? null : listable ? input.modelsFor(provider) : savedModelLabels(provider)
     const status = connectionStatus({
       needsKey,
       local,
@@ -161,10 +162,16 @@ function providerRows(providers: AiModelProvider[]): AiModelProvider[] {
     if (!configuredLocal.has(entry.kind)) rows.push(providerForDiscover(entry.kind))
   }
   for (const provider of providers) {
-    if (isLocalAiProvider(provider) || provider.kind === 'anthropic') continue
+    if (isLocalAiProvider(provider)) continue
     rows.push(provider)
   }
   return rows
+}
+
+function savedModelLabels(provider: AiModelProvider): string[] {
+  return provider.models
+    .map((model) => model.display_name?.trim() || model.id.trim())
+    .filter(Boolean)
 }
 
 function statusLabel(status: ConnectionStatus): string {

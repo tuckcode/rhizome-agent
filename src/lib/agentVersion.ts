@@ -9,19 +9,23 @@ export function normalizeAgentVersion(
   const trimmed = raw?.trim()
   if (!trimmed) return null
   const label = agentLabel.trim()
-  const withoutLabel = label
-    ? trimmed.replace(new RegExp(`\\s*\\(${escapeRegExp(label)}\\)\\s*`, 'gi'), ' ')
-    : trimmed
+  let withoutLabel = trimmed
+  if (label) {
+    const target = `(${label})`.toLowerCase()
+    while (true) {
+      const idx = withoutLabel.toLowerCase().indexOf(target)
+      if (idx === -1) break
+      withoutLabel =
+        withoutLabel.slice(0, idx) + ' ' + withoutLabel.slice(idx + target.length)
+    }
+  }
+  withoutLabel = withoutLabel.replace(/\s+/g, ' ').trim()
   const match = withoutLabel.match(/v?\d+\.\d+(?:\.\d+)?(?:[-+][\w.]+)?/)
   if (!match) return withoutLabel.replace(/\s+/g, ' ').trim() || null
   const version = match[0]
   return version.startsWith('v') || version.startsWith('V')
     ? `v${version.slice(1)}`
     : `v${version}`
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 export function formatLastChecked(checkedAt: number, now: number): string {

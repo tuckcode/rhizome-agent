@@ -49,6 +49,7 @@ export function AiAgentIcon({
         draggable={false}
         width={size}
         height={size}
+        className={agent === 'codex' || agent === 'opencode' ? 'agent-mark-invert' : undefined}
         style={{ display: 'block', width: size, height: size, objectFit: 'contain' }}
       />
     </span>

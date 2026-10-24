@@ -103,4 +103,50 @@ describe('ConnectedProvidersSummary', () => {
     expect(screen.getByRole('alert').textContent).not.toContain(secret)
     expect(JSON.stringify(analytics.trackEvent.mock.calls)).not.toContain(secret)
   })
+
+  it('shows a configured Anthropic row as Ready', () => {
+    render(
+      <ConnectedProvidersSummary
+        t={createTranslator('en')}
+        agents={createMissingAiAgentsStatus()}
+        providers={[{
+          id: 'work-claude',
+          name: 'Work Claude',
+          kind: 'anthropic',
+          api_key_storage: 'local_file',
+          models: [{ id: 'claude-sonnet', display_name: 'Claude Sonnet', capabilities }],
+        }]}
+        onChange={vi.fn()}
+        onOpen={vi.fn()}
+      />,
+    )
+    const row = screen.getByTestId('settings-connected-row-provider:work-claude')
+    expect(row).toHaveAttribute('data-status', 'ready')
+    expect(screen.getByTestId('settings-connected-status-provider:work-claude')).toHaveTextContent('Ready')
+    expect(screen.getByTestId('settings-connected-models-provider:work-claude')).toHaveTextContent('Claude Sonnet')
+  })
+
+  it('shows a configured keyless remote row as Ready', () => {
+    render(
+      <ConnectedProvidersSummary
+        t={createTranslator('en')}
+        agents={createMissingAiAgentsStatus()}
+        providers={[{
+          id: 'lab',
+          name: 'Lab',
+          kind: 'open_ai_compatible',
+          base_url: 'https://lab.example/v1',
+          api_key_storage: 'none',
+          api_key_env_var: null,
+          models: [{ id: 'lab-1', display_name: 'Lab 1', capabilities }],
+        }]}
+        onChange={vi.fn()}
+        onOpen={vi.fn()}
+      />,
+    )
+    const row = screen.getByTestId('settings-connected-row-provider:lab')
+    expect(row).toHaveAttribute('data-status', 'ready')
+    expect(screen.getByTestId('settings-connected-status-provider:lab')).toHaveTextContent('Ready')
+    expect(screen.getByTestId('settings-connected-models-provider:lab')).toHaveTextContent('Lab 1')
+  })
 })

@@ -102,7 +102,7 @@ export function buildPickerMenu(input: {
 }): PickerMenuGroup[] {
   const failureByKey = new Map(input.failures.map((failure) => [failure.cacheKey, failure.kind]))
   const groups: PickerMenuGroup[] = []
-  const index = new Map<string, number>()
+  const index: Record<string, number> = {}
 
   for (const model of input.models) {
     if (model.providerKind === 'free_tier') {
@@ -130,16 +130,16 @@ export function buildPickerMenu(input: {
 
 function pushModel(
   groups: PickerMenuGroup[],
-  index: Map<string, number>,
+  index: Record<string, number>,
   model: PickerMenuModel,
   block: PickerBlock | null,
   hint: string | null = null,
 ): void {
   const key = model.cacheKey || `${model.providerKind}:${model.providerId}`
-  let at = index.get(key)
+  let at = index[key]
   if (at === undefined) {
     at = groups.length
-    index.set(key, at)
+    index[key] = at
     const tab = model.providerKind === 'free_tier' ? 'api' : settingsTab(model.providerKind)
     groups.push({
       id: key,

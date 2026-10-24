@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { ArrowsClockwise, Copy } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import {
@@ -8,6 +8,7 @@ import {
   type AiAgentId,
   type AiAgentsStatus,
 } from '../lib/aiAgents'
+import { aiAgentsCheckedAt, noteAiAgentsChecked, subscribeAiAgentsCheckedAt } from '../lib/aiAgentsCheckedAt'
 import { formatLastChecked, normalizeAgentVersion } from '../lib/agentVersion'
 import { callHost } from '../lib/callHost'
 import { KEPT_EXTERNAL_AGENT_IDS } from '../lib/migrateRemovedHarnessChoices'
@@ -30,7 +31,7 @@ interface LocalAgentCardsProps {
  */
 export function LocalAgentCards({ t, aiAgentsStatus, onCopyMcpConfig }: LocalAgentCardsProps) {
   const [statuses, setStatuses] = useState(aiAgentsStatus)
-  const [checkedAt, setCheckedAt] = useState<number | null>(null)
+  const checkedAt = useSyncExternalStore(subscribeAiAgentsCheckedAt, aiAgentsCheckedAt, aiAgentsCheckedAt)
   const [now, setNow] = useState(() => Date.now())
   const [checking, setChecking] = useState(false)
 
@@ -51,7 +52,7 @@ export function LocalAgentCards({ t, aiAgentsStatus, onCopyMcpConfig }: LocalAge
     } catch {
       setStatuses(normalizeAiAgentsStatus(null))
     } finally {
-      setCheckedAt(Date.now())
+      noteAiAgentsChecked()
       setNow(Date.now())
       setChecking(false)
     }
