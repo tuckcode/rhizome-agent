@@ -12,7 +12,6 @@ vi.mock('../lib/productAnalytics', () => ({
   trackComposerPillOpened: vi.fn(),
   trackPrimeModelChanged: vi.fn(),
   trackPrimeThinkingLevelChanged: vi.fn(),
-  trackPrimeModelsFreeOnly: vi.fn(),
   trackRhizomeModelChanged: vi.fn(),
 }))
 

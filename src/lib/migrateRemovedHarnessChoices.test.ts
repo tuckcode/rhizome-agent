@@ -214,6 +214,8 @@ describe('migrateRemovedHarnessSettings', () => {
       }
       const once = migrateRemovedHarnessSettings(raw)
       expect(once.chat_engine).toBe('native')
+      expect(once.ai_workspace_conversations?.[0]?.target_id).toBe(`agent:${engine}`)
+      expect(once.ai_workspace_conversations?.[1]?.target_id).toBe('agent:codex')
       expect(once.ai_workspace_conversations?.map((conversation) => conversation.id)).toEqual(['c1', 'c2'])
       expect(once.ai_workspace_conversations?.map((conversation) => conversation.title)).toEqual([
         'Kept chat',

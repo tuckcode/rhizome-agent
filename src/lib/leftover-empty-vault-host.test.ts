@@ -10,11 +10,11 @@ describe('leftover empty-vault host poll', () => {
     expect(hook).toContain("return subscribe(vaultPath ?? '', setStatus)")
   })
 
-  it('locks usePrimeHostStatus(isPrimeTarget, vaultPath) in ChatHome', () => {
+  it('does not poll Prime host status from ChatHome', () => {
     const chatHome = readFileSync(
       `${process.cwd()}/src/components/ChatHome.tsx`,
       'utf8',
     )
-    expect(chatHome).toContain('usePrimeHostStatus(isPrimeTarget, vaultPath)')
+    expect(chatHome).not.toContain('usePrimeHostStatus')
   })
 })

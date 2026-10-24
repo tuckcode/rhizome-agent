@@ -5,21 +5,6 @@ import type { MutableRefObject } from 'react'
 
 const startNewChat = vi.fn()
 const sessionTitleMock = vi.hoisted(() => ({ title: null as string | null }))
-const primeHostMock = vi.hoisted(() => ({
-  enabled: true,
-  status: {
-    known: true,
-    installed: true,
-    running: true,
-    sessionId: '019fe641-61fa-73e9-82ef-91fc90097aab' as string | null,
-    sessionPath: '/mock/vault/.rhizome/sessions/019fe641.jsonl' as string | null,
-    modelName: 'Grok 4.5',
-    modelProvider: 'xai',
-    modelId: 'grok-4.5',
-    problem: null as { code: string } | null,
-  },
-}))
-
 vi.mock('../utils/loadChatNoteContent', () => ({
   loadChatNoteContent: vi.fn(async () => '# Memory loop\n\nPromote is explicit.'),
 }))
@@ -80,14 +65,6 @@ vi.mock('./AiPanel', () => ({
   },
 }))
 
-vi.mock('../hooks/usePrimeHostStatus', () => ({
-  primeModelLabel: () => 'xai / grok-4.5',
-  usePrimeHostStatus: (enabled = true) => {
-    primeHostMock.enabled = enabled
-    return enabled ? primeHostMock.status : { ...primeHostMock.status, modelName: null, modelId: null }
-  },
-}))
-
 vi.mock('../hooks/usePrimeActiveSessionTitle', () => ({
   usePrimeActiveSessionTitle: () => sessionTitleMock.title,
 }))
@@ -96,24 +73,8 @@ import ChatHome from './ChatHome'
 import { CHAT_TOP_BAR_BAND_CLASS } from './PrimeSessionSubhead'
 import { loadChatNoteContent } from '../utils/loadChatNoteContent'
 
-function livePrimeHost() {
-  primeHostMock.enabled = true
-  primeHostMock.status = {
-    known: true,
-    installed: true,
-    running: true,
-    sessionId: '019fe641-61fa-73e9-82ef-91fc90097aab',
-    sessionPath: '/mock/vault/.rhizome/sessions/019fe641.jsonl',
-    modelName: 'Grok 4.5',
-    modelProvider: 'xai',
-    modelId: 'grok-4.5',
-    problem: null,
-  }
-}
-
 describe('ChatHome', () => {
   beforeEach(() => {
-    livePrimeHost()
     sessionTitleMock.title = null
   })
 
@@ -154,7 +115,6 @@ describe('ChatHome', () => {
     expect(screen.getByTestId('panel-readiness')).toHaveTextContent('checking')
     expect(screen.getByTestId('composer-deck-mounted')).toHaveTextContent('no')
     expect(screen.queryByRole('button', { name: 'New chat' })).toBeNull()
-    expect(primeHostMock.enabled).toBe(false)
 
     rerender(
       <ChatHome
@@ -566,14 +526,10 @@ describe('ChatHome — a note handed in from the vault', () => {
 describe('ChatHome composer wiring', () => {
   const chatHomeSource = readFileSync(`${process.cwd()}/src/components/ChatHome.tsx`, 'utf8')
 
-  beforeEach(() => {
-    livePrimeHost()
-  })
-
   it('does not mount the native model picker as its own row above chat', () => {
     expect(chatHomeSource).not.toContain('<NativeChatModelPicker')
     expect(chatHomeSource).toContain('<ChatComposerDeck')
-    expect(chatHomeSource).toContain('const showComposerDeck = engineChromeReady && isPrimeChat && (showPrimeChrome || rhizomeCatalog)')
+    expect(chatHomeSource).toContain("const showComposerDeck = engineChromeReady && isPrimeChat && effectiveEngine === 'native'")
     expect(chatHomeSource).toContain('showComposerDeck ? (')
   })
 
@@ -597,10 +553,9 @@ describe('ChatHome composer wiring', () => {
     expect(chatHomeSource).not.toMatch(/onClose=\{[^}]*stop/i)
   })
 
-  it('shows Chat preflight on the composer, not a vault gate', () => {
-    expect(chatHomeSource).toContain('<ChatPreflightBanner')
-    expect(chatHomeSource).toContain('vaultPath={vaultPath}')
-    expect(chatHomeSource).toContain('provider={primeHost?.modelProvider ?? null}')
+  it('does not mount the Prime preflight banner on the composer', () => {
+    expect(chatHomeSource).not.toContain('<ChatPreflightBanner')
+    expect(chatHomeSource).not.toContain('showPrimeChrome')
   })
 
   it('keeps a Settings API default on the Prime harness', () => {
@@ -609,8 +564,8 @@ describe('ChatHome composer wiring', () => {
   })
 
   it('uses a primitive session-title refresh key', () => {
-    expect(chatHomeSource).toContain('sessionTitleRefreshKey(primeHost?.isStreaming, sessionPath)')
-    expect(chatHomeSource).not.toContain('[primeHost?.isStreaming, sessionMeta.path]')
+    expect(chatHomeSource).toContain('sessionTitleRefreshKey(false, sessionPath)')
+    expect(chatHomeSource).not.toContain('primeHost?.isStreaming')
   })
 
   it('keeps the Chat top bar off the engine once settings have settled', () => {
@@ -626,8 +581,9 @@ describe('ChatHome composer wiring', () => {
     expect(chatHomeSource).toContain('forkTargetsPrimeEntry={panelEngine === \'prime\'}')
   })
 
-  it('polls Prime from the open chat engine, not the Settings switch', () => {
-    expect(chatHomeSource).toContain("effectiveEngineForStatus === 'prime'")
+  it('does not poll Prime from the open chat', () => {
+    expect(chatHomeSource).not.toContain('usePrimeHostStatus')
+    expect(chatHomeSource).not.toContain('effectiveEngineForStatus')
     expect(chatHomeSource).not.toContain(
       "const isPrimeTarget = isPrimeChat && chatTarget?.kind !== 'api_model' && chatEngine !== 'native'",
     )
@@ -687,13 +643,6 @@ describe('ChatHome composer wiring', () => {
   })
 
   it('stays on native while host status is still unknown', () => {
-    primeHostMock.status = {
-      ...primeHostMock.status,
-      known: false,
-      installed: false,
-      running: false,
-      problem: null,
-    }
     render(
       <ChatHome
         chatEngine="prime"
@@ -711,13 +660,6 @@ describe('ChatHome composer wiring', () => {
   })
 
   it('stays on native when the host is installed but not running', () => {
-    primeHostMock.status = {
-      ...primeHostMock.status,
-      known: true,
-      installed: true,
-      running: false,
-      problem: null,
-    }
     render(
       <ChatHome
         chatEngine="prime"
@@ -735,13 +677,6 @@ describe('ChatHome composer wiring', () => {
   })
 
   it('stays on native when Prime is not installed', () => {
-    primeHostMock.status = {
-      ...primeHostMock.status,
-      known: true,
-      installed: false,
-      running: false,
-      problem: { code: 'not_installed' },
-    }
     render(
       <ChatHome
         chatEngine="prime"
@@ -759,13 +694,6 @@ describe('ChatHome composer wiring', () => {
   })
 
   it('stays on native after a later poll says Prime is not installed', () => {
-    primeHostMock.status = {
-      ...primeHostMock.status,
-      known: false,
-      installed: false,
-      running: false,
-      problem: null,
-    }
     const props = {
       locale: 'en' as const,
       defaultAiAgent: 'prime' as const,
@@ -779,13 +707,6 @@ describe('ChatHome composer wiring', () => {
     const { rerender } = render(<ChatHome chatEngine="prime" {...props} />)
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
 
-    primeHostMock.status = {
-      ...primeHostMock.status,
-      known: true,
-      installed: false,
-      running: false,
-      problem: { code: 'not_installed' },
-    }
     rerender(<ChatHome chatEngine="prime" {...props} />)
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
   })
@@ -831,7 +752,7 @@ describe('ChatHome composer wiring', () => {
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
   })
 
-  it('does not poll Prime for a saved Prime engine', () => {
+  it('stays on native across a saved Prime engine, a native flip, and New chat', () => {
     const props = {
       locale: 'en' as const,
       defaultAiAgent: 'prime' as const,
@@ -843,26 +764,16 @@ describe('ChatHome composer wiring', () => {
       onExit: vi.fn(),
     }
     const { rerender } = render(<ChatHome {...props} chatEngine="prime" />)
-    expect(primeHostMock.enabled).toBe(false)
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
 
     rerender(<ChatHome {...props} chatEngine="native" />)
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
-    expect(primeHostMock.enabled).toBe(false)
 
     fireEvent.click(screen.getByRole('button', { name: 'New chat' }))
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
-    expect(primeHostMock.enabled).toBe(false)
   })
 
   it('re-resolves after a session pick', () => {
-    primeHostMock.status = {
-      ...primeHostMock.status,
-      known: true,
-      installed: false,
-      running: false,
-      problem: { code: 'not_installed' },
-    }
     render(
       <ChatHome
         chatEngine="prime"
@@ -878,25 +789,11 @@ describe('ChatHome composer wiring', () => {
     )
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
 
-    primeHostMock.status = {
-      ...primeHostMock.status,
-      known: true,
-      installed: true,
-      running: true,
-      problem: null,
-    }
     fireEvent.click(screen.getByRole('button', { name: 'Pick session' }))
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
   })
 
   it('keeps a Codex chat on the native engine', () => {
-    primeHostMock.status = {
-      ...primeHostMock.status,
-      known: true,
-      installed: false,
-      running: false,
-      problem: { code: 'not_installed' },
-    }
     const props = {
       locale: 'en' as const,
       defaultAiAgentReadiness: 'ready' as const,
@@ -929,13 +826,6 @@ describe('ChatHome composer wiring', () => {
     )
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
 
-    primeHostMock.status = {
-      ...primeHostMock.status,
-      known: true,
-      installed: false,
-      running: false,
-      problem: { code: 'not_installed' },
-    }
     rerender(
       <ChatHome
         chatEngine="prime"
@@ -966,23 +856,12 @@ describe('ChatHome composer wiring', () => {
     const { rerender } = render(<ChatHome chatEngine="prime" {...props} />)
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
 
-    primeHostMock.status = {
-      ...primeHostMock.status,
-      known: true,
-      installed: false,
-      running: false,
-      sessionId: null,
-      sessionPath: null,
-      problem: { code: 'not_installed' },
-    }
     rerender(<ChatHome chatEngine="prime" {...props} />)
     expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
   })
 
-  it('polls Prime host status from whatever vaultPath Chat has, including empty', () => {
-    expect(chatHomeSource).toContain('usePrimeHostStatus(isPrimeTarget, vaultPath)')
-    expect(chatHomeSource).not.toMatch(/usePrimeHostStatus\([^)]*vaultPath\s*&&/)
-    expect(chatHomeSource).not.toMatch(/usePrimeHostStatus\([^)]*vaultPath\s*\?/)
+  it('does not poll Prime host status from ChatHome', () => {
+    expect(chatHomeSource).not.toContain('usePrimeHostStatus')
   })
 
   it('does not bail out of Chat when vaultPath is empty', () => {

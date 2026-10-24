@@ -9,45 +9,12 @@ import {
 const primeTarget = {
   requestedEngine: 'prime' as const,
   isPrimeTarget: true,
-  hostKnown: false,
-  hostNotInstalled: false,
   startedEngine: null,
 }
 
 describe('resolveEffectiveChatEngine', () => {
-  it('returns the native engine for every leftover choice', () => {
-    expect(resolveEffectiveChatEngine(primeTarget)).toBe('native')
-    expect(
-      resolveEffectiveChatEngine({
-        ...primeTarget,
-        requestedEngine: 'native',
-        isPrimeTarget: false,
-      }),
-    ).toBe('native')
-    expect(
-      resolveEffectiveChatEngine({
-        ...primeTarget,
-        isPrimeTarget: false,
-        hostKnown: true,
-        hostNotInstalled: true,
-      }),
-    ).toBe('native')
-    expect(
-      resolveEffectiveChatEngine({
-        ...primeTarget,
-        hostKnown: true,
-        hostNotInstalled: false,
-        startedEngine: 'prime',
-      }),
-    ).toBe('native')
-    expect(
-      resolveEffectiveChatEngine({
-        ...primeTarget,
-        hostKnown: true,
-        hostNotInstalled: true,
-        startedEngine: 'native',
-      }),
-    ).toBe('native')
+  it('returns the native engine', () => {
+    expect(resolveEffectiveChatEngine()).toBe('native')
   })
 })
 
