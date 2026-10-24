@@ -42,6 +42,10 @@ pub(crate) struct ChatGptTurn<'a> {
     pub(crate) base_url: &'a str,
     pub(crate) model: &'a str,
     pub(crate) instructions: Option<&'a str>,
+    /// Prepended to `instructions`. The chat path calls this a system prefix.
+    pub(crate) system_prefix: Option<&'a str>,
+    /// Sent as `reasoning.effort`. Empty omits the field.
+    pub(crate) reasoning_effort: Option<&'a str>,
     pub(crate) messages: &'a [Value],
     pub(crate) tools: &'a [Value],
     /// In-memory key for reasoning items. Empty skips replay.
@@ -100,15 +104,21 @@ pub(crate) struct ChatGptModel {
     pub(crate) display_name: String,
 }
 
-/// Last-known chat models. Used only when `GET /v1/models` fails, so a
-/// failed list cannot turn the provider off.
+/// Built-in picker rows when `GET /v1/models` fails or returns no
+/// `visibility: "list"` rows. A failed list cannot turn the provider off.
+///
+/// Slugs checked 2026-10-24 against OpenAI's published pages, not a live
+/// `GET /v1/models` call. Flagship ids are on
+/// <https://developers.openai.com/api/docs/models> (`gpt-6-astra`,
+/// `gpt-6.1-sol`, `gpt-6-luna`). `gpt-6-sol`, `gpt-5.5`, and `gpt-5.4`
+/// are still model ids on <https://developers.openai.com/api/docs/pricing>.
+/// `gpt-5.6` is not an id there; the published ids are `gpt-5.6-sol` and kin.
 pub(crate) fn fallback_chatgpt_models() -> Vec<ChatGptModel> {
     [
-        ("gpt-6.1-sol", "GPT-6.1 Sol"),
         ("gpt-6-astra", "GPT-6 Astra"),
-        ("gpt-6-sol", "GPT-6 Sol"),
+        ("gpt-6.1-sol", "GPT-6.1 Sol"),
         ("gpt-6-luna", "GPT-6 Luna"),
-        ("gpt-5.6", "GPT-5.6"),
+        ("gpt-6-sol", "GPT-6 Sol"),
         ("gpt-5.5", "GPT-5.5"),
         ("gpt-5.4", "GPT-5.4"),
     ]
@@ -120,8 +130,10 @@ pub(crate) fn fallback_chatgpt_models() -> Vec<ChatGptModel> {
     .collect()
 }
 
-/// `GET {base}/models`. A transport, HTTP, or parse failure returns
-/// [`fallback_chatgpt_models`]. This function has no error return.
+/// `GET {base}/models`. A transport, HTTP, or parse failure, or a 200
+/// with no `visibility: "list"` rows, returns [`fallback_chatgpt_models`].
+/// This function has no error return.
+#[allow(dead_code)] // wired in PR 3
 pub(crate) fn list_chatgpt_models<R>(
     base_url: &str,
     auth: &BearerSession<R>,
@@ -143,6 +155,10 @@ pub(crate) fn stream_chatgpt_turn<R>(
 ) where
     R: FnMut() -> Result<String, String>,
 {
+    if auth.token().trim().is_empty() {
+        let _ = emit(ModelEvent::Error(sign_in_again(None)));
+        return;
+    }
     let body = match request_body(turn) {
         Ok(body) => body,
         Err(error) => {
@@ -211,6 +227,11 @@ fn post_responses(
     };
     let status = response.status();
     if !status.is_success() {
+        let retry_after = response
+            .headers()
+            .get(reqwest::header::RETRY_AFTER)
+            .and_then(|value| value.to_str().ok())
+            .and_then(|value| value.trim().parse::<u64>().ok());
         let status = status.as_u16();
         let response_body = response.text().unwrap_or_default();
         if status == 401 {
@@ -220,6 +241,7 @@ fn post_responses(
             status,
             &response_body,
             token,
+            retry_after,
         )));
         return PostResult::Done;
     }
@@ -259,11 +281,8 @@ fn read_sse(
         }
     }
     if retry {
-        for line in std::io::BufRead::lines(&mut reader) {
-            if line.is_err() {
-                break;
-            }
-        }
+        // Drop the socket. Do not read the rest of the stream.
+        drop(reader);
         return PostResult::Retry;
     }
     match parser.end_of_stream() {
@@ -289,7 +308,11 @@ fn fetch_models(base_url: &str, token: &str, limits: HttpLimits) -> Result<Vec<C
     }
     let json = response.json::<Value>().map_err(|_| ())?;
     let models = json.get("models").and_then(Value::as_array).ok_or(())?;
-    Ok(parse_listed_models(models))
+    let listed = parse_listed_models(models);
+    if listed.is_empty() {
+        return Err(());
+    }
+    Ok(listed)
 }
 
 fn parse_listed_models(models: &[Value]) -> Vec<ChatGptModel> {
@@ -318,13 +341,27 @@ fn request_body(turn: &ChatGptTurn<'_>) -> Result<Value, ModelError> {
             "ChatGPT request is missing a model.",
         ));
     }
+    let instructions = prefixed_instructions(turn.system_prefix, turn.instructions);
     let (instructions, input) =
-        responses_input(turn.instructions, turn.messages, turn.replay_session);
+        responses_input(instructions.as_deref(), turn.messages, turn.replay_session);
     let mut body = Map::new();
     body.insert("model".to_string(), Value::String(turn.model.to_string()));
     body.insert("input".to_string(), Value::Array(input));
     body.insert("store".to_string(), Value::Bool(false));
     body.insert("stream".to_string(), Value::Bool(true));
+    // With store:false, encrypted reasoning is omitted unless asked for.
+    // https://developers.openai.com/api/docs/guides/reasoning
+    body.insert(
+        "include".to_string(),
+        json!(["reasoning.encrypted_content"]),
+    );
+    if let Some(effort) = turn
+        .reasoning_effort
+        .map(str::trim)
+        .filter(|effort| !effort.is_empty())
+    {
+        body.insert("reasoning".to_string(), json!({ "effort": effort }));
+    }
     if let Some(instructions) = instructions {
         body.insert("instructions".to_string(), Value::String(instructions));
     }
@@ -551,6 +588,17 @@ fn output_text(value: &Value) -> String {
     }
 }
 
+fn prefixed_instructions(prefix: Option<&str>, instructions: Option<&str>) -> Option<String> {
+    let prefix = prefix.map(str::trim).filter(|text| !text.is_empty());
+    let instructions = instructions.map(str::trim).filter(|text| !text.is_empty());
+    match (prefix, instructions) {
+        (Some(prefix), Some(instructions)) => Some(format!("{prefix}\n{instructions}")),
+        (Some(prefix), None) => Some(prefix.to_string()),
+        (None, Some(instructions)) => Some(instructions.to_string()),
+        (None, None) => None,
+    }
+}
+
 fn merge_instructions(base: Option<&str>, extra: &[String]) -> Option<String> {
     let mut parts = Vec::new();
     if let Some(base) = base.map(str::trim).filter(|text| !text.is_empty()) {
@@ -586,6 +634,8 @@ struct ResponsesParser {
     by_item: HashMap<String, u64>,
     assistant_text: String,
     reasoning_items: Vec<Value>,
+    /// Joined `data:` lines for the SSE event still being read.
+    data_buf: String,
     saw_output: bool,
     finished: bool,
     completed: bool,
@@ -599,6 +649,7 @@ impl ResponsesParser {
             by_item: HashMap::new(),
             assistant_text: String::new(),
             reasoning_items: Vec::new(),
+            data_buf: String::new(),
             saw_output: false,
             finished: false,
             completed: false,
@@ -613,16 +664,33 @@ impl ResponsesParser {
         if self.finished {
             return Step::Events(Vec::new());
         }
-        let line = line.trim_end_matches('\r').trim();
-        let Some(data) = line.strip_prefix("data:") else {
+        let line = line.trim_end_matches('\r');
+        if line.is_empty() {
+            return self.dispatch_data();
+        }
+        let Some(rest) = line.strip_prefix("data:") else {
             return Step::Events(Vec::new());
         };
+        // One leading space is the SSE field separator, not payload.
+        let chunk = rest.strip_prefix(' ').unwrap_or(rest);
+        if !self.data_buf.is_empty() {
+            self.data_buf.push('\n');
+        }
+        self.data_buf.push_str(chunk);
+        Step::Events(Vec::new())
+    }
+
+    fn dispatch_data(&mut self) -> Step {
+        if self.data_buf.is_empty() {
+            return Step::Events(Vec::new());
+        }
+        let data = std::mem::take(&mut self.data_buf);
         let data = data.trim();
         if data.is_empty() {
             return Step::Events(Vec::new());
         }
         if data == "[DONE]" {
-            return self.end_of_stream();
+            return self.missing_completed();
         }
         match serde_json::from_str::<Value>(data) {
             Ok(event) => self.push_event(&event),
@@ -635,6 +703,19 @@ impl ResponsesParser {
     }
 
     fn end_of_stream(&mut self) -> Step {
+        match self.dispatch_data() {
+            Step::Retry => Step::Retry,
+            Step::Events(events) if self.finished => Step::Events(events),
+            Step::Events(mut events) => {
+                if let Step::Events(tail) = self.missing_completed() {
+                    events.extend(tail);
+                }
+                Step::Events(events)
+            }
+        }
+    }
+
+    fn missing_completed(&mut self) -> Step {
         if self.finished {
             return Step::Events(Vec::new());
         }
@@ -661,11 +742,7 @@ impl ResponsesParser {
                 self.push_argument_done(event, &mut events);
             }
             "response.completed" => return Step::Events(self.push_completed(event)),
-            "response.failed" => {
-                return Step::Events(self.fail(failure_from_response(
-                    event.get("response").unwrap_or(event),
-                )));
-            }
+            "response.failed" => return self.push_failed(event),
             "response.incomplete" => {
                 return Step::Events(self.fail(model_error(
                     ModelErrorKind::Protocol,
@@ -778,6 +855,16 @@ impl ResponsesParser {
             }
         }
         self.finish_ok()
+    }
+
+    fn push_failed(&mut self, event: &Value) -> Step {
+        let response = event.get("response").unwrap_or(event);
+        let code = error_code(response);
+        let message = error_message(response);
+        if is_token_expired(&code, &message) && !self.saw_output {
+            return Step::Retry;
+        }
+        Step::Events(self.fail(failure_from_response(response)))
     }
 
     fn push_error_event(&mut self, event: &Value) -> Step {
@@ -1124,7 +1211,7 @@ fn plain_quota_message(code: &str) -> Option<(&'static str, ModelErrorKind)> {
     None
 }
 
-fn http_failure(status: u16, body: &str, token: &str) -> ModelError {
+fn http_failure(status: u16, body: &str, token: &str, retry_after_secs: Option<u64>) -> ModelError {
     let code = code_in_body(body);
     if let Some((text, kind)) = plain_quota_message(&code).or_else(|| quota_code_in_text(body)) {
         return model_error(kind, Some(status), text);
@@ -1132,9 +1219,7 @@ fn http_failure(status: u16, body: &str, token: &str) -> ModelError {
     let kind = match status {
         402 => ModelErrorKind::QuotaExhausted,
         403 => ModelErrorKind::Auth,
-        429 => ModelErrorKind::RateLimited {
-            retry_after_secs: None,
-        },
+        429 => ModelErrorKind::RateLimited { retry_after_secs },
         408 | 500..=599 => ModelErrorKind::Unavailable,
         _ => ModelErrorKind::Rejected,
     };
@@ -1279,19 +1364,45 @@ impl ReplayTurn {
     }
 }
 
-fn replay_buckets() -> &'static Mutex<HashMap<String, VecDeque<ReplayTurn>>> {
-    static BUCKETS: OnceLock<Mutex<HashMap<String, VecDeque<ReplayTurn>>>> = OnceLock::new();
-    BUCKETS.get_or_init(|| Mutex::new(HashMap::new()))
+struct ReplayBook {
+    sessions: HashMap<String, VecDeque<ReplayTurn>>,
+    /// Oldest session id first. Drop removes a chat; this cap covers a
+    /// session whose model was never dropped.
+    order: VecDeque<String>,
+}
+
+const MAX_REPLAY_SESSIONS: usize = 64;
+
+fn replay_book() -> &'static Mutex<ReplayBook> {
+    static BOOK: OnceLock<Mutex<ReplayBook>> = OnceLock::new();
+    BOOK.get_or_init(|| {
+        Mutex::new(ReplayBook {
+            sessions: HashMap::new(),
+            order: VecDeque::new(),
+        })
+    })
+}
+
+/// Drops one chat's Responses reasoning items. Safe to call twice.
+pub(crate) fn clear_responses_replay(session: &str) {
+    if session.is_empty() {
+        return;
+    }
+    let mut book = replay_book()
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+    book.sessions.remove(session);
+    book.order.retain(|id| id != session);
 }
 
 fn store_replay(session: &str, turn: ReplayTurn) {
     if session.is_empty() {
         return;
     }
-    let mut sessions = replay_buckets()
+    let mut book = replay_book()
         .lock()
         .unwrap_or_else(|error| error.into_inner());
-    let bucket = sessions.entry(session.to_string()).or_default();
+    let bucket = book.sessions.entry(session.to_string()).or_default();
     bucket.push_back(turn);
     while bucket.len() > MAX_REPLAY_TURNS {
         bucket.pop_front();
@@ -1300,6 +1411,13 @@ fn store_replay(session: &str, turn: ReplayTurn) {
     while bytes > MAX_REPLAY_BYTES && bucket.len() > 1 {
         if let Some(old) = bucket.pop_front() {
             bytes = bytes.saturating_sub(replay_bytes(&old));
+        }
+    }
+    book.order.retain(|id| id != session);
+    book.order.push_back(session.to_string());
+    while book.order.len() > MAX_REPLAY_SESSIONS {
+        if let Some(old) = book.order.pop_front() {
+            book.sessions.remove(&old);
         }
     }
 }
@@ -1317,10 +1435,10 @@ fn load_replay(session: &str) -> Vec<ReplayTurn> {
     if session.is_empty() {
         return Vec::new();
     }
-    let sessions = replay_buckets()
+    let book = replay_book()
         .lock()
         .unwrap_or_else(|error| error.into_inner());
-    sessions
+    book.sessions
         .get(session)
         .map(|turns| turns.iter().cloned().collect())
         .unwrap_or_default()
@@ -1329,7 +1447,9 @@ fn load_replay(session: &str) -> Vec<ReplayTurn> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ai_models::test_server::{json_response, responses_sse, serve, TEST_LIMITS};
+    use crate::ai_models::test_server::{
+        http_response, json_response, responses_sse, serve, serve_mapped, TEST_LIMITS,
+    };
     use std::cell::Cell;
     use std::rc::Rc;
 
@@ -1360,6 +1480,8 @@ mod tests {
             base_url: base,
             model: "gpt-6.1-sol",
             instructions,
+            system_prefix: None,
+            reasoning_effort: None,
             messages,
             tools,
             replay_session: session,
@@ -1375,6 +1497,7 @@ mod tests {
         assert_eq!(body["store"], false);
         assert_eq!(body["stream"], true);
         assert_eq!(body["model"], "gpt-6.1-sol");
+        assert_eq!(body["include"], json!(["reasoning.encrypted_content"]));
         for key in [
             "temperature",
             "max_output_tokens",
@@ -1524,17 +1647,37 @@ mod tests {
 
     #[test]
     fn reasoning_item_is_replayed_when_store_is_false() {
-        let server = serve(vec![
+        let mut calls = 0usize;
+        let server = serve_mapped(2, move |_target, body| {
+            calls += 1;
+            if calls > 1 {
+                return responses_sse(&[
+                    r#"{"type":"response.output_text.delta","delta":"Next"}"#,
+                    r#"{"type":"response.completed","response":{"status":"completed"}}"#,
+                ]);
+            }
+            let asked = serde_json::from_str::<Value>(body)
+                .ok()
+                .is_some_and(|json| {
+                    json["include"].as_array().is_some_and(|items| {
+                        items
+                            .iter()
+                            .any(|item| item.as_str() == Some("reasoning.encrypted_content"))
+                    })
+                });
+            let item = if asked {
+                r#"{"type":"reasoning","id":"rs_test","summary":[],"encrypted_content":"enc-payload","status":"completed"}"#
+            } else {
+                r#"{"type":"reasoning","id":"rs_test","summary":[],"status":"completed"}"#
+            };
+            let done =
+                format!(r#"{{"type":"response.output_item.done","output_index":0,"item":{item}}}"#);
             responses_sse(&[
-                r#"{"type":"response.output_item.done","output_index":0,"item":{"type":"reasoning","id":"rs_test","summary":[],"encrypted_content":"enc-payload","status":"completed"}}"#,
+                &done,
                 r#"{"type":"response.output_text.delta","delta":"Hello"}"#,
                 r#"{"type":"response.completed","response":{"status":"completed"}}"#,
-            ]),
-            responses_sse(&[
-                r#"{"type":"response.output_text.delta","delta":"Next"}"#,
-                r#"{"type":"response.completed","response":{"status":"completed"}}"#,
-            ]),
-        ]);
+            ])
+        });
         let session = "reasoning-round-trip";
         let first = vec![json!({"role": "user", "content": "Hi"})];
         let mut bearer = auth("token-1");
@@ -1551,6 +1694,7 @@ mod tests {
                 },
             ]
         );
+        assert_common_body(&body_of(&server, 0));
         let second = vec![
             json!({"role": "user", "content": "Hi"}),
             json!({"role": "assistant", "content": "Hello"}),
@@ -1766,5 +1910,365 @@ mod tests {
         let headers = server.headers.lock().unwrap();
         assert!(headers[0].contains("authorization: bearer token-1"));
         assert!(headers[1].contains("authorization: bearer token-1"));
+    }
+
+    #[test]
+    fn model_list_with_no_visible_rows_uses_the_fallback() {
+        let server = serve(vec![json_response(
+            "200 OK",
+            r#"{"models":[{"slug":"hidden-one","display_name":"Hidden","visibility":"hide"}]}"#,
+        )]);
+        let session = auth("token-1");
+        let listed = list_chatgpt_models(&server.base_url, &session, TEST_LIMITS);
+        assert_eq!(listed, fallback_chatgpt_models());
+    }
+
+    #[test]
+    fn system_prefix_and_reasoning_effort_go_on_the_request() {
+        let server = serve(vec![responses_sse(&[
+            r#"{"type":"response.output_text.delta","delta":"ok"}"#,
+            r#"{"type":"response.completed","response":{"status":"completed"}}"#,
+        ])]);
+        let messages = vec![json!({"role": "user", "content": "Hi"})];
+        let mut gpt = turn(&server.base_url, Some("Be brief"), &messages, &[], "");
+        gpt.system_prefix = Some("Prefix");
+        gpt.reasoning_effort = Some("high");
+        let mut session = auth("token-1");
+        let events = collect(&gpt, &mut session);
+        assert!(matches!(
+            events.last(),
+            Some(ModelEvent::Finish {
+                reason: FinishReason::Stop
+            })
+        ));
+        let body = body_of(&server, 0);
+        assert_eq!(body["instructions"], "Prefix\nBe brief");
+        assert_eq!(body["reasoning"]["effort"], "high");
+        assert_eq!(body["include"], json!(["reasoning.encrypted_content"]));
+        assert!(body.get("max_output_tokens").is_none());
+        assert!(body.get("temperature").is_none());
+    }
+
+    #[test]
+    fn multi_line_sse_data_is_one_event() {
+        let wire = responses_sse(&[r#"{"type":"response.output_text.delta","delta":"Hi"}"#]);
+        assert!(wire.contains("data: {\n"), "{wire}");
+        assert!(wire.matches("data: ").count() >= 2, "{wire}");
+        let server = serve(vec![responses_sse(&[
+            r#"{"type":"response.output_text.delta","delta":"Hi"}"#,
+            r#"{"type":"response.completed","response":{"status":"completed"}}"#,
+        ])]);
+        let messages = vec![json!({"role": "user", "content": "Hi"})];
+        let mut session = auth("token-1");
+        let events = collect(
+            &turn(&server.base_url, None, &messages, &[], ""),
+            &mut session,
+        );
+        assert_eq!(
+            events,
+            vec![
+                text("Hi"),
+                ModelEvent::Finish {
+                    reason: FinishReason::Stop,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn two_parallel_tool_calls_keep_interleaved_arguments() {
+        let server = serve(vec![responses_sse(&[
+            r#"{"type":"response.output_item.added","output_index":0,"item":{"type":"function_call","call_id":"call_a","name":"one","namespace":"rhizome","arguments":""}}"#,
+            r#"{"type":"response.output_item.added","output_index":1,"item":{"type":"function_call","call_id":"call_b","name":"two","namespace":"rhizome","arguments":""}}"#,
+            r#"{"type":"response.function_call_arguments.delta","output_index":0,"delta":"{"}"#,
+            r#"{"type":"response.function_call_arguments.delta","output_index":1,"delta":"{"}"#,
+            r#"{"type":"response.function_call_arguments.delta","output_index":0,"delta":"\"a\":1}"}"#,
+            r#"{"type":"response.function_call_arguments.delta","output_index":1,"delta":"\"b\":2}"}"#,
+            r#"{"type":"response.output_item.done","output_index":0,"item":{"type":"function_call","call_id":"call_a","name":"one","namespace":"rhizome","arguments":"{\"a\":1}"}}"#,
+            r#"{"type":"response.output_item.done","output_index":1,"item":{"type":"function_call","call_id":"call_b","name":"two","namespace":"rhizome","arguments":"{\"b\":2}"}}"#,
+            r#"{"type":"response.completed","response":{"status":"completed"}}"#,
+        ])]);
+        let messages = vec![json!({"role": "user", "content": "go"})];
+        let mut session = auth("token-1");
+        let events = collect(
+            &turn(&server.base_url, None, &messages, &[], ""),
+            &mut session,
+        );
+        assert_eq!(
+            events,
+            vec![
+                ModelEvent::ToolCallStart {
+                    id: "call_a".into(),
+                    name: "one".into(),
+                },
+                ModelEvent::ToolCallStart {
+                    id: "call_b".into(),
+                    name: "two".into(),
+                },
+                ModelEvent::ToolCallArgsDelta {
+                    id: "call_a".into(),
+                    delta: "{".into(),
+                },
+                ModelEvent::ToolCallArgsDelta {
+                    id: "call_b".into(),
+                    delta: "{".into(),
+                },
+                ModelEvent::ToolCallArgsDelta {
+                    id: "call_a".into(),
+                    delta: "\"a\":1}".into(),
+                },
+                ModelEvent::ToolCallArgsDelta {
+                    id: "call_b".into(),
+                    delta: "\"b\":2}".into(),
+                },
+                ModelEvent::ToolCallEnd {
+                    id: "call_a".into(),
+                },
+                ModelEvent::ToolCallEnd {
+                    id: "call_b".into(),
+                },
+                ModelEvent::Finish {
+                    reason: FinishReason::ToolCalls,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn unknown_event_types_are_ignored() {
+        let server = serve(vec![responses_sse(&[
+            r#"{"type":"response.widget.frob","note":"ignore me"}"#,
+            r#"{"type":"response.output_text.delta","delta":"Hi"}"#,
+            r#"{"type":"response.completed","response":{"status":"completed"}}"#,
+        ])]);
+        let messages = vec![json!({"role": "user", "content": "Hi"})];
+        let mut session = auth("token-1");
+        let events = collect(
+            &turn(&server.base_url, None, &messages, &[], ""),
+            &mut session,
+        );
+        assert_eq!(
+            events,
+            vec![
+                text("Hi"),
+                ModelEvent::Finish {
+                    reason: FinishReason::Stop,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn response_incomplete_is_an_error() {
+        let server = serve(vec![responses_sse(&[
+            r#"{"type":"response.incomplete","response":{"status":"incomplete","incomplete_details":{"reason":"max_output_tokens"}}}"#,
+        ])]);
+        let messages = vec![json!({"role": "user", "content": "Hi"})];
+        let mut session = auth("token-1");
+        let events = collect(
+            &turn(&server.base_url, None, &messages, &[], ""),
+            &mut session,
+        );
+        let error = error_of(&events);
+        assert_eq!(error.kind, ModelErrorKind::Protocol);
+        assert_eq!(error.message, INCOMPLETE);
+        assert!(events
+            .iter()
+            .all(|event| !matches!(event, ModelEvent::Finish { .. })));
+    }
+
+    #[test]
+    fn refresh_error_or_empty_token_says_sign_in_again() {
+        let server = serve(vec![
+            json_response(
+                "401 Unauthorized",
+                r#"{"error":{"code":"invalid_api_key"}}"#,
+            ),
+            json_response(
+                "401 Unauthorized",
+                r#"{"error":{"code":"invalid_api_key"}}"#,
+            ),
+        ]);
+        let messages = vec![json!({"role": "user", "content": "Hi"})];
+        let mut denied = BearerSession::new("old", || Err("nope".into()));
+        let events = collect(
+            &turn(&server.base_url, None, &messages, &[], ""),
+            &mut denied,
+        );
+        assert_eq!(error_of(&events).message, SIGN_IN_AGAIN);
+        let mut blank = BearerSession::new("old", || Ok("   ".into()));
+        let events = collect(
+            &turn(&server.base_url, None, &messages, &[], ""),
+            &mut blank,
+        );
+        assert_eq!(error_of(&events).message, SIGN_IN_AGAIN);
+        assert_eq!(server.requests.lock().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn second_unauthorized_response_does_not_refresh_again() {
+        let server = serve(vec![
+            json_response(
+                "401 Unauthorized",
+                r#"{"error":{"code":"invalid_api_key"}}"#,
+            ),
+            json_response(
+                "401 Unauthorized",
+                r#"{"error":{"code":"invalid_api_key"}}"#,
+            ),
+        ]);
+        let refreshes = Rc::new(Cell::new(0));
+        let counter = Rc::clone(&refreshes);
+        let mut session = BearerSession::new("old", move || {
+            counter.set(counter.get() + 1);
+            Ok("token-2".into())
+        });
+        let messages = vec![json!({"role": "user", "content": "Hi"})];
+        let events = collect(
+            &turn(&server.base_url, None, &messages, &[], ""),
+            &mut session,
+        );
+        assert_eq!(refreshes.get(), 1);
+        assert_eq!(server.requests.lock().unwrap().len(), 2);
+        assert_eq!(error_of(&events).message, SIGN_IN_AGAIN);
+        let headers = server.headers.lock().unwrap();
+        assert!(headers[0].contains("authorization: bearer old"));
+        assert!(headers[1].contains("authorization: bearer token-2"));
+    }
+
+    #[test]
+    fn emit_false_stops_the_stream() {
+        let server = serve(vec![responses_sse(&[
+            r#"{"type":"response.output_text.delta","delta":"Hello"}"#,
+            r#"{"type":"response.output_text.delta","delta":"!"}"#,
+            r#"{"type":"response.completed","response":{"status":"completed"}}"#,
+        ])]);
+        let messages = vec![json!({"role": "user", "content": "Hi"})];
+        let mut session = auth("token-1");
+        let mut events = Vec::new();
+        stream_chatgpt_turn(
+            &turn(&server.base_url, None, &messages, &[], ""),
+            &mut session,
+            TEST_LIMITS,
+            &mut |event| {
+                events.push(event);
+                false
+            },
+        );
+        assert_eq!(events, vec![text("Hello")]);
+    }
+
+    #[test]
+    fn empty_bearer_token_says_sign_in_again() {
+        let messages = vec![json!({"role": "user", "content": "Hi"})];
+        let mut session = BearerSession::new("   ", || Ok("later".into()));
+        let events = collect(
+            &turn("http://127.0.0.1:9/v1", None, &messages, &[], ""),
+            &mut session,
+        );
+        assert_eq!(error_of(&events).kind, ModelErrorKind::Auth);
+        assert_eq!(error_of(&events).message, SIGN_IN_AGAIN);
+    }
+
+    #[test]
+    fn expired_failure_before_output_refreshes_once() {
+        let server = serve(vec![
+            responses_sse(&[
+                r#"{"type":"response.failed","response":{"status":"failed","error":{"code":"invalid_api_key","message":"access token expired"}}}"#,
+            ]),
+            responses_sse(&[
+                r#"{"type":"response.output_text.delta","delta":"ok"}"#,
+                r#"{"type":"response.completed","response":{"status":"completed"}}"#,
+            ]),
+        ]);
+        let refreshes = Rc::new(Cell::new(0));
+        let counter = Rc::clone(&refreshes);
+        let mut session = BearerSession::new("old", move || {
+            counter.set(counter.get() + 1);
+            Ok("token-2".into())
+        });
+        let messages = vec![json!({"role": "user", "content": "Hi"})];
+        let events = collect(
+            &turn(&server.base_url, None, &messages, &[], ""),
+            &mut session,
+        );
+        assert_eq!(refreshes.get(), 1);
+        assert_eq!(server.requests.lock().unwrap().len(), 2);
+        assert_eq!(
+            events,
+            vec![
+                text("ok"),
+                ModelEvent::Finish {
+                    reason: FinishReason::Stop,
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn rate_limit_keeps_retry_after() {
+        let server = serve(vec![http_response(
+            "429 Too Many Requests",
+            &["Content-Type: application/json", "Retry-After: 7"],
+            r#"{"error":{"message":"slow down"}}"#,
+        )]);
+        let messages = vec![json!({"role": "user", "content": "Hi"})];
+        let mut session = auth("token-1");
+        let events = collect(
+            &turn(&server.base_url, None, &messages, &[], ""),
+            &mut session,
+        );
+        assert_eq!(
+            error_of(&events).kind,
+            ModelErrorKind::RateLimited {
+                retry_after_secs: Some(7),
+            }
+        );
+    }
+
+    #[test]
+    fn clear_responses_replay_drops_the_chat() {
+        let mut calls = 0usize;
+        let server = serve_mapped(2, move |_target, body| {
+            calls += 1;
+            if calls > 1 {
+                return responses_sse(&[
+                    r#"{"type":"response.output_text.delta","delta":"Next"}"#,
+                    r#"{"type":"response.completed","response":{"status":"completed"}}"#,
+                ]);
+            }
+            let asked = body.contains("reasoning.encrypted_content");
+            let item = if asked {
+                r#"{"type":"reasoning","id":"rs_clear","summary":[],"encrypted_content":"enc-clear","status":"completed"}"#
+            } else {
+                r#"{"type":"reasoning","id":"rs_clear","summary":[],"status":"completed"}"#
+            };
+            let done =
+                format!(r#"{{"type":"response.output_item.done","output_index":0,"item":{item}}}"#);
+            responses_sse(&[
+                &done,
+                r#"{"type":"response.output_text.delta","delta":"Hello"}"#,
+                r#"{"type":"response.completed","response":{"status":"completed"}}"#,
+            ])
+        });
+        let session = "clear-replay";
+        let first = vec![json!({"role": "user", "content": "Hi"})];
+        let mut bearer = auth("token-1");
+        let _ = collect(
+            &turn(&server.base_url, None, &first, &[], session),
+            &mut bearer,
+        );
+        clear_responses_replay(session);
+        let second = vec![
+            json!({"role": "user", "content": "Hi"}),
+            json!({"role": "assistant", "content": "Hello"}),
+        ];
+        let _ = collect(
+            &turn(&server.base_url, None, &second, &[], session),
+            &mut bearer,
+        );
+        let replay = body_of(&server, 1);
+        let input = replay["input"].as_array().unwrap();
+        assert!(input.iter().all(|item| item["type"] != "reasoning"));
     }
 }

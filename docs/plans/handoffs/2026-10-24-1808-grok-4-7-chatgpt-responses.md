@@ -17,6 +17,8 @@ commits: feat: stream signed-in ChatGPT through the Responses API
 - `src-tauri/src/ai_models/openai_responses.rs` streams `POST /v1/responses`
   into `ModelEvent`. `store` is false, `stream` is true, the system prompt
   is `instructions`, and `temperature` / `max_output_tokens` are not sent.
+  The body always includes `reasoning.encrypted_content`, which is what
+  makes reasoning replay work with `store: false`.
 - Tools go out in the `rhizome` namespace and come back as the bare name.
   Tool results go back as `function_call_output`.
 - A finished reasoning item with `encrypted_content` is replayed on the

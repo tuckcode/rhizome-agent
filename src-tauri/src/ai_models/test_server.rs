@@ -70,7 +70,9 @@ pub(crate) fn serve(responses: Vec<String>) -> TestServer {
             seen.lock()
                 .unwrap()
                 .push((target, String::from_utf8(body).unwrap()));
-            stream.write_all(response.as_bytes()).unwrap();
+            // A client that drops the socket mid-stream must not kill the
+            // rest of this canned sequence.
+            let _ = stream.write_all(response.as_bytes());
         }
     });
     TestServer {
@@ -116,7 +118,8 @@ pub(crate) fn json_response(status: &str, body: &str) -> String {
     http_response(status, &["Content-Type: application/json"], body)
 }
 
-/// Responses API SSE: an `event:` line plus one `data:` JSON object.
+/// Responses API SSE. Each JSON object is split across two `data:` lines
+/// and dispatched only after the blank line, per the SSE spec.
 pub(crate) fn responses_sse(events: &[&str]) -> String {
     let mut body = String::new();
     for event in events {
@@ -131,9 +134,79 @@ pub(crate) fn responses_sse(events: &[&str]) -> String {
             .unwrap_or_else(|| "message".to_string());
         body.push_str("event: ");
         body.push_str(&event_type);
-        body.push_str("\ndata: ");
-        body.push_str(event);
+        body.push('\n');
+        // A newline between these lines is JSON whitespace, so the joined
+        // payload is still one object.
+        if let Some(rest) = event.strip_prefix('{') {
+            body.push_str("data: {\n");
+            body.push_str("data: ");
+            body.push_str(rest);
+        } else {
+            body.push_str("data: ");
+            body.push_str(event);
+        }
         body.push_str("\n\n");
     }
     http_response("200 OK", &["Content-Type: text/event-stream"], &body)
+}
+
+/// Answers `count` connections. `respond` sees the request target and body.
+pub(crate) fn serve_mapped<F>(count: usize, mut respond: F) -> TestServer
+where
+    F: FnMut(&str, &str) -> String + Send + 'static,
+{
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let base_url = format!("http://{}/v1", listener.local_addr().unwrap());
+    let requests = Arc::new(Mutex::new(Vec::new()));
+    let seen = Arc::clone(&requests);
+    let headers = Arc::new(Mutex::new(Vec::new()));
+    let seen_headers = Arc::clone(&headers);
+    std::thread::spawn(move || {
+        for _ in 0..count {
+            let Ok((mut stream, _)) = listener.accept() else {
+                return;
+            };
+            stream.set_read_timeout(Some(TEST_IO_LIMIT)).unwrap();
+            stream.set_write_timeout(Some(TEST_IO_LIMIT)).unwrap();
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut request_line = String::new();
+            if reader.read_line(&mut request_line).is_err() {
+                return;
+            }
+            let mut content_length = 0usize;
+            let mut lines = String::new();
+            loop {
+                let mut header = String::new();
+                if reader.read_line(&mut header).is_err() {
+                    return;
+                }
+                if header.trim().is_empty() {
+                    break;
+                }
+                lines.push_str(&header.to_ascii_lowercase());
+                if let Some(value) = header.to_ascii_lowercase().strip_prefix("content-length:") {
+                    content_length = value.trim().parse().unwrap_or(0);
+                }
+            }
+            let mut body = vec![0; content_length];
+            if reader.read_exact(&mut body).is_err() {
+                return;
+            }
+            let target = request_line
+                .split_whitespace()
+                .take(2)
+                .collect::<Vec<_>>()
+                .join(" ");
+            let body = String::from_utf8(body).unwrap_or_default();
+            seen_headers.lock().unwrap().push(lines);
+            seen.lock().unwrap().push((target.clone(), body.clone()));
+            let response = respond(&target, &body);
+            let _ = stream.write_all(response.as_bytes());
+        }
+    });
+    TestServer {
+        base_url,
+        requests,
+        headers,
+    }
 }

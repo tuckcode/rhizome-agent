@@ -72,12 +72,28 @@ pub(crate) fn chat_transport(kind: ChatAuthKind) -> ChatTransport {
 pub(crate) fn chat_auth_kind_for_provider(
     _provider: &crate::ai_models::AiModelProvider,
 ) -> ChatAuthKind {
-    // PR 3 calls `list_chatgpt_models`. Naming it here keeps that entry in
-    // the binary before the picker is wired.
-    let _list_models =
-        crate::ai_models::openai_responses::list_chatgpt_models::<fn() -> Result<String, String>>;
-    let _ = _list_models;
     chat_auth_kind(false)
+}
+
+/// The Responses body fields that come from a chat-completions turn.
+/// Token caps stay off this path.
+fn responses_turn_fields(
+    extras: &crate::ai_models::TurnExtras,
+) -> (Option<String>, Option<String>) {
+    let prefix = extras
+        .system_prefix
+        .as_deref()
+        .map(str::trim)
+        .filter(|text| !text.is_empty())
+        .map(str::to_string);
+    let effort = extras
+        .body
+        .get("reasoning_effort")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|effort| !effort.is_empty())
+        .map(str::to_string);
+    (prefix, effort)
 }
 
 /// Calls the provider once per loop step. Runs no tools.
@@ -228,16 +244,31 @@ impl Model for ProviderModel {
                         // Reached only after the PR 1 hookup in
                         // `chat_auth_kind_for_provider`. The refresh callback
                         // stays empty until that PR passes its own.
-                        let token = request.api_key_override.clone().unwrap_or_default();
-                        let mut auth =
-                            crate::ai_models::openai_responses::BearerSession::new(token, || {
-                                Err(String::new())
-                            });
+                        let Some(token) = request
+                            .api_key_override
+                            .as_deref()
+                            .map(str::trim)
+                            .filter(|token| !token.is_empty())
+                        else {
+                            let _ = emit_step(ModelEvent::Error(crate::model_events::ModelError {
+                                kind: crate::model_events::ModelErrorKind::Auth,
+                                status: None,
+                                message: crate::ai_models::openai_responses::SIGN_IN_AGAIN.into(),
+                            }));
+                            return;
+                        };
+                        let (system_prefix, reasoning_effort) = responses_turn_fields(&extras);
+                        let mut auth = crate::ai_models::openai_responses::BearerSession::new(
+                            token.to_string(),
+                            || Err(String::new()),
+                        );
                         crate::ai_models::openai_responses::stream_chatgpt_turn(
                             &crate::ai_models::openai_responses::ChatGptTurn {
                                 base_url: request.provider.base_url.as_deref().unwrap_or(""),
                                 model: &request.model_id,
                                 instructions: request.system_prompt.as_deref(),
+                                system_prefix: system_prefix.as_deref(),
+                                reasoning_effort: reasoning_effort.as_deref(),
                                 messages: &messages,
                                 tools: &tools,
                                 replay_session: &replay_for_responses,
@@ -267,6 +298,7 @@ impl Model for ProviderModel {
 impl Drop for ProviderModel {
     fn drop(&mut self) {
         clear_reasoning_session(&self.replay_session);
+        crate::ai_models::openai_responses::clear_responses_replay(&self.replay_session);
     }
 }
 
@@ -546,6 +578,16 @@ mod tests {
         );
         assert_eq!(chat_auth_kind(false), ChatAuthKind::ApiKey);
         assert_eq!(chat_auth_kind(true), ChatAuthKind::SignedInChatGpt);
+        let mut body = serde_json::Map::new();
+        body.insert("reasoning_effort".into(), json!("medium"));
+        body.insert("max_completion_tokens".into(), json!(128));
+        let extras = crate::ai_models::TurnExtras {
+            system_prefix: Some(" Prefix ".into()),
+            body,
+        };
+        let (prefix, effort) = responses_turn_fields(&extras);
+        assert_eq!(prefix.as_deref(), Some("Prefix"));
+        assert_eq!(effort.as_deref(), Some("medium"));
     }
 
     fn view(admitted: &str, history: Vec<HistoryItem>) -> ModelView {
