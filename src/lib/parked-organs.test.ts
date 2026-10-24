@@ -939,7 +939,7 @@ describe('parked organs leftover', () => {
     expect(settings).not.toContain('loadModelCatalog')
   })
 
-  it('still polls Prime with an empty vault and wires ChatHome to that host', () => {
+  it('still polls Prime with an empty vault, and ChatHome does not', () => {
     const host = readFileSync(
       `${process.cwd()}/src/hooks/usePrimeHostStatus.ts`,
       'utf8',
@@ -954,7 +954,7 @@ describe('parked organs leftover', () => {
     )
     expect(host).toContain('return subscribe(vaultPath ?? \'\', setStatus)')
     expect(host).toContain("callHost<PrimeHostStatus>('get_prime_session_host_status')")
-    expect(home).toContain('usePrimeHostStatus(isPrimeTarget, vaultPath)')
+    expect(home).not.toContain('usePrimeHostStatus')
     expect(sessions).toContain('if (vaultPath) {')
     expect(sessions).toContain("await call('rename_prime_session', { path: session.path, name })")
   })

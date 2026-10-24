@@ -10,7 +10,6 @@ import { ChatComposerDeck } from './ChatComposerDeck'
 vi.mock('../lib/productAnalytics', () => ({
   trackComposerPillOpened: vi.fn(),
   trackPrimeModelChanged: vi.fn(),
-  trackPrimeModelsFreeOnly: vi.fn(),
   trackRhizomeModelChanged: vi.fn(),
 }))
 

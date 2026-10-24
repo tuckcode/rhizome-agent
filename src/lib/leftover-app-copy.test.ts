@@ -79,7 +79,7 @@ describe('leftover app copy — Rhizome name, kept paths', () => {
     expect(en).toContain(
       '"settings.aiProviders.keyStorage.local": "Save in your system keychain."',
     )
-    expect(en).toContain(
+    expect(en).not.toContain(
       'Provider API keys are stored in the system keychain, not in Rhizome\'s files.',
     )
     expect(en).not.toContain('Rhizome does not store provider API keys.')
