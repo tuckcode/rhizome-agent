@@ -77,8 +77,6 @@ import { useDialogs } from './hooks/useDialogs'
 import { useVaultSwitcher } from './hooks/useVaultSwitcher'
 import { useGitHistory } from './hooks/useGitHistory'
 import { useUpdater, restartApp } from './hooks/useUpdater'
-import { usePrimeUpdate } from './hooks/usePrimeUpdate'
-import { usePrimeHostStatus } from './hooks/usePrimeHostStatus'
 import { useAutoSync } from './hooks/useAutoSync'
 import { useConflictResolver } from './hooks/useConflictResolver'
 import { useVaultConfig } from './hooks/useVaultConfig'
@@ -1482,24 +1480,10 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     areAutomaticUpdateChecksEnabled(settings),
   )
 
-  // #19: one indicator covering both Rhizome and Prime. Chat already polls
-  // host status for its chrome; that loop is shared, so this is not a second
-  // ensure/reconnect.
-  const primeHostStatusForUpdates = usePrimeHostStatus(true, resolvedPath)
-  // Optional-chained deliberately: the hook resolves to null whenever its
-  // command is absent from a test's fake-IPC table, and dereferencing that
-  // unmounts the whole app rather than degrading this one badge. The same
-  // shape already broke App.test.tsx once via primeModelLabel(null).
-  const { status: primeUpdateStatus, actions: primeUpdateActions } = usePrimeUpdate(
-    primeHostStatusForUpdates?.version,
-    primeHostStatusForUpdates?.isStreaming ?? false,
-  )
   const versionUpdateIndicator = (
     <VersionUpdateIndicator
       rhizomeStatus={updateStatus}
       rhizomeActions={updateActions}
-      primeStatus={primeUpdateStatus}
-      primeActions={primeUpdateActions}
       locale={appLocale}
     />
   )
@@ -2306,8 +2290,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         onOpenSessionFootprint={handleOpenSessionFootprint}
         onOpenCommandPalette={dialogs.openCommandPalette}
         requestedNote={chatNoteRequest}
-        chatEngineUpdate={primeUpdateStatus}
-        onApplyChatEngineUpdate={() => { void primeUpdateActions.applyEngineUpdate() }}
         railLayoutWidth={sessionsRailLayoutWidth}
         onOpenAiSettings={handleOpenAiSettings}
       />

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 describe('leftover green Rhizome update bar', () => {
-  it('keeps Rhizome in-app update chrome, not Prime updater', () => {
+  it('keeps Rhizome in-app update chrome, with no Prime updater (ADR-0189)', () => {
     const source = readFileSync(
       `${process.cwd()}/src/components/VersionUpdateIndicator.tsx`,
       'utf8',
@@ -10,6 +10,6 @@ describe('leftover green Rhizome update bar', () => {
     expect(source).toContain("background: 'var(--accent-green)'")
     expect(source).toContain('data-testid="status-version-update"')
     expect(source).toContain('rhizomeActions.startDownload()')
-    expect(source).toContain('primeActions.applyEngineUpdate()')
+    expect(source).not.toContain('primeActions')
   })
 })

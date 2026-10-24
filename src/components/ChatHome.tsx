@@ -8,8 +8,6 @@ import { AgentActivityBand } from './AgentActivityBand'
 import { RlmFamilyBand } from './RlmFamilyBand'
 import { ChatComposerDeck } from './ChatComposerDeck'
 import { ChatPreflightBanner } from './ChatPreflightBanner'
-import { ChatEngineUpdateBanner } from './ChatEngineUpdateBanner'
-import type { PrimeUpdateStatus } from '../hooks/usePrimeUpdate'
 import { AgentsPill } from './status-bar/AgentsPill'
 import { useRhizomeJobs } from '../hooks/useRhizomeJobs'
 import { ChatNotePane } from './ChatNotePane'
@@ -77,9 +75,6 @@ interface ChatHomeProps {
   requestedNote?: { path: string; label: string; requestId: number } | null
   /** Layout width of the sessions rail, including hover and keyboard open. */
   railLayoutWidth?: number
-  /** Chat engine offer. The banner is the visible control. */
-  chatEngineUpdate?: PrimeUpdateStatus
-  onApplyChatEngineUpdate?: () => void
   onOpenAiSettings?: () => void
 }
 
@@ -116,8 +111,6 @@ export default function ChatHome({
   onOpenCommandPalette,
   onNotePaneOpenChange,
   requestedNote,
-  chatEngineUpdate,
-  onApplyChatEngineUpdate,
   railLayoutWidth,
   onOpenAiSettings,
 }: ChatHomeProps) {
@@ -346,10 +339,6 @@ export default function ChatHome({
               <>
               {/* Above the pills, not below: a reason the turn will fail is
                   worth more than the controls it sits over. */}
-              <ChatEngineUpdateBanner
-                status={chatEngineUpdate}
-                onUpdate={() => onApplyChatEngineUpdate?.()}
-              />
               <ChatPreflightBanner
                 locale={locale}
                 vaultPath={vaultPath}
