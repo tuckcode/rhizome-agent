@@ -33,6 +33,9 @@ pub enum AiModelApiKeyStorage {
     None,
     Env,
     LocalFile,
+    /// A browser sign-in held in the OS keychain. `api_key_from_provider`
+    /// returns a fresh access token. The API-key variants are unchanged.
+    Oauth,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -172,6 +175,7 @@ fn normalize_ai_model_provider(mut provider: AiModelProvider) -> Option<AiModelP
 
 fn normalize_api_key_storage(provider: &AiModelProvider) -> Option<AiModelApiKeyStorage> {
     match provider.api_key_storage {
+        Some(AiModelApiKeyStorage::Oauth) => Some(AiModelApiKeyStorage::Oauth),
         Some(AiModelApiKeyStorage::LocalFile) => Some(AiModelApiKeyStorage::LocalFile),
         Some(AiModelApiKeyStorage::Env) | None if provider.api_key_env_var.is_some() => {
             Some(AiModelApiKeyStorage::Env)
@@ -1065,8 +1069,15 @@ fn api_key_from_provider(request: &AiModelStreamRequest) -> Result<Option<String
     match request.provider.api_key_storage {
         Some(AiModelApiKeyStorage::LocalFile) => api_key_from_local_file(request),
         Some(AiModelApiKeyStorage::Env) => api_key_from_env(request),
-        _ => Ok(None),
+        Some(AiModelApiKeyStorage::Oauth) => api_key_from_oauth(request),
+        Some(AiModelApiKeyStorage::None) | None => Ok(None),
     }
+}
+
+/// Access token for a provider whose storage is `oauth`. Empty when the
+/// provider's own sign-in setting is off, so a saved API key is unaffected.
+fn api_key_from_oauth(request: &AiModelStreamRequest) -> Result<Option<String>, String> {
+    crate::provider_oauth::fresh_access_token(&request.provider.id).map(Some)
 }
 
 fn extract_openai_text(json: &serde_json::Value) -> Result<String, String> {
@@ -1211,6 +1222,48 @@ mod tests {
         assert_eq!(
             normalized.models[0].display_name.as_deref(),
             Some("Demo Model")
+        );
+    }
+
+    #[test]
+    fn oauth_storage_stays_oauth_and_a_saved_key_still_resolves() {
+        let mut provider = provider(AiModelProviderKind::OpenAi);
+        provider.id = "oauth-gate".into();
+        provider.api_key_storage = Some(AiModelApiKeyStorage::Oauth);
+        provider.api_key_env_var = Some("OPENAI_API_KEY".into());
+        let normalized = normalize_ai_model_provider(provider).expect("provider");
+        assert_eq!(
+            normalized.api_key_storage,
+            Some(AiModelApiKeyStorage::Oauth)
+        );
+
+        let _guard = crate::provider_oauth::test_support::install_usable_sign_in(
+            "oauth-gate",
+            "oat-secret-access",
+        );
+        let mut request = request(normalized);
+        request.provider.id = "oauth-gate".into();
+        request.provider.api_key_storage = Some(AiModelApiKeyStorage::Oauth);
+        assert_eq!(
+            api_key_from_provider(&request).unwrap().as_deref(),
+            Some("oat-secret-access")
+        );
+
+        request.api_key_override = Some("sk-override".into());
+        assert_eq!(
+            api_key_from_provider(&request).unwrap().as_deref(),
+            Some("sk-override")
+        );
+        request.api_key_override = None;
+
+        crate::provider_keys::ProviderKeys::for_app()
+            .unwrap()
+            .save("oauth-gate", "sk-local-unchanged")
+            .unwrap();
+        request.provider.api_key_storage = Some(AiModelApiKeyStorage::LocalFile);
+        assert_eq!(
+            api_key_from_provider(&request).unwrap().as_deref(),
+            Some("sk-local-unchanged")
         );
     }
 

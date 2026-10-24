@@ -249,6 +249,45 @@ pub fn delete_ai_model_provider_api_key(provider_id: String) -> Result<(), Strin
     crate::ai_models::delete_provider_api_key(provider_id)
 }
 
+/// Browser sign-in for one provider account. ChatGPT is the first provider.
+/// The opener error is not logged: the address can carry an ID-token hint.
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn oauth_sign_in(
+    app: tauri::AppHandle,
+    provider: String,
+) -> Result<crate::provider_oauth::OauthStatus, String> {
+    use tauri_plugin_opener::OpenerExt;
+
+    tokio::task::spawn_blocking(move || {
+        crate::provider_oauth::oauth_sign_in(&provider, |url| {
+            app.opener().open_url(url, None::<&str>).is_ok()
+        })
+    })
+    .await
+    .map_err(|_| "Sign-in task failed.".to_string())?
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn oauth_status(provider: String) -> Result<crate::provider_oauth::OauthStatus, String> {
+    run_blocking(move || crate::provider_oauth::oauth_status(&provider)).await?
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn oauth_sign_out(
+    provider: String,
+) -> Result<crate::provider_oauth::OauthStatus, String> {
+    run_blocking(move || crate::provider_oauth::oauth_sign_out(&provider)).await?
+}
+
+#[cfg(desktop)]
+#[tauri::command]
+pub fn oauth_cancel() {
+    crate::provider_oauth::oauth_cancel();
+}
+
 #[cfg(desktop)]
 #[tauri::command]
 pub fn test_ai_model_provider(request: AiModelProviderTestRequest) -> Result<String, String> {
@@ -385,6 +424,33 @@ pub fn save_ai_model_provider_api_key(
 pub fn delete_ai_model_provider_api_key(_provider_id: String) -> Result<(), String> {
     Err("Local AI provider secret storage is only available in the desktop app.".into())
 }
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn oauth_sign_in(
+    _app: tauri::AppHandle,
+    _provider: String,
+) -> Result<crate::provider_oauth::OauthStatus, String> {
+    Err("Sign in with ChatGPT is only available in the desktop app.".into())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn oauth_status(_provider: String) -> Result<crate::provider_oauth::OauthStatus, String> {
+    Err("Sign in with ChatGPT is only available in the desktop app.".into())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn oauth_sign_out(
+    _provider: String,
+) -> Result<crate::provider_oauth::OauthStatus, String> {
+    Err("Sign in with ChatGPT is only available in the desktop app.".into())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub fn oauth_cancel() {}
 
 #[cfg(mobile)]
 #[tauri::command]

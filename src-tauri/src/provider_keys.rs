@@ -199,6 +199,35 @@ impl ProviderKeys {
         self.drop_legacy_copy(&id)
     }
 
+    /// One keychain account, with no legacy-file migration. OAuth records
+    /// live beside the API key (`<provider>:oauth`) and must not move through
+    /// the key file.
+    pub(crate) fn read_account(&self, account: &str) -> Result<Option<String>, String> {
+        let account = normalize_id(account)?;
+        self.backend.get(&account)
+    }
+
+    /// Replaces one keychain account and bumps the scrub cache. The caller
+    /// checks the read-back before it uses a rotated token.
+    pub(crate) fn write_account(&self, account: &str, value: &str) -> Result<(), String> {
+        let account = normalize_id(account)?;
+        if value.is_empty() {
+            return Err("The sign-in could not be saved.".into());
+        }
+        self.backend.set(&account, value)?;
+        self.bump_keys();
+        Ok(())
+    }
+
+    /// Removes one keychain account. Deleting an API key does not call this
+    /// for `<provider>:oauth`, so sign-in and the pasted key stay independent.
+    pub(crate) fn delete_account(&self, account: &str) -> Result<(), String> {
+        let account = normalize_id(account)?;
+        self.backend.delete(&account)?;
+        self.bump_keys();
+        Ok(())
+    }
+
     /// Drops the file copy after the keychain write already stuck. A file
     /// that cannot be read is logged and left in place; the keychain copy
     /// is the one the user just saved or deleted.
@@ -260,6 +289,11 @@ impl ProviderKeys {
             if let Ok(id) = normalize_id(&id) {
                 if let Ok(Some(value)) = self.backend.get(&id) {
                     keep(value);
+                }
+                if let Ok(Some(value)) = self.backend.get(&format!("{id}:oauth")) {
+                    for secret in oauth_token_values(&value) {
+                        keep(secret);
+                    }
                 }
             }
         }
@@ -409,6 +443,23 @@ enum Step {
 
 /// The keychain account suffix for a provider's account id (Cloudflare).
 const ACCOUNT_SUFFIX: &str = ":account";
+
+/// Access, refresh, and ID tokens inside an `<provider>:oauth` record.
+/// A value that is not JSON is treated as one secret. Email and client id
+/// are not tokens and stay out of the scrub list.
+fn oauth_token_values(raw: &str) -> Vec<String> {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(raw) else {
+        let raw = raw.trim().to_string();
+        return (!raw.is_empty()).then_some(raw).into_iter().collect();
+    };
+    ["access_token", "refresh_token", "id_token"]
+        .into_iter()
+        .filter_map(|key| value.get(key).and_then(|item| item.as_str()))
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .map(str::to_string)
+        .collect()
+}
 
 /// Names the provider and the keychain failure. Never holds a key value.
 fn keychain_error(id: &str, error: &str) -> String {
@@ -1443,6 +1494,39 @@ mod tests {
             fixture.file_keys().unwrap().contains_key("old"),
             "scrubbing must not migrate"
         );
+    }
+
+    #[test]
+    fn saved_key_values_include_oauth_tokens_and_not_the_email() {
+        let record = r#"{"email":"ada@example.com","access_token":"oat-secret-access","refresh_token":"oat-secret-refresh","id_token":"oat-secret-id","client_id":"oaiapp_test"}"#;
+        let fixture = Fixture::with_file(&[]);
+        let keys = fixture.keys(MemoryBackend::with(&[("openai:oauth", record)]));
+
+        let values = keys.saved_key_values(["openai".to_string()]);
+
+        assert!(values.iter().any(|value| value == "oat-secret-access"));
+        assert!(values.iter().any(|value| value == "oat-secret-refresh"));
+        assert!(values.iter().any(|value| value == "oat-secret-id"));
+        assert!(!values.iter().any(|value| value.contains("ada@example.com")));
+        assert!(!values.iter().any(|value| value.contains("oaiapp_test")));
+    }
+
+    #[test]
+    fn deleting_an_api_key_leaves_the_oauth_record() {
+        let fixture = Fixture::with_file(&[]);
+        let keys = fixture.keys(MemoryBackend::with(&[
+            ("openai", "sk-pasted"),
+            ("openai:oauth", "{\"access_token\":\"oat-secret-access\"}"),
+        ]));
+
+        keys.delete("openai").unwrap();
+
+        assert_eq!(keys.get("openai").unwrap(), None);
+        assert!(keys
+            .read_account("openai:oauth")
+            .unwrap()
+            .unwrap()
+            .contains("oat-secret-access"));
     }
 
     #[test]
