@@ -51,7 +51,6 @@ import { McpSetupDialog } from './components/McpSetupDialog'
 import { ResearchPanel } from './components/ResearchPanel'
 import { NoteRetargetingDialogs } from './components/note-retargeting/NoteRetargetingDialogs'
 import { StartupScreen } from './components/StartupScreen'
-import { useAiAgentsOnboarding } from './hooks/useAiAgentsOnboarding'
 import { useAiAgentsStatus } from './hooks/useAiAgentsStatus'
 import { useVaultAiGuidanceStatus } from './hooks/useVaultAiGuidanceStatus'
 import { useAutoGit } from './hooks/useAutoGit'
@@ -315,9 +314,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     registerVault: registerVaultSelection,
   }, vaultSwitcher.loaded)
   const aiAgentsStatus = useAiAgentsStatus()
-  const aiAgentsOnboarding = useAiAgentsOnboarding(
-    onboarding.state.status === 'ready' && !noteWindowParams,
-  )
 
   // Onboarding can briefly own the vault path for a newly created/opened vault
   // before the persisted switcher catches up, but once the path is already in
@@ -688,14 +684,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     setSettingsInitialSectionId(SETTINGS_SECTION_IDS.workspaces)
     dialogs.openSettings()
   }, [dialogs])
-
-  // Re-show the full-screen AI setup onboarding on demand. Close Settings first
-  // so the startup gate (which only renders when no in-app dialog is up) can
-  // take over the screen with the onboarding.
-  const handleReopenAiOnboarding = useCallback(() => {
-    dialogs.closeSettings()
-    aiAgentsOnboarding.reopenPrompt()
-  }, [dialogs, aiAgentsOnboarding])
 
   const {
     detectedRenames,
@@ -1863,14 +1851,12 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     shouldResumeFreshStartOnboarding,
     shouldShowStartupScreen,
   } = useStartupScreenState({
-    aiAgentsPromptVisible: aiAgentsOnboarding.showPrompt,
     isNoteWindow: Boolean(noteWindowParams),
     onboardingState: onboarding.state,
     loadError,
     runtimeMissingVaultPath,
     selectedVaultPath,
     settingsLoaded,
-    showMcpSetupDialog: mcpSetupDialog.open,
     telemetryConsent: settings.telemetry_consent,
     vaultIsLoading: vault.isLoading,
     vaultSwitcher,
@@ -1989,7 +1975,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     onInstallMcp: mcpSetupDialog.toggleDialog,
     onReloadVault: handleManualVaultReload,
     onRepairVault: handleRepairVault,
-    onReopenAiOnboarding: handleReopenAiOnboarding,
     onSetNoteIcon: handleSetNoteIconCommand,
     onRemoveNoteIcon: handleRemoveNoteIconCommand,
     onChangeNoteType: changeNoteTypeCommand,
@@ -2129,8 +2114,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   if (shouldShowStartupScreen) {
     return (
       <StartupScreen
-        aiAgentsOnboarding={aiAgentsOnboarding}
-        aiAgentsStatus={aiAgentsStatus}
         isOffline={networkStatus.isOffline}
         isStartupLoading={isStartupLoading}
         locale={appLocale}
@@ -2138,14 +2121,10 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         onboarding={onboarding}
         loadError={loadError}
         runtimeMissingVaultPath={runtimeMissingVaultPath}
-        saveSettings={saveSettings}
         saveSettingsPatch={saveSettingsPatch}
         settings={settings}
         settingsLoaded={settingsLoaded}
         shouldResumeFreshStartOnboarding={shouldResumeFreshStartOnboarding}
-        showMcpSetupDialog={mcpSetupDialog.open}
-        setToastMessage={setToastMessage}
-        toastMessage={toastMessage}
         vaultSwitcher={vaultSwitcher}
       />
     )

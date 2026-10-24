@@ -114,7 +114,6 @@ interface AppCommandsConfig {
   selectedAiAgentLabel?: string
   onReloadVault?: () => void
   onRepairVault?: () => void
-  onReopenAiOnboarding?: () => void
   onSetNoteIcon?: () => void
   onRemoveNoteIcon?: () => void
   onChangeNoteType?: () => void
@@ -250,7 +249,6 @@ type CommandRegistryAiActions = Pick<
   | 'selectedAiAgent'
   | 'onCycleDefaultAiAgent'
   | 'selectedAiAgentLabel'
-  | 'onReopenAiOnboarding'
 >
 type CommandRegistryNoteActions = Pick<
   CommandRegistryConfig,
@@ -573,7 +571,6 @@ export function createCommandRegistryAiConfig(
     | 'selectedAiAgent'
     | 'onCycleDefaultAiAgent'
     | 'selectedAiAgentLabel'
-    | 'onReopenAiOnboarding'
   >,
 ): CommandRegistryAiActions {
   return {
@@ -587,7 +584,6 @@ export function createCommandRegistryAiConfig(
     selectedAiAgent: config.selectedAiAgent,
     onCycleDefaultAiAgent: config.onCycleDefaultAiAgent,
     selectedAiAgentLabel: config.selectedAiAgentLabel,
-    onReopenAiOnboarding: config.onReopenAiOnboarding,
   }
 }
 

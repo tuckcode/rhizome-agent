@@ -1089,7 +1089,7 @@ describe('App', () => {
     })
   })
 
-  it('shows the external AI setup dialog from the menu when AI onboarding is active', async () => {
+  it('opens a fresh launch on the app and skips the Prime setup screen', async () => {
     localStorage.removeItem(AI_AGENTS_ONBOARDING_DISMISSED_STORAGE_NAME)
     localStorage.removeItem(CLAUDE_CODE_ONBOARDING_DISMISSED_STORAGE_NAME)
     mockCommandResults.get_ai_agents_status = {
@@ -1103,9 +1103,10 @@ describe('App', () => {
 
     render(<App />)
 
-    await waitFor(() => {
-      expect(screen.getByText('Prime is ready')).toBeInTheDocument()
-    }, { timeout: SLOW_APP_READY_TIMEOUT_MS })
+    expect(await screen.findByText('All Notes', {}, { timeout: SLOW_APP_READY_TIMEOUT_MS })).toBeInTheDocument()
+    expect(screen.queryByText('Prime is ready')).not.toBeInTheDocument()
+    expect(screen.queryByText('Agent runtime')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('ai-agents-onboarding-screen')).not.toBeInTheDocument()
 
     await waitFor(() => {
       expect(typeof window.__rhizomeTest?.dispatchBrowserMenuCommand).toBe('function')
@@ -1647,7 +1648,7 @@ describe('App', () => {
     expect(screen.getByTestId('welcome-open-folder')).toHaveTextContent('Open existing vault')
   })
 
-  it('persists an existing vault and shows AI onboarding after first-run open', async () => {
+  it('persists an existing vault and opens the app after first-run open', async () => {
     const selectedVaultPath = '/Users/mock/Documents/Work Vault'
     const saveVaultList = vi.fn()
     const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('file:///Users/mock/Documents/Work%20Vault')
@@ -1691,9 +1692,12 @@ describe('App', () => {
     expect(saveVaultList).toHaveBeenCalledTimes(1)
 
     await waitFor(() => {
-      expect(screen.getByTestId('ai-agents-onboarding-screen')).toBeInTheDocument()
+      expect(screen.getByTestId('status-vault-trigger')).toHaveTextContent('Work Vault')
     }, { timeout: SLOW_APP_READY_TIMEOUT_MS })
-    expect(screen.getByText('Prime Agent is optional for first open')).toBeInTheDocument()
+    expect(screen.queryByTestId('welcome-screen')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('ai-agents-onboarding-screen')).not.toBeInTheDocument()
+    expect(screen.queryByText('Prime is ready')).not.toBeInTheDocument()
+    expect(screen.queryByText('Agent runtime')).not.toBeInTheDocument()
 
     promptSpy.mockRestore()
   })

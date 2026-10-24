@@ -49,7 +49,7 @@ describe('ChatHome host fallback (real Prime host hook)', () => {
     })
   })
 
-  it('stays on Prime after the first not_installed poll and falls back on the second', async () => {
+  it('opens on the native engine and does not poll Prime', async () => {
     render(
       <ChatHome
         locale="en"
@@ -65,14 +65,8 @@ describe('ChatHome host fallback (real Prime host hook)', () => {
     )
 
     await waitFor(() => {
-      expect(invoked.calls.some((call) => call.cmd === 'get_prime_session_host_status')).toBe(true)
-    })
-    expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'prime')
-
-    document.dispatchEvent(new Event('visibilitychange'))
-
-    await waitFor(() => {
       expect(screen.getByTestId('chat-home')).toHaveAttribute('data-chat-engine', 'native')
     })
+    expect(invoked.calls.some((call) => call.cmd === 'get_prime_session_host_status')).toBe(false)
   })
 })

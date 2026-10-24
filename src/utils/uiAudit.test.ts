@@ -38,7 +38,7 @@ describe('auditUi', () => {
   /** A bordered, rounded *panel* is not pretending to be pressable. Without
    *  this the rule fires on every card in the app. */
   it('leaves a card alone, however rounded', () => {
-    const host = mount('<div style="border: 1px solid; border-radius: 12px">Prime is ready</div>')
+    const host = mount('<div style="border: 1px solid; border-radius: 12px">Notes</div>')
     sized(host.firstElementChild!, { w: 560, h: 320 })
 
     expect(auditUi(host).filter((f) => f.rule === 'inert-control')).toHaveLength(0)

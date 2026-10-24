@@ -225,21 +225,9 @@ describe('buildSettingsCommands', () => {
     expect(onInstallMcp).toHaveBeenCalledOnce()
   })
 
-  it('reopens the AI setup onboarding when the reopen callback is provided', () => {
-    const onReopenAiOnboarding = vi.fn()
-    const command = findCommand('reopen-ai-onboarding', buildSettingsCommands({
-      onOpenSettings: vi.fn(),
-      onReopenAiOnboarding,
-    }))
-
-    expect(command).toMatchObject({ group: 'Settings', enabled: true })
-    expect(command?.keywords).toEqual(expect.arrayContaining(['ai', 'setup', 'login', 'authenticate']))
-    command?.execute()
-    expect(onReopenAiOnboarding).toHaveBeenCalledOnce()
-  })
-
-  it('disables the AI setup command when no reopen callback is provided', () => {
-    const command = findCommand('reopen-ai-onboarding', buildSettingsCommands({ onOpenSettings: vi.fn() }))
-    expect(command?.enabled).toBe(false)
+  it('does not offer the removed Prime setup screen', () => {
+    const commands = buildSettingsCommands({ onOpenSettings: vi.fn() })
+    expect(commands.some((command) => command.id === 'reopen-ai-onboarding')).toBe(false)
+    expect(commands.some((command) => command.label === 'Show AI Setup…')).toBe(false)
   })
 })
