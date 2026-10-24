@@ -32,8 +32,8 @@ knispo approved Julian's four-PR plan in Builders ("go", 2026-10-24 1:07 PM CT).
 1. **ChatGPT chat uses the Responses API** with `store: false`, `stream: true` and `include: ["reasoning.encrypted_content"]`. A turn is done only at `response.completed`.
 2. **ChatGPT login registers through `dynamic_agent_client`**, which returns Rhizome's own `oaiapp_` id. No borrowed client id and no fixed port 1455; the loopback listener takes any free port.
 3. **Refresh is single-flight** (an in-process mutex plus a file lock). The rotated token pair is saved before it is used. `invalid_grant` shows "Sign in again". A token that expires mid-stream refreshes once, and only before any output has streamed.
-4. **Reasoning replay** between tool steps is kept per chat and cleared when the chat closes. It is never written to disk.
-5. **Accounts:** one account per provider. Sign-out revokes the token at the provider. Each sign-in has its own on/off setting, and the API key path always keeps working.
+4. **Reasoning replay** between tool steps is kept per chat and cleared when the chat closes.
+5. **Accounts:** one account per provider. Sign-out revokes the token. Each sign-in has its own on/off setting, and the API key path always keeps working.
 6. **xAI login (PR 4)** follows decision 3: a preview on the Grok CLI's public client id, which is a setting, with the API key as the fallback.
 
 ## Provider terms (checked 2026-10-16)
