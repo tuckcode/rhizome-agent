@@ -549,14 +549,6 @@ export function trackPrimeModelsFreeOnly(on: boolean): void {
 }
 
 /**
- * The Settings default model was changed (#45).
- * Model id only. Never a provider key, an API key, or note text.
- */
-export function trackPrimeDefaultModelChanged(modelId: string): void {
-  trackEvent('prime_default_model_changed', { model_id: modelId })
-}
-
-/**
  * Images were attached to a chat message.
  *
  * The count only — never the image, its name, or its bytes. The question is

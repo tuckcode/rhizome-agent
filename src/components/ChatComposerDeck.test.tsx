@@ -1,7 +1,10 @@
-import { render as rtlRender, screen } from '@testing-library/react'
+import { fireEvent, render as rtlRender, screen } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { describe, expect, it, vi } from 'vitest'
+import { NativeLiveSlotProvider } from '../lib/nativeLiveSlotContext'
+import { createNativeLiveSlot, rememberNativeSession, resetNativeLiveSessions } from '../lib/nativeChatTranscript'
+import { rememberNativeSessionTarget } from '../lib/nativeSessionTarget'
 import { ChatComposerDeck } from './ChatComposerDeck'
 
 vi.mock('../lib/productAnalytics', () => ({
@@ -94,5 +97,30 @@ describe('ChatComposerDeck', () => {
     )
 
     expect(screen.getByTestId('status-agents-pill')).toBeInTheDocument()
+  })
+
+  it('shows the session footnote from the panel live slot', async () => {
+    resetNativeLiveSessions()
+    const slot = createNativeLiveSlot('conv-footnote')
+    rememberNativeSession(slot, 'native-footnote')
+    rememberNativeSessionTarget('native-footnote', 'ollama/llama3.2')
+    render(
+      <NativeLiveSlotProvider slot={slot}>
+        <ChatComposerDeck
+          catalog="rhizome"
+          nativeTarget="open_ai/gpt-4.1-mini"
+          onNativeTargetChange={vi.fn()}
+        />
+      </NativeLiveSlotProvider>,
+    )
+
+    fireEvent.pointerDown(
+      screen.getByTestId('native-chat-model-trigger'),
+      new PointerEvent('pointerdown', { bubbles: true, button: 0 }),
+    )
+    expect(await screen.findByTestId('native-chat-model-new-chats')).toHaveTextContent(
+      'This chat stays on llama3.2',
+    )
+    resetNativeLiveSessions()
   })
 })

@@ -1,19 +1,12 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-const source = readFileSync(
-  `${process.cwd()}/src/components/PrimeModelAllowListSection.tsx`,
-  'utf8',
-)
-
 describe('leftover allow list', () => {
-  it('locks Chat model menu heading', () => {
-    expect(source).toContain('Chat model menu')
-  })
-
-  it("locks Choose which of Prime's models appear in the chat model menu", () => {
-    expect(source).toContain(
-      "Choose which of Prime's models appear in the chat model menu",
-    )
+  it('does not keep a Prime chat model menu in Settings', () => {
+    expect(existsSync(`${process.cwd()}/src/components/PrimeModelAllowListSection.tsx`)).toBe(false)
+    const settings = readFileSync(`${process.cwd()}/src/components/SettingsPanel.tsx`, 'utf8')
+    expect(settings).not.toContain('Chat model menu')
+    expect(settings).not.toContain("Choose which of Prime's models appear in the chat model menu")
+    expect(settings).not.toContain('pick models inside Prime')
   })
 })

@@ -323,19 +323,19 @@ describe('parked organs leftover', () => {
     expect(message).toContain('copy={{ label: forkLabel }}')
   })
 
-  it('keeps Anthropic Reconnect and DeepSeek Add key on Settings cards', () => {
-    const providers = readFileSync(
-      `${process.cwd()}/src/components/PrimeProviderStatusSection.tsx`,
-      'utf8',
-    )
+  it('keeps Anthropic and DeepSeek labels and omits Prime settings cards', () => {
     const labels = readFileSync(
       `${process.cwd()}/src/lib/primeProviderLabels.ts`,
       'utf8',
     )
+    const settings = readFileSync(
+      `${process.cwd()}/src/components/SettingsPanel.tsx`,
+      'utf8',
+    )
     expect(labels).toContain("anthropic: 'Anthropic'")
     expect(labels).toContain("deepseek: 'DeepSeek'")
-    expect(providers).toContain("connected || provider.expired ? 'Reconnect' : 'Sign in'")
-    expect(providers).toContain("return 'Add key'")
+    expect(settings).not.toContain('PrimeProviderStatusSection')
+    expect(settings).not.toContain('PrimeDefaultModelSection')
   })
 
   it('keeps Linux titlebar drag and first-run scaffold leftover', () => {
@@ -609,9 +609,9 @@ describe('parked organs leftover', () => {
     expect(restore).toContain('idleDiskRestoreEligible')
   })
 
-  it('keeps Nous Add to Chat list, width-folded Sessions, and About Contribute/Docs', () => {
-    const providers = readFileSync(
-      `${process.cwd()}/src/components/PrimeProviderStatusSection.tsx`,
+  it('keeps width-folded Sessions and About Contribute/Docs', () => {
+    const settings = readFileSync(
+      `${process.cwd()}/src/components/SettingsPanel.tsx`,
       'utf8',
     )
     const app = readAppShellSource()
@@ -631,8 +631,7 @@ describe('parked organs leftover', () => {
       `${process.cwd()}/src-tauri/src/prime_session_host.rs`,
       'utf8',
     )
-    expect(providers).toContain("if (provider.name === 'nous-portal') return 'Add to Chat list'")
-    expect(providers).toContain('return `prime-agent --provider ${provider}`')
+    expect(settings).not.toContain('Add to Chat list')
     expect(app).toContain('sessionsAutoCollapsed={compactSessions}')
     expect(about).toContain('settings-about-docs')
     expect(status).toContain("keeps Contribute and Docs out of the status bar")
@@ -691,9 +690,9 @@ describe('parked organs leftover', () => {
     expect(host).toContain("await callHost('ensure_prime_session_host', { vaultPath })")
   })
 
-  it('keeps Chat model allow-list, rhizome-vault skill pill, and Welcome create-empty', () => {
-    const allow = readFileSync(
-      `${process.cwd()}/src/components/PrimeModelAllowListSection.tsx`,
+  it('keeps the rhizome-vault skill pill and Welcome create-empty', () => {
+    const settings = readFileSync(
+      `${process.cwd()}/src/components/SettingsPanel.tsx`,
       'utf8',
     )
     const home = readFileSync(
@@ -704,8 +703,8 @@ describe('parked organs leftover', () => {
       `${process.cwd()}/src/components/WelcomeScreen.tsx`,
       'utf8',
     )
-    expect(allow).toContain('Chat model menu')
-    expect(allow).toContain("Choose which of Prime's models appear in the chat model menu")
+    expect(settings).not.toContain('PrimeModelAllowListSection')
+    expect(settings).not.toContain('pick models inside Prime')
     expect(home).toContain('composerSkillsLabel="rhizome-vault"')
     expect(welcome).toContain("onboarding.welcome.createEmpty")
   })
@@ -1115,14 +1114,13 @@ describe('parked organs leftover', () => {
     expect(host).toContain('"type": "rename_saved_session"')
   })
 
-  it('adds Nous models into Prime models.json from Add to Chat list', () => {
-    const providers = readFileSync(
-      `${process.cwd()}/src/components/PrimeProviderStatusSection.tsx`,
+  it('does not add Nous models from a Settings button', () => {
+    const settings = readFileSync(
+      `${process.cwd()}/src/components/SettingsPanel.tsx`,
       'utf8',
     )
-    expect(providers).toContain("Prime's `models.json` when the user clicks Add to Chat list")
-    expect(providers).toContain("await callHost<EnsureNousPortalResult>('ensure_nous_portal_models')")
-    expect(providers).toContain('Added ${count} Nous Portal ${modelsWord} to the Chat list')
+    expect(settings).not.toContain('ensure_nous_portal_models')
+    expect(settings).not.toContain('Add to Chat list')
   })
 
   it('keeps Rhizome in-app updates on the green status-bar control', () => {

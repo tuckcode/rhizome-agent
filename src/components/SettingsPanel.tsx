@@ -1,17 +1,22 @@
-import { Copy, Cube, Info, Monitor, Moon, Stack, Sun, X } from '@phosphor-icons/react'
+import { Cube, Info, Monitor, Moon, Stack, Sun, X } from '@phosphor-icons/react'
 import {
   createMissingAiAgentsStatus,
-  getAiAgentAvailability,
-  getAiAgentDefinition,
   type AiAgentsStatus,
 } from '../lib/aiAgents'
-import { KEPT_EXTERNAL_AGENT_IDS } from '../lib/migrateRemovedHarnessChoices'
-import { AiAgentIcon } from './AiAgentIcon'
 import {
   normalizeAiModelProviders,
   type AiModelProvider,
 } from '../lib/aiTargets'
 import { NativeChatModelPicker } from './NativeChatModelPicker'
+import { ConnectedProvidersSummary } from './ConnectedProvidersSummary'
+import { LocalAgentCards } from './LocalAgentCards'
+import {
+  CONNECTED_SUMMARY_ROW_ID,
+  consumeProviderSettingsFocus,
+  subscribeProviderSettingsFocus,
+  type ProviderSettingsTab,
+} from '../lib/providerSettingsFocus'
+import type { ConnectedRow } from '../lib/connectedProviders'
 import { resetListProviderModelsCache } from '../lib/listProviderModels'
 import {
   useCallback,
@@ -1598,6 +1603,24 @@ function AiAgentSettingsSection({
 >) {
   const vaultConfig = useSyncExternalStore(subscribeVaultConfig, getVaultConfig, getVaultConfig)
   const sessionAutoDistillEnabled = vaultConfig.session_auto_distill_enabled === true
+  const [providerTab, setProviderTab] = useState<ProviderSettingsTab>('agents')
+  const [providerFocus, setProviderFocus] = useState<string | null>(null)
+
+  useEffect(() => {
+    const apply = (focus: { tab: ProviderSettingsTab; rowId: string }) => {
+      setProviderTab(focus.tab)
+      setProviderFocus(focus.rowId)
+    }
+    const pending = consumeProviderSettingsFocus()
+    if (pending) apply(pending)
+    return subscribeProviderSettingsFocus(apply)
+  }, [])
+
+  const openProviderRow = (row: ConnectedRow) => {
+    setProviderTab(row.tab)
+    setProviderFocus(row.rowId)
+  }
+  const clearProviderFocus = useCallback(() => setProviderFocus(null), [])
 
   return (
     <>
@@ -1676,6 +1699,16 @@ function AiAgentSettingsSection({
         </SettingsRow>
       </SettingsGroup>
 
+      <ConnectedProvidersSummary
+        t={t}
+        agents={aiAgentsStatus}
+        providers={aiModelProviders}
+        onChange={setAiModelProviders}
+        focusRowId={providerFocus}
+        onFocusConsumed={clearProviderFocus}
+        onOpen={openProviderRow}
+      />
+
       <AiTargetManagementTabs
         t={t}
         aiAgentsStatus={aiAgentsStatus}
@@ -1683,6 +1716,9 @@ function AiAgentSettingsSection({
         setAiModelProviders={setAiModelProviders}
         onCopyMcpConfig={onCopyMcpConfig}
         vaultPath={activeVaultPath}
+        tab={providerTab}
+        onTabChange={setProviderTab}
+        focusRowId={providerFocus === CONNECTED_SUMMARY_ROW_ID ? null : providerFocus}
       />
     </>
   )
@@ -1753,52 +1789,15 @@ function SecretFilesSettingRow({
   )
 }
 
-const SETTINGS_CLI_STATUS_AGENT_IDS = KEPT_EXTERNAL_AGENT_IDS
-
-function AiAgentsInstalledSection({
-  t,
-  aiAgentsStatus,
-}: {
-  t: Translate
-  aiAgentsStatus: AiAgentsStatus
-}) {
-  return (
-    <div className="rounded-md border border-border bg-card p-3" data-testid="settings-cli-agent-status">
-      <div className="text-sm font-medium text-foreground">{t('settings.aiAgents.installedTitle')}</div>
-      <div className="mt-1 text-xs leading-5 text-muted-foreground">{t('settings.aiAgents.installedDescription')}</div>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        {SETTINGS_CLI_STATUS_AGENT_IDS.map((id) => {
-          const definition = getAiAgentDefinition(id)
-          const status = getAiAgentAvailability(aiAgentsStatus, definition.id)
-          const installed = status.status === 'installed'
-          return (
-            <div key={definition.id} className="rounded-md border border-border bg-background px-3 py-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
-                  <AiAgentIcon agent={definition.id} size={16} />
-                  <div className="truncate text-sm font-medium text-foreground">{definition.label}</div>
-                </div>
-                <div className={installed ? 'text-xs text-feedback-success-text' : 'text-xs text-muted-foreground'}>
-                  {installed ? t('settings.aiAgents.installed') : t('settings.aiAgents.missing')}
-                </div>
-              </div>
-              <div className="mt-1 truncate text-xs text-muted-foreground">
-                {status.version || t('settings.aiAgents.noVersion')}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
 function AiTargetManagementTabs({
   t,
   aiAgentsStatus,
   aiModelProviders,
   setAiModelProviders,
   onCopyMcpConfig,
+  tab,
+  onTabChange,
+  focusRowId,
 }: {
   t: Translate
   aiAgentsStatus: AiAgentsStatus
@@ -1806,23 +1805,24 @@ function AiTargetManagementTabs({
   setAiModelProviders: (value: AiModelProvider[]) => void
   onCopyMcpConfig?: () => void
   vaultPath?: string | null
+  tab: ProviderSettingsTab
+  onTabChange: (tab: ProviderSettingsTab) => void
+  focusRowId?: string | null
 }) {
+  useEffect(() => {
+    if (!focusRowId) return
+    document.getElementById(focusRowId)?.scrollIntoView({ block: 'nearest' })
+  }, [focusRowId, tab])
+
   return (
-    <Tabs defaultValue="agents" className="gap-3">
+    <Tabs value={tab} onValueChange={(value) => onTabChange(value as ProviderSettingsTab)} className="gap-3">
       <TabsList className="grid h-9 w-full grid-cols-3">
         <TabsTrigger value="agents">{t('settings.aiAgents.agentGroup')}</TabsTrigger>
         <TabsTrigger value="local">{t('settings.aiAgents.localGroup')}</TabsTrigger>
         <TabsTrigger value="api">{t('settings.aiAgents.apiGroup')}</TabsTrigger>
       </TabsList>
       <TabsContent value="agents" className="space-y-3">
-        <AiAgentsInstalledSection t={t} aiAgentsStatus={aiAgentsStatus} />
-        {onCopyMcpConfig ? (
-          <SettingsGroup>
-            <SettingsGroupItem>
-              <CopyMcpConfigButton t={t} onCopyMcpConfig={onCopyMcpConfig} />
-            </SettingsGroupItem>
-          </SettingsGroup>
-        ) : null}
+        <LocalAgentCards t={t} aiAgentsStatus={aiAgentsStatus} onCopyMcpConfig={onCopyMcpConfig} />
         <BridgeTokenRow t={t} />
       </TabsContent>
       <TabsContent value="local">
@@ -1832,29 +1832,6 @@ function AiTargetManagementTabs({
         <AiProviderSettings t={t} mode="api" providers={aiModelProviders} onChange={setAiModelProviders} />
       </TabsContent>
     </Tabs>
-  )
-}
-
-function CopyMcpConfigButton({
-  t,
-  onCopyMcpConfig,
-}: {
-  t: Translate
-  onCopyMcpConfig: () => void
-}) {
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      onClick={onCopyMcpConfig}
-      className="w-fit gap-2"
-      aria-label={t('ai.panel.copyMcpConfig')}
-      data-testid="settings-copy-mcp-config"
-    >
-      <Copy size={15} />
-      {t('ai.panel.copyMcpConfig')}
-    </Button>
   )
 }
 

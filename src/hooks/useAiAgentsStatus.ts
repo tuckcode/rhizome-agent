@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from '../mock-tauri'
+import { noteAiAgentsChecked } from '../lib/aiAgentsCheckedAt'
 import {
   createCheckingAiAgentsStatus,
   createMissingAiAgentsStatus,
@@ -80,6 +81,7 @@ export function useAiAgentsStatus(options?: UseAiAgentsStatusOptions): AiAgentsS
       timeoutId = setTimeout(() => {
         if (!cancelled) {
           setStatuses(createMissingAiAgentsStatus())
+          noteAiAgentsChecked()
         }
       }, AI_AGENTS_STATUS_PROBE_TIMEOUT_MS)
 
@@ -88,12 +90,14 @@ export function useAiAgentsStatus(options?: UseAiAgentsStatusOptions): AiAgentsS
           clearProbeTimeout()
           if (!cancelled) {
             setStatuses(normalizeAiAgentsStatus(result))
+            noteAiAgentsChecked()
           }
         })
         .catch(() => {
           clearProbeTimeout()
           if (!cancelled) {
             setStatuses(createMissingAiAgentsStatus())
+            noteAiAgentsChecked()
           }
         })
     }

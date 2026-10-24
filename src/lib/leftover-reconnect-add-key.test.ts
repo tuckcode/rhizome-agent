@@ -1,19 +1,17 @@
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 describe('leftover reconnect / add key', () => {
-  it('locks Anthropic Reconnect and DeepSeek Add key on Settings cards', () => {
-    const providers = readFileSync(
-      `${process.cwd()}/src/components/PrimeProviderStatusSection.tsx`,
-      'utf8',
-    )
+  it('keeps provider display names and drops the Prime settings cards', () => {
+    expect(existsSync(`${process.cwd()}/src/components/PrimeProviderStatusSection.tsx`)).toBe(false)
     const labels = readFileSync(
       `${process.cwd()}/src/lib/primeProviderLabels.ts`,
       'utf8',
     )
+    const settings = readFileSync(`${process.cwd()}/src/components/SettingsPanel.tsx`, 'utf8')
     expect(labels).toContain("anthropic: 'Anthropic'")
     expect(labels).toContain("deepseek: 'DeepSeek'")
-    expect(providers).toContain("connected || provider.expired ? 'Reconnect' : 'Sign in'")
-    expect(providers).toContain("return 'Add key'")
+    expect(settings).not.toContain('PrimeProviderStatusSection')
+    expect(settings).not.toContain('pick models inside Prime')
   })
 })

@@ -34,6 +34,7 @@ import { nativeModelVision, type NativeVision } from '../lib/nativeVision'
 import { forgetVisionSendAnyway, rememberVisionSendAnyway, visionSendAnywayFor } from '../lib/visionChoice'
 import { setNativeTurnAcceptedHandler } from '../lib/nativeTurnAccepted'
 import { nativeSessionTarget } from '../lib/nativeSessionTarget'
+import { NativeLiveSlotProvider } from '../lib/nativeLiveSlotContext'
 import type { AiTarget } from '../lib/aiTargets'
 import type { AppLocale } from '../lib/i18n'
 import { type NoteListItem } from '../utils/ai-context'
@@ -509,6 +510,7 @@ export function AiPanelView({
   })
 
   return (
+    <NativeLiveSlotProvider slot={agent.getNativeLiveSlot?.() ?? null}>
     <>
       <AiPanelFrame panelRef={panelRef} isActive={isActive} showLeftBorder={showLeftBorder} surface={surface}>
       {showHeader && (
@@ -740,6 +742,7 @@ export function AiPanelView({
           )
         : null}
     </>
+    </NativeLiveSlotProvider>
   )
 }
 
