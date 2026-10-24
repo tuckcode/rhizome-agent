@@ -6,7 +6,7 @@ description: Build and run the Rhizome developer preview from source on macOS.
 You build Rhizome from source on a Mac and run it from there. This takes a few minutes, mostly for the first build.
 
 :::note
-**Developer preview.** macOS only. There is no signed download, no Homebrew package and no in-app updater yet. See [Platforms and updates](../reference/platforms-and-updates.md).
+**Developer preview.** macOS only. There is no signed download and no Homebrew package. A packaged app can check for Rhizome updates in the app. A source build updates with `git pull`. See [Platforms and updates](../reference/platforms-and-updates.md).
 :::
 
 ## Before you start

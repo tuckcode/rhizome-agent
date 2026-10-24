@@ -12,7 +12,7 @@ Make sure the remote repository exists and your system Git can authenticate to i
 ## Steps
 
 1. Open the bottom status bar remote chip, or run `Add Remote` from the command palette.
-2. Paste the remote URL.
+2. Paste the remote URL. Rhizome refuses a URL that starts with `-`, contains control characters, or uses a transport helper such as `ext::`. Use `https://`, `ssh://`, `git@host:path`, or a local path.
 3. Confirm the remote name.
 4. Fetch or push according to the app prompt.
 
