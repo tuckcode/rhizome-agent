@@ -976,13 +976,12 @@ slug)` helper also lives here, shared by all three writers.
 - Derives the final `.../Getting Started` destination path
 - Surfaces the resolved path through the app toast after a successful clone
 
-`useAiAgentsOnboarding(enabled)` adds a separate first-launch agent step:
-- Reads a local dismissal flag for the AI agents prompt (with a legacy fallback to the older Claude-only key)
-- Only shows after vault onboarding has already resolved to a ready state
-- Uses `get_ai_agents_status`, whose backend checks Claude Code, Codex, OpenCode, Pi, Antigravity, Kiro, and Hermes Agent by treating the app process path, login-shell path, and supported local/toolchain/app install locations, including nvm-managed Node installs plus Windows `.exe` and npm/pnpm/Scoop shim paths, as valid CLI-agent sources
+First launch does not gate on a Prime or agent-runtime setup screen. After the vault is ready, Chat opens on Rhizome's own engine.
+
+`useAiAgentsStatus` still probes installed CLI agents for the surfaces that ask:
+- `get_ai_agents_status` checks Claude Code, Codex, OpenCode, Pi, Antigravity, Kiro, and Hermes Agent by treating the app process path, login-shell path, and supported local/toolchain/app install locations, including nvm-managed Node installs plus Windows `.exe` and npm/pnpm/Scoop shim paths, as valid CLI-agent sources
 - App-managed Claude Code runs preserve the same user-managed Anthropic/provider env behavior by forwarding selected exported variables from the app process or the user's zsh/bash startup files without persisting those secrets
-- The shared `useAiAgentsStatus` hook defers that command until after the first render, skips it when AI features are disabled or the current window cannot render AI status surfaces, and falls back to missing-agent statuses if the native probe does not return promptly so first-launch onboarding keeps a recovery path
-- Persists dismissal locally once the user continues
+- The hook defers that command until after the first render, skips it when AI features are disabled or the current window cannot render AI status surfaces, and falls back to missing-agent statuses if the native probe does not return promptly
 
 ### Remote Git Operations
 

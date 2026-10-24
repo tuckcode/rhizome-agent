@@ -200,4 +200,41 @@ describe('migrateRemovedHarnessSettings', () => {
     expect(fresh.chat_engine).toBe('native')
     expect(removedHarnessSettingsNeedPersist(emptySettings, fresh)).toBe(false)
   })
+
+  it('moves a saved Prime or Hermes engine to native once and leaves the chats', () => {
+    for (const engine of ['prime', 'hermes'] as const) {
+      const raw: Settings = {
+        ...emptySettings,
+        chat_engine: engine,
+        default_ai_agent: engine,
+        ai_workspace_conversations: [
+          { id: 'c1', title: 'Kept chat', target_id: `agent:${engine}`, archived: false },
+          { id: 'c2', title: 'Codex chat', target_id: 'agent:codex', archived: false },
+        ],
+      }
+      const once = migrateRemovedHarnessSettings(raw)
+      expect(once.chat_engine).toBe('native')
+      expect(once.ai_workspace_conversations?.map((conversation) => conversation.id)).toEqual(['c1', 'c2'])
+      expect(once.ai_workspace_conversations?.map((conversation) => conversation.title)).toEqual([
+        'Kept chat',
+        'Codex chat',
+      ])
+      expect(removedHarnessSettingsNeedPersist(raw, once)).toBe(true)
+
+      const twice = migrateRemovedHarnessSettings(once)
+      expect(twice).toEqual(once)
+      expect(removedHarnessSettingsNeedPersist(once, twice)).toBe(false)
+    }
+
+    const native: Settings = {
+      ...emptySettings,
+      chat_engine: 'native',
+      default_ai_agent: null,
+      default_ai_target: null,
+    }
+    const migrated = migrateRemovedHarnessSettings(native)
+    expect(migrated.chat_engine).toBe('native')
+    expect(migrated.default_ai_agent).toBeNull()
+    expect(removedHarnessSettingsNeedPersist(native, migrated)).toBe(false)
+  })
 })

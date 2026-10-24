@@ -43,7 +43,6 @@ interface CommandRegistryConfig {
   selectedAiAgentLabel?: string
   onReloadVault?: () => void
   onRepairVault?: () => void
-  onReopenAiOnboarding?: () => void
   onSetNoteIcon?: () => void
   onRemoveNoteIcon?: () => void
   locale?: AppLocale
@@ -171,7 +170,7 @@ export function useCommandRegistry(config: CommandRegistryConfig): import('./com
     mcpStatus, onInstallMcp,
     aiAgentsStatus, vaultAiGuidanceStatus,
     onOpenAiAgents, onRestoreVaultAiGuidance, onSetDefaultAiAgent, selectedAiAgent, onCycleDefaultAiAgent, selectedAiAgentLabel,
-    onReloadVault, onRepairVault, onReopenAiOnboarding,
+    onReloadVault, onRepairVault,
     locale, systemLocale, selectedUiLanguage, onSetUiLanguage, onSetThemeMode,
     onSetNoteIcon, onRemoveNoteIcon, activeNoteHasIcon, onChangeNoteType, onMoveNoteToFolder, canMoveNoteToFolder,
     onOpenInNewWindow, onRevealActiveFile, onCopyActiveFilePath, onCopyActiveDeepLink, onOpenActiveFileExternal, onExportNoteAsPdf, onToggleFavorite, onToggleOrganized,
@@ -276,12 +275,12 @@ export function useCommandRegistry(config: CommandRegistryConfig): import('./com
   const settingsCommands = useMemo(() => buildSettingsCommands({
     mcpStatus, vaultCount, isGettingStartedHidden,
     onOpenSettings, onOpenFeedback, onOpenVault, onCreateEmptyVault, onRemoveActiveVault, onRestoreGettingStarted,
-    onCheckForUpdates, onInstallMcp, onReloadVault, onRepairVault, onReopenAiOnboarding,
+    onCheckForUpdates, onInstallMcp, onReloadVault, onRepairVault,
     locale, systemLocale, selectedUiLanguage, onSetUiLanguage, onSetThemeMode,
   }), [
     mcpStatus, vaultCount, isGettingStartedHidden, onOpenSettings, onOpenFeedback,
     onOpenVault, onCreateEmptyVault, onRemoveActiveVault, onRestoreGettingStarted,
-    onCheckForUpdates, onInstallMcp, onReloadVault, onRepairVault, onReopenAiOnboarding,
+    onCheckForUpdates, onInstallMcp, onReloadVault, onRepairVault,
     locale, systemLocale, selectedUiLanguage, onSetUiLanguage, onSetThemeMode,
   ])
 

@@ -28,7 +28,6 @@ interface SettingsCommandsConfig {
   onReloadVault?: () => void
   onRepairVault?: () => void
   onToggleGitignoredFilesVisibility?: () => void
-  onReopenAiOnboarding?: () => void
   locale?: AppLocale
   systemLocale?: AppLocale
   selectedUiLanguage?: UiLanguagePreference
@@ -183,17 +182,8 @@ function buildMaintenanceCommands({
   onReloadVault,
   onRepairVault,
   onToggleGitignoredFilesVisibility,
-  onReopenAiOnboarding,
-}: Pick<SettingsCommandsConfig, 'mcpStatus' | 'onInstallMcp' | 'onReloadVault' | 'onRepairVault' | 'onToggleGitignoredFilesVisibility' | 'onReopenAiOnboarding'>): CommandAction[] {
+}: Pick<SettingsCommandsConfig, 'mcpStatus' | 'onInstallMcp' | 'onReloadVault' | 'onRepairVault' | 'onToggleGitignoredFilesVisibility'>): CommandAction[] {
   return [
-    {
-      id: 'reopen-ai-onboarding',
-      label: 'Show AI Setup…',
-      group: 'Settings',
-      keywords: ['ai', 'setup', 'onboarding', 'agent', 'install', 'login', 'log in', 'authenticate', 'claude', 'guide'],
-      enabled: !!onReopenAiOnboarding,
-      execute: () => onReopenAiOnboarding?.(),
-    },
     {
       id: 'install-mcp',
       label: mcpStatus === 'installed' ? 'Manage External AI Tools…' : 'Set Up External AI Tools…',
@@ -219,7 +209,7 @@ export function buildSettingsCommands(config: SettingsCommandsConfig): CommandAc
   const {
     mcpStatus, vaultCount, isGettingStartedHidden,
     onOpenSettings, onOpenFeedback, onOpenVault, onCreateEmptyVault, onRemoveActiveVault, onRestoreGettingStarted,
-    onCheckForUpdates, onInstallMcp, onReloadVault, onRepairVault, onToggleGitignoredFilesVisibility, onReopenAiOnboarding,
+    onCheckForUpdates, onInstallMcp, onReloadVault, onRepairVault, onToggleGitignoredFilesVisibility,
     locale = 'en', systemLocale = locale, selectedUiLanguage = SYSTEM_UI_LANGUAGE, onSetUiLanguage, onSetThemeMode,
   } = config
 
@@ -248,7 +238,6 @@ export function buildSettingsCommands(config: SettingsCommandsConfig): CommandAc
       onReloadVault,
       onRepairVault,
       onToggleGitignoredFilesVisibility,
-      onReopenAiOnboarding,
     }),
   ]
 }

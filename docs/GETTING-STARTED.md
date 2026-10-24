@@ -206,7 +206,6 @@ rhizome-agent/
 │   │   ├── AiPanel.tsx           # AI transcript/composer surface (selected target + per-vault permission mode)
 │   │   ├── AiMessage.tsx         # Agent message display
 │   │   ├── AiActionCard.tsx      # Agent tool action cards
-│   │   ├── AiAgentsOnboardingPrompt.tsx # First-launch AI agent installer prompt
 │   │   ├── SearchPanel.tsx       # Search interface
 │   │   ├── SettingsPanel.tsx     # App settings
 │   │   ├── StatusBar.tsx         # Bottom bar: vault picker + sync

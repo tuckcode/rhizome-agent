@@ -40,23 +40,17 @@ export function startedEngineFromLock(
 /**
  * Which engine Chat should send on.
  *
- * Native fallback is only for Prime-targeted chats, and only after a real
- * host status says Prime is not installed. Unknown status stays on Prime.
- * An already-open chat keeps the engine it started on.
+ * Rhizome's own engine is the only chat engine (ADR-0189). A saved Prime
+ * or Hermes choice, an unknown host, and an already-open lock all resolve
+ * to native. External CLI sends still go through `usesNativeChatStream`,
+ * which reads the target rather than this value.
  */
 export function resolveEffectiveChatEngine(input: EffectiveChatEngineInput): ChatEngine {
-  if (input.startedEngine) return input.startedEngine
-  if (input.requestedEngine === 'native') return 'native'
-  if (!input.isPrimeTarget) return 'prime'
-  if (!input.hostKnown) return 'prime'
-  if (input.hostNotInstalled) return 'native'
-  return 'prime'
+  void input
+  return 'native'
 }
 
-/** Lock once Settings chose native, the chat is not Prime, or the host has spoken. */
+/** Lock native once, as soon as this chat has no lock yet. */
 export function shouldLockEffectiveChatEngine(input: EffectiveChatEngineInput): boolean {
-  if (input.startedEngine) return false
-  if (input.requestedEngine === 'native') return true
-  if (!input.isPrimeTarget) return true
-  return input.hostKnown
+  return input.startedEngine == null
 }

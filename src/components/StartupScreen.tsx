@@ -1,9 +1,5 @@
-import { AiAgentsOnboardingPrompt } from './AiAgentsOnboardingPrompt'
 import { TelemetryConsentDialog } from './TelemetryConsentDialog'
-import { Toast } from './Toast'
 import { WelcomeScreen } from './WelcomeScreen'
-import type { useAiAgentsOnboarding } from '../hooks/useAiAgentsOnboarding'
-import type { useAiAgentsStatus } from '../hooks/useAiAgentsStatus'
 import type { useOnboarding } from '../hooks/useOnboarding'
 import type { useVaultSwitcher } from '../hooks/useVaultSwitcher'
 import type { Settings } from '../types'
@@ -12,11 +8,8 @@ import type { AppLocale } from '../lib/i18n'
 
 type OnboardingState = ReturnType<typeof useOnboarding>
 type VaultSwitcherState = ReturnType<typeof useVaultSwitcher>
-type AiAgentsOnboardingState = ReturnType<typeof useAiAgentsOnboarding>
 
 export interface StartupScreenParams {
-  aiAgentsOnboarding: AiAgentsOnboardingState
-  aiAgentsStatus: ReturnType<typeof useAiAgentsStatus>
   isOffline: boolean
   isStartupLoading: boolean
   locale?: AppLocale
@@ -24,14 +17,10 @@ export interface StartupScreenParams {
   onboarding: OnboardingState
   runtimeMissingVaultPath: string | null
   loadError: string | null
-  saveSettings: (settings: Settings) => Promise<void>
   saveSettingsPatch: (patch: Partial<Settings>) => Promise<void>
   settings: Settings
   settingsLoaded: boolean
   shouldResumeFreshStartOnboarding: boolean
-  showMcpSetupDialog: boolean
-  setToastMessage: (message: string | null) => void
-  toastMessage: string | null
   vaultSwitcher: VaultSwitcherState
 }
 
@@ -70,13 +59,6 @@ function welcomeOnboardingState(params: StartupScreenParams): OnboardingState {
   return params.onboarding
 }
 
-function shouldShowAiAgentsOnboarding(params: StartupScreenParams): boolean {
-  return !params.noteWindowParams
-    && params.onboarding.state.status === 'ready'
-    && params.aiAgentsOnboarding.showPrompt
-    && !params.showMcpSetupDialog
-}
-
 function WelcomeView({ onboarding, isOffline, locale }: { onboarding: OnboardingState; isOffline: boolean; locale?: AppLocale }) {
   const state = onboarding.state as { status: 'welcome' | 'vault-missing'; defaultPath: string; vaultPath?: string }
   return (
@@ -95,22 +77,6 @@ function WelcomeView({ onboarding, isOffline, locale }: { onboarding: Onboarding
         error={onboarding.error}
         canRetryTemplate={onboarding.canRetryTemplate}
       />
-    </div>
-  )
-}
-
-function AiAgentsOnboardingView({
-  locale,
-  statuses,
-  onContinue,
-}: {
-  statuses: ReturnType<typeof useAiAgentsStatus>
-  locale?: AppLocale
-  onContinue: () => void
-}) {
-  return (
-    <div className="app-shell">
-      <AiAgentsOnboardingPrompt statuses={statuses} locale={locale} onContinue={onContinue} />
     </div>
   )
 }
@@ -150,15 +116,5 @@ export function StartupScreen(params: StartupScreenParams) {
     )
   }
 
-  if (!shouldShowAiAgentsOnboarding(params)) return null
-  return (
-    <>
-      <AiAgentsOnboardingView
-        statuses={params.aiAgentsStatus}
-        locale={params.locale}
-        onContinue={params.aiAgentsOnboarding.dismissPrompt}
-      />
-      <Toast message={params.toastMessage} onDismiss={() => params.setToastMessage(null)} />
-    </>
-  )
+  return null
 }
