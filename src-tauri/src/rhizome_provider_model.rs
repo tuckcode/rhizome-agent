@@ -9,6 +9,10 @@
 //! driver runs the tool. This file maps the loop's `ModelView` to OpenAI
 //! chat messages and runs no tools.
 //!
+//! Signed-in ChatGPT is a separate client (`ai_models/openai_responses.rs`).
+//! `complete` stays on chat completions until `chat_auth_kind_for_provider`
+//! returns `SignedInChatGpt`.
+//!
 //! The driver adds the admitted user message to history only when the turn
 //! ends. `ModelView::turn_start` says where it belongs in the meantime.
 
@@ -23,6 +27,58 @@ use crate::ai_models::{
 };
 use crate::model_events::ModelEvent;
 use crate::rhizome_loop::{HistoryItem, Model, ModelView};
+
+/// Which client a chat step uses. PR 1's OAuth types stay out of this file.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ChatAuthKind {
+    /// An API key, or a local OpenAI-compatible server.
+    ApiKey,
+    /// Signed-in ChatGPT. `POST /v1/responses`.
+    SignedInChatGpt,
+}
+
+/// The HTTP client for one chat step.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ChatTransport {
+    ChatCompletions,
+    Responses,
+}
+
+/// `true` selects the Responses client.
+pub(crate) fn chat_auth_kind(signed_in_chatgpt: bool) -> ChatAuthKind {
+    if signed_in_chatgpt {
+        ChatAuthKind::SignedInChatGpt
+    } else {
+        ChatAuthKind::ApiKey
+    }
+}
+
+/// Signed-in ChatGPT uses the Responses client. Every other kind stays on
+/// chat completions.
+pub(crate) fn chat_transport(kind: ChatAuthKind) -> ChatTransport {
+    match kind {
+        ChatAuthKind::SignedInChatGpt => ChatTransport::Responses,
+        ChatAuthKind::ApiKey => ChatTransport::ChatCompletions,
+    }
+}
+
+/// Always `ApiKey` until PR 1.
+///
+/// Hookup: replace `chat_auth_kind(false)` below with
+/// `chat_auth_kind(provider_is_signed_in_chatgpt(provider))`
+/// where `provider_is_signed_in_chatgpt` is true when that provider's auth
+/// kind is the signed-in ChatGPT record from PR 1. `complete` already calls
+/// this function, so that line is the whole switch.
+pub(crate) fn chat_auth_kind_for_provider(
+    _provider: &crate::ai_models::AiModelProvider,
+) -> ChatAuthKind {
+    // PR 3 calls `list_chatgpt_models`. Naming it here keeps that entry in
+    // the binary before the picker is wired.
+    let _list_models =
+        crate::ai_models::openai_responses::list_chatgpt_models::<fn() -> Result<String, String>>;
+    let _ = _list_models;
+    chat_auth_kind(false)
+}
 
 /// Calls the provider once per loop step. Runs no tools.
 pub struct ProviderModel {
@@ -118,50 +174,80 @@ impl Model for ProviderModel {
                 &request.model_id,
                 true,
             ) == crate::ai_model_tools::ChatToolsReasoning::None;
+        let transport = chat_transport(chat_auth_kind_for_provider(&request.provider));
         std::thread::scope(|scope| {
             scope.spawn(move || {
+                let replay_for_responses = replay_session.clone();
                 let _guard = enter_reasoning_replay_session(replay_session);
                 let mut saw_text = false;
                 let mut saw_tools = false;
-                stream_chat_events_with_params(
-                    request,
-                    messages,
-                    tools,
-                    tool_params,
-                    &extras,
-                    limits,
-                    &mut |event| {
-                        let event = match event {
-                            ModelEvent::TextDelta { ref text } if !text.trim().is_empty() => {
-                                saw_text = true;
-                                event
-                            }
-                            ModelEvent::ToolCallStart { .. } => {
-                                saw_tools = true;
-                                event
-                            }
-                            ModelEvent::Finish { .. }
-                                if thinking && !forced_off && !saw_text && !saw_tools =>
-                            {
-                                ModelEvent::Error(crate::model_events::ModelError {
-                                    kind: crate::model_events::ModelErrorKind::Rejected,
-                                    status: None,
-                                    message: crate::ai_models::REASONING_EMPTY_REPLY.into(),
-                                })
-                            }
-                            ModelEvent::Finish { .. } if forced_off && !saw_text && !saw_tools => {
-                                ModelEvent::Error(crate::model_events::ModelError {
-                                    kind: crate::model_events::ModelErrorKind::Rejected,
-                                    status: None,
-                                    message: "AI provider response did not include assistant text."
-                                        .into(),
-                                })
-                            }
-                            other => other,
-                        };
-                        sender.send(event).is_ok()
-                    },
-                );
+                let mut emit_step = |event: ModelEvent| {
+                    let event = match event {
+                        ModelEvent::TextDelta { ref text } if !text.trim().is_empty() => {
+                            saw_text = true;
+                            event
+                        }
+                        ModelEvent::ToolCallStart { .. } => {
+                            saw_tools = true;
+                            event
+                        }
+                        ModelEvent::Finish { .. }
+                            if thinking && !forced_off && !saw_text && !saw_tools =>
+                        {
+                            ModelEvent::Error(crate::model_events::ModelError {
+                                kind: crate::model_events::ModelErrorKind::Rejected,
+                                status: None,
+                                message: crate::ai_models::REASONING_EMPTY_REPLY.into(),
+                            })
+                        }
+                        ModelEvent::Finish { .. } if forced_off && !saw_text && !saw_tools => {
+                            ModelEvent::Error(crate::model_events::ModelError {
+                                kind: crate::model_events::ModelErrorKind::Rejected,
+                                status: None,
+                                message: "AI provider response did not include assistant text."
+                                    .into(),
+                            })
+                        }
+                        other => other,
+                    };
+                    sender.send(event).is_ok()
+                };
+                match transport {
+                    ChatTransport::ChatCompletions => {
+                        stream_chat_events_with_params(
+                            request,
+                            messages,
+                            tools,
+                            tool_params,
+                            &extras,
+                            limits,
+                            &mut emit_step,
+                        );
+                    }
+                    ChatTransport::Responses => {
+                        // Reached only after the PR 1 hookup in
+                        // `chat_auth_kind_for_provider`. The refresh callback
+                        // stays empty until that PR passes its own.
+                        let token = request.api_key_override.clone().unwrap_or_default();
+                        let mut auth =
+                            crate::ai_models::openai_responses::BearerSession::new(token, || {
+                                Err(String::new())
+                            });
+                        crate::ai_models::openai_responses::stream_chatgpt_turn(
+                            &crate::ai_models::openai_responses::ChatGptTurn {
+                                base_url: request.provider.base_url.as_deref().unwrap_or(""),
+                                model: &request.model_id,
+                                instructions: request.system_prompt.as_deref(),
+                                messages: &messages,
+                                tools: &tools,
+                                replay_session: &replay_for_responses,
+                            },
+                            &mut auth,
+                            limits,
+                            &mut emit_step,
+                        );
+                    }
+                }
             });
             for event in receiver.iter() {
                 if let crate::model_events::ModelEvent::Error(error) = &event {
@@ -441,6 +527,25 @@ mod tests {
             name: name.into(),
             args: args.into(),
         }
+    }
+
+    #[test]
+    fn signed_in_chatgpt_selects_the_responses_client() {
+        assert_eq!(
+            chat_transport(ChatAuthKind::ApiKey),
+            ChatTransport::ChatCompletions
+        );
+        assert_eq!(
+            chat_transport(ChatAuthKind::SignedInChatGpt),
+            ChatTransport::Responses
+        );
+        let request = request("http://127.0.0.1:9/v1");
+        assert_eq!(
+            chat_auth_kind_for_provider(&request.provider),
+            ChatAuthKind::ApiKey
+        );
+        assert_eq!(chat_auth_kind(false), ChatAuthKind::ApiKey);
+        assert_eq!(chat_auth_kind(true), ChatAuthKind::SignedInChatGpt);
     }
 
     fn view(admitted: &str, history: Vec<HistoryItem>) -> ModelView {

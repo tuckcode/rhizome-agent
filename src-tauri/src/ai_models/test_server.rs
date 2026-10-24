@@ -111,3 +111,29 @@ pub(crate) fn sse(lines: &[&str]) -> String {
         .collect::<String>();
     http_response("200 OK", &["Content-Type: text/event-stream"], &body)
 }
+
+pub(crate) fn json_response(status: &str, body: &str) -> String {
+    http_response(status, &["Content-Type: application/json"], body)
+}
+
+/// Responses API SSE: an `event:` line plus one `data:` JSON object.
+pub(crate) fn responses_sse(events: &[&str]) -> String {
+    let mut body = String::new();
+    for event in events {
+        let event_type = serde_json::from_str::<serde_json::Value>(event)
+            .ok()
+            .and_then(|value| {
+                value
+                    .get("type")
+                    .and_then(|kind| kind.as_str())
+                    .map(str::to_string)
+            })
+            .unwrap_or_else(|| "message".to_string());
+        body.push_str("event: ");
+        body.push_str(&event_type);
+        body.push_str("\ndata: ");
+        body.push_str(event);
+        body.push_str("\n\n");
+    }
+    http_response("200 OK", &["Content-Type: text/event-stream"], &body)
+}
