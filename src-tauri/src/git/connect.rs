@@ -559,6 +559,22 @@ mod tests {
     }
 
     #[test]
+    fn git_add_remote_rejects_dangerous_remote_url_without_configuring_origin() {
+        let local = setup_git_repo();
+        configure_author(local.path(), "local@test.com", "Local User");
+        create_local_commit(local.path(), "note.md", "Local", "Initial local commit");
+
+        for bad_url in ["-https://example.com/repo.git", "ext::sh -c 'touch /tmp/x'"] {
+            let result = git_add_remote(local.path().to_str().unwrap(), bad_url).unwrap();
+            assert_eq!(result.status, "error", "url: {bad_url}");
+            assert!(
+                list_remotes(local.path()).unwrap().is_empty(),
+                "bad URL must not leave a remote configured: {bad_url}"
+            );
+        }
+    }
+
+    #[test]
     fn git_add_remote_reports_when_the_vault_is_already_remote_backed() {
         let local = setup_git_repo();
         let vault = local.path();

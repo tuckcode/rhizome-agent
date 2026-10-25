@@ -1,7 +1,7 @@
 const TRANSPORT_HELPER_MARKER: &str = "::";
 
 /// Reject git URLs that git would parse as an option or run as a transport helper.
-pub(super) fn validate_remote_url(url: &str) -> Result<(), String> {
+pub(crate) fn validate_remote_url(url: &str) -> Result<(), String> {
     if url.starts_with('-') {
         return Err("Repository URL cannot start with '-'.".to_string());
     }
@@ -15,7 +15,7 @@ pub(super) fn validate_remote_url(url: &str) -> Result<(), String> {
         let is_helper_name = !helper.is_empty()
             && helper
                 .chars()
-                .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '-');
+                .all(|c| c.is_ascii_alphanumeric() || c == '+' || c == '-' || c == '.');
         if is_helper_name {
             return Err("Repository URL uses an unsupported transport.".to_string());
         }
@@ -38,6 +38,14 @@ mod tests {
     fn rejects_transport_helpers() {
         assert!(validate_remote_url("ext::sh -c 'touch /tmp/x'").is_err());
         assert!(validate_remote_url("fd::17/foo").is_err());
+        assert!(validate_remote_url("remote-foo.bar::evil").is_err());
+    }
+
+    #[test]
+    fn accepts_https_hostnames_with_dots_while_transport_helpers_still_fail() {
+        assert!(validate_remote_url("https://remote-foo.bar/repo.git").is_ok());
+        assert!(validate_remote_url("ext::sh -c 'touch /tmp/x'").is_err());
+        assert!(validate_remote_url("-https://example.com/repo.git").is_err());
     }
 
     #[test]

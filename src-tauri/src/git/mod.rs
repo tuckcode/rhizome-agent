@@ -12,6 +12,7 @@ mod pulse;
 mod remote;
 mod remote_config;
 mod remote_url;
+pub(crate) use remote_url::validate_remote_url;
 mod status;
 
 use std::ffi::{OsStr, OsString};
