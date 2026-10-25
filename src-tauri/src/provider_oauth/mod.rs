@@ -154,6 +154,14 @@ pub(crate) fn fresh_access_token(provider: &str) -> Result<String, String> {
     fresh_access_token_with(&env, provider)
 }
 
+/// Refreshes even when the saved access token is still inside its window.
+/// The same access token coming back is a failure: the caller must not
+/// retry a request with the token that just expired.
+pub(crate) fn force_refresh(provider: &str) -> Result<String, String> {
+    let env = current()?;
+    access_token_with(&env, provider, true)
+}
+
 fn current() -> Result<Arc<Env>, String> {
     if let Some(env) = override_env()
         .lock()
@@ -231,6 +239,15 @@ fn config_dir() -> Result<PathBuf, String> {
 }
 
 pub(crate) fn fresh_access_token_with(env: &Env, provider: &str) -> Result<String, String> {
+    access_token_with(env, provider, false)
+}
+
+#[cfg(test)]
+pub(crate) fn force_refresh_with(env: &Env, provider: &str) -> Result<String, String> {
+    access_token_with(env, provider, true)
+}
+
+fn access_token_with(env: &Env, provider: &str, force: bool) -> Result<String, String> {
     let provider = normalize_provider(provider)?;
     let _lock = lock_refresh(env)?;
     let Some(record) = load_record(env, &provider)? else {
@@ -250,9 +267,10 @@ pub(crate) fn fresh_access_token_with(env: &Env, provider: &str) -> Result<Strin
     if !provider_enabled(env, &provider) {
         return Err(turned_off(&provider));
     }
+    let previous_access = record.access_token.clone();
     let remaining = record.expires_at.saturating_sub(unix_now());
-    if !record.access_token.is_empty() && remaining > REFRESH_WINDOW_SECS {
-        return Ok(record.access_token);
+    if !force && !previous_access.is_empty() && remaining > REFRESH_WINDOW_SECS {
+        return Ok(previous_access);
     }
     let parsed = match openai::refresh(env, &record) {
         Ok(parsed) => parsed,
@@ -263,14 +281,17 @@ pub(crate) fn fresh_access_token_with(env: &Env, provider: &str) -> Result<Strin
         Err(openai::RefreshFail::Temporary) => return Err("The token request failed.".into()),
     };
     let mut updated = record.clone();
-    if !parsed.access_token.is_empty() {
-        updated.access_token = parsed.access_token;
+    if parsed.access_token.is_empty() {
+        updated.access_token.clear();
+        updated.expires_at = 0;
+    } else {
+        updated.access_token = parsed.access_token.clone();
+        updated.expires_at = unix_now() + parsed.expires_in.unwrap_or(3600).max(0);
     }
     updated.refresh_token = parsed
         .refresh_token
         .filter(|token| !token.is_empty())
         .unwrap_or_else(|| record.refresh_token.clone());
-    updated.expires_at = unix_now() + parsed.expires_in.unwrap_or(3600).max(0);
     updated.saved_at = unix_now();
     if let Some(scope) = parsed.scope.as_deref() {
         updated.scopes = openai::split_scopes(scope);
@@ -289,9 +310,12 @@ pub(crate) fn fresh_access_token_with(env: &Env, provider: &str) -> Result<Strin
             Ok(openai::IdCheck::Match(identity)) if identity.subject == updated.subject => {
                 updated.email = identity.email.or(updated.email);
                 updated.id_token = parsed.id_token;
-                save_rotated(env, &provider, &updated)?;
+                if let Err(error) = save_rotated(env, &provider, &updated) {
+                    log::warn!("could not store the refreshed ChatGPT profile: {error}");
+                }
             }
             Ok(openai::IdCheck::Match(_)) => {
+                let _ = openai::revoke(env, &updated);
                 let _ = save_rotated(env, &provider, &record.cleared());
                 return Err(SIGN_IN_AGAIN.into());
             }
@@ -300,6 +324,9 @@ pub(crate) fn fresh_access_token_with(env: &Env, provider: &str) -> Result<Strin
     }
     if !updated.usable {
         return Err(NOT_USABLE.into());
+    }
+    if force && updated.access_token == previous_access {
+        return Err(SIGN_IN_AGAIN.into());
     }
     Ok(updated.access_token)
 }

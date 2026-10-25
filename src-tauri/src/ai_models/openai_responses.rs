@@ -2271,4 +2271,54 @@ mod tests {
         let input = replay["input"].as_array().unwrap();
         assert!(input.iter().all(|item| item["type"] != "reasoning"));
     }
+
+    #[test]
+    fn replay_map_drops_the_oldest_chat_after_64() {
+        let sessions = (0..=MAX_REPLAY_SESSIONS)
+            .map(|index| format!("evict-chat-{index}"))
+            .collect::<Vec<_>>();
+        for session in &sessions {
+            store_replay(
+                session,
+                ReplayTurn {
+                    items: vec![json!({
+                        "type": "reasoning",
+                        "encrypted_content": "enc",
+                    })],
+                    call_ids: Vec::new(),
+                    text: Some("hello".into()),
+                },
+            );
+        }
+        assert!(load_replay(&sessions[0]).is_empty());
+        assert_eq!(load_replay(&sessions[1]).len(), 1);
+        assert_eq!(load_replay(sessions.last().unwrap()).len(), 1);
+        for session in &sessions {
+            clear_responses_replay(session);
+        }
+    }
+
+    #[test]
+    fn expired_failure_after_output_does_not_refresh() {
+        let server = serve(vec![responses_sse(&[
+            r#"{"type":"response.output_text.delta","delta":"Hi"}"#,
+            r#"{"type":"response.failed","response":{"status":"failed","error":{"code":"invalid_api_key","message":"access token expired"}}}"#,
+        ])]);
+        let refreshes = Rc::new(Cell::new(0));
+        let counter = Rc::clone(&refreshes);
+        let mut session = BearerSession::new("old", move || {
+            counter.set(counter.get() + 1);
+            Ok("token-2".into())
+        });
+        let messages = vec![json!({"role": "user", "content": "Hi"})];
+        let events = collect(
+            &turn(&server.base_url, None, &messages, &[], ""),
+            &mut session,
+        );
+        assert_eq!(refreshes.get(), 0);
+        assert_eq!(events[0], text("Hi"));
+        assert_eq!(error_of(&events).message, SIGN_IN_AGAIN);
+        assert_eq!(error_of(&events).kind, ModelErrorKind::Auth);
+        assert_eq!(server.requests.lock().unwrap().len(), 1);
+    }
 }

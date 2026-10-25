@@ -30,18 +30,12 @@ commits: feat: stream signed-in ChatGPT through the Responses API
 - `GET /v1/models` keeps `visibility: "list"` (`slug`, `display_name`).
   A failed list returns the built-in models and does not error.
 
-## Hookup after PR 1
+## Hookup
 
-In `chat_auth_kind_for_provider` (`src-tauri/src/rhizome_provider_model.rs`),
-replace `chat_auth_kind(false)` with:
-
-```rust
-chat_auth_kind(provider_is_signed_in_chatgpt(provider))
-```
-
-`provider_is_signed_in_chatgpt` is true when that provider's auth kind is
-the signed-in ChatGPT record. `complete` already calls this function.
-Pass PR 1's bearer token and refresh callback into `BearerSession` on the
-`ChatTransport::Responses` arm. Do not import PR 1 types into the client.
+`chat_auth_kind_for_provider` calls
+`chat_auth_kind(provider_is_signed_in_chatgpt(&provider.id))`.
+The bearer is `fresh_access_token` when that is true, otherwise
+`api_key_from_provider`. A mid-stream expiry calls `force_refresh`.
+The same access token coming back is a failure.
 
 `rhizome_loop/mod.rs` was not changed.

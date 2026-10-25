@@ -1060,7 +1060,9 @@ fn api_key_from_env_with_lookup(
     })
 }
 
-fn api_key_from_provider(request: &AiModelStreamRequest) -> Result<Option<String>, String> {
+pub(crate) fn api_key_from_provider(
+    request: &AiModelStreamRequest,
+) -> Result<Option<String>, String> {
     if let Some(api_key) = request
         .api_key_override
         .as_deref()

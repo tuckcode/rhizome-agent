@@ -62,17 +62,43 @@ pub(crate) fn chat_transport(kind: ChatAuthKind) -> ChatTransport {
     }
 }
 
-/// Always `ApiKey` until PR 1.
-///
-/// Hookup: replace `chat_auth_kind(false)` below with
-/// `chat_auth_kind(provider_is_signed_in_chatgpt(provider))`
-/// where `provider_is_signed_in_chatgpt` is true when that provider's auth
-/// kind is the signed-in ChatGPT record from PR 1. `complete` already calls
-/// this function, so that line is the whole switch.
+/// Signed-in ChatGPT uses the Responses client. Every other provider
+/// stays on chat completions.
 pub(crate) fn chat_auth_kind_for_provider(
-    _provider: &crate::ai_models::AiModelProvider,
+    provider: &crate::ai_models::AiModelProvider,
 ) -> ChatAuthKind {
-    chat_auth_kind(false)
+    chat_auth_kind(crate::provider_oauth::provider_is_signed_in_chatgpt(
+        &provider.id,
+    ))
+}
+
+/// Signed-in ChatGPT uses a fresh OAuth access token. Every other provider
+/// uses its API key. `api_key_override` is not the ChatGPT bearer.
+fn responses_bearer(
+    request: &crate::ai_models::AiModelStreamRequest,
+) -> Result<String, crate::model_events::ModelError> {
+    let token = if crate::provider_oauth::provider_is_signed_in_chatgpt(&request.provider.id) {
+        crate::provider_oauth::fresh_access_token(&request.provider.id)
+    } else {
+        match crate::ai_models::api_key_from_provider(request) {
+            Ok(Some(key)) => Ok(key),
+            Ok(None) => Err(crate::ai_models::openai_responses::SIGN_IN_AGAIN.to_string()),
+            Err(error) => Err(error),
+        }
+    };
+    match token {
+        Ok(token) if !token.trim().is_empty() => Ok(token),
+        Ok(_) => Err(crate::model_events::ModelError {
+            kind: crate::model_events::ModelErrorKind::Auth,
+            status: None,
+            message: crate::ai_models::openai_responses::SIGN_IN_AGAIN.into(),
+        }),
+        Err(message) => Err(crate::model_events::ModelError {
+            kind: crate::model_events::ModelErrorKind::Auth,
+            status: None,
+            message,
+        }),
+    }
 }
 
 /// The Responses body fields that come from a chat-completions turn.
@@ -241,30 +267,35 @@ impl Model for ProviderModel {
                         );
                     }
                     ChatTransport::Responses => {
-                        // Reached only after the PR 1 hookup in
-                        // `chat_auth_kind_for_provider`. The refresh callback
-                        // stays empty until that PR passes its own.
-                        let Some(token) = request
-                            .api_key_override
-                            .as_deref()
-                            .map(str::trim)
-                            .filter(|token| !token.is_empty())
-                        else {
-                            let _ = emit_step(ModelEvent::Error(crate::model_events::ModelError {
-                                kind: crate::model_events::ModelErrorKind::Auth,
-                                status: None,
-                                message: crate::ai_models::openai_responses::SIGN_IN_AGAIN.into(),
-                            }));
-                            return;
+                        let token = match responses_bearer(request) {
+                            Ok(token) => token,
+                            Err(error) => {
+                                let _ = emit_step(ModelEvent::Error(error));
+                                return;
+                            }
+                        };
+                        let base_url = match crate::ai_models::provider_base_url(&request.provider)
+                        {
+                            Ok(url) => url,
+                            Err(message) => {
+                                let _ =
+                                    emit_step(ModelEvent::Error(crate::model_events::ModelError {
+                                        kind: crate::model_events::ModelErrorKind::Rejected,
+                                        status: None,
+                                        message,
+                                    }));
+                                return;
+                            }
                         };
                         let (system_prefix, reasoning_effort) = responses_turn_fields(&extras);
+                        let provider_id = request.provider.id.clone();
                         let mut auth = crate::ai_models::openai_responses::BearerSession::new(
-                            token.to_string(),
-                            || Err(String::new()),
+                            token,
+                            move || crate::provider_oauth::force_refresh(&provider_id),
                         );
                         crate::ai_models::openai_responses::stream_chatgpt_turn(
                             &crate::ai_models::openai_responses::ChatGptTurn {
-                                base_url: request.provider.base_url.as_deref().unwrap_or(""),
+                                base_url: &base_url,
                                 model: &request.model_id,
                                 instructions: request.system_prompt.as_deref(),
                                 system_prefix: system_prefix.as_deref(),
