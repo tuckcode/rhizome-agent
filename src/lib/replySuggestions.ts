@@ -19,7 +19,9 @@
  */
 
 import {
+  clauseWords,
   isConsequentialAsk,
+  isDenyWord,
   looksSecret,
   predictedCompletion,
   suppressesReply,
@@ -318,7 +320,13 @@ function tryExtractActionYesNo(text: string, fullMessage: string): ReplySuggesti
     return null
   }
 
-  if (looksSecret(sentence) || isConsequentialAsk(sentence)) return null
+  if (
+    looksSecret(sentence)
+    || isConsequentialAsk(sentence)
+    || clauseWords(sentence).some(isDenyWord)
+  ) {
+    return null
+  }
 
   const affirmativeLabel = sentence
   return {
@@ -333,11 +341,19 @@ function tryExtractActionYesNo(text: string, fullMessage: string): ReplySuggesti
 const ABBREVIATION_BEFORE_TAIL =
   /\b(?:e\.g|i\.e|etc|vs|Mr|Mrs|Ms|Dr|St|Jr|Sr)\.$/i
 
+const LOWERCASE_ABBREV_BEFORE_TAIL = /\b(?:approx|dept|est|fig|inc|misc|no|pt|ref|vol)\.$/i
+
+const TAIL_STARTS_WITH_CAPITAL_OR_DIGIT = /^["'(]?[\p{Lu}\p{N}]/u
+
 /** False split from `lastSentenceOf` on abbreviations, code ticks, or bad tails. */
 function multiSentenceEchoTailUnsafe(sentence: string, normalized: string): boolean {
-  if (!/^["'(]?[A-Z]/.test(sentence)) return true
+  if (!TAIL_STARTS_WITH_CAPITAL_OR_DIGIT.test(sentence)) return true
   const prefix = normalized.slice(0, normalized.length - sentence.length).trimEnd()
   if (ABBREVIATION_BEFORE_TAIL.test(prefix)) return true
+  if (/(?:^|\s)[A-Z]\.$/.test(prefix)) return true
+  if (/\s[A-Z][a-z]{0,4}\.$/.test(prefix)) return true
+  if (/\b[A-Z](?:\.[A-Z])+\.$/.test(prefix)) return true
+  if (LOWERCASE_ABBREV_BEFORE_TAIL.test(prefix)) return true
   const backticks = sentence.match(/`/g)?.length ?? 0
   if (backticks % 2 === 1) return true
   return false

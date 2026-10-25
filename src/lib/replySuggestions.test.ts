@@ -281,11 +281,34 @@ describe('suggestReply', () => {
       expect(suggestReply('SECRET_KEY=abc. Want me to jot that down?')).toBeNull()
     })
 
+    it('accepts an accented capital tail after a lead-in', () => {
+      const result = suggestReply('Répondez en français. Ouvrir les notes?')
+      expect(result?.kind).toBe('options')
+      if (result?.kind === 'options') {
+        expect(result.options[0].label).toBe('Ouvrir les notes')
+      }
+    })
+
+    it('labels a tail that starts with a digit', () => {
+      const result = suggestReply('All good. 2 more steps?')
+      expect(result?.kind).toBe('options')
+      if (result?.kind === 'options') {
+        expect(result.options[0].label).toBe('2 more steps')
+      }
+    })
+
     it.each([
       ['Ask Mr. Smith?', 'Smith'],
       ['Ping Dr. Lee now?', 'Lee now'],
       ['Use e.g. staging?', 'staging'],
       ['Fixed. Run `make. test` now?', 'test` now'],
+      ['Ask J. Smith?', 'Smith'],
+      ['Ping the U.S. Team?', 'Team'],
+      ['Call Prof. Lee?', 'Lee'],
+      ['Ask Sen. Warren?', 'Warren'],
+      ['See Fig. Two?', 'Two'],
+      ['From Inc. Legal?', 'Legal'],
+      ['Use approx. Two files?', 'Two files'],
     ] as const)('does not split abbreviations or code into pills (%j)', (message, badLabel) => {
       const result = suggestReply(message)
       if (result?.kind === 'options') {
@@ -344,6 +367,15 @@ describe('suggestReply', () => {
       expect(suggestReply('Push 33 commits?')).toBeNull()
       expect(suggestReply('Commit and push?')).toBeNull()
       expect(suggestReply('Run the build?')).toBeNull()
+    })
+
+    it('rejects_deny_word_inflections_for_action_yes_no', () => {
+      expect(suggestReply('Commit these changes?')).toBeNull()
+      expect(suggestReply('Done. Deploying now?')).toBeNull()
+      expect(suggestReply('Redeploy now?')).toBeNull()
+      expect(suggestReply('Sync the notes?')).toBeNull()
+      expect(suggestReply('Reset the filter?')).toBeNull()
+      expect(suggestReply('Remove the typo?')).toBeNull()
     })
   })
 
