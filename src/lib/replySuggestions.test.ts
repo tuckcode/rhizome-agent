@@ -252,6 +252,29 @@ describe('suggestReply', () => {
     })
   })
 
+  describe('Yes/no fallback without echoing the message (#246)', () => {
+    it('does not put the assistant message text in pills after a lead-in', () => {
+      expect(suggestReply('Done. Want me to deploy?')).toBeNull()
+      expect(suggestReply('Done. Want me to draft the note?')).toEqual({
+        kind: 'completion',
+        text: 'Yes — draft the note',
+      })
+      const imperative = suggestReply('All set. Deploy now?')
+      expect(imperative?.kind).toBe('options')
+      if (imperative?.kind === 'options') {
+        for (const option of imperative.options) {
+          expect(option.label).not.toContain('All set')
+          expect(option.text).not.toContain('All set')
+        }
+        expect(imperative.options[0].label).toBe('Deploy now')
+      }
+    })
+
+    it('does not offer pills that contain a secret', () => {
+      expect(suggestReply('SECRET_KEY=abc. Want me to jot that down?')).toBeNull()
+    })
+  })
+
   describe('Imperative action questions', () => {
     /**
      * "Push 33 commits?" is already in imperative form.

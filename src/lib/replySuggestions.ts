@@ -18,7 +18,7 @@
  * reading a question the agent already asked.
  */
 
-import { predictedCompletion, suppressesReply } from './consequentialAsk'
+import { looksSecret, predictedCompletion, suppressesReply } from './consequentialAsk'
 
 /** One pill. */
 export interface ReplyOption {
@@ -92,7 +92,7 @@ export function suggestReply(agentMessage: string): ReplySuggestion | null {
       return orOptions
     }
 
-    const actionOptions = tryExtractActionYesNo(withoutQuestion)
+    const actionOptions = tryExtractActionYesNo(withoutQuestion, trimmed)
     if (actionOptions !== null) {
       return actionOptions
     }
@@ -279,32 +279,43 @@ function tryExtractBulletOptions(text: string): ReplySuggestion | null {
  * is already in imperative form. Return null if uncertain.
  * Negative option is always "No".
  */
-function tryExtractActionYesNo(text: string): ReplySuggestion | null {
+function tryExtractActionYesNo(text: string, fullMessage: string): ReplySuggestion | null {
+  const normalized = text.trim()
+  const sentence = lastSentenceOf(`${normalized}?`).replace(/[?!]+$/, '').trim()
+  if (sentence.length < 3) return null
+
+  const echoesWholeMessage = sentence !== normalized
+  if (echoesWholeMessage) {
+    if (suppressesReply(fullMessage) || looksSecret(sentence)) return null
+    const question = sentence.endsWith('?') ? sentence : `${sentence}?`
+    // Consent on the last sentence is a Tab completion, not a yes/no pill echo.
+    if (predictedCompletion(question, fullMessage)) return null
+  }
+
   // Must NOT contain " or " — that's handled by tryExtractOrOptions
-  if (text.includes(' or ')) {
+  if (normalized.includes(' or ') || sentence.includes(' or ')) {
     return null
   }
 
-  // Must NOT be a numbered or bulleted list
-  if (/\d+\./.test(text) || /^[-*•]\s+/.test(text)) {
+  // Must NOT be a numbered or bulleted list (check the whole offer, not only the tail)
+  if (/\d+\./.test(normalized) || /^[-*•]\s+/.test(normalized) || /\n[-*•]\s+/.test(normalized)) {
     return null
   }
 
   // Reject open questions (what, how, why, when, where, who, which, etc.)
   const openQuestionStart =
     /^(what|how|why|when|where|who|which|whose|can you|could you|would you|should you|want me|should i|shall i|would i|any\s)/i
-  if (openQuestionStart.test(text)) {
+  if (openQuestionStart.test(sentence)) {
     return null
   }
 
-  // Check if it's too short or too long
-  if (text.length < 3 || text.length > MAX_OPTION_LENGTH) {
+  if (sentence.length > MAX_OPTION_LENGTH) {
     return null
   }
 
-  // At this point, if it doesn't match exclusion patterns and is a reasonable length,
-  // treat it as an imperative action question.
-  const affirmativeLabel = text
+  if (suppressesReply(fullMessage) || looksSecret(sentence)) return null
+
+  const affirmativeLabel = sentence
   return {
     kind: 'options',
     options: [
