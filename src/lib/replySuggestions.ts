@@ -18,7 +18,12 @@
  * reading a question the agent already asked.
  */
 
-import { looksSecret, predictedCompletion, suppressesReply } from './consequentialAsk'
+import {
+  isConsequentialAsk,
+  looksSecret,
+  predictedCompletion,
+  suppressesReply,
+} from './consequentialAsk'
 
 /** One pill. */
 export interface ReplyOption {
@@ -286,8 +291,8 @@ function tryExtractActionYesNo(text: string, fullMessage: string): ReplySuggesti
 
   const echoesWholeMessage = sentence !== normalized
   if (echoesWholeMessage) {
-    if (suppressesReply(fullMessage) || looksSecret(sentence)) return null
-    const question = sentence.endsWith('?') ? sentence : `${sentence}?`
+    if (multiSentenceEchoTailUnsafe(sentence, normalized)) return null
+    const question = `${sentence}?`
     // Consent on the last sentence is a Tab completion, not a yes/no pill echo.
     if (predictedCompletion(question, fullMessage)) return null
   }
@@ -313,7 +318,7 @@ function tryExtractActionYesNo(text: string, fullMessage: string): ReplySuggesti
     return null
   }
 
-  if (suppressesReply(fullMessage) || looksSecret(sentence)) return null
+  if (looksSecret(sentence) || isConsequentialAsk(sentence)) return null
 
   const affirmativeLabel = sentence
   return {
@@ -323,4 +328,17 @@ function tryExtractActionYesNo(text: string, fullMessage: string): ReplySuggesti
       { label: 'No', text: 'No' }
     ]
   }
+}
+
+const ABBREVIATION_BEFORE_TAIL =
+  /\b(?:e\.g|i\.e|etc|vs|Mr|Mrs|Ms|Dr|St|Jr|Sr)\.$/i
+
+/** False split from `lastSentenceOf` on abbreviations, code ticks, or bad tails. */
+function multiSentenceEchoTailUnsafe(sentence: string, normalized: string): boolean {
+  if (!/^["'(]?[A-Z]/.test(sentence)) return true
+  const prefix = normalized.slice(0, normalized.length - sentence.length).trimEnd()
+  if (ABBREVIATION_BEFORE_TAIL.test(prefix)) return true
+  const backticks = sentence.match(/`/g)?.length ?? 0
+  if (backticks % 2 === 1) return true
+  return false
 }
