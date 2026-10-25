@@ -252,32 +252,102 @@ describe('suggestReply', () => {
     })
   })
 
+  describe('Yes/no fallback without echoing the message (#246)', () => {
+    it('stays silent when the tail action is consequential', () => {
+      expect(suggestReply('Done. Want me to deploy?')).toBeNull()
+      expect(suggestReply('All set. Deploy now?')).toBeNull()
+    })
+
+    it('defers safe consent on the last sentence to Tab completion', () => {
+      expect(suggestReply('Done. Want me to draft the note?')).toEqual({
+        kind: 'completion',
+        text: 'Yes — draft the note',
+      })
+    })
+
+    it('labels only the last sentence for a harmless imperative tail', () => {
+      const imperative = suggestReply('All set. Open the notes?')
+      expect(imperative?.kind).toBe('options')
+      if (imperative?.kind === 'options') {
+        for (const option of imperative.options) {
+          expect(option.label).not.toContain('All set')
+          expect(option.text).not.toContain('All set')
+        }
+        expect(imperative.options[0].label).toBe('Open the notes')
+      }
+    })
+
+    it('does not offer pills that contain a secret', () => {
+      expect(suggestReply('SECRET_KEY=abc. Want me to jot that down?')).toBeNull()
+    })
+
+    it('accepts an accented capital tail after a lead-in', () => {
+      const result = suggestReply('Répondez en français. Ouvrir les notes?')
+      expect(result?.kind).toBe('options')
+      if (result?.kind === 'options') {
+        expect(result.options[0].label).toBe('Ouvrir les notes')
+      }
+    })
+
+    it('labels a tail that starts with a digit', () => {
+      const result = suggestReply('All good. 2 more steps?')
+      expect(result?.kind).toBe('options')
+      if (result?.kind === 'options') {
+        expect(result.options[0].label).toBe('2 more steps')
+      }
+    })
+
+    it.each([
+      ['Ask Mr. Smith?', 'Smith'],
+      ['Ping Dr. Lee now?', 'Lee now'],
+      ['Use e.g. staging?', 'staging'],
+      ['Fixed. Run `make. test` now?', 'test` now'],
+      ['Ask J. Smith?', 'Smith'],
+      ['Ping the U.S. Team?', 'Team'],
+      ['Call Prof. Lee?', 'Lee'],
+      ['Ask Sen. Warren?', 'Warren'],
+      ['See Fig. Two?', 'Two'],
+      ['From Inc. Legal?', 'Legal'],
+      ['Use approx. Two files?', 'Two files'],
+    ] as const)('does not split abbreviations or code into pills (%j)', (message, badLabel) => {
+      const result = suggestReply(message)
+      if (result?.kind === 'options') {
+        for (const option of result.options) {
+          expect(option.label).not.toBe(badLabel)
+          expect(option.text).not.toBe(badLabel)
+        }
+      } else {
+        expect(result).toBeNull()
+      }
+    })
+  })
+
   describe('Imperative action questions', () => {
     /**
      * "Push 33 commits?" is already in imperative form.
      * Use it as the affirmative label, with "No" as the negative.
      */
     it('imperative_action_question_with_no', () => {
-      const result = suggestReply('Push 33 commits?')
+      const result = suggestReply('Open the notes?')
       expect(result?.kind).toBe('options')
       if (result?.kind === 'options') {
         expect(result.options).toHaveLength(2)
-        expect(result.options[0].label).toBe('Push 33 commits')
+        expect(result.options[0].label).toBe('Open the notes')
         expect(result.options[1].label).toBe('No')
       }
     })
 
     it('another_imperative_question', () => {
-      const result = suggestReply('Commit and push?')
+      const result = suggestReply('Review the diff?')
       expect(result?.kind).toBe('options')
       if (result?.kind === 'options') {
-        expect(result.options[0].label).toBe('Commit and push')
+        expect(result.options[0].label).toBe('Review the diff')
         expect(result.options[1].label).toBe('No')
       }
     })
 
     it('action_no_option_uses_no_for_label_and_text', () => {
-      const result = suggestReply('Run the build?')
+      const result = suggestReply('Summarize the thread?')
       expect(result?.kind).toBe('options')
       if (result?.kind === 'options') {
         expect(result.options[1]).toEqual({ label: 'No', text: 'No' })
@@ -291,6 +361,21 @@ describe('suggestReply', () => {
       expect(suggestReply('Should I push?')).toBeNull()
       expect(suggestReply('Can you fix it?')).toBeNull()
       expect(suggestReply('Would you like me to deploy?')).toBeNull()
+    })
+
+    it('rejects_consequential_imperatives_for_action_yes_no', () => {
+      expect(suggestReply('Push 33 commits?')).toBeNull()
+      expect(suggestReply('Commit and push?')).toBeNull()
+      expect(suggestReply('Run the build?')).toBeNull()
+    })
+
+    it('rejects_deny_word_inflections_for_action_yes_no', () => {
+      expect(suggestReply('Commit these changes?')).toBeNull()
+      expect(suggestReply('Done. Deploying now?')).toBeNull()
+      expect(suggestReply('Redeploy now?')).toBeNull()
+      expect(suggestReply('Sync the notes?')).toBeNull()
+      expect(suggestReply('Reset the filter?')).toBeNull()
+      expect(suggestReply('Remove the typo?')).toBeNull()
     })
   })
 

@@ -144,7 +144,7 @@ const EXPLAIN_STOP = new Set([
   'once', 'via', 'using', 'with', 'on', 'in', 'into', 'for', 'from', 'as', 'well', 'followed',
   'it', 'them', 'this', 'that', 'all', 'every', 'each', 'now',
 ])
-const DENY_WORD = /^(?:push|delete|remove|drop|deploy|ship|merge|pay|send|post|rm|run|migrate|apply|wipe|reset|force|publish|sync|overwrite|commit|rebase|revert|execute|approve|install|kill|purge|trash|erase|truncate)(?:s|es|d|ed|ing)?$/i
+const DENY_WORD = /^(?:push|delete|remove|drop|redeploy(?:s|ed|ing)?|deploy|ship|merge|pay|send|post|rm|run|migrate|apply|wipe|reset|force|publish|sync|overwrite|commit|rebase|revert|execute|approve|install|kill|purge|trash|erase|truncate)(?:s|es|d|ed|ing)?$/i
 const DENY_ING = /^(?:delet|remov|merg|migrat|wip|approv|execut|purg|eras|truncat|runn|dropp|shipp|committ)ing$/i
 const LANGUAGES = new Set([
   'english', 'french', 'spanish', 'german', 'italian', 'portuguese', 'dutch',
@@ -502,7 +502,7 @@ export function suppressesReply(text: string): boolean {
   return looksSecret(text) || looksDangerousCommand(text)
 }
 
-function isDenyWord(word: string): boolean {
+export function isDenyWord(word: string): boolean {
   return DENY_WORD.test(word) || DENY_ING.test(word)
 }
 
@@ -516,7 +516,7 @@ function countsAsExplainDeny(parts: string[], index: number): boolean {
   return previous !== undefined && !/^(?:the|a|an|how|why|what)$/.test(previous)
 }
 
-function clauseWords(action: string): string[] {
+export function clauseWords(action: string): string[] {
   const prepared = prepareText(action)
     .replace(/^(?:yes|ready)\s*[—–-]\s*/i, '')
     .toLowerCase()

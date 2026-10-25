@@ -18,7 +18,14 @@
  * reading a question the agent already asked.
  */
 
-import { predictedCompletion, suppressesReply } from './consequentialAsk'
+import {
+  clauseWords,
+  isConsequentialAsk,
+  isDenyWord,
+  looksSecret,
+  predictedCompletion,
+  suppressesReply,
+} from './consequentialAsk'
 
 /** One pill. */
 export interface ReplyOption {
@@ -92,7 +99,7 @@ export function suggestReply(agentMessage: string): ReplySuggestion | null {
       return orOptions
     }
 
-    const actionOptions = tryExtractActionYesNo(withoutQuestion)
+    const actionOptions = tryExtractActionYesNo(withoutQuestion, trimmed)
     if (actionOptions !== null) {
       return actionOptions
     }
@@ -279,32 +286,49 @@ function tryExtractBulletOptions(text: string): ReplySuggestion | null {
  * is already in imperative form. Return null if uncertain.
  * Negative option is always "No".
  */
-function tryExtractActionYesNo(text: string): ReplySuggestion | null {
+function tryExtractActionYesNo(text: string, fullMessage: string): ReplySuggestion | null {
+  const normalized = text.trim()
+  const sentence = lastSentenceOf(`${normalized}?`).replace(/[?!]+$/, '').trim()
+  if (sentence.length < 3) return null
+
+  const echoesWholeMessage = sentence !== normalized
+  if (echoesWholeMessage) {
+    if (multiSentenceEchoTailUnsafe(sentence, normalized)) return null
+    const question = `${sentence}?`
+    // Consent on the last sentence is a Tab completion, not a yes/no pill echo.
+    if (predictedCompletion(question, fullMessage)) return null
+  }
+
   // Must NOT contain " or " — that's handled by tryExtractOrOptions
-  if (text.includes(' or ')) {
+  if (normalized.includes(' or ') || sentence.includes(' or ')) {
     return null
   }
 
-  // Must NOT be a numbered or bulleted list
-  if (/\d+\./.test(text) || /^[-*•]\s+/.test(text)) {
+  // Must NOT be a numbered or bulleted list (check the whole offer, not only the tail)
+  if (/\d+\./.test(normalized) || /^[-*•]\s+/.test(normalized) || /\n[-*•]\s+/.test(normalized)) {
     return null
   }
 
   // Reject open questions (what, how, why, when, where, who, which, etc.)
   const openQuestionStart =
     /^(what|how|why|when|where|who|which|whose|can you|could you|would you|should you|want me|should i|shall i|would i|any\s)/i
-  if (openQuestionStart.test(text)) {
+  if (openQuestionStart.test(sentence)) {
     return null
   }
 
-  // Check if it's too short or too long
-  if (text.length < 3 || text.length > MAX_OPTION_LENGTH) {
+  if (sentence.length > MAX_OPTION_LENGTH) {
     return null
   }
 
-  // At this point, if it doesn't match exclusion patterns and is a reasonable length,
-  // treat it as an imperative action question.
-  const affirmativeLabel = text
+  if (
+    looksSecret(sentence)
+    || isConsequentialAsk(sentence)
+    || clauseWords(sentence).some(isDenyWord)
+  ) {
+    return null
+  }
+
+  const affirmativeLabel = sentence
   return {
     kind: 'options',
     options: [
@@ -312,4 +336,25 @@ function tryExtractActionYesNo(text: string): ReplySuggestion | null {
       { label: 'No', text: 'No' }
     ]
   }
+}
+
+const ABBREVIATION_BEFORE_TAIL =
+  /\b(?:e\.g|i\.e|etc|vs|Mr|Mrs|Ms|Dr|St|Jr|Sr)\.$/i
+
+const LOWERCASE_ABBREV_BEFORE_TAIL = /\b(?:approx|dept|est|fig|inc|misc|no|pt|ref|vol)\.$/i
+
+const TAIL_STARTS_WITH_CAPITAL_OR_DIGIT = /^["'(]?[\p{Lu}\p{N}]/u
+
+/** False split from `lastSentenceOf` on abbreviations, code ticks, or bad tails. */
+function multiSentenceEchoTailUnsafe(sentence: string, normalized: string): boolean {
+  if (!TAIL_STARTS_WITH_CAPITAL_OR_DIGIT.test(sentence)) return true
+  const prefix = normalized.slice(0, normalized.length - sentence.length).trimEnd()
+  if (ABBREVIATION_BEFORE_TAIL.test(prefix)) return true
+  if (/(?:^|\s)[A-Z]\.$/.test(prefix)) return true
+  if (/\s[A-Z][a-z]{0,4}\.$/.test(prefix)) return true
+  if (/\b[A-Z](?:\.[A-Z])+\.$/.test(prefix)) return true
+  if (LOWERCASE_ABBREV_BEFORE_TAIL.test(prefix)) return true
+  const backticks = sentence.match(/`/g)?.length ?? 0
+  if (backticks % 2 === 1) return true
+  return false
 }
