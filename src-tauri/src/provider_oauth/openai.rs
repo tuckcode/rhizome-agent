@@ -634,6 +634,10 @@ mod tests {
         /// Rejects the rotated access token so a refresh cannot be saved.
         reject_rotated: bool,
         fail_first_rotated: std::sync::atomic::AtomicBool,
+        /// Fails every rotated write after the first, so the profile save
+        /// after a good token save can fail on its own.
+        fail_second_rotated: bool,
+        rotated_writes: std::sync::atomic::AtomicU32,
     }
 
     impl Keys {
@@ -642,6 +646,8 @@ mod tests {
                 values: Mutex::new(HashMap::new()),
                 reject_rotated: false,
                 fail_first_rotated: std::sync::atomic::AtomicBool::new(false),
+                fail_second_rotated: false,
+                rotated_writes: std::sync::atomic::AtomicU32::new(0),
             }
         }
     }
@@ -652,10 +658,12 @@ mod tests {
         }
 
         fn set(&self, account: &str, value: &str) -> Result<(), String> {
-            if value.contains(ACCESS_2)
-                && (self.reject_rotated || self.fail_first_rotated.swap(false, Ordering::SeqCst))
-            {
-                return Err("keychain write failed".into());
+            if value.contains(ACCESS_2) {
+                let index = self.rotated_writes.fetch_add(1, Ordering::SeqCst);
+                let fail_first = self.fail_first_rotated.swap(false, Ordering::SeqCst);
+                if self.reject_rotated || fail_first || (self.fail_second_rotated && index >= 1) {
+                    return Err("keychain write failed".into());
+                }
             }
             self.values
                 .lock()
@@ -690,6 +698,8 @@ mod tests {
         RefreshJwksFails,
         SubjectMismatch,
         RevokeFails,
+        EmptyAccess,
+        SameAccess,
     }
 
     impl Mock {
@@ -868,7 +878,11 @@ mod tests {
             _ => "openid profile email offline_access resource.invoke chatgpt.tokens.use.direct",
         };
         let refreshing = body.contains("grant_type=refresh_token");
-        let (access, refresh) = if refreshing {
+        let (access, refresh) = if refreshing && matches!(mode, Mode::SameAccess) {
+            (ACCESS, REFRESH)
+        } else if refreshing && matches!(mode, Mode::EmptyAccess) {
+            ("", REFRESH_2)
+        } else if refreshing {
             (ACCESS_2, REFRESH_2)
         } else {
             (ACCESS, REFRESH)
@@ -1507,6 +1521,125 @@ mod tests {
         assert!(stored.access_token.is_empty());
         assert!(stored.refresh_token.is_empty());
         assert_eq!(stored.client_id, CLIENT);
+        let revoke = mock
+            .requests
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|(target, _)| target.starts_with("/revoke"))
+            .map(|(_, body)| body.clone())
+            .unwrap_or_default();
+        assert!(revoke.contains(REFRESH_2), "{revoke}");
+    }
+
+    #[test]
+    fn an_empty_access_token_is_stored_so_the_next_call_refreshes() {
+        let mock = Mock::start(Mode::EmptyAccess);
+        let (_dir, env) = env_for(&mock);
+        signed_in(&env);
+        expire_for_refresh(&env);
+        let error = fresh_access_token_with(&env, "openai").unwrap_err();
+        assert_eq!(error, "The token request failed.");
+        let stored = load_record(&env, "openai").unwrap().unwrap();
+        assert!(stored.access_token.is_empty());
+        assert_eq!(stored.expires_at, 0);
+        let again = fresh_access_token_with(&env, "openai").unwrap_err();
+        assert_eq!(again, "The token request failed.");
+        let refresh_hits = mock
+            .requests
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(target, body)| {
+                target.starts_with("/token") && body.contains("grant_type=refresh_token")
+            })
+            .count();
+        assert_eq!(refresh_hits, 2);
+    }
+
+    #[test]
+    fn a_failed_profile_save_still_returns_the_token() {
+        let mock = Mock::start(Mode::Happy {
+            scope: DIRECT_SCOPE.into(),
+            delay_ms: 0,
+        });
+        let dir = tempfile::tempdir().unwrap();
+        let mut keys = Keys::new();
+        keys.fail_second_rotated = true;
+        let env = Env::in_dir_with(dir.path(), mock.endpoints(), Box::new(keys));
+        signed_in(&env);
+        expire_for_refresh(&env);
+        assert_eq!(fresh_access_token_with(&env, "openai").unwrap(), ACCESS_2);
+        assert_eq!(
+            load_record(&env, "openai").unwrap().unwrap().access_token,
+            ACCESS_2
+        );
+    }
+
+    #[test]
+    fn force_refresh_rejects_the_same_access_token() {
+        let mock = Mock::start(Mode::SameAccess);
+        let (_dir, env) = env_for(&mock);
+        signed_in(&env);
+        let error = super::super::force_refresh_with(&env, "openai", ACCESS).unwrap_err();
+        assert_eq!(error, SIGN_IN_AGAIN);
+        let refresh_hits = mock
+            .requests
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(target, body)| {
+                target.starts_with("/token") && body.contains("grant_type=refresh_token")
+            })
+            .count();
+        assert_eq!(refresh_hits, 1);
+        let stored = load_record(&env, "openai").unwrap().unwrap();
+        assert_eq!(stored.access_token, ACCESS);
+    }
+
+    #[test]
+    fn two_force_refreshes_for_one_rejected_token_refresh_once() {
+        let mock = Mock::start(Mode::Happy {
+            scope: DIRECT_SCOPE.into(),
+            delay_ms: 250,
+        });
+        let (_dir, env) = env_for(&mock);
+        let env = Arc::new(env);
+        signed_in(&env);
+        let left_env = Arc::clone(&env);
+        let right_env = Arc::clone(&env);
+        let left = std::thread::spawn(move || {
+            super::super::force_refresh_with(&left_env, "openai", ACCESS)
+        });
+        let right = std::thread::spawn(move || {
+            super::super::force_refresh_with(&right_env, "openai", ACCESS)
+        });
+        assert_eq!(left.join().unwrap().unwrap(), ACCESS_2);
+        assert_eq!(right.join().unwrap().unwrap(), ACCESS_2);
+        let refresh_hits = mock
+            .requests
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(target, body)| {
+                target.starts_with("/token") && body.contains("grant_type=refresh_token")
+            })
+            .count();
+        assert_eq!(refresh_hits, 1);
+    }
+
+    #[test]
+    fn force_refresh_asks_again_before_the_token_is_due() {
+        let mock = Mock::start(Mode::Happy {
+            scope: DIRECT_SCOPE.into(),
+            delay_ms: 0,
+        });
+        let (_dir, env) = env_for(&mock);
+        signed_in(&env);
+        assert_eq!(
+            super::super::force_refresh_with(&env, "openai", ACCESS).unwrap(),
+            ACCESS_2
+        );
     }
 
     #[test]

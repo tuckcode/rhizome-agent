@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::OnceLock;
 
+pub(crate) mod openai_responses;
 mod openai_stream;
 #[cfg(test)]
 pub(crate) mod test_server;
@@ -1059,7 +1060,14 @@ fn api_key_from_env_with_lookup(
     })
 }
 
-fn api_key_from_provider(request: &AiModelStreamRequest) -> Result<Option<String>, String> {
+/// Official host for a ChatGPT sign-in token. Anything else is refused.
+pub(crate) const OPENAI_API_V1: &str = "https://api.openai.com/v1";
+
+pub(crate) const CHATGPT_TOKEN_WRONG_HOST: &str = "ChatGPT sign-in only calls https://api.openai.com/v1. This provider points somewhere else, so the sign-in token was not sent.";
+
+pub(crate) fn api_key_from_provider(
+    request: &AiModelStreamRequest,
+) -> Result<Option<String>, String> {
     if let Some(api_key) = request
         .api_key_override
         .as_deref()
@@ -1069,7 +1077,13 @@ fn api_key_from_provider(request: &AiModelStreamRequest) -> Result<Option<String
         return Ok(Some(api_key));
     }
 
-    if crate::provider_oauth::provider_is_signed_in_chatgpt(&request.provider.id) {
+    if request.provider.kind == AiModelProviderKind::OpenAi
+        && crate::provider_oauth::provider_is_signed_in_chatgpt(&request.provider.id)
+    {
+        let base = provider_base_url(&request.provider)?;
+        if base != OPENAI_API_V1 {
+            return Err(CHATGPT_TOKEN_WRONG_HOST.into());
+        }
         return crate::provider_oauth::fresh_access_token(
             crate::provider_oauth::BUILTIN_OPENAI_PROVIDER_ID,
         )
@@ -1260,6 +1274,7 @@ mod tests {
         );
         let mut openai = provider(AiModelProviderKind::OpenAi);
         openai.id = "openai".into();
+        openai.base_url = Some(OPENAI_API_V1.into());
         openai.api_key_env_var = None;
         openai.api_key_storage = Some(AiModelApiKeyStorage::LocalFile);
         let mut openai_request = request(openai);
@@ -1275,6 +1290,14 @@ mod tests {
             api_key_from_provider(&openai_request).unwrap().as_deref(),
             Some("sk-override")
         );
+        openai_request.api_key_override = None;
+        openai_request.provider.base_url = Some("https://evil.example/v1".into());
+        let refused = api_key_from_provider(&openai_request).unwrap_err();
+        assert_eq!(refused, CHATGPT_TOKEN_WRONG_HOST);
+        assert!(!refused.contains("oat-secret-access"));
+        assert!(!crate::provider_oauth::provider_is_signed_in_chatgpt(
+            " OpenAI"
+        ));
 
         let mut custom = provider(AiModelProviderKind::OpenAiCompatible);
         custom.id = "my-gateway".into();
