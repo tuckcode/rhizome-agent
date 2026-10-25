@@ -69,7 +69,7 @@ fs4 = "0.8"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 # ID-token checks for Sign in with ChatGPT. JWKS RSA keys in, claims out.
 # MIT. No live call in tests: the suite signs tokens locally.
-jsonwebtoken = "9"
+jsonwebtoken = "10"
 tauri-plugin-deep-link = "2.4.9"
 tauri-plugin-single-instance = { version = "2.4.2", features = ["deep-link"] }
 tantivy = "0.22.1"
