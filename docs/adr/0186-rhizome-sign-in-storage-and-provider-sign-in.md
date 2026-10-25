@@ -25,6 +25,18 @@ supersedes: "0176 (sign-in part only)"
 
 **Builder:** G-baby (changed from Dank.bot on 2026-10-24, when knispo approved Julian's four-PR sign-in plan in Builders). v1 keeps one signed-in account per provider; switching accounts is sign out, then sign in.
 
+## Rev 2 (2026-10-24): implementation rules for the sign-in PRs
+
+knispo approved Julian's four-PR plan in Builders ("go", 2026-10-24 1:07 PM CT). These rules bind PRs 1 to 4 (#264, #265 and their follow-ups):
+
+1. **ChatGPT chat uses the Responses API** with `store: false`, `stream: true` and `include: ["reasoning.encrypted_content"]`. A turn is done only at `response.completed`.
+2. **ChatGPT login registers through `dynamic_agent_client`**, which returns Rhizome's own `oaiapp_` id. No borrowed client id and no fixed port 1455; the loopback listener takes any free port.
+3. **Refresh is single-flight** (an in-process mutex plus a file lock). The rotated token pair is saved before it is used. `invalid_grant` shows "Sign in again". A token that expires mid-stream refreshes once, and only before any output has streamed.
+4. **Reasoning replay** between tool steps is kept per chat and cleared when the chat closes.
+5. **Accounts:** one account per provider. Sign-out revokes the token. Each sign-in has its own on/off setting, and the API key path always keeps working.
+6. **xAI login (PR 4)** follows decision 3: a preview on the Grok CLI's public client id, which is a setting, with the API key as the fallback.
+7. **Tests and redaction:** CI uses only a mock OAuth server and a mock Responses stream, with no live provider calls. Tokens are redacted from logs, Sentry and error messages, and a test proves it. A sign-in PR that breaks either rule is held.
+
 ## Provider terms (checked 2026-10-16)
 
 | Provider | Works | Allowed by current terms | Client registration |
