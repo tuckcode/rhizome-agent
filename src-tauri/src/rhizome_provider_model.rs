@@ -62,23 +62,36 @@ pub(crate) fn chat_transport(kind: ChatAuthKind) -> ChatTransport {
     }
 }
 
-/// Signed-in ChatGPT uses the Responses client. Every other provider
-/// stays on chat completions.
+/// Signed-in ChatGPT uses the Responses client. That is the built-in
+/// OpenAI row (`kind` OpenAI and id exactly `openai`) with a usable
+/// sign-in. Every other provider stays on chat completions.
 pub(crate) fn chat_auth_kind_for_provider(
     provider: &crate::ai_models::AiModelProvider,
 ) -> ChatAuthKind {
-    chat_auth_kind(crate::provider_oauth::provider_is_signed_in_chatgpt(
-        &provider.id,
-    ))
+    chat_auth_kind(signed_in_builtin_openai(provider))
 }
 
-/// Signed-in ChatGPT uses a fresh OAuth access token. Every other provider
-/// uses its API key. `api_key_override` is not the ChatGPT bearer.
+/// Kind OpenAI and the exact built-in id, with a usable ChatGPT sign-in.
+fn signed_in_builtin_openai(provider: &crate::ai_models::AiModelProvider) -> bool {
+    provider.kind == crate::ai_models::AiModelProviderKind::OpenAi
+        && crate::provider_oauth::provider_is_signed_in_chatgpt(&provider.id)
+}
+
+/// Signed-in ChatGPT uses a fresh OAuth access token, and only for
+/// `https://api.openai.com/v1`. A row that points somewhere else is refused.
+/// The token is not sent there. A provider that is not signed in uses
+/// `api_key_from_provider`, which does honor `api_key_override`.
 fn responses_bearer(
     request: &crate::ai_models::AiModelStreamRequest,
 ) -> Result<String, crate::model_events::ModelError> {
-    let token = if crate::provider_oauth::provider_is_signed_in_chatgpt(&request.provider.id) {
-        crate::provider_oauth::fresh_access_token(&request.provider.id)
+    let token = if signed_in_builtin_openai(&request.provider) {
+        match crate::ai_models::provider_base_url(&request.provider) {
+            Ok(base) if base == crate::ai_models::OPENAI_API_V1 => {
+                crate::provider_oauth::fresh_access_token(&request.provider.id)
+            }
+            Ok(_) => Err(crate::ai_models::CHATGPT_TOKEN_WRONG_HOST.to_string()),
+            Err(error) => Err(error),
+        }
     } else {
         match crate::ai_models::api_key_from_provider(request) {
             Ok(Some(key)) => Ok(key),
@@ -274,28 +287,21 @@ impl Model for ProviderModel {
                                 return;
                             }
                         };
-                        let base_url = match crate::ai_models::provider_base_url(&request.provider)
-                        {
-                            Ok(url) => url,
-                            Err(message) => {
-                                let _ =
-                                    emit_step(ModelEvent::Error(crate::model_events::ModelError {
-                                        kind: crate::model_events::ModelErrorKind::Rejected,
-                                        status: None,
-                                        message,
-                                    }));
-                                return;
-                            }
-                        };
+                        // The bearer was issued only because this row's host
+                        // is the official one. Pin the call to that host.
+                        let base_url = crate::ai_models::OPENAI_API_V1;
                         let (system_prefix, reasoning_effort) = responses_turn_fields(&extras);
                         let provider_id = request.provider.id.clone();
+                        let failed_token = token.clone();
                         let mut auth = crate::ai_models::openai_responses::BearerSession::new(
                             token,
-                            move || crate::provider_oauth::force_refresh(&provider_id),
+                            move || {
+                                crate::provider_oauth::force_refresh(&provider_id, &failed_token)
+                            },
                         );
                         crate::ai_models::openai_responses::stream_chatgpt_turn(
                             &crate::ai_models::openai_responses::ChatGptTurn {
-                                base_url: &base_url,
+                                base_url,
                                 model: &request.model_id,
                                 instructions: request.system_prompt.as_deref(),
                                 system_prefix: system_prefix.as_deref(),
@@ -619,6 +625,63 @@ mod tests {
         let (prefix, effort) = responses_turn_fields(&extras);
         assert_eq!(prefix.as_deref(), Some("Prefix"));
         assert_eq!(effort.as_deref(), Some("medium"));
+    }
+
+    fn openai_request(kind: &str, id: &str, base_url: &str) -> AiModelStreamRequest {
+        serde_json::from_value(json!({
+            "provider": {
+                "id": id,
+                "name": "OpenAI",
+                "kind": kind,
+                "base_url": base_url,
+                "api_key_storage": "none",
+                "models": [{
+                    "id": "gpt-6.1-sol",
+                    "capabilities": {
+                        "streaming": true,
+                        "tools": true,
+                        "vision": false,
+                        "json_mode": false,
+                        "reasoning": false
+                    }
+                }]
+            },
+            "model_id": "gpt-6.1-sol",
+            "message": ""
+        }))
+        .expect("openai request")
+    }
+
+    #[test]
+    fn signed_in_openai_uses_the_oauth_token_and_refuses_another_host() {
+        let _guard = crate::provider_oauth::test_support::install_usable_sign_in(
+            "openai",
+            "oat-secret-access",
+        );
+        let mut official = openai_request("open_ai", "openai", "https://api.openai.com/v1");
+        official.api_key_override = Some("sk-override".into());
+        assert_eq!(
+            chat_auth_kind_for_provider(&official.provider),
+            ChatAuthKind::SignedInChatGpt
+        );
+        let token = responses_bearer(&official).expect("oauth bearer");
+        assert_eq!(token, "oat-secret-access");
+
+        let compatible =
+            openai_request("open_ai_compatible", "openai", "https://api.openai.com/v1");
+        assert_eq!(
+            chat_auth_kind_for_provider(&compatible.provider),
+            ChatAuthKind::ApiKey
+        );
+
+        let edited = openai_request("open_ai", "openai", "https://evil.example/v1");
+        assert_eq!(
+            chat_auth_kind_for_provider(&edited.provider),
+            ChatAuthKind::SignedInChatGpt
+        );
+        let error = responses_bearer(&edited).expect_err("wrong host");
+        assert_eq!(error.message, crate::ai_models::CHATGPT_TOKEN_WRONG_HOST);
+        assert!(!error.message.contains("oat-secret-access"));
     }
 
     fn view(admitted: &str, history: Vec<HistoryItem>) -> ModelView {

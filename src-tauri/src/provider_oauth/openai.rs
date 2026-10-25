@@ -1581,7 +1581,7 @@ mod tests {
         let mock = Mock::start(Mode::SameAccess);
         let (_dir, env) = env_for(&mock);
         signed_in(&env);
-        let error = super::super::force_refresh_with(&env, "openai").unwrap_err();
+        let error = super::super::force_refresh_with(&env, "openai", ACCESS).unwrap_err();
         assert_eq!(error, SIGN_IN_AGAIN);
         let refresh_hits = mock
             .requests
@@ -1598,6 +1598,37 @@ mod tests {
     }
 
     #[test]
+    fn two_force_refreshes_for_one_rejected_token_refresh_once() {
+        let mock = Mock::start(Mode::Happy {
+            scope: DIRECT_SCOPE.into(),
+            delay_ms: 250,
+        });
+        let (_dir, env) = env_for(&mock);
+        let env = Arc::new(env);
+        signed_in(&env);
+        let left_env = Arc::clone(&env);
+        let right_env = Arc::clone(&env);
+        let left = std::thread::spawn(move || {
+            super::super::force_refresh_with(&left_env, "openai", ACCESS)
+        });
+        let right = std::thread::spawn(move || {
+            super::super::force_refresh_with(&right_env, "openai", ACCESS)
+        });
+        assert_eq!(left.join().unwrap().unwrap(), ACCESS_2);
+        assert_eq!(right.join().unwrap().unwrap(), ACCESS_2);
+        let refresh_hits = mock
+            .requests
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(target, body)| {
+                target.starts_with("/token") && body.contains("grant_type=refresh_token")
+            })
+            .count();
+        assert_eq!(refresh_hits, 1);
+    }
+
+    #[test]
     fn force_refresh_asks_again_before_the_token_is_due() {
         let mock = Mock::start(Mode::Happy {
             scope: DIRECT_SCOPE.into(),
@@ -1606,7 +1637,7 @@ mod tests {
         let (_dir, env) = env_for(&mock);
         signed_in(&env);
         assert_eq!(
-            super::super::force_refresh_with(&env, "openai").unwrap(),
+            super::super::force_refresh_with(&env, "openai", ACCESS).unwrap(),
             ACCESS_2
         );
     }

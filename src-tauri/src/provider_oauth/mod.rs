@@ -157,9 +157,13 @@ pub(crate) fn fresh_access_token(provider: &str) -> Result<String, String> {
 /// Refreshes even when the saved access token is still inside its window.
 /// The same access token coming back is a failure: the caller must not
 /// retry a request with the token that just expired.
-pub(crate) fn force_refresh(provider: &str) -> Result<String, String> {
+///
+/// `failed_token` is the bearer that was just rejected. Under the refresh
+/// lock, a stored token that already differs from it is returned as-is, so
+/// parallel failures share one refresh.
+pub(crate) fn force_refresh(provider: &str, failed_token: &str) -> Result<String, String> {
     let env = current()?;
-    access_token_with(&env, provider, true)
+    access_token_with(&env, provider, true, failed_token)
 }
 
 fn current() -> Result<Arc<Env>, String> {
@@ -239,15 +243,24 @@ fn config_dir() -> Result<PathBuf, String> {
 }
 
 pub(crate) fn fresh_access_token_with(env: &Env, provider: &str) -> Result<String, String> {
-    access_token_with(env, provider, false)
+    access_token_with(env, provider, false, "")
 }
 
 #[cfg(test)]
-pub(crate) fn force_refresh_with(env: &Env, provider: &str) -> Result<String, String> {
-    access_token_with(env, provider, true)
+pub(crate) fn force_refresh_with(
+    env: &Env,
+    provider: &str,
+    failed_token: &str,
+) -> Result<String, String> {
+    access_token_with(env, provider, true, failed_token)
 }
 
-fn access_token_with(env: &Env, provider: &str, force: bool) -> Result<String, String> {
+fn access_token_with(
+    env: &Env,
+    provider: &str,
+    force: bool,
+    failed_token: &str,
+) -> Result<String, String> {
     let provider = normalize_provider(provider)?;
     let _lock = lock_refresh(env)?;
     let Some(record) = load_record(env, &provider)? else {
@@ -269,6 +282,9 @@ fn access_token_with(env: &Env, provider: &str, force: bool) -> Result<String, S
     }
     let previous_access = record.access_token.clone();
     let remaining = record.expires_at.saturating_sub(unix_now());
+    if force && !previous_access.is_empty() && previous_access != failed_token {
+        return Ok(previous_access);
+    }
     if !force && !previous_access.is_empty() && remaining > REFRESH_WINDOW_SECS {
         return Ok(previous_access);
     }
@@ -487,9 +503,10 @@ pub(super) fn unix_now() -> i64 {
 /// under this id. A custom OpenAI-compatible provider keeps its API key.
 pub const BUILTIN_OPENAI_PROVIDER_ID: &str = "openai";
 
-/// True when `provider_id` is the built-in OpenAI provider, ChatGPT sign-in
-/// is switched on, and the keychain holds a usable token. PR 2 calls this
-/// to choose the Responses API. Custom providers never match.
+/// True when `provider_id` is exactly `openai`, ChatGPT sign-in is switched
+/// on, and the keychain holds a usable token. The caller also requires
+/// provider kind OpenAI before it attaches this token. A different id,
+/// including one that only matches after trim or lowercase, does not.
 pub fn provider_is_signed_in_chatgpt(provider_id: &str) -> bool {
     current()
         .map(|env| provider_is_signed_in_with(&env, provider_id))
@@ -497,13 +514,12 @@ pub fn provider_is_signed_in_chatgpt(provider_id: &str) -> bool {
 }
 
 pub(crate) fn provider_is_signed_in_with(env: &Env, provider_id: &str) -> bool {
-    let Ok(id) = normalize_provider(provider_id) else {
-        return false;
-    };
-    if id != BUILTIN_OPENAI_PROVIDER_ID || !provider_enabled(env, &id) {
+    // Exact id. Trim and lowercase would treat " OpenAI" as the built-in row
+    // and hand it the ChatGPT token.
+    if provider_id != BUILTIN_OPENAI_PROVIDER_ID || !provider_enabled(env, provider_id) {
         return false;
     }
-    let Ok(Some(record)) = load_record(env, &id) else {
+    let Ok(Some(record)) = load_record(env, provider_id) else {
         return false;
     };
     !record.access_token.is_empty()

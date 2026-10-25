@@ -78,21 +78,29 @@ where
     R: FnMut() -> Result<String, String>,
 {
     /// Remembers the first attempt. A second call in the same turn does nothing.
-    fn refresh_once(&mut self) -> bool {
+    /// The callback's error is kept. An empty token means the sign-in is gone.
+    fn refresh_once(&mut self) -> Result<(), String> {
         if self.tried_refresh {
-            return false;
+            return Err(SIGN_IN_AGAIN.to_string());
         }
         self.tried_refresh = true;
         match (self.refresh)() {
             Ok(token) => {
                 let token = token.trim().to_string();
                 if token.is_empty() {
-                    return false;
+                    return Err(SIGN_IN_AGAIN.to_string());
                 }
                 self.token = token;
-                true
+                Ok(())
             }
-            Err(_) => false,
+            Err(error) => {
+                let error = error.trim().to_string();
+                if error.is_empty() {
+                    Err(SIGN_IN_AGAIN.to_string())
+                } else {
+                    Err(error)
+                }
+            }
         }
     }
 }
@@ -176,12 +184,13 @@ pub(crate) fn stream_chatgpt_turn<R>(
             emit,
         ) {
             PostResult::Done => return,
-            PostResult::Retry => {
-                if !auth.refresh_once() {
-                    let _ = emit(ModelEvent::Error(sign_in_again(None)));
+            PostResult::Retry => match auth.refresh_once() {
+                Ok(()) => {}
+                Err(message) => {
+                    let _ = emit(ModelEvent::Error(refresh_failure(message)));
                     return;
                 }
-            }
+            },
         }
     }
     let _ = emit(ModelEvent::Error(sign_in_again(None)));
@@ -1261,6 +1270,24 @@ fn quota_code_in_text(body: &str) -> Option<(&'static str, ModelErrorKind)> {
         .and_then(|code| plain_quota_message(code))
 }
 
+/// A refresh failure keeps its own words. Sign-in-again is only the case
+/// where the sign-in itself is gone. A token-endpoint or network failure
+/// stays a temporary error.
+fn refresh_failure(message: String) -> ModelError {
+    let auth = message == SIGN_IN_AGAIN
+        || message == crate::provider_oauth::NOT_USABLE
+        || message == crate::provider_oauth::TURNED_OFF;
+    model_error(
+        if auth {
+            ModelErrorKind::Auth
+        } else {
+            ModelErrorKind::Unavailable
+        },
+        None,
+        message,
+    )
+}
+
 fn sign_in_again(status: Option<u16>) -> ModelError {
     model_error(ModelErrorKind::Auth, status, SIGN_IN_AGAIN)
 }
@@ -2095,7 +2122,8 @@ mod tests {
             &turn(&server.base_url, None, &messages, &[], ""),
             &mut denied,
         );
-        assert_eq!(error_of(&events).message, SIGN_IN_AGAIN);
+        assert_eq!(error_of(&events).message, "nope");
+        assert_ne!(error_of(&events).message, SIGN_IN_AGAIN);
         let mut blank = BearerSession::new("old", || Ok("   ".into()));
         let events = collect(
             &turn(&server.base_url, None, &messages, &[], ""),
@@ -2156,6 +2184,24 @@ mod tests {
             },
         );
         assert_eq!(events, vec![text("Hello")]);
+    }
+
+    #[test]
+    fn a_token_endpoint_failure_stays_a_temporary_error() {
+        let server = serve(vec![json_response(
+            "401 Unauthorized",
+            r#"{"error":{"code":"invalid_api_key"}}"#,
+        )]);
+        let messages = vec![json!({"role": "user", "content": "Hi"})];
+        let mut session = BearerSession::new("old", || Err("The token request failed.".into()));
+        let events = collect(
+            &turn(&server.base_url, None, &messages, &[], ""),
+            &mut session,
+        );
+        let error = error_of(&events);
+        assert_eq!(error.kind, ModelErrorKind::Unavailable);
+        assert_eq!(error.message, "The token request failed.");
+        assert_ne!(error.message, SIGN_IN_AGAIN);
     }
 
     #[test]
