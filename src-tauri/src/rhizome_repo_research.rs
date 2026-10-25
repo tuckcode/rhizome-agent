@@ -177,12 +177,13 @@ pub fn ensure_local_repo(
         )?;
     } else {
         on_line(&format!("Cloning {url}..."));
+        crate::git::validate_remote_url(url)?;
         if let Some(parent) = dir.parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|e| format!("Failed to create repo cache dir: {e}"))?;
         }
         crate::rhizome_commands::run_cli_streaming(
-            &["git", "clone", "--depth", "1", url, &dir_str],
+            &["git", "clone", "--depth", "1", "--", url, &dir_str],
             GIT_ENV,
             on_line,
         )?;
@@ -548,6 +549,28 @@ mod tests {
         assert_eq!(path, repo.path());
         assert!(lines.is_empty(), "local refs must not touch git: {lines:?}");
         assert!(!vault.path().join(".rhizome").exists());
+    }
+
+    #[test]
+    fn ensure_local_repo_rejects_dangerous_remote_url_before_git_clone() {
+        let vault = tempfile::tempdir().unwrap();
+        let reference = RepoReference::Remote {
+            url: "ext::sh -c 'touch /tmp/x'".into(),
+            slug: "evil-remote".into(),
+            display: "evil/remote".into(),
+        };
+        let err = ensure_local_repo(vault.path(), &reference, &mut |_| {}).unwrap_err();
+        assert!(
+            err.contains("unsupported transport"),
+            "validation must fail before git runs: {err}"
+        );
+        assert!(
+            !vault
+                .path()
+                .join(".rhizome/repo-cache/evil-remote")
+                .exists(),
+            "clone must not create cache dir when URL is rejected"
+        );
     }
 
     #[test]
