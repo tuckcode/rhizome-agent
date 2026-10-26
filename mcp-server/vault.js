@@ -31,12 +31,16 @@ export async function findMarkdownFiles(dir) {
 }
 
 async function collectMarkdownFilesUnder(vaultRoot, dir, visitedDirs) {
-  const dirReal = await resolveContainedPath(vaultRoot, dir)
+  let dirReal
+  try {
+    dirReal = await resolveContainedPath(vaultRoot, dir)
+  } catch {
+    return []
+  }
   if (!dirReal) return []
 
-  const visitKey = await directoryVisitKey(dirReal)
-  if (visitedDirs.has(visitKey)) return []
-  visitedDirs.add(visitKey)
+  if (visitedDirs.has(dirReal)) return []
+  visitedDirs.add(dirReal)
 
   const results = []
   let items
@@ -49,11 +53,6 @@ async function collectMarkdownFilesUnder(vaultRoot, dir, visitedDirs) {
     await collectMarkdownFile(results, vaultRoot, dirReal, item, visitedDirs)
   }
   return results
-}
-
-async function directoryVisitKey(dirReal) {
-  const st = await stat(dirReal)
-  return `${st.dev}:${st.ino}`
 }
 
 async function resolveVaultNotePath(vaultPath, notePath) {
