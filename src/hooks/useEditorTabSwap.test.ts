@@ -103,6 +103,38 @@ type SwapHarnessProps = {
   vaultPath?: string
 }
 
+function installRoundTripEditor(editor: ReturnType<typeof makeMockEditor>) {
+  editor.tryParseMarkdownToBlocks.mockImplementation((markdown: string) => [
+    makeTextParagraphBlock(markdown),
+  ])
+  editor.blocksToMarkdownLossy.mockImplementation((blocks?: unknown[]) => {
+    const source = (Array.isArray(blocks) ? blocks : editor.document) as Array<{
+      content?: Array<{ text?: string }>
+    }>
+    return source
+      .map(block => (block.content ?? []).map(part => part.text ?? '').join(''))
+      .join('\n')
+  })
+}
+
+async function editRichDocument(options: {
+  docRef: { current: unknown[] }
+  result: { current: { flushPendingEditorChange: () => boolean, handleEditorChange: () => void } }
+  text: string
+}) {
+  const { docRef, result, text } = options
+  docRef.current = [...docRef.current, makeTextParagraphBlock(text)]
+  act(() => {
+    result.current.handleEditorChange()
+    result.current.flushPendingEditorChange()
+  })
+}
+
+function savedNote(onContentChange: ReturnType<typeof vi.fn>, path: string): string {
+  const saves = onContentChange.mock.calls.filter(call => call[0] === path)
+  return String(saves.at(-1)?.[1] ?? '')
+}
+
 async function createSwapHarness(options: {
   initialProps: SwapHarnessProps
   onContentChange?: (path: string, content: string) => void
@@ -1148,6 +1180,56 @@ describe('useEditorTabSwap raw mode sync', () => {
     expect(mockEditor.tryParseMarkdownToBlocks).toHaveBeenCalledWith(
       expect.stringContaining('Edit 2'),
     )
+  })
+
+  it('keeps a raw edit when rich mode resumes after a tab swap away and back', async () => {
+    const onContentChange = vi.fn()
+    const tabA = makeTab('a.md', 'Note A')
+    const tabB = makeTab('b.md', 'Note B')
+    const rawEdited = {
+      ...tabA,
+      content: `${tabA.content}\nRAW-EDIT-MARKER`,
+    }
+    const { docRef, result, rerenderWith } = await createSwapHarness({
+      initialProps: { tabs: [tabA, tabB], activeTabPath: 'a.md', rawMode: false },
+      onContentChange,
+      setupEditor: installRoundTripEditor,
+    })
+
+    await rerenderWith({ rawMode: true })
+    await rerenderWith({ tabs: [rawEdited, tabB], rawMode: true })
+    await rerenderWith({ activeTabPath: 'b.md', rawMode: true })
+    await rerenderWith({ activeTabPath: 'a.md', rawMode: true })
+    await rerenderWith({ rawMode: false })
+    await editRichDocument({ docRef, result, text: 'RICH-EDIT' })
+
+    expect(savedNote(onContentChange, 'a.md')).toContain('RAW-EDIT-MARKER')
+    expect(savedNote(onContentChange, 'a.md')).toContain('RICH-EDIT')
+  })
+
+  it('keeps a raw edit when rich mode resumes on another tab before returning', async () => {
+    const onContentChange = vi.fn()
+    const tabA = makeTab('a.md', 'Note A')
+    const tabB = makeTab('b.md', 'Note B')
+    const rawEdited = {
+      ...tabA,
+      content: `${tabA.content}\nRAW-EDIT-MARKER`,
+    }
+    const { docRef, result, rerenderWith } = await createSwapHarness({
+      initialProps: { tabs: [tabA, tabB], activeTabPath: 'a.md', rawMode: false },
+      onContentChange,
+      setupEditor: installRoundTripEditor,
+    })
+
+    await rerenderWith({ rawMode: true })
+    await rerenderWith({ tabs: [rawEdited, tabB], rawMode: true })
+    await rerenderWith({ activeTabPath: 'b.md', rawMode: true })
+    await rerenderWith({ activeTabPath: 'b.md', rawMode: false })
+    await rerenderWith({ activeTabPath: 'a.md', rawMode: false })
+    await editRichDocument({ docRef, result, text: 'RICH-EDIT' })
+
+    expect(savedNote(onContentChange, 'a.md')).toContain('RAW-EDIT-MARKER')
+    expect(savedNote(onContentChange, 'a.md')).toContain('RICH-EDIT')
   })
 })
 

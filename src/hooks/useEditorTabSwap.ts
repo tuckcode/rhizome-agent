@@ -300,14 +300,31 @@ function cachePreviousTabOnPathChange(options: {
   prevPath: string | null
   previousTab: Tab | undefined
   pathChanged: boolean
+  rawModeJustEnded: boolean
   editorMountedRef: MutableRefObject<boolean>
   cache: Map<string, CachedTabState>
   editor: ReturnType<typeof useCreateBlockNote>
   editorContentPathRef: EditorContentPathRef
 }) {
-  const { prevPath, previousTab, pathChanged, editorMountedRef, cache, editor, editorContentPathRef } = options
+  const {
+    prevPath,
+    previousTab,
+    pathChanged,
+    rawModeJustEnded,
+    editorMountedRef,
+    cache,
+    editor,
+    editorContentPathRef,
+  } = options
   if (!prevPath || !previousTab || !pathChanged || !editorMountedRef.current) return
   if (editorContentPathRef.current !== prevPath) return
+  // Raw edits live in the tab markdown. The BlockNote document is still the
+  // pre-raw blocks, so pairing those blocks with the new markdown makes the
+  // next rich edit overwrite the raw text.
+  if (rawModeJustEnded) {
+    if (cache.get(prevPath)?.sourceContent !== previousTab.content) cache.delete(prevPath)
+    return
+  }
   cacheEditorState(cache, prevPath, {
     blocks: editor.document,
     scrollTop: readEditorScrollTop(),
@@ -327,6 +344,7 @@ function shouldWaitForActiveTab(options: {
 function syncActivePathTransition(options: {
   prevPath: string | null
   pathChanged: boolean
+  rawModeJustEnded: boolean
   activeTabPath: string | null
   activeTab: Tab | undefined
   previousTab: Tab | undefined
@@ -339,6 +357,7 @@ function syncActivePathTransition(options: {
   const {
     prevPath,
     pathChanged,
+    rawModeJustEnded,
     activeTabPath,
     activeTab,
     previousTab,
@@ -353,6 +372,7 @@ function syncActivePathTransition(options: {
     prevPath,
     previousTab,
     pathChanged,
+    rawModeJustEnded,
     editorMountedRef,
     cache,
     editor,
@@ -938,6 +958,7 @@ function shouldSkipScheduledTabSwap(options: {
   if (syncActivePathTransition({
     prevPath: state.prevPath,
     pathChanged: state.pathChanged,
+    rawModeJustEnded: state.rawModeJustEnded,
     activeTabPath,
     activeTab: state.activeTab,
     previousTab: state.previousTab,
