@@ -1412,4 +1412,233 @@ mod tests {
             fs::read_to_string(&marker).unwrap_or_default()
         );
     }
+
+    #[cfg(unix)]
+    #[test]
+    fn newline_in_filter_clean_does_not_forge_a_credential_helper() {
+        let _guard = GitConfigEnvGuard::isolated();
+        let repo = setup_git_repo();
+        let payload = "harmless\nglobal\tcredential.helper !/tmp/evil";
+        let wrote = git_command_in(Some(repo.path()))
+            .unwrap()
+            .args(["config", "filter.x.clean", payload])
+            .output()
+            .unwrap();
+        assert!(
+            wrote.status.success(),
+            "{}",
+            String::from_utf8_lossy(&wrote.stderr)
+        );
+        let args: Vec<String> = git_command_in(Some(repo.path()))
+            .unwrap()
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect();
+        assert!(
+            args.iter().all(|arg| !arg.contains("!/tmp/evil")),
+            "{args:?}"
+        );
+        assert!(args.iter().any(|arg| arg == "filter.x.clean="), "{args:?}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn trusted_lfs_filter_is_replayed_over_a_local_one() {
+        let dir = TempDir::new().unwrap();
+        let marker = dir.path().join("lfs-marker.txt");
+        let global_script = dir.path().join("lfs-global.sh");
+        let local_script = dir.path().join("lfs-local.sh");
+        write_executable(
+            &global_script,
+            &format!(
+                "#!/bin/sh\nprintf '%s\\n' global >> '{}'\ncat\n",
+                marker.display()
+            ),
+        );
+        write_executable(
+            &local_script,
+            &format!(
+                "#!/bin/sh\nprintf '%s\\n' local >> '{}'\ncat\n",
+                marker.display()
+            ),
+        );
+        let _guard = GitConfigEnvGuard::with_global_contents(&format!(
+            "[filter \"lfs\"]\n\tclean = {}\n\tsmudge = {}\n",
+            global_script.display(),
+            global_script.display()
+        ));
+        let repo = setup_git_repo();
+        let wrote = git_command_in(Some(repo.path()))
+            .unwrap()
+            .args([
+                "config",
+                "--local",
+                "filter.lfs.clean",
+                local_script.to_str().unwrap(),
+            ])
+            .output()
+            .unwrap();
+        assert!(
+            wrote.status.success(),
+            "{}",
+            String::from_utf8_lossy(&wrote.stderr)
+        );
+        fs::write(repo.path().join(".gitattributes"), "* filter=lfs\n").unwrap();
+        fs::write(repo.path().join("note.md"), "# lfs\n").unwrap();
+        let added = git_command_in(Some(repo.path()))
+            .unwrap()
+            .args(["add", "--", "note.md"])
+            .output()
+            .unwrap();
+        let text = fs::read_to_string(&marker).unwrap_or_default();
+        assert!(
+            added.status.success(),
+            "add failed: {} marker={text}",
+            String::from_utf8_lossy(&added.stderr)
+        );
+        assert!(text.lines().any(|line| line == "global"), "{text}");
+        assert!(!text.lines().any(|line| line == "local"), "{text}");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn local_alternate_refs_command_does_not_run_on_fetch() {
+        let _guard = GitConfigEnvGuard::isolated();
+        let repo = setup_git_repo();
+        let other = setup_git_repo();
+        fs::write(other.path().join("other.md"), "# other\n").unwrap();
+        git_command_in(Some(other.path()))
+            .unwrap()
+            .args(["add", "--", "other.md"])
+            .output()
+            .unwrap();
+        git_command_in(Some(other.path()))
+            .unwrap()
+            .args(["commit", "-m", "other"])
+            .output()
+            .unwrap();
+        let marker = repo.path().join("alternates-marker.txt");
+        let script = repo.path().join("alternates.sh");
+        write_executable(&script, &marker_script(&marker, "ran"));
+        fs::create_dir_all(repo.path().join(".git/objects/info")).unwrap();
+        fs::write(
+            repo.path().join(".git/objects/info/alternates"),
+            format!("{}/objects\n", other.path().join(".git").display()),
+        )
+        .unwrap();
+        git_command_in(Some(repo.path()))
+            .unwrap()
+            .args([
+                "config",
+                "core.alternateRefsCommand",
+                script.to_str().unwrap(),
+            ])
+            .output()
+            .unwrap();
+        let _ = git_command_in(Some(repo.path()))
+            .unwrap()
+            .args(["fetch", other.path().to_str().unwrap()])
+            .output();
+        assert!(
+            !marker.exists(),
+            "alternateRefsCommand ran: {}",
+            fs::read_to_string(&marker).unwrap_or_default()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn local_gpg_ssh_default_key_command_does_not_run_on_commit() {
+        let _guard = GitConfigEnvGuard::isolated();
+        let repo = setup_git_repo();
+        let marker = repo.path().join("gpg-ssh-marker.txt");
+        let script = repo.path().join("gpg-ssh.sh");
+        write_executable(&script, &marker_script(&marker, "ran"));
+        for (key, value) in [
+            ("gpg.format", "ssh"),
+            ("commit.gpgsign", "true"),
+            ("gpg.ssh.defaultKeyCommand", script.to_str().unwrap()),
+        ] {
+            let wrote = git_command_in(Some(repo.path()))
+                .unwrap()
+                .args(["config", key, value])
+                .output()
+                .unwrap();
+            assert!(wrote.status.success(), "{key}");
+        }
+        fs::write(repo.path().join("note.md"), "# note\n").unwrap();
+        let _ = git_commit(repo.path().to_str().unwrap(), "Sign");
+        assert!(
+            !marker.exists(),
+            "gpg.ssh.defaultKeyCommand ran: {}",
+            fs::read_to_string(&marker).unwrap_or_default()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn local_git_proxy_does_not_run_on_git_protocol_fetch() {
+        let _guard = GitConfigEnvGuard::isolated();
+        let repo = setup_git_repo();
+        let marker = repo.path().join("proxy-marker.txt");
+        let script = repo.path().join("proxy.sh");
+        write_executable(&script, &marker_script(&marker, "ran"));
+        git_command_in(Some(repo.path()))
+            .unwrap()
+            .args(["config", "core.gitProxy", script.to_str().unwrap()])
+            .output()
+            .unwrap();
+        let _ = git_command_in(Some(repo.path()))
+            .unwrap()
+            .args(["ls-remote", "git://127.0.0.1/no.git"])
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .output();
+        assert!(
+            !marker.exists(),
+            "core.gitProxy ran: {}",
+            fs::read_to_string(&marker).unwrap_or_default()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn local_ask_pass_does_not_run_when_http_demands_credentials() {
+        use std::io::{Read, Write};
+
+        let _guard = GitConfigEnvGuard::isolated();
+        let repo = setup_git_repo();
+        let marker = repo.path().join("askpass-marker.txt");
+        let script = repo.path().join("askpass.sh");
+        write_executable(&script, &marker_script(&marker, "ran"));
+        git_command_in(Some(repo.path()))
+            .unwrap()
+            .args(["config", "core.askPass", script.to_str().unwrap()])
+            .output()
+            .unwrap();
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            for _ in 0..4 {
+                let Ok((mut socket, _)) = listener.accept() else {
+                    break;
+                };
+                let mut buffer = [0_u8; 1024];
+                let _ = socket.read(&mut buffer);
+                let _ = socket.write_all(
+                    b"HTTP/1.1 401 Unauthorized\r\nWWW-Authenticate: Basic realm=\"x\"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                );
+            }
+        });
+        let url = format!("http://127.0.0.1:{port}/no.git");
+        let _ = git_command_in(Some(repo.path()))
+            .unwrap()
+            .args(["ls-remote", &url])
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .output();
+        assert!(
+            !marker.exists(),
+            "core.askPass ran: {}",
+            fs::read_to_string(&marker).unwrap_or_default()
+        );
+    }
 }
