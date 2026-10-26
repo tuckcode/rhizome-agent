@@ -49,6 +49,9 @@ function resolveLatestPath(renamedPaths: RenamedPathMap, path: string): string {
 
 function trackRenamedPath(renamedPaths: RenamedPathMap, oldPath: string, newPath: string): void {
   if (notePathsMatch(oldPath, newPath)) return
+  for (const trackedOldPath of [...renamedPaths.keys()]) {
+    if (notePathsMatch(trackedOldPath, newPath)) renamedPaths.delete(trackedOldPath)
+  }
   const latestPath = resolveLatestPath(renamedPaths, newPath)
   for (const [trackedOldPath, trackedNewPath] of renamedPaths) {
     if (notePathsMatch(trackedNewPath, oldPath)) renamedPaths.set(trackedOldPath, latestPath)

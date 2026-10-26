@@ -584,6 +584,59 @@ describe('useAppSave', () => {
     ])
   })
 
+  it('saves to the original path after renaming A->B->A', async () => {
+    vi.useFakeTimers()
+    vi.mocked(isTauri).mockReturnValue(true)
+
+    const pathA = '/vault/note-a.md'
+    const pathB = '/vault/note-b.md'
+    const entry = makeEntry(pathA, 'Note A', 'note-a.md')
+
+    vi.mocked(invoke).mockImplementation(async (command: string) => {
+      if (command === 'save_note_content_checked') return undefined
+      return undefined
+    })
+
+    deps.handleRenameFilename.mockImplementation(async (path, newFilenameStem, vaultPath, onEntryRenamed) => {
+      expect(vaultPath).toBe('/vault')
+      const nextPath = newFilenameStem === 'note-b' ? pathB : pathA
+      const nextFilename = newFilenameStem === 'note-b' ? 'note-b.md' : 'note-a.md'
+      onEntryRenamed(path, { path: nextPath, filename: nextFilename, title: 'Note A' }, '# Note A\n\nBody')
+    })
+
+    const { result } = renderSave({
+      tabs: [{ entry, content: '# Note A\n\nBody' }],
+      activeTabPath: pathA,
+      unsavedPaths: new Set([pathA]),
+    })
+
+    await act(async () => {
+      await result.current.handleFilenameRename(pathA, 'note-b')
+    })
+
+    await act(async () => {
+      await result.current.handleFilenameRename(pathB, 'note-a')
+    })
+
+    await act(async () => {
+      result.current.handleContentChange(pathA, '# Note A\n\nBody\n\nSaved after round trip')
+      await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS)
+    })
+
+    const saveCalls = vi.mocked(invoke).mock.calls.filter(([command]) => command === 'save_note_content_checked')
+    expect(saveCalls.at(-1)).toEqual([
+      'save_note_content_checked',
+      expect.objectContaining({
+        path: pathA,
+        content: '# Note A\n\nBody\n\nSaved after round trip',
+      }),
+    ])
+    expect(saveCalls).not.toContainEqual([
+      'save_note_content_checked',
+      expect.objectContaining({ path: pathB }),
+    ])
+  })
+
   it('tracks filename renames so follow-up saves do not recreate the old path', async () => {
     vi.useFakeTimers()
     vi.mocked(isTauri).mockReturnValue(true)
