@@ -39,4 +39,4 @@ Keep agent work in small commits, so one bad change is easy to undo. See [Your v
 
 ## Remotes
 
-Connect a compatible Git remote when you want sync or backup. Rhizome relies on your system Git authentication, so GitHub CLI, SSH keys, credential helpers, and existing Git configuration can continue to work.
+Connect a compatible Git remote when you want sync or backup. Rhizome relies on your system Git authentication, so GitHub CLI, SSH keys, credential helpers, and existing Git configuration can continue to work. The URL has to be a normal remote address. Rhizome refuses a URL that starts with `-`, contains a control character, or uses a Git transport helper (`name::`). See [Connect a Git remote](../guides/connect-a-git-remote.md).
