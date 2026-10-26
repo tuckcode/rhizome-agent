@@ -1644,4 +1644,57 @@ mod tests {
             fs::read_to_string(&marker).unwrap_or_default()
         );
     }
+
+    #[cfg(unix)]
+    fn append_repo_config(repo: &std::path::Path, section: &str) {
+        let path = repo.join(".git/config");
+        let mut config = fs::read_to_string(&path).unwrap();
+        config.push('\n');
+        config.push_str(section);
+        if !section.ends_with('\n') {
+            config.push('\n');
+        }
+        fs::write(path, config).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn filter_subsection_containing_equals_fails_closed_without_running() {
+        let _guard = GitConfigEnvGuard::isolated();
+        let repo = setup_git_repo();
+        let marker = repo.path().join("equals-filter.txt");
+        let script = repo.path().join("equals-filter.sh");
+        write_executable(&script, &marker_script(&marker, "ran"));
+        append_repo_config(
+            repo.path(),
+            &format!("[filter \"a=b\"]\n\tclean = {}\n", script.display()),
+        );
+        fs::create_dir_all(repo.path().join(".git/info")).unwrap();
+        fs::write(repo.path().join(".git/info/attributes"), "* filter=a=b\n").unwrap();
+        fs::write(repo.path().join("note.md"), "# note\n").unwrap();
+        let err = git_command_in(Some(repo.path())).unwrap_err();
+        assert!(err.contains("filter.a=b.clean"), "{err}");
+        assert!(err.contains("can't be safely overridden"), "{err}");
+        assert!(!marker.exists(), "filter a=b ran");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn merge_driver_subsection_containing_equals_fails_closed_without_running() {
+        let _guard = GitConfigEnvGuard::isolated();
+        let repo = setup_git_repo();
+        let marker = repo.path().join("equals-merge.txt");
+        let script = repo.path().join("equals-merge.sh");
+        write_executable(&script, &marker_script(&marker, "ran"));
+        append_repo_config(
+            repo.path(),
+            &format!("[merge \"a=b\"]\n\tdriver = {}\n", script.display()),
+        );
+        fs::create_dir_all(repo.path().join(".git/info")).unwrap();
+        fs::write(repo.path().join(".git/info/attributes"), "* merge=a=b\n").unwrap();
+        let err = git_command_in(Some(repo.path())).unwrap_err();
+        assert!(err.contains("merge.a=b.driver"), "{err}");
+        assert!(err.contains("can't be safely overridden"), "{err}");
+        assert!(!marker.exists(), "merge driver a=b ran");
+    }
 }

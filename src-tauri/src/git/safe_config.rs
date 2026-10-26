@@ -135,15 +135,11 @@ fn discover_overrides(
 ) -> Result<RepoOverrides, String> {
     let entries = query_scoped_entries(base, repo, DISCOVERY_PATTERN)?;
 
-    let credential_helpers = entries
-        .iter()
-        .filter(|entry| is_trusted(entry) && is_credential_helper(&entry.key))
-        .map(|entry| (entry.key.clone(), entry.value.clone()))
-        .collect();
+    let credential_helpers = credential_helper_overrides(&entries)?;
 
     Ok(RepoOverrides {
         credential_helpers,
-        command_overrides: filter_and_merge_overrides(&entries),
+        command_overrides: filter_and_merge_overrides(&entries)?,
         gpg_program: trusted_or_default(&entries, GPG_PROGRAM, "gpg"),
         gpg_ssh_program: trusted_or_default(&entries, GPG_SSH_PROGRAM, "ssh-keygen"),
         gpg_x509_program: trusted_or_default(&entries, GPG_X509_PROGRAM, "gpgsm"),
@@ -156,7 +152,18 @@ fn discover_overrides(
     })
 }
 
-fn filter_and_merge_overrides(entries: &[ScopedEntry]) -> Vec<(String, String)> {
+fn credential_helper_overrides(entries: &[ScopedEntry]) -> Result<Vec<(String, String)>, String> {
+    let mut helpers = Vec::new();
+    for entry in entries {
+        if is_trusted(entry) && is_credential_helper(&entry.key) {
+            reject_config_key_with_equals(&entry.key)?;
+            helpers.push((entry.key.clone(), entry.value.clone()));
+        }
+    }
+    Ok(helpers)
+}
+
+fn filter_and_merge_overrides(entries: &[ScopedEntry]) -> Result<Vec<(String, String)>, String> {
     let mut keys = Vec::new();
     for entry in entries {
         if is_repo_scope(entry)
@@ -166,12 +173,24 @@ fn filter_and_merge_overrides(entries: &[ScopedEntry]) -> Vec<(String, String)> 
             keys.push(entry.key.clone());
         }
     }
-    keys.into_iter()
-        .map(|key| {
-            let value = trusted_value(entries, &key).unwrap_or_default();
-            (key, value)
-        })
-        .collect()
+    let mut overrides = Vec::new();
+    for key in keys {
+        reject_config_key_with_equals(&key)?;
+        let value = trusted_value(entries, &key).unwrap_or_default();
+        overrides.push((key, value));
+    }
+    Ok(overrides)
+}
+
+/// Git splits `-c name=value` at the first `=`, so a key that itself contains
+/// `=` is applied to the wrong name and the real driver keeps running.
+fn reject_config_key_with_equals(key: &str) -> Result<(), String> {
+    if key.contains('=') {
+        return Err(format!(
+            "A config key containing '=' can't be safely overridden: {key}"
+        ));
+    }
+    Ok(())
 }
 
 fn ask_pass_override(entries: &[ScopedEntry]) -> Option<String> {
@@ -567,7 +586,7 @@ mod tests {
             ("global", "merge.ours.driver", "true"),
         ]);
         let entries = parse_show_scope_z(&bytes).unwrap();
-        let overrides = filter_and_merge_overrides(&entries);
+        let overrides = filter_and_merge_overrides(&entries).unwrap();
         assert_eq!(
             overrides,
             vec![
@@ -578,6 +597,39 @@ mod tests {
                 ("filter.evil.clean".to_string(), String::new()),
                 ("merge.ours.driver".to_string(), "true".to_string()),
             ]
+        );
+    }
+
+    #[test]
+    fn filter_and_merge_keys_containing_equals_fail_closed() {
+        let filter =
+            parse_show_scope_z(&z_records(&[("local", "filter.a=b.clean", "/evil")])).unwrap();
+        let filter_error = filter_and_merge_overrides(&filter).unwrap_err();
+        assert!(
+            filter_error.contains("can't be safely overridden"),
+            "{filter_error}"
+        );
+        assert!(filter_error.contains("filter.a=b.clean"), "{filter_error}");
+
+        let merge =
+            parse_show_scope_z(&z_records(&[("local", "merge.a=b.driver", "/evil")])).unwrap();
+        let merge_error = filter_and_merge_overrides(&merge).unwrap_err();
+        assert!(merge_error.contains("merge.a=b.driver"), "{merge_error}");
+    }
+
+    #[test]
+    fn credential_url_containing_equals_fails_closed() {
+        let entries = parse_show_scope_z(&z_records(&[(
+            "global",
+            "credential.https://example.com?x=y.helper",
+            "!gh auth git-credential",
+        )]))
+        .unwrap();
+        let error = credential_helper_overrides(&entries).unwrap_err();
+        assert!(error.contains("can't be safely overridden"), "{error}");
+        assert!(
+            error.contains("credential.https://example.com?x=y.helper"),
+            "{error}"
         );
     }
 
