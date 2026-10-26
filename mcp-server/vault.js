@@ -26,21 +26,34 @@ const ACTIVE_VAULT_ERROR = 'Note path must stay inside the active vault'
  */
 export async function findMarkdownFiles(dir) {
   const vaultRoot = await realpath(dir)
-  return collectMarkdownFilesUnder(vaultRoot, vaultRoot)
+  const visitedDirs = new Set()
+  return collectMarkdownFilesUnder(vaultRoot, vaultRoot, visitedDirs)
 }
 
-async function collectMarkdownFilesUnder(vaultRoot, dir) {
+async function collectMarkdownFilesUnder(vaultRoot, dir, visitedDirs) {
+  const dirReal = await resolveContainedPath(vaultRoot, dir)
+  if (!dirReal) return []
+
+  const visitKey = await directoryVisitKey(dirReal)
+  if (visitedDirs.has(visitKey)) return []
+  visitedDirs.add(visitKey)
+
   const results = []
   let items
   try {
-    items = await opendir(dir)
+    items = await opendir(dirReal)
   } catch {
     return results
   }
   for await (const item of items) {
-    await collectMarkdownFile(results, vaultRoot, dir, item)
+    await collectMarkdownFile(results, vaultRoot, dirReal, item, visitedDirs)
   }
   return results
+}
+
+async function directoryVisitKey(dirReal) {
+  const st = await stat(dirReal)
+  return `${st.dev}:${st.ino}`
 }
 
 async function resolveVaultNotePath(vaultPath, notePath) {
@@ -167,7 +180,7 @@ export async function vaultContext(vaultPath) {
 
 // --- Helpers ---
 
-async function collectMarkdownFile(results, vaultRoot, dir, item) {
+async function collectMarkdownFile(results, vaultRoot, dir, item, visitedDirs) {
   if (item.name.startsWith('.')) return
 
   const full = resolveInside(dir, item.name)
@@ -176,7 +189,7 @@ async function collectMarkdownFile(results, vaultRoot, dir, item) {
   if (item.isDirectory()) {
     const contained = await resolveContainedPath(vaultRoot, full)
     if (!contained) return
-    results.push(...await collectMarkdownFilesUnder(vaultRoot, contained))
+    results.push(...await collectMarkdownFilesUnder(vaultRoot, contained, visitedDirs))
     return
   }
 
@@ -190,7 +203,7 @@ async function collectMarkdownFile(results, vaultRoot, dir, item) {
       return
     }
     if (st.isDirectory()) {
-      results.push(...await collectMarkdownFilesUnder(vaultRoot, contained))
+      results.push(...await collectMarkdownFilesUnder(vaultRoot, contained, visitedDirs))
       return
     }
     if (st.isFile() && item.name.endsWith('.md')) {

@@ -236,6 +236,31 @@ describe('S2 vault symlink boundary', () => {
     assert.equal(note.frontmatter.title, 'Inside')
   })
 
+  it('finishes a symlinked-directory cycle and lists each note once', { skip: SYMLINK_SKIP }, async () => {
+    symlinkSync(vault, path.join(vault, 'self'))
+    const files = await Promise.race([
+      findMarkdownFiles(vault),
+      new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('findMarkdownFiles hung on symlink cycle')), 2000)
+      }),
+    ])
+    const relative = files.map((filePath) => path.relative(vault, filePath)).sort()
+    assert.deepEqual(relative, ['normal.md', 'note/nested.md'])
+  })
+
+  it('does not follow a directory symlink outside the vault', { skip: SYMLINK_SKIP }, async () => {
+    const outsideDir = path.join(fixture, 'outside-tree')
+    await mkdir(outsideDir, { recursive: true })
+    await writeFile(path.join(outsideDir, 'secret.md'), `# ${SENTINEL}\n`)
+    symlinkSync(outsideDir, path.join(vault, 'outside-tree'))
+
+    const files = await findMarkdownFiles(vault)
+    assert.equal(files.some((filePath) => filePath.endsWith('secret.md')), false)
+
+    const found = await searchNotes(vault, SENTINEL)
+    assert.equal(found.length, 0)
+  })
+
   it('keeps createNote traversal rejected and a writable note readable', async () => {
     await assert.rejects(() => createNote(vault, '../escaped.md', 'Synthetic'), { message: ACTIVE_VAULT_ERROR })
     const created = await createNote(vault, 'note/writable.md', '# Writable\n')
