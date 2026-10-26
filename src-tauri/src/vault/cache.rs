@@ -145,9 +145,9 @@ fn git_head_hash(vault: &Path) -> Option<String> {
 
 /// Run a git command in the given directory and return stdout if successful.
 fn run_git(vault: &Path, args: &[&str]) -> Option<String> {
-    let output = crate::git::git_command()
+    let output = crate::git::git_command_in(Some(vault))
+        .ok()?
         .args(args)
-        .current_dir(vault)
         .output()
         .ok()?;
     if !output.status.success() {
@@ -219,9 +219,18 @@ fn collect_paths_from_porcelain(stdout: &str) -> Vec<String> {
 
 fn git_changed_files(vault: &Path, from_hash: &str, to_hash: &str) -> Vec<String> {
     let diff_arg = format!("{}..{}", from_hash, to_hash);
-    let mut files = run_git(vault, &["diff", "--no-ext-diff", &diff_arg, "--name-only"])
-        .map(|s| collect_paths_from_diff(vault, &s))
-        .unwrap_or_default();
+    let mut files = run_git(
+        vault,
+        &[
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            &diff_arg,
+            "--name-only",
+        ],
+    )
+    .map(|s| collect_paths_from_diff(vault, &s))
+    .unwrap_or_default();
 
     // Include uncommitted changes (modified, staged, and untracked files).
     let uncommitted = git_uncommitted_files(vault);

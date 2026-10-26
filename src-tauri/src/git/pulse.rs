@@ -1,7 +1,7 @@
 use serde::Serialize;
 use std::path::Path;
 
-use super::{git_command, parse_github_repo_path};
+use super::{git_command_in, parse_github_repo_path};
 
 #[derive(Debug, Serialize, Clone)]
 pub struct PulseFile {
@@ -129,7 +129,7 @@ pub fn get_vault_pulse(
 
     let limit_str = limit.to_string();
     let skip_str = skip.to_string();
-    let output = git_command()
+    let output = git_command_in(Some(vault))?
         .args([
             "log",
             "--name-status",
@@ -142,7 +142,6 @@ pub fn get_vault_pulse(
             "--",
             "*.md",
         ])
-        .current_dir(vault)
         .output()
         .map_err(|e| format!("Failed to run git log: {}", e))?;
 
@@ -163,9 +162,9 @@ pub fn get_vault_pulse(
 }
 
 fn get_github_base_url(vault: &Path) -> Option<GitHubBaseUrl> {
-    let output = git_command()
+    let output = git_command_in(Some(vault))
+        .ok()?
         .args(["remote", "get-url", "origin"])
-        .current_dir(vault)
         .output()
         .ok()?;
 
@@ -277,9 +276,8 @@ pub fn get_last_commit_info(
 ) -> Result<Option<LastCommitInfo>, String> {
     let vault = vault_path.as_ref();
 
-    let output = git_command()
+    let output = git_command_in(Some(vault))?
         .args(["log", "-1", "--format=%H|%h"])
-        .current_dir(vault)
         .output()
         .map_err(|e| format!("Failed to run git log: {}", e))?;
 

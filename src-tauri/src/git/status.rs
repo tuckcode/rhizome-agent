@@ -1,4 +1,4 @@
-use super::git_command;
+use super::git_command_in;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::path::Path;
@@ -155,9 +155,8 @@ fn parse_numstat_output(output: &[u8]) -> HashMap<String, DiffStats> {
 }
 
 fn repo_has_head(vault: &Path) -> Result<bool, String> {
-    let output = git_command()
+    let output = git_command_in(Some(vault))?
         .args(["rev-parse", "--verify", "HEAD"])
-        .current_dir(vault)
         .output()
         .map_err(|e| format!("Failed to run git rev-parse: {e}"))?;
 
@@ -169,17 +168,17 @@ fn load_diff_stats(vault: &Path) -> Result<HashMap<String, DiffStats>, String> {
         return Ok(HashMap::new());
     }
 
-    let output = git_command()
+    let output = git_command_in(Some(vault))?
         .args([
             "diff",
             "--no-ext-diff",
+            "--no-textconv",
             "--numstat",
             "-z",
             "--find-renames",
             "HEAD",
             "--",
         ])
-        .current_dir(vault)
         .output()
         .map_err(|e| format!("Failed to run git diff --numstat: {e}"))?;
 
@@ -249,10 +248,9 @@ fn ensure_path_within_vault(vault: &Path, relative_path: &Path, abs: &Path) -> R
 }
 
 fn load_file_status(vault: &Path, relative_path: &Path) -> Result<String, String> {
-    let output = git_command()
+    let output = git_command_in(Some(vault))?
         .args(["status", "--porcelain", "--"])
         .arg(relative_path)
-        .current_dir(vault)
         .output()
         .map_err(|e| format!("Failed to run git status: {e}"))?;
 
@@ -265,16 +263,14 @@ fn load_file_status(vault: &Path, relative_path: &Path) -> Result<String, String
 }
 
 fn restore_tracked_file(vault: &Path, relative_path: &Path) -> Result<(), String> {
-    let _ = git_command()
+    let _ = git_command_in(Some(vault))?
         .args(["reset", "HEAD", "--"])
         .arg(relative_path)
-        .current_dir(vault)
         .output();
 
-    let checkout = git_command()
+    let checkout = git_command_in(Some(vault))?
         .args(["checkout", "--"])
         .arg(relative_path)
-        .current_dir(vault)
         .output()
         .map_err(|e| format!("Failed to run git checkout: {e}"))?;
 
@@ -303,9 +299,8 @@ fn get_modified_files_impl(vault: &Path, include_stats: bool) -> Result<Vec<Modi
         return Ok(Vec::new());
     }
 
-    let output = git_command()
+    let output = git_command_in(Some(vault))?
         .args(["status", "--porcelain=v1", "-z", "--untracked-files=all"])
-        .current_dir(vault)
         .output()
         .map_err(|e| format!("Failed to run git status: {e}"))?;
 
@@ -384,8 +379,8 @@ pub fn discard_file_changes(vault_path: &str, relative_path: &str) -> Result<(),
 
 #[cfg(test)]
 mod tests {
-    use super::git_command;
     use super::*;
+    use crate::git::git_command;
     use crate::git::git_commit;
     use crate::git::tests::setup_git_repo;
     use std::fs;
@@ -397,6 +392,7 @@ mod tests {
 
     fn force_quoted_git_paths(vault: &Path) {
         git_command()
+            .unwrap()
             .args(["config", "core.quotePath", "true"])
             .current_dir(vault)
             .output()
@@ -448,11 +444,13 @@ mod tests {
         // Create and commit a file
         fs::write(vault.join("note.md"), "# Note\n").unwrap();
         git_command()
+            .unwrap()
             .args(["add", "note.md"])
             .current_dir(vault)
             .output()
             .unwrap();
         git_command()
+            .unwrap()
             .args(["commit", "-m", "Add note"])
             .current_dir(vault)
             .output()
@@ -492,11 +490,13 @@ mod tests {
 
         fs::write(vault.join("note.md"), "# Note\n").unwrap();
         git_command()
+            .unwrap()
             .args(["add", "note.md"])
             .current_dir(vault)
             .output()
             .unwrap();
         git_command()
+            .unwrap()
             .args(["commit", "-m", "Add note"])
             .current_dir(vault)
             .output()
@@ -521,11 +521,13 @@ mod tests {
         // Create initial commit so git is initialized
         fs::write(vault.join("init.md"), "# Init\n").unwrap();
         git_command()
+            .unwrap()
             .args(["add", "init.md"])
             .current_dir(vault)
             .output()
             .unwrap();
         git_command()
+            .unwrap()
             .args(["commit", "-m", "Initial"])
             .current_dir(vault)
             .output()
@@ -592,6 +594,7 @@ mod tests {
         let file = expect_changed_file_after(relative_path, "renamed", |vault, vp| {
             write_and_commit_markdown(vault, vp, "alpha.md", "# Alpha\n");
             git_command()
+                .unwrap()
                 .args(["mv", "alpha.md", relative_path])
                 .current_dir(vault)
                 .output()

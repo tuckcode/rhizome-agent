@@ -431,6 +431,7 @@ mod tests {
         let vp = path_text(vault);
 
         git_command()
+            .unwrap()
             .args(["remote", "add", "origin", "https://example.com/repo.git"])
             .current_dir(vault)
             .output()
@@ -446,12 +447,14 @@ mod tests {
         let vp = path_text(vault);
 
         git_command()
+            .unwrap()
             .args(["config", "remote.origin.prune", "true"])
             .current_dir(vault)
             .output()
             .unwrap();
 
         let remote_names = git_command()
+            .unwrap()
             .args(["remote"])
             .current_dir(vault)
             .output()

@@ -192,22 +192,31 @@ pub(crate) fn run_cli_streaming(
     envs: &[(&str, &str)],
     on_line: &mut dyn FnMut(&str),
 ) -> Result<String, String> {
-    use std::io::BufRead;
-
     if args.is_empty() {
         return Err("Empty command".into());
     }
-    let mut child = hidden_command(args[0])
-        .args(&args[1..])
-        .envs(
-            envs.iter()
-                .copied()
-                .map(|(k, v)| (k.to_string(), v.to_string())),
-        )
+    let mut command = hidden_command(args[0]);
+    command.args(&args[1..]).envs(
+        envs.iter()
+            .copied()
+            .map(|(key, value)| (key.to_string(), value.to_string())),
+    );
+    run_command_streaming(command, args[0], on_line)
+}
+
+/// Stream stdout from a prepared command. `name` is used in error text.
+pub(crate) fn run_command_streaming(
+    mut command: std::process::Command,
+    name: &str,
+    on_line: &mut dyn FnMut(&str),
+) -> Result<String, String> {
+    use std::io::BufRead;
+
+    let mut child = command
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .spawn()
-        .map_err(|e| format!("Failed to spawn {}: {}", args[0], e))?;
+        .map_err(|e| format!("Failed to spawn {name}: {e}"))?;
 
     // Reader thread streams stdout lines over a channel while we poll for exit.
     let (tx, rx) = std::sync::mpsc::channel::<String>();
@@ -253,17 +262,17 @@ pub(crate) fn run_cli_streaming(
                         String::from_utf8_lossy(&buf).to_string()
                     })
                     .unwrap_or_default();
-                return Err(format!("{} failed: {}", args[0], stderr.trim()));
+                return Err(format!("{name} failed: {}", stderr.trim()));
             }
             Ok(None) => {
                 if start.elapsed() > timeout {
                     let _ = child.kill();
                     let _ = child.wait();
-                    return Err(format!("{} timed out after {}s", args[0], CLI_TIMEOUT_SECS));
+                    return Err(format!("{name} timed out after {CLI_TIMEOUT_SECS}s"));
                 }
                 std::thread::sleep(Duration::from_millis(100));
             }
-            Err(e) => return Err(format!("{} process error: {}", args[0], e)),
+            Err(e) => return Err(format!("{name} process error: {e}")),
         }
     }
 }

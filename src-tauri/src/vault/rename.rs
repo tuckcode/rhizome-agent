@@ -597,9 +597,16 @@ pub struct DetectedRename {
 
 /// Detect renamed files by comparing working tree against HEAD using git diff.
 pub fn detect_renames(vault: &Path) -> Result<Vec<DetectedRename>, String> {
-    let output = crate::git::git_command()
-        .args(["diff", "HEAD", "--name-status", "--diff-filter=R", "-M"])
-        .current_dir(vault)
+    let output = crate::git::git_command_in(Some(vault))?
+        .args([
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            "HEAD",
+            "--name-status",
+            "--diff-filter=R",
+            "-M",
+        ])
         .output()
         .map_err(|e| format!("Failed to run git diff: {e}"))?;
 

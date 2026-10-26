@@ -444,6 +444,7 @@ mod tests {
         // Keep checkouts byte-identical on autocrlf machines (Windows): the
         // discard assertion below compares exact file content.
         crate::git::git_command()
+            .unwrap()
             .args(["config", "core.autocrlf", "false"])
             .current_dir(dir.path())
             .output()

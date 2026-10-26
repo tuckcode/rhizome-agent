@@ -1,4 +1,4 @@
-use super::git_command;
+use super::git_command_in;
 use crate::vault::path_identity::vault_relative_path_string;
 use std::path::Path;
 
@@ -23,7 +23,7 @@ pub fn get_file_history(vault_path: &str, file_path: &str) -> Result<Vec<GitComm
     let file = Path::new(file_path);
     let relative_str = vault_relative_path_string(vault, file)?;
 
-    let output = git_command()
+    let output = git_command_in(Some(vault))?
         .args([
             "log",
             "--format=%H|%h|%an|%aI|%s",
@@ -32,7 +32,6 @@ pub fn get_file_history(vault_path: &str, file_path: &str) -> Result<Vec<GitComm
             "--",
             &relative_str,
         ])
-        .current_dir(vault)
         .output()
         .map_err(|e| format!("Failed to run git log: {}", e))?;
 
@@ -80,9 +79,14 @@ pub fn get_file_diff(vault_path: &str, file_path: &str) -> Result<String, String
     let relative_str = vault_relative_path_string(vault, file)?;
 
     // First try tracked file diff
-    let output = git_command()
-        .args(["diff", "--no-ext-diff", "--", &relative_str])
-        .current_dir(vault)
+    let output = git_command_in(Some(vault))?
+        .args([
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--",
+            &relative_str,
+        ])
         .output()
         .map_err(|e| format!("Failed to run git diff: {}", e))?;
 
@@ -90,9 +94,15 @@ pub fn get_file_diff(vault_path: &str, file_path: &str) -> Result<String, String
 
     // If no diff (maybe staged or untracked), try diff --cached
     if stdout.is_empty() {
-        let cached = git_command()
-            .args(["diff", "--no-ext-diff", "--cached", "--", &relative_str])
-            .current_dir(vault)
+        let cached = git_command_in(Some(vault))?
+            .args([
+                "diff",
+                "--no-ext-diff",
+                "--no-textconv",
+                "--cached",
+                "--",
+                &relative_str,
+            ])
             .output()
             .map_err(|e| format!("Failed to run git diff --cached: {}", e))?;
 
@@ -102,9 +112,8 @@ pub fn get_file_diff(vault_path: &str, file_path: &str) -> Result<String, String
         }
 
         // Try showing untracked file as all-new
-        let status = git_command()
+        let status = git_command_in(Some(vault))?
             .args(["status", "--porcelain", "--", &relative_str])
-            .current_dir(vault)
             .output()
             .map_err(|e| format!("Failed to run git status: {}", e))?;
 
@@ -141,17 +150,17 @@ pub fn get_file_diff_at_commit(
     // Show diff between commit^ and commit for this file.
     // `--end-of-options` stops a dash-leading revision being read as an option
     // if a future caller bypasses the hash check.
-    let output = git_command()
+    let output = git_command_in(Some(vault))?
         .args([
             "diff",
             "--no-ext-diff",
+            "--no-textconv",
             "--end-of-options",
             &parent,
             commit_hash,
             "--",
             &relative_str,
         ])
-        .current_dir(vault)
         .output()
         .map_err(|e| format!("Failed to run git diff: {}", e))?;
 
@@ -160,14 +169,14 @@ pub fn get_file_diff_at_commit(
     // If diff is empty, it might be the initial commit (no parent).
     // Fall back to showing the full file content as added.
     if stdout.is_empty() {
-        let show = git_command()
+        let show = git_command_in(Some(vault))?
             .args([
                 "show",
                 "--no-ext-diff",
+                "--no-textconv",
                 "--end-of-options",
                 &format!("{commit_hash}:{relative_str}"),
             ])
-            .current_dir(vault)
             .output()
             .map_err(|e| format!("Failed to run git show: {}", e))?;
 
@@ -188,13 +197,14 @@ pub fn get_file_diff_at_commit(
 
 #[cfg(test)]
 mod tests {
-    use super::git_command;
     use super::*;
+    use crate::git::git_command;
     use crate::git::tests::setup_git_repo;
     use std::{fs, path::PathBuf};
 
     fn force_quoted_git_paths(vault: &Path) {
         git_command()
+            .unwrap()
             .args(["config", "core.quotePath", "true"])
             .current_dir(vault)
             .output()
@@ -210,11 +220,13 @@ mod tests {
         let file = vault.join(relative_path);
         fs::write(&file, content).unwrap();
         git_command()
+            .unwrap()
             .args(["add", relative_path])
             .current_dir(vault)
             .output()
             .unwrap();
         git_command()
+            .unwrap()
             .args(["commit", "-m", message])
             .current_dir(vault)
             .output()
@@ -224,6 +236,7 @@ mod tests {
 
     fn head_hash(vault: &Path) -> String {
         let log = git_command()
+            .unwrap()
             .args(["log", "--format=%H", "-1"])
             .current_dir(vault)
             .output()

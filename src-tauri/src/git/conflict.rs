@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use super::{ensure_author_config, git_command, run_git};
+use super::{ensure_author_config, git_command_in, run_git};
 
 /// List files with merge conflicts (unmerged paths).
 ///
@@ -9,9 +9,8 @@ use super::{ensure_author_config, git_command, run_git};
 /// stale (e.g. after a reboot or when MERGE_HEAD is missing).
 pub fn get_conflict_files(vault_path: &str) -> Result<Vec<String>, String> {
     let vault = Path::new(vault_path);
-    let output = git_command()
+    let output = git_command_in(Some(vault))?
         .args(["ls-files", "--unmerged"])
-        .current_dir(vault)
         .output()
         .map_err(|e| format!("Failed to check conflicts: {}", e))?;
 
@@ -94,15 +93,13 @@ pub fn git_commit_conflict_resolution(vault_path: &str) -> Result<String, String
 
     let mode = get_conflict_mode(vault_path);
     let output = match mode.as_str() {
-        "rebase" => git_command()
+        "rebase" => git_command_in(Some(vault))?
             .args(["rebase", "--continue"])
             .env("GIT_EDITOR", "true")
-            .current_dir(vault)
             .output()
             .map_err(|e| format!("Failed to run git rebase --continue: {}", e))?,
-        _ => git_command()
+        _ => git_command_in(Some(vault))?
             .args(["commit", "-m", "Resolve merge conflicts"])
-            .current_dir(vault)
             .output()
             .map_err(|e| format!("Failed to run git commit: {}", e))?,
     };
@@ -129,6 +126,7 @@ pub fn git_commit_conflict_resolution(vault_path: &str) -> Result<String, String
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::git::git_command;
     use crate::git::tests::{setup_git_repo, setup_remote_pair, GitConfigEnvGuard};
     use crate::git::{git_commit, git_pull, git_push};
     use std::fs;
@@ -138,6 +136,7 @@ mod tests {
     fn unset_local_author_config(vault: &Path) {
         for key in ["user.name", "user.email"] {
             let status = git_command()
+                .unwrap()
                 .args(["config", "--local", "--unset-all", key])
                 .current_dir(vault)
                 .status()
@@ -148,6 +147,7 @@ mod tests {
 
     fn local_config_value(vault: &Path, key: &str) -> Option<String> {
         let output = git_command()
+            .unwrap()
             .args(["config", "--local", key])
             .current_dir(vault)
             .output()
@@ -264,6 +264,7 @@ mod tests {
         assert!(result.is_ok());
 
         let log = git_command()
+            .unwrap()
             .args(["log", "--oneline", "-1"])
             .current_dir(clone_b.path())
             .output()
@@ -356,6 +357,7 @@ mod tests {
         git_commit(vp_b, "B's change").unwrap();
 
         let output = git_command()
+            .unwrap()
             .args(["pull", "--rebase"])
             .current_dir(clone_b_dir.path())
             .output()

@@ -2,10 +2,37 @@ use std::io;
 use std::path::Path;
 use std::process::Output;
 
-use super::git_command;
-
 pub(super) fn git_output(dir: &Path, args: &[&str]) -> io::Result<Output> {
-    git_command().args(args).current_dir(dir).output()
+    let mut command = super::git_command_in(Some(dir)).map_err(io::Error::other)?;
+    command.args(with_transport_pins(args)).output()
+}
+
+/// `git -c remote.<name>.uploadpack=` does not replace a repo-local value:
+/// git keeps the first one and still runs it. The fetch/push flags do.
+fn with_transport_pins<'a>(args: &'a [&'a str]) -> Vec<&'a str> {
+    let Some(index) = subcommand_index(args) else {
+        return args.to_vec();
+    };
+    let mut pinned = args.to_vec();
+    let flag = match args[index] {
+        "fetch" | "pull" | "ls-remote" | "clone" => "--upload-pack=git-upload-pack",
+        "push" => "--receive-pack=git-receive-pack",
+        _ => return pinned,
+    };
+    pinned.insert(index + 1, flag);
+    pinned
+}
+
+fn subcommand_index(args: &[&str]) -> Option<usize> {
+    let mut index = 0;
+    while index < args.len() {
+        if args[index] == "-c" {
+            index += 2;
+            continue;
+        }
+        return Some(index);
+    }
+    None
 }
 
 pub(super) fn git_output_result(dir: &Path, args: &[&str]) -> Result<Output, String> {

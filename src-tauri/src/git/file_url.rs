@@ -318,6 +318,7 @@ mod tests {
 
     fn add_remote(vault: &Path, remote: RemoteFixture) {
         git_command()
+            .unwrap()
             .args(["remote", "add", remote.name, remote.url])
             .current_dir(vault)
             .output()
