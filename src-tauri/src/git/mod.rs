@@ -1315,9 +1315,12 @@ mod tests {
         .unwrap();
         let repo = setup_git_repo();
         let other = setup_git_repo();
+        // Git matches `gitdir:` against the resolved `.git` directory. On
+        // macOS a temp path under `/var` is a symlink to `/private/var`.
+        let git_dir = repo.path().join(".git").canonicalize().unwrap();
         let _guard = GitConfigEnvGuard::with_global_contents(&format!(
-            "[includeIf \"gitdir:{}/\"]\n\tpath = {}\n",
-            repo.path().display(),
+            "[includeIf \"gitdir:{}\"]\n\tpath = {}\n",
+            git_dir.display(),
             included.display()
         ));
         run_credential_fill(repo.path());
