@@ -176,8 +176,8 @@ pub fn ensure_local_repo(
             on_line,
         )?;
     } else {
-        on_line(&format!("Cloning {url}..."));
         crate::git::validate_remote_url(url)?;
+        on_line(&format!("Cloning {url}..."));
         if let Some(parent) = dir.parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|e| format!("Failed to create repo cache dir: {e}"))?;
@@ -559,10 +559,18 @@ mod tests {
             slug: "evil-remote".into(),
             display: "evil/remote".into(),
         };
-        let err = ensure_local_repo(vault.path(), &reference, &mut |_| {}).unwrap_err();
+        let mut lines = Vec::new();
+        let err = ensure_local_repo(vault.path(), &reference, &mut |line| {
+            lines.push(line.to_string())
+        })
+        .unwrap_err();
         assert!(
             err.contains("unsupported transport"),
             "validation must fail before git runs: {err}"
+        );
+        assert!(
+            lines.iter().all(|line| !line.starts_with("Cloning ")),
+            "rejected URL must not be printed as a clone: {lines:?}"
         );
         assert!(
             !vault

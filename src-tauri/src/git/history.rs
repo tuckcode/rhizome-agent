@@ -4,6 +4,19 @@ use std::path::Path;
 
 use super::GitCommit;
 
+/// Hashes recorded by `git log` (`%H` / `%h`). Symbolic refs are not accepted:
+/// the history UI only sends these hashes, and a value such as `--output=…`
+/// would otherwise be parsed as a git option.
+pub(crate) fn validate_commit_hash(hash: &str) -> Result<(), String> {
+    let is_hex =
+        (4..=64).contains(&hash.len()) && hash.bytes().all(|byte| byte.is_ascii_hexdigit());
+    if is_hex {
+        Ok(())
+    } else {
+        Err("Commit hash must be 4-64 hexadecimal characters.".to_string())
+    }
+}
+
 /// Get git log history for a specific file in the vault.
 pub fn get_file_history(vault_path: &str, file_path: &str) -> Result<Vec<GitCommit>, String> {
     let vault = Path::new(vault_path);
@@ -68,7 +81,7 @@ pub fn get_file_diff(vault_path: &str, file_path: &str) -> Result<String, String
 
     // First try tracked file diff
     let output = git_command()
-        .args(["diff", "--", &relative_str])
+        .args(["diff", "--no-ext-diff", "--", &relative_str])
         .current_dir(vault)
         .output()
         .map_err(|e| format!("Failed to run git diff: {}", e))?;
@@ -78,7 +91,7 @@ pub fn get_file_diff(vault_path: &str, file_path: &str) -> Result<String, String
     // If no diff (maybe staged or untracked), try diff --cached
     if stdout.is_empty() {
         let cached = git_command()
-            .args(["diff", "--cached", "--", &relative_str])
+            .args(["diff", "--no-ext-diff", "--cached", "--", &relative_str])
             .current_dir(vault)
             .output()
             .map_err(|e| format!("Failed to run git diff --cached: {}", e))?;
@@ -119,15 +132,21 @@ pub fn get_file_diff_at_commit(
     file_path: &str,
     commit_hash: &str,
 ) -> Result<String, String> {
+    validate_commit_hash(commit_hash)?;
     let vault = Path::new(vault_path);
     let file = Path::new(file_path);
     let relative_str = vault_relative_path_string(vault, file)?;
+    let parent = format!("{commit_hash}^");
 
-    // Show diff between commit^ and commit for this file
+    // Show diff between commit^ and commit for this file.
+    // `--end-of-options` stops a dash-leading revision being read as an option
+    // if a future caller bypasses the hash check.
     let output = git_command()
         .args([
             "diff",
-            &format!("{}^", commit_hash),
+            "--no-ext-diff",
+            "--end-of-options",
+            &parent,
             commit_hash,
             "--",
             &relative_str,
@@ -142,7 +161,12 @@ pub fn get_file_diff_at_commit(
     // Fall back to showing the full file content as added.
     if stdout.is_empty() {
         let show = git_command()
-            .args(["show", &format!("{}:{}", commit_hash, relative_str)])
+            .args([
+                "show",
+                "--no-ext-diff",
+                "--end-of-options",
+                &format!("{commit_hash}:{relative_str}"),
+            ])
             .current_dir(vault)
             .output()
             .map_err(|e| format!("Failed to run git show: {}", e))?;
@@ -337,5 +361,56 @@ mod tests {
         assert!(diff.contains("-第一行"));
         assert!(diff.contains("+第二行"));
         assert!(!diff.contains("\\344"));
+    }
+
+    #[test]
+    fn test_get_file_diff_at_commit_accepts_a_short_hash() {
+        let dir = setup_git_repo();
+        let vault = dir.path();
+        let file = write_and_commit_file(vault, "short.md", "# First\n", "First");
+        write_and_commit_file(vault, "short.md", "# Second\n", "Second");
+        let short = &head_hash(vault)[..7];
+
+        let diff = get_file_diff_at_commit(vault.to_str().unwrap(), file.to_str().unwrap(), short)
+            .unwrap();
+
+        assert!(diff.contains("+# Second"), "{diff}");
+    }
+
+    #[test]
+    fn test_get_file_diff_at_commit_rejects_option_like_hashes_without_writing() {
+        let dir = setup_git_repo();
+        let vault = dir.path();
+        let file = write_and_commit_file(vault, "guard.md", "# Guard\n", "Guard");
+        let vault_path = vault.to_str().unwrap();
+        let file_path = file.to_str().unwrap();
+        let output = dir.path().join("must-not-be-written");
+
+        for hash in [
+            format!("--output={}", output.display()),
+            "-p".to_string(),
+            "--output".to_string(),
+            "HEAD".to_string(),
+            "abc".to_string(),
+            "gggg".to_string(),
+            format!("{} --output={}", "a".repeat(4), output.display()),
+        ] {
+            let err = get_file_diff_at_commit(vault_path, file_path, &hash).unwrap_err();
+            assert!(
+                err.contains("hexadecimal"),
+                "hash {hash:?} should be rejected: {err}"
+            );
+            assert!(
+                !output.exists(),
+                "git wrote {} for hash {hash}",
+                output.display()
+            );
+        }
+
+        assert!(validate_commit_hash("abcd").is_ok());
+        assert!(validate_commit_hash(&"ab".repeat(20)).is_ok());
+        assert!(validate_commit_hash(&"cd".repeat(32)).is_ok());
+        assert!(validate_commit_hash("ABCD").is_ok());
+        assert!(validate_commit_hash(&"a".repeat(65)).is_err());
     }
 }

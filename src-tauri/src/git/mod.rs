@@ -13,6 +13,7 @@ mod remote;
 mod remote_config;
 mod remote_url;
 pub(crate) use remote_url::validate_remote_url;
+mod safe_config;
 mod status;
 
 use std::ffi::{OsStr, OsString};
@@ -41,6 +42,7 @@ pub use conflict::{
 pub use connect::{disconnect_all_remotes, git_add_remote, GitAddRemoteResult};
 pub use dates::{get_all_file_dates, GitDates};
 pub use file_url::git_file_url;
+pub(crate) use history::validate_commit_hash;
 pub use history::{get_file_diff, get_file_diff_at_commit, get_file_history};
 pub use pulse::{get_last_commit_info, get_vault_pulse, LastCommitInfo, PulseCommit, PulseFile};
 pub use remote::{
@@ -109,6 +111,15 @@ struct GitShellEnvBinding {
 }
 
 pub(crate) fn git_command() -> Command {
+    let mut command = git_command_base();
+    // quotePath is separate from the untrusted-repo overrides: the app
+    // parses paths itself and must not see C-quoted non-ASCII names.
+    command.args(["-c", "core.quotePath=false"]);
+    safe_config::apply_untrusted_repo_overrides(&mut command, git_command_base);
+    command
+}
+
+fn git_command_base() -> Command {
     let config = git_launch_config();
     let mut command = crate::hidden_command(&config.program);
     if let Some(path) = &config.path {
@@ -118,7 +129,6 @@ pub(crate) fn git_command() -> Command {
     apply_git_shell_env(&mut command);
     #[cfg(test)]
     apply_test_git_config_env(&mut command);
-    command.args(["-c", "core.quotePath=false"]);
     command
 }
 
@@ -437,16 +447,19 @@ mod tests {
 
         /// Optionally expose a global identity to spawned git commands.
         pub(crate) fn with_global_identity(identity: Option<(&str, &str)>) -> Self {
+            let contents = identity
+                .map(|(name, email)| format!("[user]\n\tname = {name}\n\temail = {email}\n"))
+                .unwrap_or_default();
+            Self::with_global_contents(&contents)
+        }
+
+        /// Point global and system git config at files owned by this guard.
+        pub(crate) fn with_global_contents(contents: &str) -> Self {
             let dir = TempDir::new().unwrap();
             let global = dir.path().join("gitconfig-global");
-            if let Some((name, email)) = identity {
-                fs::write(
-                    &global,
-                    format!("[user]\n\tname = {name}\n\temail = {email}\n"),
-                )
-                .unwrap();
-            }
+            fs::write(&global, contents).unwrap();
             let system = dir.path().join("gitconfig-system");
+            fs::write(&system, "").unwrap();
 
             let config = TestGitConfigEnv { global, system };
             let previous = TEST_GIT_CONFIG_ENV.with(|env| env.replace(Some(config)));
@@ -1009,5 +1022,187 @@ mod tests {
     fn test_parse_github_repo_path_non_github() {
         assert_repo_path("https://gitlab.com/owner/repo.git", None);
         assert_repo_path("owner/repo", None);
+    }
+
+    #[cfg(unix)]
+    fn write_executable(path: &std::path::Path, body: &str) {
+        use std::os::unix::fs::PermissionsExt;
+
+        fs::write(path, body).unwrap();
+        let mut permissions = fs::metadata(path).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(path, permissions).unwrap();
+    }
+
+    #[cfg(unix)]
+    fn marker_script(marker: &std::path::Path, word: &str) -> String {
+        format!(
+            "#!/bin/sh\nprintf '%s\\n' '{word}' >> '{marker}'\n",
+            word = word,
+            marker = marker.display()
+        )
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn repo_local_fsmonitor_hooks_and_external_diff_do_not_run() {
+        let _guard = GitConfigEnvGuard::isolated();
+        let dir = setup_git_repo();
+        let vault = dir.path();
+        let marker = vault.join("hostile-marker.txt");
+        let script = vault.join("hostile.sh");
+        write_executable(&script, &marker_script(&marker, "ran"));
+
+        let hooks = vault.join("hostile-hooks");
+        fs::create_dir(&hooks).unwrap();
+        write_executable(&hooks.join("pre-commit"), &marker_script(&marker, "hook"));
+
+        for (key, value) in [
+            ("core.fsmonitor", script.to_str().unwrap()),
+            ("core.hooksPath", hooks.to_str().unwrap()),
+            ("diff.external", script.to_str().unwrap()),
+        ] {
+            let wrote = git_command()
+                .args(["config", "--local", key, value])
+                .current_dir(vault)
+                .output()
+                .unwrap();
+            assert!(
+                wrote.status.success(),
+                "{key}: {}",
+                String::from_utf8_lossy(&wrote.stderr)
+            );
+        }
+
+        let note = vault.join("note.md");
+        fs::write(&note, "# one\n").unwrap();
+        git_commit(vault.to_str().unwrap(), "Add note").unwrap();
+        fs::write(&note, "# two\n").unwrap();
+        get_modified_files(vault).unwrap();
+        let diff = get_file_diff(vault.to_str().unwrap(), note.to_str().unwrap()).unwrap();
+        assert!(diff.contains("+# two") || diff.contains("# two"), "{diff}");
+        git_commit(vault.to_str().unwrap(), "Update note").unwrap();
+
+        assert!(
+            !marker.exists(),
+            "repo-local git config ran: {}",
+            fs::read_to_string(&marker).unwrap_or_default()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn local_credential_helper_does_not_run_and_global_helper_does() {
+        use std::io::Write;
+        use std::process::Stdio;
+
+        let dir = TempDir::new().unwrap();
+        let marker = dir.path().join("cred-marker.txt");
+        let global_script = dir.path().join("global-helper.sh");
+        let local_script = dir.path().join("local-helper.sh");
+        write_executable(&global_script, &marker_script(&marker, "global"));
+        write_executable(&local_script, &marker_script(&marker, "local"));
+
+        let _guard = GitConfigEnvGuard::with_global_contents(&format!(
+            "[credential]\n\thelper = {}\n",
+            global_script.display()
+        ));
+        let repo = setup_git_repo();
+        let wrote = git_command()
+            .args([
+                "config",
+                "--local",
+                "credential.helper",
+                local_script.to_str().unwrap(),
+            ])
+            .current_dir(repo.path())
+            .output()
+            .unwrap();
+        assert!(
+            wrote.status.success(),
+            "{}",
+            String::from_utf8_lossy(&wrote.stderr)
+        );
+
+        let mut child = git_command()
+            .args(["credential", "fill"])
+            .current_dir(repo.path())
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::piped())
+            .spawn()
+            .unwrap();
+        child
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(b"protocol=https\nhost=example.com\n\n")
+            .unwrap();
+        let finished = child.wait_with_output().unwrap();
+        let text = fs::read_to_string(&marker).unwrap_or_default();
+        assert!(
+            text.lines().any(|line| line == "global"),
+            "global helper did not run: {text} stderr={}",
+            String::from_utf8_lossy(&finished.stderr)
+        );
+        assert!(
+            !text.lines().any(|line| line == "local"),
+            "repo-local helper ran: {text}"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn local_ssh_command_does_not_run() {
+        let _guard = GitConfigEnvGuard::isolated();
+        let dir = setup_git_repo();
+        let marker = dir.path().join("ssh-marker.txt");
+        let script = dir.path().join("evil-ssh.sh");
+        write_executable(
+            &script,
+            &format!(
+                "#!/bin/sh\nprintf '%s\\n' ssh >> '{}'\nexit 1\n",
+                marker.display()
+            ),
+        );
+        let wrote = git_command()
+            .args([
+                "config",
+                "--local",
+                "core.sshCommand",
+                script.to_str().unwrap(),
+            ])
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        assert!(
+            wrote.status.success(),
+            "{}",
+            String::from_utf8_lossy(&wrote.stderr)
+        );
+
+        let effective = git_command()
+            .args(["config", "--get", "core.sshCommand"])
+            .current_dir(dir.path())
+            .output()
+            .unwrap();
+        assert_eq!(
+            String::from_utf8_lossy(&effective.stdout).trim(),
+            "ssh",
+            "stderr={}",
+            String::from_utf8_lossy(&effective.stderr)
+        );
+
+        let _ = git_command()
+            .args(["ls-remote", "ssh://git@127.0.0.1:1/no.git", "HEAD"])
+            .current_dir(dir.path())
+            .output();
+
+        assert!(
+            !marker.exists(),
+            "repo-local core.sshCommand ran: {}",
+            fs::read_to_string(&marker).unwrap_or_default()
+        );
     }
 }

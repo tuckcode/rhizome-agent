@@ -258,13 +258,19 @@ mod tests {
             envs.get("SSH_ASKPASS_REQUIRE"),
             Some(&Some("never".to_string()))
         );
+        assert!(
+            args.windows(2)
+                .any(|pair| pair == ["-c", "protocol.ext.allow=never"]),
+            "clone must keep ext:: disabled: {args:?}"
+        );
+        assert!(
+            args.windows(2)
+                .any(|pair| pair == ["-c", "core.fsmonitor=false"]),
+            "clone must disable fsmonitor: {args:?}"
+        );
         assert_eq!(
-            args,
-            vec![
-                "-c".to_string(),
-                "core.quotePath=false".to_string(),
-                "-c".to_string(),
-                "protocol.ext.allow=never".to_string(),
+            &args[args.len() - 5..],
+            [
                 "clone".to_string(),
                 "--quiet".to_string(),
                 "--".to_string(),

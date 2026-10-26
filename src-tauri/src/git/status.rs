@@ -170,7 +170,15 @@ fn load_diff_stats(vault: &Path) -> Result<HashMap<String, DiffStats>, String> {
     }
 
     let output = git_command()
-        .args(["diff", "--numstat", "-z", "--find-renames", "HEAD", "--"])
+        .args([
+            "diff",
+            "--no-ext-diff",
+            "--numstat",
+            "-z",
+            "--find-renames",
+            "HEAD",
+            "--",
+        ])
         .current_dir(vault)
         .output()
         .map_err(|e| format!("Failed to run git diff --numstat: {e}"))?;
