@@ -170,6 +170,29 @@ describe('folder rename save path', () => {
     })
   })
 
+  it('keeps a pending autosave for a note outside the renamed folder', async () => {
+    const { result } = renderRenameSave()
+
+    await act(async () => {
+      result.current.save.handleContentChange(outsidePath, pendingOutside)
+    })
+
+    await act(async () => {
+      await result.current.folder.renameFolder('projects', 'work')
+    })
+
+    expect(saveCalls().some((call) => call.args?.path === outsidePath)).toBe(false)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(AUTO_SAVE_DEBOUNCE_MS)
+    })
+
+    expect(saveCalls().at(-1)).toEqual({
+      command: 'save_note_content_checked',
+      args: expect.objectContaining({ path: outsidePath, content: pendingOutside }),
+    })
+  })
+
   it('retargets a prior note rename when its folder moves', async () => {
     const pathA = '/vault/projects/note-a.md'
     const pathB = '/vault/projects/note-b.md'
