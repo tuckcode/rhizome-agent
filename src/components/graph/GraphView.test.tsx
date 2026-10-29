@@ -225,11 +225,16 @@ describe('GraphView', () => {
 
   it('focuses a start node on the first arrow without a click', async () => {
     await renderGraph()
+    const host = screen.getByTestId('graph-canvas-host')
+    // Arrows only apply when the graph host is focused (eventInGraph). The
+    // auto-focus effect runs after paint; a window keydown before that is a
+    // silent no-op and leaves data-selected-id empty under CI load.
+    await waitFor(() => expect(host).toHaveFocus())
     fireEvent.keyDown(window, { key: 'ArrowRight' })
     await waitFor(() =>
       expect(screen.getByTestId('graph-node-preview')).toBeInTheDocument(),
     )
-    expect(screen.getByTestId('graph-canvas-host')).toHaveAttribute(
+    expect(host).toHaveAttribute(
       'data-selected-id',
       'note/daily-log.md',
     )
