@@ -612,10 +612,10 @@ function useImmediateSaveCommands({
 
   const savePendingForPath = useCallback(
     (path: string): Promise<boolean> => {
-      cancelAutoSave()
+      if (matchesPendingPath(pendingContentRef.current, path, resolvePath)) cancelAutoSave()
       return canPersistRef.current ? flushPending(path) : Promise.resolve(false)
     },
-    [canPersistRef, cancelAutoSave, flushPending],
+    [canPersistRef, cancelAutoSave, flushPending, pendingContentRef, resolvePath],
   )
 
   const savePending = useCallback((): Promise<boolean> => {

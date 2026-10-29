@@ -1,6 +1,11 @@
 import { useCallback, useState } from 'react'
 import type { SidebarSelection, VaultEntry } from '../../types'
 import {
+  flushSavesInFolder,
+  retargetSavesAfterFolderRename,
+} from '../folderRenameSaveSync'
+import {
+  folderAbsolutePath,
   folderLabel,
   invokeRenameFolder,
   type FolderTab,
@@ -43,8 +48,11 @@ export function useFolderRename({
       return true
     }
 
+    const oldPrefix = folderAbsolutePath({ vaultPath, folderPath })
     try {
+      await flushSavesInFolder(oldPrefix)
       const renameResult = await invokeRenameFolder({ vaultPath, folderPath, newName: trimmedName })
+      retargetSavesAfterFolderRename(oldPrefix, folderAbsolutePath({ vaultPath, folderPath: renameResult.new_path }))
       setRenamingFolderPath(null)
       await reloadFolders()
       const refreshedEntries = await reloadVault()

@@ -9,6 +9,12 @@ import { createTranslator, type AppLocale } from '../lib/i18n'
 import { canWritePathToVault } from '../utils/vaultPathContainment'
 import { vaultPathForEntry } from '../utils/workspaces'
 import { notePathsMatch } from '../utils/notePathIdentity'
+import { isWithinPrefix, replaceFolderPrefix } from './folder-actions/folderActionUtils'
+import {
+  registerFolderRenameSaveSync,
+  unregisterFolderRenameSaveSync,
+  type FolderRenameSaveSync,
+} from './folderRenameSaveSync'
 
 interface TabState {
   entry: VaultEntry
@@ -63,6 +69,45 @@ function trackRenamedPath(renamedPaths: RenamedPathMap, oldPath: string, newPath
     }
   }
   renamedPaths.set(oldPath, latestPath)
+}
+
+function releaseSettledRenames(
+  renamedPaths: RenamedPathMap,
+  savedPath: string,
+  livePaths: readonly string[],
+): void {
+  for (const [oldPath, newPath] of [...renamedPaths.entries()]) {
+    if (!notePathsMatch(newPath, savedPath)) continue
+    const oldPathStillOpen = livePaths.some((path) => notePathsMatch(path, oldPath))
+    if (!oldPathStillOpen) renamedPaths.delete(oldPath)
+  }
+}
+
+function collectFolderFilePaths({
+  prefix,
+  tabs,
+  unsavedPaths,
+  renamedPaths,
+}: {
+  prefix: string
+  tabs: readonly TabState[]
+  unsavedPaths: ReadonlySet<string>
+  renamedPaths: RenamedPathMap
+}): string[] {
+  const candidates = [
+    ...tabs.map((tab) => tab.entry.path),
+    ...unsavedPaths,
+    ...renamedPaths.keys(),
+    ...renamedPaths.values(),
+  ]
+  const paths: string[] = []
+  for (const candidate of candidates) {
+    const path = resolveLatestPath(renamedPaths, candidate)
+    if (!isWithinPrefix({ path, prefix })) continue
+    if (paths.some((existing) => notePathsMatch(existing, path))) continue
+    paths.push(path)
+  }
+  return paths
 }
 
 function vaultPathForTabPath(tabs: TabState[], path: string, fallbackVaultPath: string): string {
@@ -449,6 +494,7 @@ function useUntitledRenameCoordinator({
     pendingUntitledRenameRef,
     cancelPendingUntitledRename,
     registerRenamedPath,
+    renamedPathsRef,
     resolveCurrentPath,
     resolvePathBeforeSave,
     flushPendingUntitledRename,
@@ -492,6 +538,7 @@ interface EditorPersistenceOptions {
   scheduleUntitledRename: (path: string, content: string) => void
   resolveCurrentPath: (path: string) => string
   resolvePathBeforeSave: (path: string) => Promise<string>
+  releaseSettledRename: (path: string) => void
   canPersist: boolean
   persistenceScope: string | readonly string[]
   locale: AppLocale
@@ -694,6 +741,7 @@ function useEditorPersistence({
   scheduleUntitledRename,
   resolveCurrentPath,
   resolvePathBeforeSave,
+  releaseSettledRename,
   canPersist,
   persistenceScope,
   locale,
@@ -703,11 +751,12 @@ function useEditorPersistence({
   }, [loadModifiedFiles])
 
   const onNotePersisted = useCallback((path: string, content: string) => {
+    releaseSettledRename(path)
     onInternalVaultWrite?.(path)
     clearUnsaved(path)
     if (path.endsWith('.yml')) reloadViews?.()
     scheduleUntitledRename(path, content)
-  }, [clearUnsaved, onInternalVaultWrite, reloadViews, scheduleUntitledRename])
+  }, [clearUnsaved, onInternalVaultWrite, releaseSettledRename, reloadViews, scheduleUntitledRename])
 
   const {
     handleSave: handleSaveRaw,
@@ -863,17 +912,24 @@ export function useAppSave({
   const canPersist = resolvedPath.trim().length > 0
   const { tabsRef, activeTabPathRef, unsavedPathsRef } = useAppSaveStateRefs({ tabs, activeTabPath, unsavedPaths })
   const {
-    pendingUntitledRenameRef, cancelPendingUntitledRename, registerRenamedPath,
+    pendingUntitledRenameRef, cancelPendingUntitledRename, registerRenamedPath, renamedPathsRef,
     resolveCurrentPath, resolvePathBeforeSave, flushPendingUntitledRename,
     refreshPendingUntitledRename, scheduleUntitledRename,
   } = useUntitledRenameCoordinator({
     resolvedPath, tabsRef, activeTabPathRef, setTabs, handleSwitchTab,
     replaceEntry, loadModifiedFiles, onInternalVaultWrite, initialH1AutoRenameEnabled,
   })
+  const releaseSettledRename = useCallback((savedPath: string) => {
+    releaseSettledRenames(
+      renamedPathsRef.current,
+      savedPath,
+      tabsRef.current.map((tab) => tab.entry.path),
+    )
+  }, [renamedPathsRef, tabsRef])
   const { handleSaveRaw, handleContentChange, holdPendingSave, savePendingForPath, savePending } = useEditorPersistence({
     updateEntry, setTabs, setToastMessage, loadModifiedFiles, trackUnsaved,
     clearUnsaved, onInternalVaultWrite, reloadViews, refreshPendingUntitledRename, scheduleUntitledRename,
-    resolveCurrentPath, resolvePathBeforeSave, canPersist,
+    resolveCurrentPath, resolvePathBeforeSave, releaseSettledRename, canPersist,
     persistenceScope: writableVaultPaths && writableVaultPaths.length > 0 ? writableVaultPaths : resolvedPath,
     locale,
   })
@@ -885,6 +941,40 @@ export function useAppSave({
     handleRenameFilename: handleRenameFilenameRaw,
     resolvedPath, resolvePathBeforeSave, replaceRenamedEntry, loadModifiedFiles, handleSaveRaw, tabs, unsavedPaths,
   })
+  const folderSaveSyncRef = useRef<FolderRenameSaveSync>({
+    flushNotesInFolder: async () => {},
+    retargetNotesInFolder: () => {},
+  })
+  const flushNotesInFolder = useCallback(async (prefix: string) => {
+    const paths = collectFolderFilePaths({
+      prefix,
+      tabs: tabsRef.current,
+      unsavedPaths: unsavedPathsRef.current,
+      renamedPaths: renamedPathsRef.current,
+    })
+    for (const path of paths) {
+      await flushBeforeAction(path)
+    }
+  }, [flushBeforeAction, renamedPathsRef, tabsRef, unsavedPathsRef])
+  const retargetNotesInFolder = useCallback((oldPrefix: string, newPrefix: string) => {
+    const paths = collectFolderFilePaths({
+      prefix: oldPrefix,
+      tabs: tabsRef.current,
+      unsavedPaths: unsavedPathsRef.current,
+      renamedPaths: renamedPathsRef.current,
+    })
+    for (const path of paths) {
+      registerRenamedPath(path, replaceFolderPrefix({ path, oldPrefix, newPrefix }))
+    }
+  }, [registerRenamedPath, renamedPathsRef, tabsRef, unsavedPathsRef])
+
+  useEffect(() => {
+    folderSaveSyncRef.current = { flushNotesInFolder, retargetNotesInFolder }
+  }, [flushNotesInFolder, retargetNotesInFolder])
+  useEffect(() => {
+    registerFolderRenameSaveSync(folderSaveSyncRef)
+    return () => unregisterFolderRenameSaveSync(folderSaveSyncRef)
+  }, [])
 
   return {
     contentChangeRef, handleContentChange, handleFilenameRename, handleSave,
