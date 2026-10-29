@@ -81,7 +81,7 @@ fn run_clone(request: &CloneRequest<'_>) -> Result<(), String> {
             request.dest.display()
         )
     })?;
-    let output = build_clone_command(request, destination)
+    let output = build_clone_command(request, destination)?
         .output()
         .map_err(|e| format!("Failed to run git clone: {}", e))?;
 
@@ -95,15 +95,22 @@ fn run_clone(request: &CloneRequest<'_>) -> Result<(), String> {
     ))
 }
 
-fn build_clone_command(request: &CloneRequest<'_>, destination: &str) -> Command {
-    let mut command = git_command();
+fn build_clone_command(request: &CloneRequest<'_>, destination: &str) -> Result<Command, String> {
+    let mut command = git_command()?;
     command
         .args(["-c", "protocol.ext.allow=never"])
-        .args(["clone", "--quiet", "--", request.url, destination])
+        .args([
+            "clone",
+            "--upload-pack=git-upload-pack",
+            "--quiet",
+            "--",
+            request.url,
+            destination,
+        ])
         .env("GIT_TERMINAL_PROMPT", "0")
         .env("SSH_ASKPASS_REQUIRE", "never")
         .stdin(Stdio::null());
-    command
+    Ok(command)
 }
 
 fn clone_failure_message(output: &Output) -> String {
@@ -235,7 +242,7 @@ mod tests {
             url: "https://example.com/repo.git",
             dest,
         };
-        let command = build_clone_command(&request, "/tmp/repo");
+        let command = build_clone_command(&request, "/tmp/repo").unwrap();
         let args = command
             .get_args()
             .map(|arg| arg.to_string_lossy().to_string())
@@ -258,14 +265,21 @@ mod tests {
             envs.get("SSH_ASKPASS_REQUIRE"),
             Some(&Some("never".to_string()))
         );
+        assert!(
+            args.windows(2)
+                .any(|pair| pair == ["-c", "protocol.ext.allow=never"]),
+            "clone must keep ext:: disabled: {args:?}"
+        );
+        assert!(
+            args.windows(2)
+                .any(|pair| pair == ["-c", "core.fsmonitor=false"]),
+            "clone must disable fsmonitor: {args:?}"
+        );
         assert_eq!(
-            args,
-            vec![
-                "-c".to_string(),
-                "core.quotePath=false".to_string(),
-                "-c".to_string(),
-                "protocol.ext.allow=never".to_string(),
+            &args[args.len() - 6..],
+            [
                 "clone".to_string(),
+                "--upload-pack=git-upload-pack".to_string(),
                 "--quiet".to_string(),
                 "--".to_string(),
                 "https://example.com/repo.git".to_string(),

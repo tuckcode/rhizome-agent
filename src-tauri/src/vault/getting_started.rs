@@ -847,9 +847,8 @@ fn refresh_cloned_vault_config_files(vault_path: &Path) -> Result<(), String> {
 }
 
 fn vault_has_pending_changes(vault_path: &Path) -> Result<bool, String> {
-    let output = crate::hidden_command("git")
+    let output = crate::git::git_command_in(Some(vault_path))?
         .args(["status", "--porcelain"])
-        .current_dir(vault_path)
         .output()
         .map_err(|e| format!("Failed to inspect cloned vault status: {e}"))?;
 

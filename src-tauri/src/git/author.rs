@@ -1,7 +1,7 @@
 use serde::Serialize;
 use std::path::Path;
 
-use super::{git_command, run_git};
+use super::{git_command_in, run_git};
 
 pub(crate) const FALLBACK_AUTHOR_NAME: &str = "Rhizome";
 pub(crate) const FALLBACK_AUTHOR_EMAIL: &str = "vault@rhizome.default";
@@ -80,9 +80,8 @@ pub(crate) fn ensure_author_config(dir: &Path) -> Result<(), String> {
             AuthorConfigKey::Name => "user.name",
             AuthorConfigKey::Email => "user.email",
         };
-        let resolved = git_command()
+        let resolved = git_command_in(Some(dir))?
             .args(["config", key_name])
-            .current_dir(dir)
             .output()
             .map_err(|e| format!("Failed to check git config {key_name}: {e}"))?;
 
@@ -145,9 +144,8 @@ fn config_value(
         AuthorConfigKey::Name => "user.name",
         AuthorConfigKey::Email => "user.email",
     };
-    let output = git_command()
+    let output = git_command_in(Some(dir))?
         .args(["config", scope_flag, key_name])
-        .current_dir(dir)
         .output()
         .map_err(|e| format!("Failed to check git config {key_name}: {e}"))?;
 
@@ -157,9 +155,8 @@ fn config_value(
 }
 
 fn resolved_git_author_identity(dir: &Path) -> Result<AuthorIdentity, String> {
-    let output = git_command()
+    let output = git_command_in(Some(dir))?
         .args(["var", "GIT_AUTHOR_IDENT"])
-        .current_dir(dir)
         .output()
         .map_err(|e| format!("Failed to resolve git author identity: {e}"))?;
 
@@ -224,9 +221,8 @@ fn scoped_config_value(
         AuthorConfigKey::Name => "user.name",
         AuthorConfigKey::Email => "user.email",
     };
-    let output = git_command()
+    let output = git_command_in(Some(dir))?
         .args(["config", "--show-scope", "--get", key_name])
-        .current_dir(dir)
         .output()
         .map_err(|e| format!("Failed to check git config {key_name}: {e}"))?;
 

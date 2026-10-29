@@ -37,6 +37,7 @@ mod tests {
     #[test]
     fn rejects_transport_helpers() {
         assert!(validate_remote_url("ext::sh -c 'touch /tmp/x'").is_err());
+        assert!(validate_remote_url("EXT::x").is_err());
         assert!(validate_remote_url("fd::17/foo").is_err());
         assert!(validate_remote_url("remote-foo.bar::evil").is_err());
     }

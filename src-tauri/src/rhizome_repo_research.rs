@@ -143,6 +143,16 @@ pub fn repo_cache_dir(vault_path: &Path, slug: &str) -> PathBuf {
     vault_path.join(".rhizome").join("repo-cache").join(slug)
 }
 
+fn stream_git(
+    repo: Option<&Path>,
+    args: &[&str],
+    on_line: &mut dyn FnMut(&str),
+) -> Result<(), String> {
+    let mut command = crate::git::git_command_in(repo)?;
+    command.args(args).env("GIT_TERMINAL_PROMPT", "0");
+    crate::rhizome_commands::run_command_streaming(command, "git", on_line).map(|_| ())
+}
+
 /// Make the referenced repository readable on disk and return its path.
 /// Local references pass through untouched (never cloned, never written).
 /// Remote references are shallow-cloned into the repo cache, or updated in
@@ -159,32 +169,45 @@ pub fn ensure_local_repo(
         RepoReference::Remote { url, slug, .. } => (url, slug),
     };
 
-    const GIT_ENV: &[(&str, &str)] = &[("GIT_TERMINAL_PROMPT", "0")];
     let dir = repo_cache_dir(vault_path, slug);
     let dir_str = dir.to_string_lossy().to_string();
 
     if dir.join(".git").is_dir() {
         on_line(&format!("Updating cached clone of {url}..."));
-        crate::rhizome_commands::run_cli_streaming(
-            &["git", "-C", &dir_str, "fetch", "--depth", "1", "origin"],
-            GIT_ENV,
+        stream_git(
+            Some(dir.as_path()),
+            &[
+                "fetch",
+                "--upload-pack=git-upload-pack",
+                "--depth",
+                "1",
+                "origin",
+            ],
             on_line,
         )?;
-        crate::rhizome_commands::run_cli_streaming(
-            &["git", "-C", &dir_str, "reset", "--hard", "FETCH_HEAD"],
-            GIT_ENV,
+        stream_git(
+            Some(dir.as_path()),
+            &["reset", "--hard", "FETCH_HEAD"],
             on_line,
         )?;
     } else {
-        on_line(&format!("Cloning {url}..."));
         crate::git::validate_remote_url(url)?;
+        on_line(&format!("Cloning {url}..."));
         if let Some(parent) = dir.parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|e| format!("Failed to create repo cache dir: {e}"))?;
         }
-        crate::rhizome_commands::run_cli_streaming(
-            &["git", "clone", "--depth", "1", "--", url, &dir_str],
-            GIT_ENV,
+        stream_git(
+            None,
+            &[
+                "clone",
+                "--upload-pack=git-upload-pack",
+                "--depth",
+                "1",
+                "--",
+                url,
+                &dir_str,
+            ],
             on_line,
         )?;
     }
@@ -559,10 +582,18 @@ mod tests {
             slug: "evil-remote".into(),
             display: "evil/remote".into(),
         };
-        let err = ensure_local_repo(vault.path(), &reference, &mut |_| {}).unwrap_err();
+        let mut lines = Vec::new();
+        let err = ensure_local_repo(vault.path(), &reference, &mut |line| {
+            lines.push(line.to_string())
+        })
+        .unwrap_err();
         assert!(
             err.contains("unsupported transport"),
             "validation must fail before git runs: {err}"
+        );
+        assert!(
+            lines.iter().all(|line| !line.starts_with("Cloning ")),
+            "rejected URL must not be printed as a clone: {lines:?}"
         );
         assert!(
             !vault

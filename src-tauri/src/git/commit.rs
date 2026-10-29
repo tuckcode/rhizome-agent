@@ -1,4 +1,4 @@
-use super::{ensure_author_config, git_command};
+use super::{ensure_author_config, git_command_in};
 use std::path::Path;
 
 struct CommitFailure {
@@ -11,9 +11,8 @@ pub fn git_commit(vault_path: &str, message: &str) -> Result<String, String> {
     let vault = Path::new(vault_path);
 
     // Stage all changes
-    let add = git_command()
+    let add = git_command_in(Some(vault))?
         .args(["add", "-A"])
-        .current_dir(vault)
         .output()
         .map_err(|e| format!("Failed to run git add: {}", e))?;
 
@@ -39,14 +38,16 @@ pub fn git_commit(vault_path: &str, message: &str) -> Result<String, String> {
 }
 
 fn run_commit(vault: &Path, message: &str, disable_signing: bool) -> Result<String, CommitFailure> {
-    let mut command = git_command();
+    let mut command = git_command_in(Some(vault)).map_err(|error| CommitFailure {
+        stdout: String::new(),
+        stderr: error,
+    })?;
     if disable_signing {
         command.args(["-c", "commit.gpgsign=false"]);
     }
 
     let commit = command
         .args(["commit", "-m", message])
-        .current_dir(vault)
         .output()
         .map_err(|e| CommitFailure {
             stdout: String::new(),
@@ -87,8 +88,8 @@ fn is_commit_signing_failure(detail: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::git_command;
     use super::*;
+    use crate::git::git_command;
     use crate::git::tests::{setup_git_repo, GitConfigEnvGuard};
     use std::fs;
     use std::path::Path;
@@ -96,6 +97,7 @@ mod tests {
     fn unset_local_author_config(vault: &Path) {
         for key in ["user.name", "user.email"] {
             let status = git_command()
+                .unwrap()
                 .args(["config", "--local", "--unset-all", key])
                 .current_dir(vault)
                 .status()
@@ -106,6 +108,7 @@ mod tests {
 
     fn local_config_value(vault: &Path, key: &str) -> Option<String> {
         let output = git_command()
+            .unwrap()
             .args(["config", "--local", key])
             .current_dir(vault)
             .output()
@@ -128,6 +131,7 @@ mod tests {
 
         // Verify the commit exists
         let log = git_command()
+            .unwrap()
             .args(["log", "--oneline", "-1"])
             .current_dir(vault)
             .output()
@@ -162,6 +166,7 @@ mod tests {
         );
 
         let author = git_command()
+            .unwrap()
             .args(["log", "-1", "--format=%an <%ae>"])
             .current_dir(vault)
             .output()
@@ -194,6 +199,7 @@ mod tests {
         assert_eq!(local_config_value(vault, "user.email"), None);
 
         let author = git_command()
+            .unwrap()
             .args(["log", "-1", "--format=%an <%ae>"])
             .current_dir(vault)
             .output()
@@ -230,11 +236,13 @@ mod tests {
         let vp = vault.to_str().unwrap();
 
         git_command()
+            .unwrap()
             .args(["config", "commit.gpgsign", "true"])
             .current_dir(vault)
             .output()
             .unwrap();
         git_command()
+            .unwrap()
             .args(["config", "gpg.program", "/missing/tolaria-test-gpg"])
             .current_dir(vault)
             .output()
@@ -248,6 +256,7 @@ mod tests {
         );
 
         let log = git_command()
+            .unwrap()
             .args(["log", "--oneline", "-1"])
             .current_dir(vault)
             .output()
@@ -255,6 +264,7 @@ mod tests {
         assert!(String::from_utf8_lossy(&log.stdout).contains("Commit with broken signing config"));
 
         let config = git_command()
+            .unwrap()
             .args(["config", "commit.gpgsign"])
             .current_dir(vault)
             .output()

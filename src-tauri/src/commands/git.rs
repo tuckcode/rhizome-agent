@@ -57,6 +57,7 @@ pub fn get_file_diff_at_commit(
     path: NotePathArg,
     commit_hash: CommitHashArg,
 ) -> Result<String, String> {
+    crate::git::validate_commit_hash(&commit_hash)?;
     let vault_path = expand_tilde(&vault_path);
     let path = expand_tilde(&path);
     crate::git::get_file_diff_at_commit(&vault_path, &path, &commit_hash)
@@ -443,6 +444,7 @@ mod tests {
         // Keep checkouts byte-identical on autocrlf machines (Windows): the
         // discard assertion below compares exact file content.
         crate::git::git_command()
+            .unwrap()
             .args(["config", "core.autocrlf", "false"])
             .current_dir(dir.path())
             .output()
@@ -597,5 +599,18 @@ mod tests {
         assert!(!status.has_remote);
         assert_eq!(status.branch, "");
         assert_eq!((status.ahead, status.behind), (0, 0));
+    }
+
+    #[test]
+    fn get_file_diff_at_commit_rejects_dash_leading_hash_at_the_command_boundary() {
+        let (dir, vault) = create_initialized_vault();
+        let note = note_path(&dir, "note.md");
+        let output = dir.path().join("must-not-be-written");
+
+        let err = get_file_diff_at_commit(vault, note, format!("--output={}", output.display()))
+            .unwrap_err();
+
+        assert!(err.contains("hexadecimal"), "{err}");
+        assert!(!output.exists(), "git wrote {}", output.display());
     }
 }
