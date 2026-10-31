@@ -215,7 +215,7 @@ rhizome-agent/
 │   │   ├── LinuxTitlebar.tsx     # Linux/Windows custom window chrome + controls
 │   │   ├── MacOSTitlebar.tsx     # macOS 32px overlay chrome + Command Palette
 │   │   ├── LinuxMenuButton.tsx   # Linux titlebar menu mirroring app commands
-│   │   ├── CloneVaultModal.tsx   # Clone a vault from any git URL
+│   │   ├── CloneVaultModal.tsx   # Clone a vault from a git URL the remote-URL guard accepts
 │   │   ├── AddRemoteModal.tsx    # Connect a local-only vault to a remote later
 │   │   ├── ConflictResolverModal.tsx # Git conflict resolution
 │   │   ├── CommitDialog.tsx      # Git commit modal
