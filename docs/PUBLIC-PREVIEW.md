@@ -16,7 +16,7 @@ This page is the install and recovery guide. Developer commands live in [`GETTIN
 | Theme | Graphite (default). Dark is Graphite, Light is Earth light, System follows the OS. Earth dark, Loam, and Mycelium are color skins. | |
 | Models | **Taproot** (free automatic router), plus catalog providers you add a key for | |
 | Keys | System keychain (macOS Keychain, Windows Credential Manager, or Secret Service) | A JSON key file you edit by hand |
-| Updates | Check for updates in the app. Install applies from a signed release on the alpha or stable feed. | An update while the updater public key is still the placeholder, or from an unsigned build |
+| Updates | Check for updates in the app. **Update now** installs Rhizome from a signed alpha or stable feed. There is no Prime Chat-engine update offer. | An update from an unsigned local build, or while a feed object has no signature |
 
 The app reports version `0.1.0`. That number is the bundle version, not a promise about every macOS release.
 
@@ -59,17 +59,18 @@ Open http://localhost:5202. The dev server does not use port 5173.
 ## First minute
 
 1. The first launch may ask **Help improve Rhizome**. Telemetry is explained below. Graphite is the default theme.
-2. Chat opens. Notes stay closed until you show them. Views sit on the left rail.
+2. Chat opens on Rhizome's own engine. There is no Prime setup screen. Notes stay closed until you show them. Views sit on the left rail.
 3. You can create a local vault or open a folder you already have. Nothing is cloned from the network unless you set `RHIZOME_GETTING_STARTED_REPO_URL`.
-4. Send one message. On Rhizome's engine you should get an answer, a notice if a non-fatal error occurred, or a clear failure. Prime-targeted chats fail clearly when Prime is missing, the provider login expired, or the connection dropped.
+4. Send one message. You should get an answer, a notice if a non-fatal error occurred, or a clear failure (no provider key, for example). Add a key or Taproot in Settings → AI Agents → Connected.
 5. Show Notes, open or create a note, save, quit, and reopen the same file.
 
 ## If something fails
 
 | What you see | What to do |
 |---|---|
-| Prime is missing | Applies only to an open Prime-locked chat. Install Prime, run `prime-agent` once, start the daemon, then reopen that chat. New chats use Rhizome's engine. |
-| Prime is installed and Chat still says it is missing | Applies only to Prime-locked chats. Wait a few seconds. The status check repeats. |
+| No provider key | Settings → AI Agents → Connected. Paste a key or turn on Taproot. |
+| Couldn't load models | Retry in the picker. The live list waits 10 seconds. |
+| Prime is missing | Applies only to an old Prime-locked chat. Start a new chat, or install Prime for that leftover session. |
 | Provider or login failure | Settings → AI Agents. Native keys go in the system keychain. |
 | macOS blocks the vault folder | Grant access to Documents, Desktop, or Downloads, or move the vault. |
 | No network, or no model | Notes on disk still open. Chat cannot answer. |
