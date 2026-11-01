@@ -1,3 +1,13 @@
 html, body, #root {
   min-height: 100%;
 }
+
+/* Review shots: show the full picker (accounts through Free/Taproot) without clipping. */
+[data-testid="native-chat-model-list"] {
+  max-height: none !important;
+}
+
+[data-testid="native-chat-model-menu"] {
+  max-height: none !important;
+  overflow: visible !important;
+}

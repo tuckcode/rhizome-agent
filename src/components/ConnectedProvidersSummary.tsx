@@ -310,7 +310,7 @@ function ConnectedProvidersSummaryBody({
                 </>
               )}
             </div>
-          ) : row.action === 'none' || row.action === 'add_key' ? null : (
+          ) : row.action === 'none' || row.action === 'add_key' || (row.showKeyField && row.status === 'ready') ? null : (
             <Button
               type="button"
               variant="outline"

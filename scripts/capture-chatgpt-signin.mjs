@@ -43,11 +43,17 @@ for (const [name, theme, state] of shots) {
     } else {
       await page.getByTestId('native-chat-model-sign-in').first().waitFor({ timeout: 10000 })
     }
-    await page.getByText('Taproot', { exact: true }).first().waitFor({ timeout: 10000 }).catch(() => {})
+    await page.getByText('Taproot', { exact: true }).first().waitFor({ timeout: 10000 })
+    await page.getByText('Free tier', { exact: true }).first().waitFor({ timeout: 10000 })
   }
   await page.waitForTimeout(250)
   const file = path.join(outDir, `${name}.png`)
-  await page.locator('[data-testid="chatgpt-signin-shot"]').screenshot({ path: file })
+  if (state === 'connected' || state === 'connected-signed-in') {
+    await page.locator('[data-testid="chatgpt-signin-shot"]').screenshot({ path: file })
+  } else {
+    // Menu content portals to body; capture the full viewport so accounts + Free/Taproot stay in frame.
+    await page.screenshot({ path: file, fullPage: true })
+  }
   console.log(file)
 }
 
