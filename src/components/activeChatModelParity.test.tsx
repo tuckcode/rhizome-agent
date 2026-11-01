@@ -92,7 +92,7 @@ function renderPair(next: Settings, nativeTarget: string | null, providers?: AiM
 }
 
 describe('Settings and the composer chip', () => {
-  it('name the same default Rhizome model, with the chip showing the model name', () => {
+  it('name the same default Rhizome model with a shared Provider · model label', () => {
     renderPair(settings, null)
 
     expect(pickers().map((node) => node.getAttribute('data-model-id'))).toEqual([
@@ -101,13 +101,13 @@ describe('Settings and the composer chip', () => {
     ])
     const chip = chipPicker()
     const chipText = within(chip).getByTestId('native-chat-model-trigger-label').textContent ?? ''
-    expect(chipText).toBe('llama3.2')
+    expect(chipText).toBe('Ollama · llama3.2')
     const row = pickers().find((node) => node.getAttribute('data-variant') === 'row')
-    expect(within(row!).getByTestId('native-chat-model-trigger-label').textContent).toContain(chipText)
-    expect(within(chip).getByTestId('native-chat-model-trigger')).toHaveAccessibleName('llama3.2, Ollama')
+    expect(within(row!).getByTestId('native-chat-model-trigger-label').textContent).toBe(chipText)
+    expect(within(chip).getByTestId('native-chat-model-trigger')).toHaveAccessibleName('Ollama · llama3.2, ollama/llama3.2')
   })
 
-  it('keeps a user-picked model on both surfaces and starts the chip name with that model', () => {
+  it('keeps a user-picked model on both surfaces with the shared Provider · model label', () => {
     const picked = { ...settings, native_chat_target: 'work-openai/gpt-4o', ai_model_providers: [workOpenAi] }
     renderPair(picked, 'work-openai/gpt-4o', [workOpenAi])
 
@@ -116,8 +116,27 @@ describe('Settings and the composer chip', () => {
       'work-openai/gpt-4o',
     ])
     const chip = chipPicker()
-    expect(within(chip).getByTestId('native-chat-model-trigger-label')).toHaveTextContent('GPT-4o')
-    expect(within(chip).getByTestId('native-chat-model-trigger')).toHaveAccessibleName(/^GPT-4o,/)
+    expect(within(chip).getByTestId('native-chat-model-trigger-label')).toHaveTextContent('Work OpenAI · GPT-4o')
+    expect(within(chip).getByTestId('native-chat-model-trigger')).toHaveAccessibleName(/^Work OpenAI · GPT-4o/)
+  })
+
+  it('labels Settings with Provider · model when the selected id is not listed yet', () => {
+    const ollama: AiModelProvider = {
+      id: 'ollama',
+      name: 'Ollama',
+      kind: 'ollama',
+      api_key_storage: 'none',
+      models: [{ id: 'llama3.2', display_name: 'llama3.2', capabilities }],
+    }
+    const next = { ...settings, native_chat_target: 'ollama/qwen2.5', ai_model_providers: [ollama] }
+    render(<SettingsPanel open settings={next} onSave={vi.fn()} onClose={vi.fn()} />)
+
+    const row = pickers().find((node) => node.getAttribute('data-variant') === 'row')
+    expect(row).toBeTruthy()
+    expect(row!.getAttribute('data-model-id')).toBe('ollama/qwen2.5')
+    expect(within(row!).getByTestId('native-chat-model-trigger-label').textContent).toBe(
+      'Ollama · qwen2.5',
+    )
   })
 
   it('shows a removed model by its name on the chip, and the accessible name starts there', () => {

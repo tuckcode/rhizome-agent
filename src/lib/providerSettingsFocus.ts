@@ -9,9 +9,12 @@ export const PROVIDER_SETTINGS_FOCUS_EVENT = 'rhizome-provider-settings-focus'
 export const CONNECTED_SUMMARY_ROW_ID = 'connected-providers'
 
 let pending: ProviderSettingsFocus | null = null
+/** When Add key opens Settings, skip the panel's Sync autofocus and section jump. */
+let suppressOpenAutofocus = false
 
 export function requestProviderSettingsFocus(focus: ProviderSettingsFocus): void {
   pending = focus
+  suppressOpenAutofocus = true
   if (typeof window === 'undefined') return
   window.dispatchEvent(new CustomEvent(PROVIDER_SETTINGS_FOCUS_EVENT, { detail: focus }))
 }
@@ -20,6 +23,14 @@ export function consumeProviderSettingsFocus(): ProviderSettingsFocus | null {
   const value = pending
   pending = null
   return value
+}
+
+export function isSettingsOpenAutofocusSuppressed(): boolean {
+  return suppressOpenAutofocus
+}
+
+export function clearSettingsOpenAutofocusSuppress(): void {
+  suppressOpenAutofocus = false
 }
 
 export function subscribeProviderSettingsFocus(

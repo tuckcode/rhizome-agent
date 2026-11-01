@@ -1,3 +1,4 @@
+import type { TranslationKey } from './i18n'
 import type { AiModelProviderKind } from './aiTargets'
 
 export type PickerBlock =
@@ -84,6 +85,13 @@ export function pickerBlockReason(
   if (block === 'not_running') return `${providerName} isn't running`
   if (block === 'no_models') return 'No models found'
   return "Couldn't load models"
+}
+
+/** Map picker empty/error hint strings to existing i18n keys (en.json owned by #284). */
+export function pickerHintI18nKey(hint: string | null | undefined): TranslationKey | null {
+  if (hint === 'No models found') return 'ai.composer.noModelsFound'
+  if (hint === "Couldn't load models") return 'ai.composer.couldntLoadModels'
+  return null
 }
 
 function settingsTab(kind: string): 'local' | 'api' {

@@ -42,8 +42,16 @@ import {
   rhizomeProviderNeedsApiKey,
   seedRhizomeChatModels,
   type RhizomeChatModel,
+  rhizomeChatModelTriggerLabel,
+  formatChatModelLabel,
+  unresolvedRhizomeChatModelLabel,
 } from '../lib/rhizomeChatModels'
-import { buildPickerMenu, unsetProviderGroupCount, type PickerMenuGroup } from '../lib/pickerModelMenu'
+import {
+  buildPickerMenu,
+  unsetProviderGroupCount,
+  type PickerMenuGroup,
+  pickerHintI18nKey,
+} from '../lib/pickerModelMenu'
 import { requestProviderSettingsFocus, CONNECTED_SUMMARY_ROW_ID } from '../lib/providerSettingsFocus'
 import { nativeSessionTargetForSlot } from '../lib/nativeChatTranscript'
 import { useNativeLiveSlot } from '../lib/nativeLiveSlot'
@@ -157,6 +165,7 @@ export function NativeChatModelPicker({
   const triggerRef = useRef<HTMLButtonElement>(null)
   const filterRef = useRef<HTMLInputElement>(null)
   const selectedRowRef = useRef<HTMLDivElement | null>(null)
+  const skipCloseAutoFocusRef = useRef(false)
   const [open, setOpen] = useState(false)
   useEffect(() => {
     const openPicker = () => setOpen(true)
@@ -196,14 +205,26 @@ export function NativeChatModelPicker({
     : (selectedRhizome
       ? (selectedRhizome.displayName.trim() || selectedRhizome.modelId)
       : selectedId)
-  const rowLabel = prime ? displayName : (selectedRhizome?.label ?? displayName)
-  const visibleText = chip ? displayName : rowLabel
-  const tooltipTitle = providerName ? `${providerName} · ${displayName}` : displayName
-  const showRawId = rawId != null && rawId !== displayName
+  // Unlisted selection: Provider · model from Settings providers (#283).
+  const labelFallback = (!prime && !selectedRhizome && selectedId)
+    ? unresolvedRhizomeChatModelLabel(selectedId, providers)
+    : displayName
+  const rowLabel = prime
+    ? displayName
+    : rhizomeChatModelTriggerLabel(selectedRhizome, labelFallback, { chip: false })
+  // Chip and Settings share the same "Provider · model" label (#283).
+  const visibleText = prime
+    ? displayName
+    : rhizomeChatModelTriggerLabel(selectedRhizome, labelFallback, { chip })
+  const tooltipTitle = prime
+    ? (providerName ? formatChatModelLabel(providerName, displayName) : displayName)
+    : rowLabel
+  const tooltipRawId = prime ? rawId : (selectedRhizome?.id ?? selectedId)
+  const showRawId = tooltipRawId != null && tooltipRawId !== visibleText
   // WCAG 2.5.3: the accessible name starts with the text the control shows.
-  const accessibleName = chip
-    ? [displayName, providerName, showRawId ? rawId : null].filter((part): part is string => Boolean(part)).join(', ')
-    : [rowLabel, showRawId ? rawId : null].filter((part): part is string => Boolean(part)).join(', ')
+  const accessibleName = [visibleText, showRawId ? tooltipRawId : null]
+    .filter((part): part is string => Boolean(part))
+    .join(', ')
   const visibleRhizome = filterRhizomeChatModels(listed, query)
   const needle = query.trim().toLowerCase()
   const visiblePrime = needle
@@ -238,6 +259,14 @@ export function NativeChatModelPicker({
     ? t('ai.composer.chatStaysOn', { model: sessionLabel })
     : t('ai.composer.modelAppliesToNewChats')
   const removed = !prime && selectedRhizome?.label === REMOVED_PROVIDER_LABEL
+  // Prefer keeping the model name when the chip is narrow: provider ellipsizes first (#283).
+  const splitChipLabel = Boolean(
+    chip
+    && !prime
+    && !removed
+    && providerName
+    && selectedRhizome?.providerKind !== 'free_tier',
+  )
   const showFooter = chip && !prime
 
   useEffect(() => {
@@ -351,6 +380,7 @@ export function NativeChatModelPicker({
         open={open}
         onOpenChange={(next) => {
           if (next) {
+            skipCloseAutoFocusRef.current = false
             updateMenuPlacement()
             setQuery('')
             setLoadingNames(prime ? [] : pendingLiveProviderNames(providers))
@@ -380,9 +410,26 @@ export function NativeChatModelPicker({
                 aria-label={accessibleName}
                 data-testid="native-chat-model-trigger"
               >
-                <span className="min-w-0 truncate" data-testid="native-chat-model-trigger-label">
-                  {visibleText}
-                </span>
+                {splitChipLabel ? (
+                  <span
+                    className="inline-flex min-w-0 max-w-full items-center overflow-hidden"
+                    data-testid="native-chat-model-trigger-label"
+                  >
+                    <span className="min-w-0 shrink-[999] truncate" data-testid="native-chat-model-trigger-provider">
+                      {providerName}
+                    </span>
+                    <span className="shrink-0 whitespace-nowrap" aria-hidden="true">
+                      {' · '}
+                    </span>
+                    <span className="min-w-0 truncate" data-testid="native-chat-model-trigger-model">
+                      {displayName}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="min-w-0 truncate" data-testid="native-chat-model-trigger-label">
+                    {visibleText}
+                  </span>
+                )}
                 <CaretDown
                   size={chip ? 12 : 9}
                   weight="bold"
@@ -395,7 +442,7 @@ export function NativeChatModelPicker({
           <TooltipContent side="top" data-testid="native-chat-model-tooltip">
             <div>{tooltipTitle}</div>
             {showRawId ? (
-              <div className="font-mono text-[11px]" data-testid="native-chat-model-tooltip-id">{rawId}</div>
+              <div className="font-mono text-[11px]" data-testid="native-chat-model-tooltip-id">{tooltipRawId}</div>
             ) : null}
           </TooltipContent>
         </Tooltip>
@@ -407,6 +454,10 @@ export function NativeChatModelPicker({
           avoidCollisions
           onCloseAutoFocus={(event) => {
             event.preventDefault()
+            if (skipCloseAutoFocusRef.current) {
+              skipCloseAutoFocusRef.current = false
+              return
+            }
             triggerRef.current?.focus()
           }}
           className={cn(MENU_PANEL_CLASS, chip ? undefined : SETTINGS_MENU_Z_CLASS)}
@@ -502,7 +553,11 @@ export function NativeChatModelPicker({
             ) : (
               rhizomeMenu.map((group, index) => {
                 const loading = loadingNames.includes(group.label) || loadingNames.includes(group.cacheKey)
-                const headerReason = group.blocked ? group.rows.find((row) => row.reason)?.reason : group.hint
+                const rawHeaderReason = group.blocked ? group.rows.find((row) => row.reason)?.reason : group.hint
+                const hintKey = pickerHintI18nKey(group.hint)
+                const headerReason = group.blocked
+                  ? rawHeaderReason
+                  : (hintKey ? t(hintKey) : rawHeaderReason)
                 const headerAction = group.blocked
                   ? group.rows.find((row) => row.action)?.action ?? null
                   : group.hint ? 'retry' : null
@@ -513,6 +568,7 @@ export function NativeChatModelPicker({
                     setReloadToken((token) => token + 1)
                     return
                   }
+                  skipCloseAutoFocusRef.current = true
                   requestProviderSettingsFocus({
                     tab: group.tab === 'agents' ? 'api' : group.tab,
                     rowId: headerAction === 'add_key' ? `summary-provider-row-${group.providerId}` : CONNECTED_SUMMARY_ROW_ID,
@@ -635,6 +691,7 @@ export function NativeChatModelPicker({
                       event.preventDefault()
                     }}
                     onClick={() => {
+                      skipCloseAutoFocusRef.current = true
                       requestProviderSettingsFocus({ tab: 'agents', rowId: CONNECTED_SUMMARY_ROW_ID })
                       onOpenProviders?.()
                       setOpen(false)

@@ -348,6 +348,55 @@ export async function loadRhizomeChatModels(
   return listed
 }
 
+/** Shared Settings + chip trigger label: "Provider · model". */
+export function formatChatModelLabel(providerName: string, displayName: string): string {
+  const name = displayName.trim() || 'Model'
+  const provider = providerName.trim()
+  if (!provider) return name
+  return `${provider} · ${name}`
+}
+
+/** Title-case a raw provider prefix when Settings has no matching provider. */
+function titleCaseProviderPrefix(prefix: string): string {
+  return prefix
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ')
+}
+
+/** When the listed catalog has no match yet, build Provider · model from Settings providers. */
+export function unresolvedRhizomeChatModelLabel(
+  selectedId: string,
+  providers?: AiModelProvider[] | null,
+): string {
+  const parts = splitTarget(selectedId)
+  if (!parts) return selectedId
+  const provider = normalizeAiModelProviders(providers).find(
+    (item) => providerKey(item) === parts.provider || item.kind === parts.provider,
+  )
+  const name =
+    provider?.name?.trim()
+    || catalogEntry(parts.provider)?.name
+    || titleCaseProviderPrefix(parts.provider)
+  return formatChatModelLabel(name, parts.modelId)
+}
+
+/** Trigger label for the active Rhizome model. Chip and Settings share "Provider · model". */
+export function rhizomeChatModelTriggerLabel(
+  model: RhizomeChatModel | undefined,
+  fallback: string,
+  options?: { chip?: boolean },
+): string {
+  if (!model) return fallback
+  // Removed providers keep the chip on the model name; Settings shows the tombstone label.
+  if (model.label === REMOVED_PROVIDER_LABEL) {
+    return options?.chip ? (model.displayName.trim() || model.modelId || fallback) : model.label
+  }
+  if (model.providerKind === 'free_tier') return model.label
+  return model.label || formatChatModelLabel(model.providerName, model.displayName.trim() || model.modelId)
+}
+
 /** Display name when the catalog has one, otherwise the model id. */
 export function rhizomeModelVisibleName(model: RhizomeChatModel): string {
   if (model.label === REMOVED_PROVIDER_LABEL) return REMOVED_PROVIDER_LABEL

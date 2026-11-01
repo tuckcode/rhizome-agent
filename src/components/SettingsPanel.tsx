@@ -12,7 +12,9 @@ import { ConnectedProvidersSummary } from './ConnectedProvidersSummary'
 import { LocalAgentCards } from './LocalAgentCards'
 import {
   CONNECTED_SUMMARY_ROW_ID,
+  clearSettingsOpenAutofocusSuppress,
   consumeProviderSettingsFocus,
+  isSettingsOpenAutofocusSuppressed,
   subscribeProviderSettingsFocus,
   type ProviderSettingsTab,
 } from '../lib/providerSettingsFocus'
@@ -595,6 +597,7 @@ function SettingsPanelInner({
   const openerRef = useRef<HTMLElement | null>(null)
   useEffect(() => {
     if (!open) {
+      clearSettingsOpenAutofocusSuppress()
       const opener = openerRef.current
       openerRef.current = null
       if (opener?.isConnected) opener.focus()
@@ -610,6 +613,8 @@ function SettingsPanelInner({
     if (!initialSectionId) return
     const targetId = resolveSettingsSectionId(initialSectionId)
     const timer = window.setTimeout(() => {
+      // Provider key focus scrolls the row; a section jump would undo it (#285).
+      if (isSettingsOpenAutofocusSuppressed()) return
       if (targetId) document.getElementById(targetId)?.scrollIntoView({ block: 'start' })
     }, 50)
     return () => window.clearTimeout(timer)

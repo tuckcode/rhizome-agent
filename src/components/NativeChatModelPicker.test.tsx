@@ -1,15 +1,21 @@
 import { act, fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react'
-import type { ReactElement } from 'react'
+import { useEffect, useState, type ReactElement } from 'react'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createMissingAiAgentsStatus } from '../lib/aiAgents'
 import type { AiModelProvider } from '../lib/aiTargets'
 import { NATIVE_CHAT_MODEL_CHIP_MAX_WIDTH_CLASS } from '../lib/composerMenuSide'
+import { createTranslator } from '../lib/i18n'
 import { resetPrimeHostStatus } from '../hooks/usePrimeHostStatus'
 import { resetPrimeModelCatalog } from '../lib/primeModelCatalog'
 import { resetListProviderModelsCache } from '../lib/listProviderModels'
-import { consumeProviderSettingsFocus } from '../lib/providerSettingsFocus'
+import {
+  consumeProviderSettingsFocus,
+  subscribeProviderSettingsFocus,
+} from '../lib/providerSettingsFocus'
 import { SETTINGS_MENU_Z_CLASS } from '../lib/settingsMenuLayer'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { ConnectedProvidersSummary } from './ConnectedProvidersSummary'
 import { NativeChatModelPicker } from './NativeChatModelPicker'
 
 function render(ui: ReactElement) {
@@ -72,6 +78,15 @@ vi.mock('../lib/callHost', () => ({
 vi.mock('../lib/productAnalytics', () => ({
   trackRhizomeModelChanged: vi.fn(),
   trackPrimeModelChanged: vi.fn(),
+}))
+
+vi.mock('../utils/aiProviderSecrets', () => ({
+  saveAiModelProviderApiKey: vi.fn(async () => {}),
+  testAiModelProvider: vi.fn(async () => 'OK'),
+}))
+
+vi.mock('../lib/telemetry', () => ({
+  trackEvent: vi.fn(),
 }))
 
 beforeEach(() => {
@@ -245,7 +260,7 @@ describe('NativeChatModelPicker', () => {
     })
   })
 
-  it('names the chip with the visible model first and keeps a compact muted control', async () => {
+  it('names the chip with the shared Provider · model label and keeps a compact muted control', async () => {
     render(
       <NativeChatModelPicker
         variant="chip"
@@ -257,13 +272,13 @@ describe('NativeChatModelPicker', () => {
 
     const chip = screen.getByTestId('native-chat-model-trigger')
     expect(chip.tagName).toBe('BUTTON')
-    expect(chip).toHaveAccessibleName('GPT-4o, Work OpenAI, gpt-4o')
-    expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveTextContent('GPT-4o')
+    expect(chip).toHaveAccessibleName('Work OpenAI · GPT-4o, work-openai/gpt-4o')
+    expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveTextContent('Work OpenAI · GPT-4o')
     chip.focus()
     const tooltip = (await screen.findAllByTestId('native-chat-model-tooltip'))[0]
     expect(tooltip).toHaveTextContent('Work OpenAI · GPT-4o')
     const tooltipId = within(tooltip).getAllByTestId('native-chat-model-tooltip-id')[0]
-    expect(tooltipId).toHaveTextContent('gpt-4o')
+    expect(tooltipId).toHaveTextContent('work-openai/gpt-4o')
     expect(tooltipId).toHaveClass('font-mono')
     expect(chip).toHaveClass('rounded-md')
     expect(chip).toHaveClass('h-6')
@@ -337,8 +352,13 @@ describe('NativeChatModelPicker', () => {
 
     const chip = screen.getByTestId('native-chat-model-trigger')
     expect(chip).toHaveClass(NATIVE_CHAT_MODEL_CHIP_MAX_WIDTH_CLASS)
-    expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveTextContent('anthropic-claude-opus-4-very-long-id')
-    expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveClass('truncate')
+    expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveTextContent('Work OpenAI · anthropic-claude-opus-4-very-long-id')
+    expect(screen.getByTestId('native-chat-model-trigger-provider')).toHaveClass('min-w-0', 'shrink-[999]', 'truncate')
+    expect(screen.getByTestId('native-chat-model-trigger-model')).toHaveClass('min-w-0', 'truncate')
+    expect(screen.getByTestId('native-chat-model-trigger-model')).not.toHaveClass('shrink-0')
+    expect(screen.getByTestId('native-chat-model-trigger-model')).not.toHaveClass('shrink-[999]')
+    expect(screen.getByTestId('native-chat-model-trigger-model')).toHaveTextContent('anthropic-claude-opus-4-very-long-id')
+    expect(screen.getByTestId('native-chat-model-trigger-provider')).toHaveTextContent('Work OpenAI')
     chip.focus()
     expect(await screen.findByTestId('native-chat-model-tooltip')).toHaveTextContent(LONG_NAME)
 
@@ -353,6 +373,76 @@ describe('NativeChatModelPicker', () => {
     expect(row).toHaveTextContent('anthropic-claude-opus-4-very-long-id')
     expect(row.querySelector('.truncate')).not.toBeNull()
     expect(row.querySelector('.truncate')).toHaveAttribute('title', 'anthropic-claude-opus-4-very-long-id')
+  })
+
+  it('lets the provider span shrink before the model name on a narrow chip', () => {
+    render(
+      <NativeChatModelPicker
+        variant="chip"
+        value="work-openai/gpt-4o"
+        onChange={vi.fn()}
+        providers={configured}
+      />,
+    )
+
+    const label = screen.getByTestId('native-chat-model-trigger-label')
+    expect(label).toHaveClass('min-w-0')
+    expect(label).toHaveClass('overflow-hidden')
+    const provider = screen.getByTestId('native-chat-model-trigger-provider')
+    const model = screen.getByTestId('native-chat-model-trigger-model')
+    expect(provider).toHaveClass('min-w-0', 'shrink-[999]', 'truncate')
+    expect(model).toHaveClass('min-w-0', 'truncate')
+    expect(model).not.toHaveClass('shrink-0')
+    expect(model).not.toHaveClass('shrink-[999]')
+    expect(label).toHaveTextContent('Work OpenAI · GPT-4o')
+    expect(screen.getByTestId('native-chat-model-trigger')).toHaveAccessibleName(
+      'Work OpenAI · GPT-4o, work-openai/gpt-4o',
+    )
+  })
+
+  it('focuses the Settings key field after Add key without returning focus to the chip', async () => {
+    function Harness() {
+      const [focusRowId, setFocusRowId] = useState<string | null>(null)
+      useEffect(() => {
+        return subscribeProviderSettingsFocus((focus) => {
+          setFocusRowId(focus.rowId)
+        })
+      }, [])
+      return (
+        <>
+          <NativeChatModelPicker
+            variant="chip"
+            value={null}
+            onChange={vi.fn()}
+            providers={[]}
+            onOpenProviders={() => {}}
+          />
+          <ConnectedProvidersSummary
+            t={createTranslator('en')}
+            agents={createMissingAiAgentsStatus()}
+            providers={[]}
+            onChange={vi.fn()}
+            onOpen={vi.fn()}
+            focusRowId={focusRowId}
+            onFocusConsumed={() => {
+              setFocusRowId(null)
+            }}
+          />
+        </>
+      )
+    }
+
+    render(<Harness />)
+    openMenu()
+    const addKey = await screen.findAllByTestId('native-chat-model-add-key')
+    await act(async () => {
+      fireEvent.click(addKey[0])
+    })
+    await waitFor(() => {
+      const field = document.querySelector<HTMLInputElement>('[data-key-for]')
+      expect(field).not.toBeNull()
+      expect(document.activeElement).toBe(field)
+    })
   })
 
   it('styles the chip menu panel and lists model ids under sentence-case groups', async () => {
@@ -684,8 +774,8 @@ describe('NativeChatModelPicker', () => {
       />,
     )
 
-    expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveTextContent('gemini-2.5-flash')
-    expect(screen.getByTestId('native-chat-model-trigger')).toHaveAccessibleName(/^gemini-2\.5-flash,/)
+    expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveTextContent('Gemini · gemini-2.5-flash')
+    expect(screen.getByTestId('native-chat-model-trigger')).toHaveAccessibleName(/^Gemini · gemini-2\.5-flash/)
     openMenu()
     await waitFor(() => {
       expect(screen.getByTestId('native-chat-model-gemini/gemini-2.5-flash')).toBeInTheDocument()
