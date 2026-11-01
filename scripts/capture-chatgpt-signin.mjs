@@ -29,6 +29,8 @@ for (const [name, theme, state] of shots) {
     if (state === 'connected-signed-in') {
       await page.getByTestId('settings-connected-email-account:openai').waitFor({ timeout: 10000 })
     }
+    await page.getByTestId('settings-connected-section-free').waitFor({ timeout: 10000 })
+    await page.getByTestId('settings-connected-row-provider:free_tier').waitFor({ timeout: 10000 })
   } else {
     const trigger = page.getByTestId('native-chat-model-trigger')
     await trigger.waitFor()
