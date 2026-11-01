@@ -209,7 +209,7 @@ export function NativeChatModelPicker({
   const unresolvedFallback = !prime && !selectedRhizome && selectedId
     ? unresolvedRhizomeChatModelLabel(selectedId, providers)
     : null
-  const labelFallback = selectedRhizome ? displayName : (unresolvedFallback ?? displayName ?? '')
+  const labelFallback = selectedRhizome ? displayName : (unresolvedFallback ?? displayName)
   const rowLabel = prime
     ? displayName
     : rhizomeChatModelTriggerLabel(selectedRhizome, labelFallback, { chip: false })
