@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMissingAiAgentsStatus } from '../lib/aiAgents'
 import { createTranslator } from '../lib/i18n'
 import type { AiModelProvider } from '../lib/aiTargets'
@@ -151,8 +151,25 @@ describe('ConnectedProvidersSummary', () => {
     expect(screen.getByTestId('settings-connected-models-provider:lab')).toHaveTextContent('Lab 1')
   })
 
-  it('focuses the key field, scrolls the row, and briefly highlights it for Add key', async () => {
+  function installFocusRetryTimers() {
     vi.useFakeTimers()
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      return window.setTimeout(() => {
+        callback(performance.now())
+      }, 16) as unknown as number
+    })
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => {
+      window.clearTimeout(id)
+    })
+  }
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  it('focuses the key field, scrolls the row, and briefly highlights it for Add key', async () => {
+    installFocusRetryTimers()
     const focusRowId = summaryRowId(providerRowId('work-openai'))
     const onFocusConsumed = vi.fn()
     render(
@@ -172,7 +189,7 @@ describe('ConnectedProvidersSummary', () => {
     row.scrollIntoView = scrollIntoView
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(120)
+      await vi.advanceTimersByTimeAsync(16)
     })
 
     expect(scrollIntoView).toHaveBeenCalled()
@@ -184,7 +201,73 @@ describe('ConnectedProvidersSummary', () => {
       await vi.advanceTimersByTimeAsync(1600)
     })
     expect(row).not.toHaveAttribute('data-highlighted')
-    vi.useRealTimers()
+  })
+
+  it('retries Add key focus until the key field mounts, then consumes the focus request', async () => {
+    installFocusRetryTimers()
+    const focusRowId = summaryRowId(providerRowId('work-openai'))
+    const onFocusConsumed = vi.fn()
+    render(
+      <ConnectedProvidersSummary
+        t={createTranslator('en')}
+        agents={createMissingAiAgentsStatus()}
+        providers={[provider]}
+        onChange={vi.fn()}
+        onOpen={vi.fn()}
+        focusRowId={focusRowId}
+        onFocusConsumed={onFocusConsumed}
+      />,
+    )
+    const row = screen.getByTestId('settings-connected-row-provider:work-openai')
+    const field = screen.getByTestId('settings-connected-key-provider:work-openai')
+    const host = field.parentElement
+    expect(host).not.toBeNull()
+    field.remove()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(48)
+    })
+    expect(onFocusConsumed).not.toHaveBeenCalled()
+
+    host!.appendChild(field)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(16)
+    })
+
+    expect(field).toHaveFocus()
+    expect(row).toHaveAttribute('data-highlighted', 'true')
+    expect(onFocusConsumed).toHaveBeenCalledOnce()
+  })
+
+  it('consumes Add key focus after the retry cap when the key field never appears', async () => {
+    installFocusRetryTimers()
+    const focusRowId = summaryRowId(providerRowId('work-openai'))
+    const onFocusConsumed = vi.fn()
+    render(
+      <ConnectedProvidersSummary
+        t={createTranslator('en')}
+        agents={createMissingAiAgentsStatus()}
+        providers={[provider]}
+        onChange={vi.fn()}
+        onOpen={vi.fn()}
+        focusRowId={focusRowId}
+        onFocusConsumed={onFocusConsumed}
+      />,
+    )
+    const row = screen.getByTestId('settings-connected-row-provider:work-openai')
+    const field = screen.getByTestId('settings-connected-key-provider:work-openai')
+    const scrollIntoView = vi.fn()
+    row.scrollIntoView = scrollIntoView
+    field.remove()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1100)
+    })
+
+    expect(scrollIntoView).toHaveBeenCalled()
+    expect(onFocusConsumed).toHaveBeenCalledOnce()
+    expect(row).toHaveAttribute('data-highlighted', 'true')
+    expect(document.activeElement).not.toBe(field)
   })
 
 })

@@ -73,20 +73,48 @@ export function ConnectedProvidersSummary({
 
   useEffect(() => {
     if (!focusRowId) return
-    // Settings scrolls the AI section to start ~50ms after open; wait past that
-    // so Add key still lands on the provider key field (#283).
-    const focusTimer = window.setTimeout(() => {
+    // Settings scrolls the AI section ~50ms after open. Retry until the key
+    // field is mounted (or ~1s elapses) so Add key does not race that scroll (#283).
+    let cancelled = false
+    let frame = 0
+    const startedAt = performance.now()
+    const FOCUS_RETRY_CAP_MS = 1000
+
+    const finish = (field: HTMLInputElement | null) => {
+      if (cancelled) return
       const row = document.getElementById(focusRowId)
       row?.scrollIntoView({ block: 'center' })
+      if (field) {
+        field.focus()
+      }
+      setHighlightRowId(focusRowId)
+      onFocusConsumed?.()
+    }
+
+    const tryFocus = () => {
+      if (cancelled) return
       const field = document.querySelector<HTMLInputElement>(
         `[data-key-for="${CSS.escape(focusRowId)}"]`,
       )
-      field?.focus()
-      setHighlightRowId(focusRowId)
-      onFocusConsumed?.()
-    }, 120)
+      if (field) {
+        finish(field)
+        return
+      }
+      if (performance.now() - startedAt >= FOCUS_RETRY_CAP_MS) {
+        finish(null)
+        return
+      }
+      frame = window.requestAnimationFrame(() => {
+        tryFocus()
+      })
+    }
+
+    frame = window.requestAnimationFrame(() => {
+      tryFocus()
+    })
     return () => {
-      window.clearTimeout(focusTimer)
+      cancelled = true
+      window.cancelAnimationFrame(frame)
     }
   }, [focusRowId, onFocusConsumed])
 

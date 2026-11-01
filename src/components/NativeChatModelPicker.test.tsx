@@ -338,7 +338,11 @@ describe('NativeChatModelPicker', () => {
     const chip = screen.getByTestId('native-chat-model-trigger')
     expect(chip).toHaveClass(NATIVE_CHAT_MODEL_CHIP_MAX_WIDTH_CLASS)
     expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveTextContent('Work OpenAI · anthropic-claude-opus-4-very-long-id')
-    expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveClass('truncate')
+    expect(screen.getByTestId('native-chat-model-trigger-provider')).toHaveClass('min-w-0')
+    expect(screen.getByTestId('native-chat-model-trigger-provider')).toHaveClass('truncate')
+    expect(screen.getByTestId('native-chat-model-trigger-model')).toHaveClass('shrink-0')
+    expect(screen.getByTestId('native-chat-model-trigger-model')).toHaveTextContent('anthropic-claude-opus-4-very-long-id')
+    expect(screen.getByTestId('native-chat-model-trigger-provider')).toHaveTextContent('Work OpenAI')
     chip.focus()
     expect(await screen.findByTestId('native-chat-model-tooltip')).toHaveTextContent(LONG_NAME)
 
@@ -353,6 +357,30 @@ describe('NativeChatModelPicker', () => {
     expect(row).toHaveTextContent('anthropic-claude-opus-4-very-long-id')
     expect(row.querySelector('.truncate')).not.toBeNull()
     expect(row.querySelector('.truncate')).toHaveAttribute('title', 'anthropic-claude-opus-4-very-long-id')
+  })
+
+  it('lets the provider span shrink before the model name on a narrow chip', () => {
+    render(
+      <NativeChatModelPicker
+        variant="chip"
+        value="work-openai/gpt-4o"
+        onChange={vi.fn()}
+        providers={configured}
+      />,
+    )
+
+    const label = screen.getByTestId('native-chat-model-trigger-label')
+    expect(label).toHaveClass('min-w-0')
+    expect(label).toHaveClass('overflow-hidden')
+    const provider = screen.getByTestId('native-chat-model-trigger-provider')
+    const model = screen.getByTestId('native-chat-model-trigger-model')
+    expect(provider).toHaveClass('min-w-0', 'truncate')
+    expect(model).toHaveClass('shrink-0')
+    expect(model).not.toHaveClass('truncate')
+    expect(label).toHaveTextContent('Work OpenAI · GPT-4o')
+    expect(screen.getByTestId('native-chat-model-trigger')).toHaveAccessibleName(
+      'Work OpenAI · GPT-4o, work-openai/gpt-4o',
+    )
   })
 
   it('styles the chip menu panel and lists model ids under sentence-case groups', async () => {

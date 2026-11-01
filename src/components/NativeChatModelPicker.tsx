@@ -253,6 +253,14 @@ export function NativeChatModelPicker({
     ? t('ai.composer.chatStaysOn', { model: sessionLabel })
     : t('ai.composer.modelAppliesToNewChats')
   const removed = !prime && selectedRhizome?.label === REMOVED_PROVIDER_LABEL
+  // Prefer keeping the model name when the chip is narrow: provider ellipsizes first (#283).
+  const splitChipLabel = Boolean(
+    chip
+    && !prime
+    && !removed
+    && providerName
+    && selectedRhizome?.providerKind !== 'free_tier',
+  )
   const showFooter = chip && !prime
 
   useEffect(() => {
@@ -395,9 +403,26 @@ export function NativeChatModelPicker({
                 aria-label={accessibleName}
                 data-testid="native-chat-model-trigger"
               >
-                <span className="min-w-0 truncate" data-testid="native-chat-model-trigger-label">
-                  {visibleText}
-                </span>
+                {splitChipLabel ? (
+                  <span
+                    className="inline-flex min-w-0 max-w-full items-center overflow-hidden"
+                    data-testid="native-chat-model-trigger-label"
+                  >
+                    <span className="min-w-0 truncate" data-testid="native-chat-model-trigger-provider">
+                      {providerName}
+                    </span>
+                    <span className="shrink-0 whitespace-nowrap" aria-hidden="true">
+                      {' · '}
+                    </span>
+                    <span className="shrink-0" data-testid="native-chat-model-trigger-model">
+                      {displayName}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="min-w-0 truncate" data-testid="native-chat-model-trigger-label">
+                    {visibleText}
+                  </span>
+                )}
                 <CaretDown
                   size={chip ? 12 : 9}
                   weight="bold"
