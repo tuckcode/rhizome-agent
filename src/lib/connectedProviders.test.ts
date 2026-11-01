@@ -21,7 +21,7 @@ function provider(overrides: Partial<AiModelProvider> & Pick<AiModelProvider, 'i
 }
 
 describe('buildConnectedRows', () => {
-  it('lists agents and providers with Ready, Needs a key, Not running, and Couldn\'t load models', () => {
+  it('lists agents and providers with Ready, Needs a key, Not running, No models found, and Couldn\'t load models', () => {
     const agents = {
       ...createMissingAiAgentsStatus(),
       claude_code: createAiAgentAvailability('installed', '2.1.289 (Claude Code)'),
@@ -64,8 +64,8 @@ describe('buildConnectedRows', () => {
       tab: 'local',
     })
     expect(rows.find((row) => row.name === 'LM Studio')).toMatchObject({
-      status: 'load_failed',
-      statusLabel: "Couldn't load models",
+      status: 'no_models',
+      statusLabel: 'No models found',
       action: 'retry',
     })
     expect(rows.find((row) => row.name === 'Scrub test')).toMatchObject({

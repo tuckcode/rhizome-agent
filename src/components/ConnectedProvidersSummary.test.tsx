@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMissingAiAgentsStatus } from '../lib/aiAgents'
 import { createTranslator } from '../lib/i18n'
 import type { AiModelProvider } from '../lib/aiTargets'
 import { resetListProviderModelsCache } from '../lib/listProviderModels'
+import { providerRowId, summaryRowId } from '../lib/connectedProviders'
 import { ConnectedProvidersSummary } from './ConnectedProvidersSummary'
 
 const secrets = vi.hoisted(() => ({
@@ -149,4 +150,41 @@ describe('ConnectedProvidersSummary', () => {
     expect(screen.getByTestId('settings-connected-status-provider:lab')).toHaveTextContent('Ready')
     expect(screen.getByTestId('settings-connected-models-provider:lab')).toHaveTextContent('Lab 1')
   })
+
+  it('focuses the key field, scrolls the row, and briefly highlights it for Add key', async () => {
+    vi.useFakeTimers()
+    const focusRowId = summaryRowId(providerRowId('work-openai'))
+    const onFocusConsumed = vi.fn()
+    render(
+      <ConnectedProvidersSummary
+        t={createTranslator('en')}
+        agents={createMissingAiAgentsStatus()}
+        providers={[provider]}
+        onChange={vi.fn()}
+        onOpen={vi.fn()}
+        focusRowId={focusRowId}
+        onFocusConsumed={onFocusConsumed}
+      />,
+    )
+    const row = screen.getByTestId('settings-connected-row-provider:work-openai')
+    const field = screen.getByTestId('settings-connected-key-provider:work-openai')
+    const scrollIntoView = vi.fn()
+    row.scrollIntoView = scrollIntoView
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(120)
+    })
+
+    expect(scrollIntoView).toHaveBeenCalled()
+    expect(field).toHaveFocus()
+    expect(row).toHaveAttribute('data-highlighted', 'true')
+    expect(onFocusConsumed).toHaveBeenCalledOnce()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1600)
+    })
+    expect(row).not.toHaveAttribute('data-highlighted')
+    vi.useRealTimers()
+  })
+
 })

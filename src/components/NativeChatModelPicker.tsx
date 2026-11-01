@@ -42,8 +42,15 @@ import {
   rhizomeProviderNeedsApiKey,
   seedRhizomeChatModels,
   type RhizomeChatModel,
+  rhizomeChatModelTriggerLabel,
+  formatChatModelLabel,
 } from '../lib/rhizomeChatModels'
-import { buildPickerMenu, unsetProviderGroupCount, type PickerMenuGroup } from '../lib/pickerModelMenu'
+import {
+  buildPickerMenu,
+  unsetProviderGroupCount,
+  type PickerMenuGroup,
+  pickerHintI18nKey,
+} from '../lib/pickerModelMenu'
 import { requestProviderSettingsFocus, CONNECTED_SUMMARY_ROW_ID } from '../lib/providerSettingsFocus'
 import { nativeSessionTargetForSlot } from '../lib/nativeChatTranscript'
 import { useNativeLiveSlot } from '../lib/nativeLiveSlot'
@@ -196,14 +203,22 @@ export function NativeChatModelPicker({
     : (selectedRhizome
       ? (selectedRhizome.displayName.trim() || selectedRhizome.modelId)
       : selectedId)
-  const rowLabel = prime ? displayName : (selectedRhizome?.label ?? displayName)
-  const visibleText = chip ? displayName : rowLabel
-  const tooltipTitle = providerName ? `${providerName} · ${displayName}` : displayName
-  const showRawId = rawId != null && rawId !== displayName
+  const rowLabel = prime
+    ? displayName
+    : rhizomeChatModelTriggerLabel(selectedRhizome, displayName, { chip: false })
+  // Chip and Settings share the same "Provider · model" label (#283).
+  const visibleText = prime
+    ? displayName
+    : rhizomeChatModelTriggerLabel(selectedRhizome, displayName, { chip })
+  const tooltipTitle = prime
+    ? (providerName ? formatChatModelLabel(providerName, displayName) : displayName)
+    : rowLabel
+  const tooltipRawId = prime ? rawId : (selectedRhizome?.id ?? selectedId)
+  const showRawId = tooltipRawId != null && tooltipRawId !== visibleText
   // WCAG 2.5.3: the accessible name starts with the text the control shows.
-  const accessibleName = chip
-    ? [displayName, providerName, showRawId ? rawId : null].filter((part): part is string => Boolean(part)).join(', ')
-    : [rowLabel, showRawId ? rawId : null].filter((part): part is string => Boolean(part)).join(', ')
+  const accessibleName = [visibleText, showRawId ? tooltipRawId : null]
+    .filter((part): part is string => Boolean(part))
+    .join(', ')
   const visibleRhizome = filterRhizomeChatModels(listed, query)
   const needle = query.trim().toLowerCase()
   const visiblePrime = needle
@@ -395,7 +410,7 @@ export function NativeChatModelPicker({
           <TooltipContent side="top" data-testid="native-chat-model-tooltip">
             <div>{tooltipTitle}</div>
             {showRawId ? (
-              <div className="font-mono text-[11px]" data-testid="native-chat-model-tooltip-id">{rawId}</div>
+              <div className="font-mono text-[11px]" data-testid="native-chat-model-tooltip-id">{tooltipRawId}</div>
             ) : null}
           </TooltipContent>
         </Tooltip>
@@ -502,7 +517,11 @@ export function NativeChatModelPicker({
             ) : (
               rhizomeMenu.map((group, index) => {
                 const loading = loadingNames.includes(group.label) || loadingNames.includes(group.cacheKey)
-                const headerReason = group.blocked ? group.rows.find((row) => row.reason)?.reason : group.hint
+                const rawHeaderReason = group.blocked ? group.rows.find((row) => row.reason)?.reason : group.hint
+                const hintKey = pickerHintI18nKey(group.hint)
+                const headerReason = group.blocked
+                  ? rawHeaderReason
+                  : (hintKey ? t(hintKey) : rawHeaderReason)
                 const headerAction = group.blocked
                   ? group.rows.find((row) => row.action)?.action ?? null
                   : group.hint ? 'retry' : null

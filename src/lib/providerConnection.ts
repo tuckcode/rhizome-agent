@@ -1,4 +1,6 @@
-export type ConnectionStatus = 'checking' | 'ready' | 'needs_key' | 'not_running' | 'load_failed'
+import type { TranslationKey } from './i18n'
+
+export type ConnectionStatus = 'checking' | 'ready' | 'needs_key' | 'not_running' | 'no_models' | 'load_failed'
 
 export type ConnectionAction = 'add_key' | 'retry' | 'open' | 'install' | 'none'
 
@@ -19,8 +21,19 @@ export function connectionStatus(input: {
   if (!probe || probe.models === undefined) return 'checking'
   if (probe.unreachable && input.local) return 'not_running'
   if (probe.failed) return 'load_failed'
-  if (!probe.models || probe.models.length === 0) return 'load_failed'
+  if (!probe.models || probe.models.length === 0) return 'no_models'
   return 'ready'
+}
+
+/** i18n keys shared by Settings Connected and the chat picker. */
+export function connectionStatusMessageKey(status: ConnectionStatus): TranslationKey | null {
+  if (status === 'checking') return 'settings.connected.checking'
+  if (status === 'ready') return 'settings.connected.ready'
+  if (status === 'needs_key') return 'settings.connected.needsKey'
+  if (status === 'not_running') return 'settings.connected.notRunning'
+  if (status === 'no_models') return 'ai.composer.noModelsFound'
+  if (status === 'load_failed') return 'settings.connected.loadFailed'
+  return null
 }
 
 export function connectionStatusLabel(status: ConnectionStatus): string {
@@ -33,6 +46,8 @@ export function connectionStatusLabel(status: ConnectionStatus): string {
       return 'Needs a key'
     case 'not_running':
       return 'Not running'
+    case 'no_models':
+      return 'No models found'
     case 'load_failed':
       return "Couldn't load models"
   }

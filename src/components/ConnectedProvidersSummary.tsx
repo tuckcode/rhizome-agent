@@ -10,7 +10,10 @@ import {
   providersToListLive,
 } from '../lib/listProviderModels'
 import type { createTranslator } from '../lib/i18n'
-import { connectionErrorMessage } from '../lib/providerConnection'
+import {
+  connectionErrorMessage,
+  connectionStatusMessageKey,
+} from '../lib/providerConnection'
 import { cn } from '@/lib/utils'
 import { openExternalUrl } from '../utils/url'
 import { trackEvent } from '../lib/telemetry'
@@ -44,6 +47,7 @@ export function ConnectedProvidersSummary({
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [busyId, setBusyId] = useState<string | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [highlightRowId, setHighlightRowId] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -69,11 +73,26 @@ export function ConnectedProvidersSummary({
 
   useEffect(() => {
     if (!focusRowId) return
-    document.getElementById(focusRowId)?.scrollIntoView({ block: 'nearest' })
-    const field = document.querySelector<HTMLInputElement>(`[data-key-for="${CSS.escape(focusRowId)}"]`)
-    field?.focus()
-    onFocusConsumed?.()
+    // Settings scrolls the AI section to start ~50ms after open; wait past that
+    // so Add key still lands on the provider key field (#283).
+    const focusTimer = window.setTimeout(() => {
+      const row = document.getElementById(focusRowId)
+      row?.scrollIntoView({ block: 'center' })
+      const field = document.querySelector<HTMLInputElement>(
+        `[data-key-for="${CSS.escape(focusRowId)}"]`,
+      )
+      field?.focus()
+      setHighlightRowId(focusRowId)
+      onFocusConsumed?.()
+    }, 120)
+    return () => window.clearTimeout(focusTimer)
   }, [focusRowId, onFocusConsumed])
+
+  useEffect(() => {
+    if (!highlightRowId) return
+    const clearTimer = window.setTimeout(() => setHighlightRowId(null), 1600)
+    return () => window.clearTimeout(clearTimer)
+  }, [highlightRowId])
 
   const retry = async (row: ConnectedRow) => {
     if (!row.provider) return
@@ -122,8 +141,17 @@ export function ConnectedProvidersSummary({
 
   const statusClass = (status: ConnectedRow['status']) => {
     if (status === 'ready') return 'bg-[var(--feedback-success-bg)] text-feedback-success-text'
-    if (status === 'needs_key' || status === 'load_failed') return 'bg-[var(--feedback-warning-bg)] text-[var(--feedback-warning-text)]'
+    if (status === 'needs_key' || status === 'load_failed' || status === 'no_models') {
+      return 'bg-[var(--feedback-warning-bg)] text-[var(--feedback-warning-text)]'
+    }
     return 'bg-muted text-muted-foreground'
+  }
+
+  const statusText = (row: ConnectedRow) => {
+    // Agents use a custom "Not installed" label on not_running; keep that.
+    if (row.kind === 'agent') return row.statusLabel
+    const key = connectionStatusMessageKey(row.status)
+    return key ? t(key) : row.statusLabel
   }
 
   return (
@@ -143,14 +171,18 @@ export function ConnectedProvidersSummary({
               id={row.rowId}
               data-testid={`settings-connected-row-${row.id}`}
               data-status={row.status}
-              className="rounded-md border border-border bg-background px-3 py-2"
+              data-highlighted={highlightRowId === row.rowId ? 'true' : undefined}
+              className={cn(
+                'rounded-md border border-border bg-background px-3 py-2 transition-shadow',
+                highlightRowId === row.rowId && 'ring-2 ring-[var(--feedback-warning-text)] ring-offset-2 ring-offset-background',
+              )}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="truncate text-sm font-medium text-foreground">{row.name}</div>
                   <div data-testid={`settings-connected-status-${row.id}`}>
                     <span className={cn('inline-flex rounded-full px-1.5 py-0.5 text-[11px] font-medium', statusClass(row.status))}>
-                      {row.statusLabel}
+                      {statusText(row)}
                     </span>
                   </div>
                   {row.models.length > 0 ? (

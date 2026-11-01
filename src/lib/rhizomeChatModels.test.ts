@@ -15,6 +15,8 @@ import {
   seedRhizomeChatModels,
   excludeKeylessRhizomeModels,
   countKeylessRhizomeProviders,
+  formatChatModelLabel,
+  rhizomeChatModelTriggerLabel,
 } from './rhizomeChatModels'
 
 vi.mock('./callHost', () => ({
@@ -268,5 +270,25 @@ describe('resolveRhizomeChatModel', () => {
     const keyed = excludeKeylessRhizomeModels(listed, [], 'gemini/gemini-2.5-flash')
     expect(keyed.some((model) => model.id === 'gemini/gemini-2.5-flash')).toBe(true)
     expect(keyed.some((model) => model.providerKind === 'open_ai')).toBe(false)
+  })
+})
+
+describe('formatChatModelLabel', () => {
+  it('builds the shared Provider · model string', () => {
+    expect(formatChatModelLabel('Ollama', 'llama3.2')).toBe('Ollama · llama3.2')
+    const model = {
+      id: 'ollama/llama3.2',
+      providerId: 'ollama',
+      providerKind: 'ollama',
+      providerName: 'Ollama',
+      modelId: 'llama3.2',
+      displayName: 'llama3.2',
+      label: 'Ollama · llama3.2',
+    }
+    expect(rhizomeChatModelTriggerLabel(model, 'fallback')).toBe('Ollama · llama3.2')
+    expect(rhizomeChatModelTriggerLabel(model, 'fallback', { chip: true })).toBe('Ollama · llama3.2')
+    const removed = { ...model, label: REMOVED_PROVIDER_LABEL, providerName: REMOVED_PROVIDER_LABEL, displayName: 'gpt-4o', modelId: 'gpt-4o' }
+    expect(rhizomeChatModelTriggerLabel(removed, 'fallback', { chip: true })).toBe('gpt-4o')
+    expect(rhizomeChatModelTriggerLabel(removed, 'fallback')).toBe(REMOVED_PROVIDER_LABEL)
   })
 })

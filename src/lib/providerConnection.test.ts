@@ -5,6 +5,7 @@ import {
   connectionErrorMessage,
   connectionStatus,
   connectionStatusLabel,
+  connectionStatusMessageKey,
   providersNeedAttentionLabel,
 } from './providerConnection'
 
@@ -39,7 +40,7 @@ describe('connectionStatus', () => {
     expect(connectionAction('not_running')).toBe('retry')
   })
 
-  it('says Checking until a probe exists, then Couldn\'t load models when it fails or is empty', () => {
+  it('says Checking until a probe exists, Couldn\'t load models on failure, and No models found when empty', () => {
     expect(connectionStatus({
       needsKey: false,
       local: true,
@@ -52,13 +53,17 @@ describe('connectionStatus', () => {
       local: false,
       probe: { failed: true, models: [] },
     })).toBe('load_failed')
+    expect(connectionStatusLabel('load_failed')).toBe("Couldn't load models")
+    expect(connectionAction('load_failed')).toBe('retry')
     expect(connectionStatus({
       needsKey: false,
       local: true,
       probe: { models: [] },
-    })).toBe('load_failed')
-    expect(connectionStatusLabel('load_failed')).toBe("Couldn't load models")
-    expect(connectionAction('load_failed')).toBe('retry')
+    })).toBe('no_models')
+    expect(connectionStatusLabel('no_models')).toBe('No models found')
+    expect(connectionAction('no_models')).toBe('retry')
+    expect(connectionStatusMessageKey('no_models')).toBe('ai.composer.noModelsFound')
+    expect(connectionStatusMessageKey('load_failed')).toBe('settings.connected.loadFailed')
   })
 
   it('does not call a remote HTTP failure Not running', () => {

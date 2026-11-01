@@ -10,6 +10,7 @@ import { providerForDiscover, rhizomeProviderNeedsApiKey } from './rhizomeChatMo
 import {
   connectionAction,
   connectionStatus,
+  connectionStatusLabel,
   type ConnectionAction,
   type ConnectionProbe,
   type ConnectionStatus,
@@ -55,7 +56,8 @@ export function probeToConnection(input: {
   if (input.needsKey) return { models: [] }
   if (input.failure === null && input.models === null) return null
   if (input.failure === 'unreachable') return { unreachable: true, failed: true, models: [] }
-  if (input.failure === 'timeout' || input.failure === 'empty') return { failed: true, models: [] }
+  if (input.failure === 'timeout') return { failed: true, models: [] }
+  if (input.failure === 'empty') return { models: [] }
   return { models: input.models ?? [] }
 }
 
@@ -175,9 +177,5 @@ function savedModelLabels(provider: AiModelProvider): string[] {
 }
 
 function statusLabel(status: ConnectionStatus): string {
-  if (status === 'checking') return 'Checking…'
-  if (status === 'ready') return 'Ready'
-  if (status === 'needs_key') return 'Needs a key'
-  if (status === 'not_running') return 'Not running'
-  return "Couldn't load models"
+  return connectionStatusLabel(status)
 }

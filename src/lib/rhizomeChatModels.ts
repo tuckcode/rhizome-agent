@@ -348,6 +348,29 @@ export async function loadRhizomeChatModels(
   return listed
 }
 
+/** Shared Settings + chip trigger label: "Provider · model". */
+export function formatChatModelLabel(providerName: string, displayName: string): string {
+  const name = displayName.trim() || 'Model'
+  const provider = providerName.trim()
+  if (!provider) return name
+  return `${provider} · ${name}`
+}
+
+/** Trigger label for the active Rhizome model. Chip and Settings share "Provider · model". */
+export function rhizomeChatModelTriggerLabel(
+  model: RhizomeChatModel | undefined,
+  fallback: string,
+  options?: { chip?: boolean },
+): string {
+  if (!model) return fallback
+  // Removed providers keep the chip on the model name; Settings shows the tombstone label.
+  if (model.label === REMOVED_PROVIDER_LABEL) {
+    return options?.chip ? (model.displayName.trim() || model.modelId || fallback) : model.label
+  }
+  if (model.providerKind === 'free_tier') return model.label
+  return model.label || formatChatModelLabel(model.providerName, model.displayName.trim() || model.modelId)
+}
+
 /** Display name when the catalog has one, otherwise the model id. */
 export function rhizomeModelVisibleName(model: RhizomeChatModel): string {
   if (model.label === REMOVED_PROVIDER_LABEL) return REMOVED_PROVIDER_LABEL
