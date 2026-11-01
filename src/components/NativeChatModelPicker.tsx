@@ -206,10 +206,9 @@ export function NativeChatModelPicker({
       ? (selectedRhizome.displayName.trim() || selectedRhizome.modelId)
       : selectedId)
   // Unlisted selection: Provider · model from Settings providers (#283).
-  const unresolvedFallback = !prime && !selectedRhizome && selectedId
+  const labelFallback = (!prime && !selectedRhizome && selectedId)
     ? unresolvedRhizomeChatModelLabel(selectedId, providers)
-    : null
-  const labelFallback = selectedRhizome ? displayName : (unresolvedFallback ?? displayName)
+    : displayName
   const rowLabel = prime
     ? displayName
     : rhizomeChatModelTriggerLabel(selectedRhizome, labelFallback, { chip: false })
