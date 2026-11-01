@@ -120,6 +120,25 @@ describe('Settings and the composer chip', () => {
     expect(within(chip).getByTestId('native-chat-model-trigger')).toHaveAccessibleName(/^Work OpenAI · GPT-4o/)
   })
 
+  it('labels Settings with Provider · model when the selected id is not listed yet', () => {
+    const ollama: AiModelProvider = {
+      id: 'ollama',
+      name: 'Ollama',
+      kind: 'ollama',
+      api_key_storage: 'none',
+      models: [{ id: 'llama3.2', display_name: 'llama3.2', capabilities }],
+    }
+    const next = { ...settings, native_chat_target: 'ollama/qwen2.5', ai_model_providers: [ollama] }
+    render(<SettingsPanel open settings={next} onSave={vi.fn()} onClose={vi.fn()} />)
+
+    const row = pickers().find((node) => node.getAttribute('data-variant') === 'row')
+    expect(row).toBeTruthy()
+    expect(row!.getAttribute('data-model-id')).toBe('ollama/qwen2.5')
+    expect(within(row!).getByTestId('native-chat-model-trigger-label').textContent).toBe(
+      'Ollama · qwen2.5',
+    )
+  })
+
   it('shows a removed model by its name on the chip, and the accessible name starts there', () => {
     const removed = { ...settings, native_chat_target: 'gone-openai/gpt-4o' }
     renderPair(removed, 'gone-openai/gpt-4o')

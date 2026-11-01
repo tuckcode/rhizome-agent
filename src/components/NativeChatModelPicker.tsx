@@ -44,6 +44,7 @@ import {
   type RhizomeChatModel,
   rhizomeChatModelTriggerLabel,
   formatChatModelLabel,
+  unresolvedRhizomeChatModelLabel,
 } from '../lib/rhizomeChatModels'
 import {
   buildPickerMenu,
@@ -164,6 +165,7 @@ export function NativeChatModelPicker({
   const triggerRef = useRef<HTMLButtonElement>(null)
   const filterRef = useRef<HTMLInputElement>(null)
   const selectedRowRef = useRef<HTMLDivElement | null>(null)
+  const skipCloseAutoFocusRef = useRef(false)
   const [open, setOpen] = useState(false)
   useEffect(() => {
     const openPicker = () => setOpen(true)
@@ -203,13 +205,18 @@ export function NativeChatModelPicker({
     : (selectedRhizome
       ? (selectedRhizome.displayName.trim() || selectedRhizome.modelId)
       : selectedId)
+  // Unlisted selection: Provider · model from Settings providers (#283).
+  const unresolvedFallback = !prime && !selectedRhizome && selectedId
+    ? unresolvedRhizomeChatModelLabel(selectedId, providers)
+    : null
+  const labelFallback = selectedRhizome ? displayName : (unresolvedFallback ?? displayName ?? '')
   const rowLabel = prime
     ? displayName
-    : rhizomeChatModelTriggerLabel(selectedRhizome, displayName, { chip: false })
+    : rhizomeChatModelTriggerLabel(selectedRhizome, labelFallback, { chip: false })
   // Chip and Settings share the same "Provider · model" label (#283).
   const visibleText = prime
     ? displayName
-    : rhizomeChatModelTriggerLabel(selectedRhizome, displayName, { chip })
+    : rhizomeChatModelTriggerLabel(selectedRhizome, labelFallback, { chip })
   const tooltipTitle = prime
     ? (providerName ? formatChatModelLabel(providerName, displayName) : displayName)
     : rowLabel
@@ -414,7 +421,7 @@ export function NativeChatModelPicker({
                     <span className="shrink-0 whitespace-nowrap" aria-hidden="true">
                       {' · '}
                     </span>
-                    <span className="shrink-0" data-testid="native-chat-model-trigger-model">
+                    <span className="min-w-0 truncate" data-testid="native-chat-model-trigger-model">
                       {displayName}
                     </span>
                   </span>
@@ -447,6 +454,10 @@ export function NativeChatModelPicker({
           avoidCollisions
           onCloseAutoFocus={(event) => {
             event.preventDefault()
+            if (skipCloseAutoFocusRef.current) {
+              skipCloseAutoFocusRef.current = false
+              return
+            }
             triggerRef.current?.focus()
           }}
           className={cn(MENU_PANEL_CLASS, chip ? undefined : SETTINGS_MENU_Z_CLASS)}
@@ -557,6 +568,7 @@ export function NativeChatModelPicker({
                     setReloadToken((token) => token + 1)
                     return
                   }
+                  skipCloseAutoFocusRef.current = true
                   requestProviderSettingsFocus({
                     tab: group.tab === 'agents' ? 'api' : group.tab,
                     rowId: headerAction === 'add_key' ? `summary-provider-row-${group.providerId}` : CONNECTED_SUMMARY_ROW_ID,
@@ -679,6 +691,7 @@ export function NativeChatModelPicker({
                       event.preventDefault()
                     }}
                     onClick={() => {
+                      skipCloseAutoFocusRef.current = true
                       requestProviderSettingsFocus({ tab: 'agents', rowId: CONNECTED_SUMMARY_ROW_ID })
                       onOpenProviders?.()
                       setOpen(false)

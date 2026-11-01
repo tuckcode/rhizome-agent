@@ -17,6 +17,7 @@ import {
   countKeylessRhizomeProviders,
   formatChatModelLabel,
   rhizomeChatModelTriggerLabel,
+  unresolvedRhizomeChatModelLabel,
 } from './rhizomeChatModels'
 
 vi.mock('./callHost', () => ({
@@ -274,6 +275,19 @@ describe('resolveRhizomeChatModel', () => {
 })
 
 describe('formatChatModelLabel', () => {
+  it('builds Provider · model from providers when the selection is not listed yet', () => {
+    const providers: AiModelProvider[] = [{
+      id: 'ollama',
+      name: 'Ollama',
+      kind: 'ollama',
+      api_key_storage: 'none',
+      models: [{ id: 'llama3.2', display_name: 'llama3.2', capabilities }],
+    }]
+    expect(unresolvedRhizomeChatModelLabel('ollama/qwen2.5', providers)).toBe('Ollama · qwen2.5')
+    expect(unresolvedRhizomeChatModelLabel('ollama/qwen2.5', [])).toBe('ollama/qwen2.5')
+    expect(unresolvedRhizomeChatModelLabel('nolabel', providers)).toBe('nolabel')
+  })
+
   it('builds the shared Provider · model string', () => {
     expect(formatChatModelLabel('Ollama', 'llama3.2')).toBe('Ollama · llama3.2')
     const model = {

@@ -356,6 +356,21 @@ export function formatChatModelLabel(providerName: string, displayName: string):
   return `${provider} · ${name}`
 }
 
+/** When the listed catalog has no match yet, build Provider · model from Settings providers. */
+export function unresolvedRhizomeChatModelLabel(
+  selectedId: string,
+  providers?: AiModelProvider[] | null,
+): string {
+  const parts = splitTarget(selectedId)
+  if (!parts) return selectedId
+  const provider = normalizeAiModelProviders(providers).find(
+    (item) => providerKey(item) === parts.provider || item.kind === parts.provider,
+  )
+  const name = provider?.name?.trim()
+  if (!name) return selectedId
+  return formatChatModelLabel(name, parts.modelId)
+}
+
 /** Trigger label for the active Rhizome model. Chip and Settings share "Provider · model". */
 export function rhizomeChatModelTriggerLabel(
   model: RhizomeChatModel | undefined,

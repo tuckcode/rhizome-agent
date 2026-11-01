@@ -1,15 +1,21 @@
 import { act, fireEvent, render as rtlRender, screen, waitFor, within } from '@testing-library/react'
-import type { ReactElement } from 'react'
+import { useEffect, useState, type ReactElement } from 'react'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createMissingAiAgentsStatus } from '../lib/aiAgents'
 import type { AiModelProvider } from '../lib/aiTargets'
 import { NATIVE_CHAT_MODEL_CHIP_MAX_WIDTH_CLASS } from '../lib/composerMenuSide'
+import { createTranslator } from '../lib/i18n'
 import { resetPrimeHostStatus } from '../hooks/usePrimeHostStatus'
 import { resetPrimeModelCatalog } from '../lib/primeModelCatalog'
 import { resetListProviderModelsCache } from '../lib/listProviderModels'
-import { consumeProviderSettingsFocus } from '../lib/providerSettingsFocus'
+import {
+  consumeProviderSettingsFocus,
+  subscribeProviderSettingsFocus,
+} from '../lib/providerSettingsFocus'
 import { SETTINGS_MENU_Z_CLASS } from '../lib/settingsMenuLayer'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { ConnectedProvidersSummary } from './ConnectedProvidersSummary'
 import { NativeChatModelPicker } from './NativeChatModelPicker'
 
 function render(ui: ReactElement) {
@@ -72,6 +78,15 @@ vi.mock('../lib/callHost', () => ({
 vi.mock('../lib/productAnalytics', () => ({
   trackRhizomeModelChanged: vi.fn(),
   trackPrimeModelChanged: vi.fn(),
+}))
+
+vi.mock('../utils/aiProviderSecrets', () => ({
+  saveAiModelProviderApiKey: vi.fn(async () => {}),
+  testAiModelProvider: vi.fn(async () => 'OK'),
+}))
+
+vi.mock('../lib/telemetry', () => ({
+  trackEvent: vi.fn(),
 }))
 
 beforeEach(() => {
@@ -340,7 +355,8 @@ describe('NativeChatModelPicker', () => {
     expect(screen.getByTestId('native-chat-model-trigger-label')).toHaveTextContent('Work OpenAI · anthropic-claude-opus-4-very-long-id')
     expect(screen.getByTestId('native-chat-model-trigger-provider')).toHaveClass('min-w-0')
     expect(screen.getByTestId('native-chat-model-trigger-provider')).toHaveClass('truncate')
-    expect(screen.getByTestId('native-chat-model-trigger-model')).toHaveClass('shrink-0')
+    expect(screen.getByTestId('native-chat-model-trigger-model')).toHaveClass('min-w-0', 'truncate')
+    expect(screen.getByTestId('native-chat-model-trigger-model')).not.toHaveClass('shrink-0')
     expect(screen.getByTestId('native-chat-model-trigger-model')).toHaveTextContent('anthropic-claude-opus-4-very-long-id')
     expect(screen.getByTestId('native-chat-model-trigger-provider')).toHaveTextContent('Work OpenAI')
     chip.focus()
@@ -375,12 +391,57 @@ describe('NativeChatModelPicker', () => {
     const provider = screen.getByTestId('native-chat-model-trigger-provider')
     const model = screen.getByTestId('native-chat-model-trigger-model')
     expect(provider).toHaveClass('min-w-0', 'truncate')
-    expect(model).toHaveClass('shrink-0')
-    expect(model).not.toHaveClass('truncate')
+    expect(model).toHaveClass('min-w-0', 'truncate')
+    expect(model).not.toHaveClass('shrink-0')
     expect(label).toHaveTextContent('Work OpenAI · GPT-4o')
     expect(screen.getByTestId('native-chat-model-trigger')).toHaveAccessibleName(
       'Work OpenAI · GPT-4o, work-openai/gpt-4o',
     )
+  })
+
+  it('focuses the Settings key field after Add key without returning focus to the chip', async () => {
+    function Harness() {
+      const [focusRowId, setFocusRowId] = useState<string | null>(null)
+      useEffect(() => {
+        return subscribeProviderSettingsFocus((focus) => {
+          setFocusRowId(focus.rowId)
+        })
+      }, [])
+      return (
+        <>
+          <NativeChatModelPicker
+            variant="chip"
+            value={null}
+            onChange={vi.fn()}
+            providers={[]}
+            onOpenProviders={() => {}}
+          />
+          <ConnectedProvidersSummary
+            t={createTranslator('en')}
+            agents={createMissingAiAgentsStatus()}
+            providers={[]}
+            onChange={vi.fn()}
+            onOpen={vi.fn()}
+            focusRowId={focusRowId}
+            onFocusConsumed={() => {
+              setFocusRowId(null)
+            }}
+          />
+        </>
+      )
+    }
+
+    render(<Harness />)
+    openMenu()
+    const addKey = await screen.findAllByTestId('native-chat-model-add-key')
+    await act(async () => {
+      fireEvent.click(addKey[0])
+    })
+    await waitFor(() => {
+      const field = document.querySelector<HTMLInputElement>('[data-key-for]')
+      expect(field).not.toBeNull()
+      expect(document.activeElement).toBe(field)
+    })
   })
 
   it('styles the chip menu panel and lists model ids under sentence-case groups', async () => {
