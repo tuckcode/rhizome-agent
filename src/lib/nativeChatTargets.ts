@@ -32,7 +32,10 @@ export function nativeChatTargetOptions(
   }))
 }
 
-function orderedSeedModels(providers?: AiModelProvider[] | null): RhizomeChatModel[] {
+function orderedSeedModels(
+  providers?: AiModelProvider[] | null,
+  oauthByProvider?: Record<string, OauthStatus | null | undefined> | null,
+): RhizomeChatModel[] {
   const models = seedRhizomeChatModels(providers)
   // Preserve catalog/seed order within a section+readiness bucket so the first
   // ready default stays Ollama llama3.2 (not LM Studio, which sorts earlier by label).
@@ -40,7 +43,7 @@ function orderedSeedModels(providers?: AiModelProvider[] | null): RhizomeChatMod
     models.map((model, index) => ({ model, index })),
     ({ model, index }) => ({
       section: providerListSectionFor({ kind: model.providerKind }),
-      readiness: modelIsReady(model, providers) ? 'ready' : 'needs_setup',
+      readiness: modelIsReady(model, providers, oauthByProvider) ? 'ready' : 'needs_setup',
       name: String(index).padStart(6, '0'),
     }),
   ).map(({ model }) => model)
@@ -68,7 +71,7 @@ export function defaultNativeChatTarget(
   providers?: AiModelProvider[] | null,
   oauthByProvider?: Record<string, OauthStatus | null | undefined> | null,
 ): string {
-  const models = orderedSeedModels(providers)
+  const models = orderedSeedModels(providers, oauthByProvider)
   const ready = models.find((model) => modelIsReady(model, providers, oauthByProvider))
   return ready?.id ?? FREE_TIER_AUTO_TARGET
 }

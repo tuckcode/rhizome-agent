@@ -59,3 +59,34 @@ export function normalizeProviderBaseUrl(baseUrl: string | null | undefined): st
   if (!raw) return OPENAI_API_V1
   return raw.replace(/\/+$/, '')
 }
+
+/** oauth.signIn / normalize_openai only accept `openai`, never `open_ai`. */
+export function normalizeOauthSignInProvider(provider: string): string {
+  const id = provider.trim().toLowerCase()
+  if (id === '' || id === 'openai' || id === 'open_ai') return CHATGPT_ACCOUNT_PROVIDER_ID
+  return id
+}
+
+/**
+ * ChatGPT account chrome stays Ready only while the built-in OpenAI row
+ * still points at the official host (or no OpenAI row is configured yet).
+ */
+export function chatgptOfficialHostConfigured(
+  providers?: Array<{ id?: string | null; kind?: string | null; base_url?: string | null }> | null,
+): boolean {
+  const rows = (providers ?? []).filter((provider) => {
+    const kind = (provider.kind ?? '').trim().toLowerCase()
+    if (kind !== 'open_ai') return false
+    const id = (provider.id ?? '').trim().toLowerCase()
+    return id === '' || id === 'openai' || id === 'open_ai'
+  })
+  if (rows.length === 0) return true
+  return rows.every((provider) =>
+    providerAllowsChatgptSignIn({
+      id: provider.id,
+      kind: provider.kind,
+      baseUrl: provider.base_url,
+    }),
+  )
+}
+

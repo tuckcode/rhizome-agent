@@ -25,6 +25,7 @@ import {
 } from './providerListOrder'
 import {
   ACCOUNT_SIGN_IN_PROVIDERS,
+  chatgptOfficialHostConfigured,
   type AccountSignInProvider,
 } from './accountSignInProviders'
 import { oauthAccountReady, type OauthStatus } from './providerOauth'
@@ -100,10 +101,11 @@ export function buildConnectedRows(input: {
   const providers = normalizeAiModelProviders(input.providers)
   const rows: ConnectedRow[] = []
   const oauthByProvider = input.oauthByProvider ?? {}
+  const hostOk = chatgptOfficialHostConfigured(providers)
 
   for (const account of ACCOUNT_SIGN_IN_PROVIDERS) {
     const status = oauthByProvider[account.id]
-    const ready = oauthAccountReady(status)
+    const ready = hostOk && oauthAccountReady(status)
     const targetRowId = accountRowId(account.id)
     rows.push({
       id: `account:${account.id}`,

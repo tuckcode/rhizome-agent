@@ -1,7 +1,8 @@
 import type { TranslationKey } from './i18n'
-import type { AiModelProviderKind } from './aiTargets'
+import type { AiModelProvider, AiModelProviderKind } from './aiTargets'
 import {
   ACCOUNT_SIGN_IN_PROVIDERS,
+  chatgptOfficialHostConfigured,
 } from './accountSignInProviders'
 import {
   oauthAccountReady,
@@ -68,8 +69,7 @@ export interface PickerMenuGroup {
   accountSignIn: boolean
 }
 
-const LOCAL_GROUP_ID = 'local'
-const LOCAL_GROUP_LABEL = 'Local'
+const OPENAI_API_KEY_GROUP_LABEL = 'OpenAI API key'
 
 export function baseUrlHost(baseUrl: string | null | undefined): string | null {
   const raw = baseUrl?.trim()
@@ -121,13 +121,15 @@ function isCatalogCustomSeed(model: PickerMenuModel): boolean {
   return model.providerKind === 'open_ai_compatible' && model.providerId === 'open_ai_compatible'
 }
 
+function groupHasSelectableModel(group: PickerMenuGroup): boolean {
+  return group.rows.some((row) => !row.disabled && Boolean(row.modelId))
+}
+
+/** Sink only when the group has nothing the user can pick. */
 function groupReadiness(group: PickerMenuGroup): ProviderListReadiness {
-  if (group.blocked && group.rows.some((row) => row.action === 'add_key' || row.action === 'sign_in')) {
-    return 'needs_setup'
-  }
-  if (group.blocked) return 'needs_setup'
-  if (group.attention) return 'needs_setup'
-  return 'ready'
+  if (groupHasSelectableModel(group)) return 'ready'
+  if (group.section === 'not_installed') return 'not_installed'
+  return 'needs_setup'
 }
 
 export function buildPickerMenu(input: {
@@ -135,35 +137,39 @@ export function buildPickerMenu(input: {
   failures: PickerMenuFailure[]
   loadingNames: string[]
   needsKey: (providerKind: string, providerId: string) => boolean
-  /** When true, OpenAI group shows Sign in instead of only Add key. */
+  /** @deprecated Sign in lives only on the accounts group. Kept for call-site compat. */
   accountNeedsSignIn?: (providerKind: string, providerId: string) => boolean
   oauthByProvider?: Record<string, OauthStatus | null | undefined> | null
+  /** Used to hide ChatGPT Ready when the OpenAI base URL was edited off-host. */
+  providers?: AiModelProvider[] | null
 }): PickerMenuGroup[] {
   const failureByKey = new Map(input.failures.map((failure) => [failure.cacheKey, failure.kind]))
   const groups: PickerMenuGroup[] = []
   const index: Record<string, number> = {}
+  const hostOk = chatgptOfficialHostConfigured(input.providers)
 
   for (const account of ACCOUNT_SIGN_IN_PROVIDERS) {
     const status = input.oauthByProvider?.[account.id]
-    const ready = oauthAccountReady(status)
+    const ready = hostOk && oauthAccountReady(status)
+    const email = ready ? (status?.email ?? null) : null
     const key = `account:${account.id}`
     groups.push({
       id: key,
-      label: account.label,
+      label: email ? `${account.label} · ${email}` : account.label,
       providerKind: account.providerKind,
       providerId: account.id,
       cacheKey: key,
       tab: 'api',
       section: 'accounts',
       blocked: !ready,
-      hint: ready ? (status?.email ?? null) : 'Needs sign-in',
+      hint: ready ? email : 'Needs sign-in',
       attention: !ready,
       accountSignIn: !ready,
       rows: ready
         ? [{
             id: key,
             modelId: '',
-            label: status?.email ?? 'Signed in',
+            label: email ?? 'Signed in',
             providerKind: account.providerKind,
             providerId: account.id,
             disabled: true,
@@ -196,67 +202,31 @@ export function buildPickerMenu(input: {
 
     const loading = input.loadingNames.includes(model.providerName) || input.loadingNames.includes(model.cacheKey)
     const needsKey = input.needsKey(model.providerKind, model.providerId)
-    const needsSignIn = input.accountNeedsSignIn?.(model.providerKind, model.providerId) ?? false
     const failure = failureByKey.get(model.cacheKey)
     const local = isLocalProviderKind(model.providerKind)
     let block: PickerBlock | null = null
     let hint: string | null = null
-    if (needsKey && !needsSignIn) block = 'needs_key'
-    else if (needsSignIn && needsKey) block = 'needs_key'
+    if (needsKey) block = 'needs_key'
     else if (!loading && failure === 'unreachable' && local) block = 'not_running'
     else if (!loading && failure === 'empty') hint = pickerBlockReason(model.providerName, 'no_models')
     else if (!loading && failure === 'timeout') hint = pickerBlockReason(model.providerName, 'load_failed')
-    pushModel(groups, index, model, block, hint, needsSignIn)
+    // Sign in lives only on the accounts group — never on the API key row.
+    pushModel(groups, index, model, block, hint, false)
   }
 
-  const merged = mergeLocalGroups(groups)
-  return sortByProviderListOrder(merged, (group) => ({
+  return sortByProviderListOrder(groups, (group) => ({
     section: group.section,
     readiness: groupReadiness(group),
     name: group.label,
   }))
 }
 
-function mergeLocalGroups(groups: PickerMenuGroup[]): PickerMenuGroup[] {
-  const locals = groups.filter((group) => isLocalProviderKind(group.providerKind))
-  if (locals.length <= 1) {
-    return groups.map((group) =>
-      isLocalProviderKind(group.providerKind)
-        ? {
-            ...group,
-            id: LOCAL_GROUP_ID,
-            label: LOCAL_GROUP_LABEL,
-            section: 'local' as const,
-            rows: group.rows.map((row) => ({
-              ...row,
-              label: localModelRowLabel(row.modelId || row.label, group.label),
-            })),
-          }
-        : group,
-    )
+function openAiGroupLabel(model: PickerMenuModel): string {
+  const id = model.providerId.trim().toLowerCase()
+  if (model.providerKind === 'open_ai' && (id === '' || id === 'openai' || id === 'open_ai')) {
+    return OPENAI_API_KEY_GROUP_LABEL
   }
-
-  const rest = groups.filter((group) => !isLocalProviderKind(group.providerKind))
-  const merged: PickerMenuGroup = {
-    id: LOCAL_GROUP_ID,
-    label: LOCAL_GROUP_LABEL,
-    providerKind: 'ollama',
-    providerId: LOCAL_GROUP_ID,
-    cacheKey: LOCAL_GROUP_ID,
-    tab: 'local',
-    section: 'local',
-    blocked: locals.some((group) => group.blocked),
-    hint: locals.find((group) => group.hint)?.hint ?? null,
-    attention: locals.some((group) => group.attention),
-    accountSignIn: false,
-    rows: locals.flatMap((group) =>
-      group.rows.map((row) => ({
-        ...row,
-        label: localModelRowLabel(row.modelId || row.label, group.label),
-      })),
-    ),
-  }
-  return [...rest, merged]
+  return chatProviderGroupLabel(model.providerName, model.providerKind, model.baseUrl)
 }
 
 function pushModel(
@@ -268,6 +238,7 @@ function pushModel(
   accountSignIn = false,
 ): void {
   const local = isLocalProviderKind(model.providerKind)
+  // Keep Ollama and LM Studio as separate groups; scope empty/error hints per providerId.
   const key = local
     ? `local:${model.providerKind}:${model.providerId}`
     : (model.cacheKey || `${model.providerKind}:${model.providerId}`)
@@ -281,7 +252,7 @@ function pushModel(
       id: key,
       label: model.providerKind === 'free_tier'
         ? model.providerName
-        : chatProviderGroupLabel(model.providerName, model.providerKind, model.baseUrl),
+        : openAiGroupLabel(model),
       providerKind: model.providerKind,
       providerId: model.providerId,
       cacheKey: key,
@@ -296,6 +267,7 @@ function pushModel(
   }
   const group = groups[at]
   if (block) group.blocked = true
+  // Empty/load hints stay on this provider group only (no Local bleed).
   if (hint) group.hint = hint
   if (accountSignIn) group.accountSignIn = true
   group.attention = group.blocked || group.hint !== null || group.accountSignIn
@@ -314,7 +286,7 @@ function pushModel(
     disabled: block !== null,
     reason,
     action: block === 'needs_key'
-      ? (accountSignIn ? 'sign_in' : 'add_key')
+      ? 'add_key'
       : block
         ? 'retry'
         : null,

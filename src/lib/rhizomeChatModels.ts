@@ -150,15 +150,33 @@ export function migrateRhizomeChatTarget(
   return matches.length === 1 ? matches[0].id : selectedId
 }
 
+/** Catalog open_ai id aliases to the built-in oauth id `openai`. */
+function catalogProviderId(kind: string): string {
+  return kind === 'open_ai' ? 'openai' : kind
+}
+
+function hasBuiltinOpenai(providers: AiModelProvider[]): boolean {
+  return providers.some((provider) => {
+    if (provider.kind !== 'open_ai') return false
+    const id = provider.id.trim().toLowerCase()
+    return id === '' || id === 'openai' || id === 'open_ai'
+  })
+}
+
 /** Catalog defaults plus Settings-configured models. Never empty. */
 export function seedRhizomeChatModels(
   providers?: AiModelProvider[] | null,
 ): RhizomeChatModel[] {
+  const configured = normalizeAiModelProviders(providers)
   const into = new Map<string, RhizomeChatModel>()
+  const skipCatalogOpenai = hasBuiltinOpenai(configured)
   for (const entry of CATALOG) {
+    // Avoid duplicate OpenAI groups: catalog open_ai/* vs configured openai/*.
+    if (entry.kind === 'open_ai' && skipCatalogOpenai) continue
+    const providerId = catalogProviderId(entry.kind)
     addModel(into, {
-      id: `${entry.kind}/${entry.default_model_id}`,
-      providerId: entry.kind,
+      id: `${providerId}/${entry.default_model_id}`,
+      providerId,
       providerKind: entry.kind,
       providerName: entry.name,
       modelId: entry.default_model_id,
@@ -166,7 +184,7 @@ export function seedRhizomeChatModels(
       label: `${entry.name} · ${entry.default_model_id}`,
     })
   }
-  for (const provider of normalizeAiModelProviders(providers)) {
+  for (const provider of configured) {
     const key = providerKey(provider)
     for (const model of provider.models) {
       const displayName = model.display_name || model.id

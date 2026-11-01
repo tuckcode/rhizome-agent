@@ -4,6 +4,8 @@ import {
   accountSignInProvider,
   CHATGPT_ACCOUNT_PROVIDER_ID,
   OPENAI_API_V1,
+  chatgptOfficialHostConfigured,
+  normalizeOauthSignInProvider,
   providerAllowsChatgptSignIn,
 } from './accountSignInProviders'
 
@@ -23,5 +25,22 @@ describe('accountSignInProviders', () => {
       baseUrl: 'https://evil.example/v1',
     })).toBe(false)
     expect(providerAllowsChatgptSignIn({ kind: 'open_ai_compatible', id: 'openai', baseUrl: OPENAI_API_V1 })).toBe(false)
+  })
+
+  it('normalizes open_ai to openai for oauth.signIn', () => {
+    expect(normalizeOauthSignInProvider('open_ai')).toBe('openai')
+    expect(normalizeOauthSignInProvider('OpenAI')).toBe('openai')
+    expect(normalizeOauthSignInProvider('')).toBe('openai')
+    expect(normalizeOauthSignInProvider('xai')).toBe('xai')
+  })
+
+  it('treats missing OpenAI rows as official and rejects edited hosts', () => {
+    expect(chatgptOfficialHostConfigured([])).toBe(true)
+    expect(chatgptOfficialHostConfigured([
+      { id: 'openai', kind: 'open_ai', base_url: OPENAI_API_V1 },
+    ])).toBe(true)
+    expect(chatgptOfficialHostConfigured([
+      { id: 'openai', kind: 'open_ai', base_url: 'https://proxy.example/v1' },
+    ])).toBe(false)
   })
 })

@@ -52,11 +52,13 @@ describe('buildPickerMenu', () => {
     providerKind: 'lm_studio',
   })
   const openai = model({
-    id: 'open_ai/gpt-4.1-mini',
+    id: 'openai/gpt-4.1-mini',
     modelId: 'gpt-4.1-mini',
     displayName: 'gpt-4.1-mini',
     providerName: 'OpenAI',
     providerKind: 'open_ai',
+    providerId: 'openai',
+    cacheKey: 'openai',
   })
   const free = model({
     id: 'free_tier_auto',
@@ -66,32 +68,35 @@ describe('buildPickerMenu', () => {
     providerKind: 'free_tier',
   })
 
-  it('puts ChatGPT accounts first, then merges Local with provider-suffixed labels', () => {
+  it('puts ChatGPT accounts first, then separate Ollama and LM Studio under Local', () => {
     const groups = buildPickerMenu({
       models: [ollama, studio],
       failures: [],
       loadingNames: [],
       needsKey: () => false,
     })
-    expect(groups.map((group) => group.label)).toEqual(['ChatGPT', 'Local'])
-    expect(groups[0].section).toBe('accounts')
+    expect(groups.map((group) => group.label)).toEqual(['ChatGPT', 'LM Studio', 'Ollama'])
+    expect(groups.map((group) => group.section)).toEqual(['accounts', 'local', 'local'])
     expect(groups[0].accountSignIn).toBe(true)
-    expect(groups[1].rows.map((row) => row.label)).toEqual([
-      'llama3.2 · Ollama',
-      'llama3.2 · LM Studio',
+    expect(groups.find((group) => group.label === 'Ollama')?.rows.map((row) => row.label)).toEqual([
+      'Ollama · llama3.2',
     ])
-    expect(groups[1].rows[0].disabled).toBe(false)
+    expect(groups.find((group) => group.label === 'LM Studio')?.rows.map((row) => row.label)).toEqual([
+      'LM Studio · llama3.2',
+    ])
   })
 
-  it('orders accounts → API keys → Local → Free, and sinks needs-setup', () => {
+  it('orders accounts → API keys → Local → Free, and sinks groups with no selectable model', () => {
     const groups = buildPickerMenu({
       models: [free, ollama, openai],
       failures: [],
       loadingNames: [],
       needsKey: (kind) => kind === 'open_ai',
     })
-    expect(groups.map((group) => group.label)).toEqual(['ChatGPT', 'OpenAI', 'Local', 'Free tier'])
+    expect(groups.map((group) => group.label)).toEqual(['ChatGPT', 'OpenAI API key', 'Ollama', 'Free tier'])
     expect(groups[1].blocked).toBe(true)
+    // ChatGPT (no selectable model) sinks within accounts; OpenAI API key sinks in api_keys
+    expect(groups[0].accountSignIn).toBe(true)
   })
 
   it('disables a keyless provider and points Add key at the API tab', () => {
@@ -101,7 +106,7 @@ describe('buildPickerMenu', () => {
       loadingNames: [],
       needsKey: (kind) => kind === 'open_ai',
     })
-    const openAi = groups.find((group) => group.label === 'OpenAI')
+    const openAi = groups.find((group) => group.label === 'OpenAI API key')
     expect(openAi?.blocked).toBe(true)
     expect(openAi?.rows[0]).toMatchObject({
       disabled: true,
@@ -112,7 +117,7 @@ describe('buildPickerMenu', () => {
     expect(unsetProviderGroupCount(groups)).toBeGreaterThanOrEqual(1)
   })
 
-  it('shows Sign in on OpenAI when accountNeedsSignIn', () => {
+  it('keeps Sign in on the accounts group only, not the OpenAI API key group', () => {
     const groups = buildPickerMenu({
       models: [openai],
       failures: [],
@@ -120,8 +125,9 @@ describe('buildPickerMenu', () => {
       needsKey: () => true,
       accountNeedsSignIn: (kind) => kind === 'open_ai',
     })
-    const openAi = groups.find((group) => group.label === 'OpenAI')
-    expect(openAi?.rows[0]).toMatchObject({ action: 'sign_in' })
+    const openAi = groups.find((group) => group.label === 'OpenAI API key')
+    expect(openAi?.rows[0]).toMatchObject({ action: 'add_key' })
+    expect(groups.find((group) => group.section === 'accounts')?.accountSignIn).toBe(true)
   })
 
   it('disables Ollama when it is not running and keeps a model row', () => {
@@ -131,13 +137,13 @@ describe('buildPickerMenu', () => {
       loadingNames: [],
       needsKey: () => false,
     })
-    const local = groups.find((group) => group.label === 'Local')
+    const local = groups.find((group) => group.label === 'Ollama')
     expect(local?.rows[0]).toMatchObject({
       disabled: true,
       reason: "Ollama isn't running",
       action: 'retry',
       tab: 'local',
-      label: 'llama3.2 · Ollama',
+      label: 'Ollama · llama3.2',
     })
   })
 
@@ -169,12 +175,13 @@ describe('buildPickerMenu', () => {
     expect(failed.find((group) => group.label === 'Scrub test')?.hint).toBe("Couldn't load models")
 
     const empty = buildPickerMenu({
-      models: [studio],
+      models: [studio, ollama],
       failures: [{ cacheKey: 'lm_studio', kind: 'empty' }],
       loadingNames: [],
       needsKey: () => false,
     })
-    expect(empty.find((group) => group.label === 'Local')?.hint).toBe('No models found')
+    expect(empty.find((group) => group.label === 'LM Studio')?.hint).toBe('No models found')
+    expect(empty.find((group) => group.label === 'Ollama')?.hint).toBeNull()
   })
 
   it('hides the catalog Custom provider seed even when the user named a host', () => {
@@ -204,6 +211,47 @@ describe('buildPickerMenu', () => {
       loadingNames: [],
       needsKey: () => false,
     })
-    expect(groups.map((group) => group.label)).toEqual(['ChatGPT', 'OpenAI', 'Scrub test'])
+    expect(groups.map((group) => group.label)).toEqual(['ChatGPT', 'OpenAI API key', 'Scrub test'])
   })
+
+  it('only sinks groups with no selectable model; accountNeedsSignIn does not sink API key rows', () => {
+    const groups = buildPickerMenu({
+      models: [openai, ollama, free],
+      failures: [],
+      loadingNames: [],
+      needsKey: () => false,
+      accountNeedsSignIn: () => true,
+    })
+    expect(groups.map((group) => group.label)).toEqual([
+      'ChatGPT',
+      'OpenAI API key',
+      'Ollama',
+      'Free tier',
+    ])
+    const openAi = groups.find((group) => group.label === 'OpenAI API key')
+    expect(openAi?.rows.some((row) => !row.disabled)).toBe(true)
+    expect(openAi?.accountSignIn).toBe(false)
+    expect(groups.find((group) => group.section === 'accounts')?.accountSignIn).toBe(true)
+  })
+
+  it('labels the openai providerId group OpenAI API key', () => {
+    const catalog = model({
+      id: 'openai/gpt-4.1-mini',
+      modelId: 'gpt-4.1-mini',
+      displayName: 'gpt-4.1-mini',
+      providerName: 'OpenAI',
+      providerKind: 'open_ai',
+      providerId: 'openai',
+      cacheKey: 'openai',
+    })
+    const groups = buildPickerMenu({
+      models: [catalog],
+      failures: [],
+      loadingNames: [],
+      needsKey: () => false,
+    })
+    expect(groups.filter((group) => group.providerKind === 'open_ai' && group.section === 'api_keys')).toHaveLength(1)
+    expect(groups.find((group) => group.section === 'api_keys')?.label).toBe('OpenAI API key')
+  })
+
 })

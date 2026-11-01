@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   ACCOUNT_SIGN_IN_PROVIDERS,
   CHATGPT_ACCOUNT_PROVIDER_ID,
+  normalizeOauthSignInProvider,
 } from './accountSignInProviders'
 import {
   cancelOauthSignIn,
@@ -40,16 +41,17 @@ export function useOauthAccounts() {
   }, [refresh])
 
   const signIn = useCallback(async (provider = CHATGPT_ACCOUNT_PROVIDER_ID) => {
-    setBusyProvider(provider)
+    const id = normalizeOauthSignInProvider(provider)
+    setBusyProvider(id)
     setSigningIn(true)
-    setErrorByProvider((current) => ({ ...current, [provider]: '' }))
+    setErrorByProvider((current) => ({ ...current, [id]: '' }))
     try {
-      const status = await startOauthSignIn(provider)
-      setOauthByProvider((current) => ({ ...current, [provider]: status }))
+      const status = await startOauthSignIn(id)
+      setOauthByProvider((current) => ({ ...current, [id]: status }))
       return status
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      setErrorByProvider((current) => ({ ...current, [provider]: message || 'Sign in failed' }))
+      setErrorByProvider((current) => ({ ...current, [id]: message || 'Sign in failed' }))
       await refresh()
       return null
     } finally {
@@ -99,3 +101,5 @@ export function useOauthAccounts() {
     cancel,
   }
 }
+
+export type OauthAccounts = ReturnType<typeof useOauthAccounts>

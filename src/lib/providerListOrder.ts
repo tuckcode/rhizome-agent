@@ -83,11 +83,31 @@ export function sortByProviderListOrder<T>(
   })
 }
 
-/** Model row label under a shared Local header: "llama3.2 · Ollama". */
+/** Model row label: "Ollama · llama3.2" (Provider · model). */
 export function localModelRowLabel(modelId: string, providerName: string): string {
   const model = modelId.trim() || 'model'
   const provider = providerName.trim() || 'Local'
-  return `${model} · ${provider}`
+  return `${provider} · ${model}`
+}
+
+/** Section title without indexing a Record (Codacy). */
+export function providerListSectionLabel(section: ProviderListSection): string {
+  switch (section) {
+    case 'accounts':
+      return 'Your accounts'
+    case 'api_keys':
+      return 'API keys'
+    case 'local':
+      return 'Local'
+    case 'free':
+      return 'Free'
+    case 'not_installed':
+      return 'Not installed'
+    default: {
+      const _exhaustive: never = section
+      return _exhaustive
+    }
+  }
 }
 
 export function isLocalProviderKind(kind: string | null | undefined): boolean {

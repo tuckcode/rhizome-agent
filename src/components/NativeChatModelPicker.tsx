@@ -57,8 +57,11 @@ import { nativeSessionTargetForSlot } from '../lib/nativeChatTranscript'
 import { useNativeLiveSlot } from '../lib/nativeLiveSlot'
 import { visionForTargets } from '../lib/nativeVision'
 import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
-import { providerAllowsChatgptSignIn } from '../lib/accountSignInProviders'
-import { useOauthAccounts } from '../lib/useOauthAccounts'
+import {
+  CHATGPT_ACCOUNT_PROVIDER_ID,
+  chatgptOfficialHostConfigured,
+} from '../lib/accountSignInProviders'
+import { useOauthAccounts, type OauthAccounts } from '../lib/useOauthAccounts'
 import { SETTINGS_MENU_Z_CLASS } from '../lib/settingsMenuLayer'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { trackPrimeModelChanged, trackRhizomeModelChanged } from '../lib/productAnalytics'
@@ -136,19 +139,7 @@ function findComposerBox(trigger: HTMLElement | null): HTMLElement | null {
   return global instanceof HTMLElement ? global : null
 }
 
-/** One picker: Rhizome catalog on the native engine, Prime catalog on a Prime chat. */
-export function NativeChatModelPicker({
-  value,
-  onChange,
-  providers,
-  variant = 'row',
-  locale = 'en',
-  onOpenProviders,
-  engine = 'native',
-  vaultPath,
-  showLabel = true,
-  nativeLiveSlot,
-}: {
+type NativeChatModelPickerProps = {
   value: string | null | undefined
   onChange: (target: string) => void
   providers?: AiModelProvider[] | null
@@ -160,10 +151,36 @@ export function NativeChatModelPicker({
   showLabel?: boolean
   /** The chat panel that owns this picker. Other sessions are ignored. */
   nativeLiveSlot?: string | null
-}) {
+  /** Shared oauth from Settings so Connected and picker stay in sync. */
+  oauth?: OauthAccounts
+}
+
+/** One picker: Rhizome catalog on the native engine, Prime catalog on a Prime chat. */
+export function NativeChatModelPicker(props: NativeChatModelPickerProps) {
+  if (props.oauth) return <NativeChatModelPickerBody {...props} oauth={props.oauth} />
+  return <NativeChatModelPickerWithOauth {...props} />
+}
+
+function NativeChatModelPickerWithOauth(props: NativeChatModelPickerProps) {
+  const oauth = useOauthAccounts()
+  return <NativeChatModelPickerBody {...props} oauth={oauth} />
+}
+
+function NativeChatModelPickerBody({
+  value,
+  onChange,
+  providers,
+  variant = 'row',
+  locale = 'en',
+  onOpenProviders,
+  engine = 'native',
+  vaultPath,
+  showLabel = true,
+  nativeLiveSlot,
+  oauth,
+}: NativeChatModelPickerProps & { oauth: OauthAccounts }) {
   const contextSlot = useNativeLiveSlot()
   const liveSlot = nativeLiveSlot ?? contextSlot
-  const oauth = useOauthAccounts()
   const t = createTranslator(locale)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const filterRef = useRef<HTMLInputElement>(null)
@@ -251,20 +268,17 @@ export function NativeChatModelPicker({
       failures: listProviderFailures(),
       loadingNames,
       needsKey: (kind) => {
-        if (kind === 'open_ai' && oauth.chatgptReady) return false
+        if (
+          kind === 'open_ai'
+          && oauth.chatgptReady
+          && chatgptOfficialHostConfigured(providers)
+        ) {
+          return false
+        }
         return kind !== 'free_tier' && rhizomeProviderNeedsApiKey(kind, providers)
       },
-      accountNeedsSignIn: (kind, providerId) => {
-        if (kind !== 'open_ai') return false
-        const provider = (providers ?? []).find((item) => item.id === providerId)
-          ?? { id: providerId, kind, base_url: null }
-        return providerAllowsChatgptSignIn({
-          id: provider.id,
-          kind: provider.kind,
-          baseUrl: 'base_url' in provider ? provider.base_url : null,
-        }) && !oauth.chatgptReady
-      },
       oauthByProvider: oauth.oauthByProvider,
+      providers,
     })
   const rhizomeMenu = needle
     ? rhizomeMenuRaw.filter((group) => {
@@ -590,7 +604,7 @@ export function NativeChatModelPicker({
                     : (!isAccount && group.hint ? 'retry' as const : null)
                 const openFix = () => {
                   if (headerAction === 'sign_in') {
-                    void oauth.signIn(group.providerId)
+                    void oauth.signIn(CHATGPT_ACCOUNT_PROVIDER_ID)
                     return
                   }
                   if (headerAction === 'retry') {
@@ -637,28 +651,50 @@ export function NativeChatModelPicker({
                         </span>
                       ) : null}
                       {headerAction === 'sign_in' ? (
-                        <button
-                          type="button"
-                          className={cn('ml-auto shrink-0 text-[12px] font-normal text-[var(--link-color)] underline-offset-2 hover:underline', CHAT_FOCUS_RING_CLASS)}
-                          data-testid="native-chat-model-sign-in"
-                          onPointerDown={(event) => event.preventDefault()}
-                          onClick={(event) => {
-                            event.stopPropagation()
-                            openFix()
-                          }}
-                        >
-                          {oauth.signingIn && oauth.busyProvider === group.providerId ? 'Waiting…' : 'Sign in with ChatGPT'}
-                        </button>
+                        <span className="ml-auto flex shrink-0 flex-col items-end gap-0.5">
+                          <button
+                            type="button"
+                            className={cn(
+                              'text-[12px] font-normal text-[var(--link-color)] underline-offset-2 hover:underline disabled:opacity-60',
+                              CHAT_FOCUS_RING_CLASS,
+                            )}
+                            data-testid="native-chat-model-sign-in"
+                            disabled={oauth.signingIn}
+                            onPointerDown={(event) => event.preventDefault()}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              openFix()
+                            }}
+                          >
+                            {oauth.signingIn && oauth.busyProvider === CHATGPT_ACCOUNT_PROVIDER_ID
+                              ? 'Waiting…'
+                              : 'Sign in with ChatGPT'}
+                          </button>
+                          {oauth.signingIn && oauth.busyProvider === CHATGPT_ACCOUNT_PROVIDER_ID ? (
+                            <button
+                              type="button"
+                              className={cn('text-[11px] font-normal text-muted-foreground underline-offset-2 hover:underline', CHAT_FOCUS_RING_CLASS)}
+                              data-testid="native-chat-model-cancel-sign-in"
+                              onPointerDown={(event) => event.preventDefault()}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                void oauth.cancel()
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          ) : null}
+                        </span>
                       ) : null}
                       {isAccount && !group.blocked ? (
                         <button
                           type="button"
-                          className={cn('ml-auto shrink-0 text-[12px] font-normal text-[var(--link-color)] underline-offset-2 hover:underline', CHAT_FOCUS_RING_CLASS)}
+                          className={cn('ml-auto shrink-0 text-[12px] font-normal text-muted-foreground underline-offset-2 hover:underline', CHAT_FOCUS_RING_CLASS)}
                           data-testid="native-chat-model-sign-out"
                           onPointerDown={(event) => event.preventDefault()}
                           onClick={(event) => {
                             event.stopPropagation()
-                            void oauth.signOut(group.providerId)
+                            void oauth.signOut(CHATGPT_ACCOUNT_PROVIDER_ID)
                           }}
                         >
                           Sign out
@@ -745,7 +781,7 @@ export function NativeChatModelPicker({
                   <button
                     type="button"
                     className={cn(
-                      'rounded-sm text-left text-[12px] font-normal text-[var(--link-color)] underline-offset-2',
+                      'rounded-sm text-left text-[12px] font-normal text-[var(--feedback-warning-text)] underline-offset-2',
                       'hover:underline',
                       CHAT_FOCUS_RING_CLASS,
                     )}

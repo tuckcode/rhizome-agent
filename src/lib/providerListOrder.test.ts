@@ -45,7 +45,7 @@ describe('providerListOrder', () => {
     expect([...CONNECTED_EXTERNAL_AGENT_IDS]).toEqual(['codex', 'opencode', 'antigravity', 'kiro'])
   })
 
-  it('labels local models with their provider', () => {
-    expect(localModelRowLabel('llama3.2', 'Ollama')).toBe('llama3.2 · Ollama')
+  it('labels local models Provider · model', () => {
+    expect(localModelRowLabel('llama3.2', 'Ollama')).toBe('Ollama · llama3.2')
   })
 })

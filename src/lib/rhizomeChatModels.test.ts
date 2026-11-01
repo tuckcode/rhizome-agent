@@ -71,7 +71,7 @@ describe('seedRhizomeChatModels', () => {
   it('lists catalog defaults, configured models, and Free tier, and hides Anthropic', () => {
     const listed = seedRhizomeChatModels(configured)
     expect(listed.some((model) => model.id === 'ollama/llama3.2')).toBe(true)
-    expect(listed.some((model) => model.id === 'open_ai/gpt-4.1-mini')).toBe(true)
+    expect(listed.some((model) => model.id === 'openai/gpt-4.1-mini')).toBe(true)
     expect(listed.some((model) => model.id === 'work-openai/gpt-4o')).toBe(true)
     expect(listed.some((model) => model.id === 'home-openai/gpt-4o')).toBe(true)
     expect(listed.some((model) => model.id === 'free_tier_auto')).toBe(true)
@@ -79,6 +79,22 @@ describe('seedRhizomeChatModels', () => {
     expect(listed.at(-1)?.id).toBe('free_tier_auto')
     expect(listed.find((model) => model.id === 'work-openai/gpt-4o')?.displayName).toBe('GPT-4o')
     expect(rhizomeModelVisibleName(listed.at(-1)!)).toBe('Taproot')
+  })
+
+  it('dedupes catalog open_ai when configured openai exists', () => {
+    const listed = seedRhizomeChatModels([{
+      id: 'openai',
+      name: 'OpenAI',
+      kind: 'open_ai' as const,
+      base_url: 'https://api.openai.com/v1',
+      api_key_storage: 'local_file' as const,
+      api_key_env_var: null,
+      headers: null,
+      models: [{ id: 'gpt-4.1-mini', display_name: null, context_window: null, capabilities }],
+    }])
+    const openaiIds = listed.filter((model) => model.providerKind === 'open_ai').map((model) => model.id)
+    expect(openaiIds).toEqual(['openai/gpt-4.1-mini'])
+    expect(listed.some((model) => model.providerId === 'open_ai')).toBe(false)
   })
 
   it('prefixes the provider when two display names collide', () => {

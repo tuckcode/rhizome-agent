@@ -11,9 +11,8 @@ import {
 } from '../lib/listProviderModels'
 import type { createTranslator } from '../lib/i18n'
 import { connectionErrorMessage, connectionStatusMessageKey } from '../lib/providerConnection'
-import { PROVIDER_LIST_SECTION_LABEL, type ProviderListSection } from '../lib/providerListOrder'
-import { providerAllowsChatgptSignIn } from '../lib/accountSignInProviders'
-import { useOauthAccounts } from '../lib/useOauthAccounts'
+import { providerListSectionLabel, type ProviderListSection } from '../lib/providerListOrder'
+import { useOauthAccounts, type OauthAccounts } from '../lib/useOauthAccounts'
 import { cn } from '@/lib/utils'
 import { openExternalUrl } from '../utils/url'
 import { trackEvent } from '../lib/telemetry'
@@ -31,6 +30,8 @@ interface ConnectedProvidersSummaryProps {
   onOpen: (row: ConnectedRow) => void
   focusRowId?: string | null
   onFocusConsumed?: () => void
+  /** Shared oauth state from Settings so picker sign-in/out stay in sync. */
+  oauth?: OauthAccounts
 }
 
 const SECTION_ORDER: ProviderListSection[] = [
@@ -41,7 +42,17 @@ const SECTION_ORDER: ProviderListSection[] = [
   'not_installed',
 ]
 
-export function ConnectedProvidersSummary({
+export function ConnectedProvidersSummary(props: ConnectedProvidersSummaryProps) {
+  if (props.oauth) return <ConnectedProvidersSummaryBody {...props} oauth={props.oauth} />
+  return <ConnectedProvidersSummaryWithOauth {...props} />
+}
+
+function ConnectedProvidersSummaryWithOauth(props: ConnectedProvidersSummaryProps) {
+  const oauth = useOauthAccounts()
+  return <ConnectedProvidersSummaryBody {...props} oauth={oauth} />
+}
+
+function ConnectedProvidersSummaryBody({
   t,
   agents,
   providers,
@@ -49,7 +60,8 @@ export function ConnectedProvidersSummary({
   onOpen,
   focusRowId,
   onFocusConsumed,
-}: ConnectedProvidersSummaryProps) {
+  oauth,
+}: ConnectedProvidersSummaryProps & { oauth: OauthAccounts }) {
   const [probe, setProbe] = useState(0)
   const [, setRevision] = useState(0)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
@@ -57,7 +69,7 @@ export function ConnectedProvidersSummary({
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [notInstalledOpen, setNotInstalledOpen] = useState(false)
   const [highlightRowId, setHighlightRowId] = useState<string | null>(null)
-  const oauth = useOauthAccounts()
+  const [managingIds, setManagingIds] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     let cancelled = false
@@ -97,6 +109,11 @@ export function ConnectedProvidersSummary({
 
   useEffect(() => {
     if (!focusRowId) return
+    // Ready key rows hide the paste field behind Manage — expand so focus can land.
+    const focused = rows.find((row) => row.rowId === focusRowId)
+    if (focused?.showKeyField && focused.status === 'ready') {
+      setManagingIds((current) => ({ ...current, [focused.id]: true }))
+    }
     // Settings scrolls the AI section ~50ms after open. Retry until the key
     // field is mounted (or ~1s elapses) so Add key does not race that scroll (#283).
     let cancelled = false
@@ -140,7 +157,7 @@ export function ConnectedProvidersSummary({
       cancelled = true
       window.cancelAnimationFrame(frame)
     }
-  }, [focusRowId, onFocusConsumed])
+  }, [focusRowId, onFocusConsumed, rows])
 
   useEffect(() => {
     if (!highlightRowId) return
@@ -217,15 +234,10 @@ export function ConnectedProvidersSummary({
     const secret = drafts[row.id] ?? ''
     const account = row.kind === 'account' ? row.account : null
     const accountBusy = account ? oauth.busyProvider === account.id : false
-    const showSignInOnProvider = Boolean(
-      row.provider
-      && providerAllowsChatgptSignIn({
-        id: row.provider.id,
-        kind: row.provider.kind,
-        baseUrl: row.provider.base_url,
-      })
-      && !oauth.chatgptReady,
+    const keyReadyCollapsed = Boolean(
+      row.showKeyField && row.status === 'ready' && !managingIds[row.id],
     )
+    const showKeyControls = Boolean(row.showKeyField && !keyReadyCollapsed)
 
     return (
       <li
@@ -264,8 +276,9 @@ export function ConnectedProvidersSummary({
               {row.status === 'ready' ? (
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
+                  className="text-muted-foreground hover:text-foreground"
                   data-testid={`settings-connected-sign-out-${row.id}`}
                   disabled={accountBusy}
                   onClick={() => { void oauth.signOut(account.id) }}
@@ -319,7 +332,20 @@ export function ConnectedProvidersSummary({
             </Button>
           )}
         </div>
-        {row.showKeyField ? (
+        {keyReadyCollapsed ? (
+          <div className="mt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              data-testid={`settings-connected-manage-${row.id}`}
+              onClick={() => setManagingIds((current) => ({ ...current, [row.id]: true }))}
+            >
+              {t('settings.connected.manage')}
+            </Button>
+          </div>
+        ) : null}
+        {showKeyControls ? (
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <Input
               type="password"
@@ -345,18 +371,6 @@ export function ConnectedProvidersSummary({
             >
               {busyId === row.id ? t('settings.connected.testing') : t('settings.connected.saveAndTest')}
             </Button>
-            {showSignInOnProvider ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                data-testid={`settings-connected-sign-in-${row.id}`}
-                disabled={oauth.busyProvider === 'openai'}
-                onClick={() => { void oauth.signIn('openai') }}
-              >
-                Sign in with ChatGPT
-              </Button>
-            ) : null}
           </div>
         ) : null}
         {errors[row.id] ? (
@@ -375,8 +389,7 @@ export function ConnectedProvidersSummary({
       className="rounded-md border border-border bg-card p-3"
       data-testid="settings-connected-summary"
     >
-      <div className="text-sm font-medium text-foreground">{t('settings.connected.title')}</div>
-      <p className="mt-1 text-xs leading-5 text-muted-foreground">{t('settings.connected.description')}</p>
+      <p className="text-xs leading-5 text-muted-foreground">{t('settings.connected.description')}</p>
       <div className="mt-3 flex flex-col gap-4">
         {sections.map(({ section, rows: sectionRows }) => {
           if (section === 'not_installed') {
@@ -384,12 +397,12 @@ export function ConnectedProvidersSummary({
               <div key={section} data-testid="settings-connected-not-installed">
                 <button
                   type="button"
-                  className="flex w-full items-center justify-between rounded-md px-1 py-1 text-left text-xs font-medium text-muted-foreground hover:text-foreground"
+                  className="flex w-full items-center justify-between rounded-md px-1 py-1 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
                   aria-expanded={notInstalledOpen}
                   data-testid="settings-connected-not-installed-toggle"
-                  onClick={() => setNotInstalledOpen((value) => !value)}
+                  onClick={() => { setNotInstalledOpen((value) => !value) }}
                 >
-                  <span>{PROVIDER_LIST_SECTION_LABEL.not_installed} ({sectionRows.length})</span>
+                  <span>{providerListSectionLabel('not_installed')} ({sectionRows.length})</span>
                   <span aria-hidden="true">{notInstalledOpen ? '▾' : '▸'}</span>
                 </button>
                 {notInstalledOpen ? (
@@ -402,8 +415,8 @@ export function ConnectedProvidersSummary({
           }
           return (
             <div key={section} data-testid={`settings-connected-section-${section}`}>
-              <div className="mb-2 px-1 text-xs font-medium text-muted-foreground">
-                {PROVIDER_LIST_SECTION_LABEL[section]}
+              <div className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                {providerListSectionLabel(section)}
               </div>
               <ul className="flex flex-col gap-2">
                 {sectionRows.map(renderRow)}
