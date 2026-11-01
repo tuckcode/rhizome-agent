@@ -456,8 +456,8 @@ function NativeChatModelPickerBody({
                     <span className="min-w-0 shrink-[999] truncate" data-testid="native-chat-model-trigger-provider">
                       {providerName}
                     </span>
-                    <span className="shrink-0 px-1" aria-hidden="true">
-                      ·
+                    <span className="shrink-0 whitespace-pre" aria-hidden="true">
+                      {' · '}
                     </span>
                     <span className="min-w-0 truncate" data-testid="native-chat-model-trigger-model">
                       {displayName}
