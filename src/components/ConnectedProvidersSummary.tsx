@@ -347,7 +347,7 @@ function ConnectedProvidersSummaryBody({
               variant="outline"
               size="sm"
               data-testid={`settings-connected-manage-${row.id}`}
-              onClick={() => setManagingIds((current) => ({ ...current, [row.id]: true }))}
+              onClick={() => { setManagingIds((current) => ({ ...current, [row.id]: true })) }}
             >
               {t('settings.connected.manage')}
             </Button>
