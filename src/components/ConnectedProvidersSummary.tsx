@@ -112,10 +112,18 @@ function ConnectedProvidersSummaryBody({
     // Ready key rows hide the paste field behind Manage — expand so focus can land.
     const focused = rows.find((row) => row.rowId === focusRowId)
     if (focused?.showKeyField && focused.status === 'ready') {
-      setManagingIds((current) => ({ ...current, [focused.id]: true }))
+      setManagingIds((current) => (
+        current[focused.id] ? current : { ...current, [focused.id]: true }
+      ))
     }
+  }, [focusRowId, rows])
+
+  useEffect(() => {
+    if (!focusRowId) return
     // Settings scrolls the AI section ~50ms after open. Retry until the key
     // field is mounted (or ~1s elapses) so Add key does not race that scroll (#283).
+    // Keep deps free of `rows` so oauth/list refresh does not cancel the RAF loop
+    // under focus-retry fake timers (setTimeout-backed cancelAnimationFrame).
     let cancelled = false
     let frame = 0
     const startedAt = performance.now()
@@ -157,7 +165,7 @@ function ConnectedProvidersSummaryBody({
       cancelled = true
       window.cancelAnimationFrame(frame)
     }
-  }, [focusRowId, onFocusConsumed, rows])
+  }, [focusRowId, onFocusConsumed])
 
   useEffect(() => {
     if (!highlightRowId) return

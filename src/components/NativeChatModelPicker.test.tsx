@@ -543,7 +543,7 @@ describe('NativeChatModelPicker', () => {
         /1 providers/,
       )
       expect(screen.getByTestId('native-chat-model-open-settings').tagName).toBe('BUTTON')
-      expect(screen.getByTestId('native-chat-model-open-settings')).toHaveClass('text-[var(--link-color)]')
+      expect(screen.getByTestId('native-chat-model-open-settings')).toHaveClass('text-[var(--feedback-warning-text)]')
       expect(screen.getByTestId('native-chat-model-open-settings')).toHaveClass('hover:underline')
       expect(screen.getByTestId('native-chat-model-open-settings').className).toMatch(/outline-2/)
     })
@@ -689,7 +689,7 @@ describe('NativeChatModelPicker', () => {
     })
   })
 
-  it('styles only Open settings as an accent link', async () => {
+  it('styles the attention footer with the warning token', async () => {
     render(
       <NativeChatModelPicker
         variant="chip"
@@ -703,7 +703,7 @@ describe('NativeChatModelPicker', () => {
     const link = await screen.findByTestId('native-chat-model-open-settings')
     const note = screen.getByTestId('native-chat-model-keyless-note')
     expect(note).not.toHaveClass('text-primary')
-    expect(link).toHaveClass('text-[var(--link-color)]')
+    expect(link).toHaveClass('text-[var(--feedback-warning-text)]')
     expect(link.className).toMatch(/underline/)
   })
 
@@ -804,7 +804,7 @@ describe('NativeChatModelPicker', () => {
       'data-selected',
       'true',
     )
-    const hidden = screen.getByTestId('native-chat-model-open_ai/gpt-4.1-mini')
+    const hidden = screen.getByTestId('native-chat-model-openai/gpt-4.1-mini')
     expect(hidden).toHaveAttribute('aria-disabled', 'true')
     expect(screen.getAllByTestId('native-chat-model-reason').some((node) => node.textContent === 'Needs an API key')).toBe(true)
   })
