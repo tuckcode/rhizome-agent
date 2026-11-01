@@ -78,14 +78,18 @@ export function useOauthAccounts() {
   }, [refresh])
 
   const cancel = useCallback(async () => {
+    const id = busyProvider
     try {
       await cancelOauthSignIn()
     } finally {
+      if (id) {
+        setErrorByProvider((current) => ({ ...current, [id]: '' }))
+      }
       setSigningIn(false)
       setBusyProvider(null)
       await refresh()
     }
-  }, [refresh])
+  }, [busyProvider, refresh])
 
   const chatgptReady = oauthAccountReady(oauthByProvider[CHATGPT_ACCOUNT_PROVIDER_ID])
 

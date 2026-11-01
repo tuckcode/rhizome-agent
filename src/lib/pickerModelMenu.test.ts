@@ -79,10 +79,10 @@ describe('buildPickerMenu', () => {
     expect(groups.map((group) => group.section)).toEqual(['accounts', 'local', 'local'])
     expect(groups[0].accountSignIn).toBe(true)
     expect(groups.find((group) => group.label === 'Ollama')?.rows.map((row) => row.label)).toEqual([
-      'Ollama · llama3.2',
+      'llama3.2',
     ])
     expect(groups.find((group) => group.label === 'LM Studio')?.rows.map((row) => row.label)).toEqual([
-      'LM Studio · llama3.2',
+      'llama3.2',
     ])
   })
 
@@ -143,7 +143,7 @@ describe('buildPickerMenu', () => {
       reason: "Ollama isn't running",
       action: 'retry',
       tab: 'local',
-      label: 'Ollama · llama3.2',
+      label: 'llama3.2',
     })
   })
 
@@ -232,6 +232,66 @@ describe('buildPickerMenu', () => {
     expect(openAi?.rows.some((row) => !row.disabled)).toBe(true)
     expect(openAi?.accountSignIn).toBe(false)
     expect(groups.find((group) => group.section === 'accounts')?.accountSignIn).toBe(true)
+  })
+
+  it('puts the signed-in email in the ChatGPT group label, not a hint', () => {
+    const groups = buildPickerMenu({
+      models: [openai],
+      failures: [],
+      loadingNames: [],
+      needsKey: () => false,
+      oauthByProvider: {
+        openai: {
+          provider: 'openai',
+          enabled: true,
+          signed_in: true,
+          usable: true,
+          email: 'plus@example.com',
+          revoked: true,
+        },
+      },
+      providers: [{
+        id: 'openai',
+        name: 'OpenAI',
+        kind: 'open_ai',
+        base_url: 'https://api.openai.com/v1',
+        api_key_storage: 'none',
+        models: [],
+      }],
+    })
+    const chatgpt = groups.find((group) => group.id === 'account:openai')
+    expect(chatgpt?.label).toBe('ChatGPT · plus@example.com')
+    expect(chatgpt?.hint).toBeNull()
+  })
+
+  it('lists gpt models under ChatGPT when Ready and keeps them off the OpenAI API key group', () => {
+    const groups = buildPickerMenu({
+      models: [openai],
+      failures: [],
+      loadingNames: [],
+      needsKey: () => false,
+      oauthByProvider: {
+        openai: {
+          provider: 'openai',
+          enabled: true,
+          signed_in: true,
+          usable: true,
+          email: 'plus@example.com',
+          revoked: true,
+        },
+      },
+      providers: [{
+        id: 'openai',
+        name: 'OpenAI',
+        kind: 'open_ai',
+        base_url: 'https://api.openai.com/v1',
+        api_key_storage: 'local_file',
+        models: [],
+      }],
+    })
+    const chatgpt = groups.find((group) => group.id === 'account:openai')
+    expect(chatgpt?.rows.map((row) => row.modelId)).toEqual(['gpt-4.1-mini'])
+    expect(groups.find((group) => group.label === 'OpenAI API key')).toBeUndefined()
   })
 
   it('labels the openai providerId group OpenAI API key', () => {

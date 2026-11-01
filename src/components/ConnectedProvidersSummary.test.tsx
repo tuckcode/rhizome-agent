@@ -298,6 +298,30 @@ describe('ConnectedProvidersSummary', () => {
     expect(document.activeElement).not.toBe(field)
   })
 
+  it('opens FreeTierSettings from the Free Taproot Manage action', async () => {
+    const onOpen = vi.fn()
+    render(
+      <ConnectedProvidersSummary
+        t={createTranslator('en')}
+        agents={createMissingAiAgentsStatus()}
+        providers={[provider]}
+        onChange={vi.fn()}
+        onOpen={onOpen}
+      />,
+    )
+    expect(await screen.findByTestId('settings-connected-section-free')).toHaveTextContent('Free')
+    const row = screen.getByTestId('settings-connected-row-provider:free_tier')
+    expect(row).toHaveAttribute('data-section', 'free')
+    fireEvent.click(screen.getByTestId('settings-connected-action-provider:free_tier'))
+    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'provider:free_tier',
+      targetRowId: 'free-tier-settings',
+      tab: 'api',
+      action: 'open',
+      rowId: 'free-tier-settings',
+    }))
+  })
+
   it('lists ChatGPT under Your accounts and keeps Not installed collapsed', async () => {
     render(
       <ConnectedProvidersSummary

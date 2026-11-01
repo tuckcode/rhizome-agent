@@ -2,6 +2,7 @@ import { CONNECTED_EXTERNAL_AGENT_IDS } from './providerListOrder'
 import { getAiAgentDefinition, type AiAgentId, type AiAgentsStatus, getAiAgentAvailability } from './aiAgents'
 import {
   aiModelProviderCatalog,
+  aiModelProviderCatalogEntry,
   isLocalAiProvider,
   normalizeAiModelProviders,
   type AiModelProvider,
@@ -63,6 +64,11 @@ export function accountRowId(accountId: string): string {
   return `account-row-${accountId}`
 }
 
+/** DOM id for FreeTierSettings — Connected Manage scrolls here. */
+export function freeTierRowId(): string {
+  return 'free-tier-settings'
+}
+
 export function summaryRowId(targetRowId: string): string {
   return `summary-${targetRowId}`
 }
@@ -117,7 +123,7 @@ export function buildConnectedRows(input: {
       statusLabel: ready ? 'Ready' : 'Needs sign-in',
       action: ready ? 'open' : 'none',
       tab: 'api',
-      models: [],
+      models: ready ? chatgptAccountModelLabels(providers, input.modelsFor) : [],
       showKeyField: false,
       installUrl: null,
       provider: null,
@@ -214,12 +220,57 @@ export function buildConnectedRows(input: {
     })
   }
 
+  const freeTarget = freeTierRowId()
+  rows.push({
+    id: 'provider:free_tier',
+    rowId: summaryRowId(freeTarget),
+    targetRowId: freeTarget,
+    name: 'Taproot',
+    kind: 'provider',
+    status: 'ready',
+    statusLabel: 'Ready',
+    action: 'open',
+    tab: 'api',
+    models: ['Taproot'],
+    showKeyField: false,
+    installUrl: null,
+    provider: null,
+    section: 'free',
+    account: null,
+    accountEmail: null,
+  })
+
   return sortByProviderListOrder(rows, (row) => ({
     section: row.section,
     readiness: readinessForStatus(row.status, row.section === 'not_installed'),
     name: row.name,
   }))
 }
+
+function isBuiltinOpenaiProvider(provider: AiModelProvider): boolean {
+  if (provider.kind !== 'open_ai') return false
+  const id = provider.id.trim().toLowerCase()
+  return id === '' || id === 'openai' || id === 'open_ai'
+}
+
+/** Labels for the ChatGPT Connected row when oauth is Ready. */
+function chatgptAccountModelLabels(
+  providers: AiModelProvider[],
+  modelsFor: (provider: AiModelProvider) => string[] | null,
+): string[] {
+  const openai = providers.find(isBuiltinOpenaiProvider)
+  if (openai) {
+    const listable = openai.kind !== 'anthropic' && canListProviderModelsLive(openai)
+    if (listable) {
+      const live = modelsFor(openai)
+      if (live && live.length > 0) return live
+    }
+    const saved = savedModelLabels(openai)
+    if (saved.length > 0) return saved
+  }
+  return [aiModelProviderCatalogEntry('open_ai').default_model_id]
+}
+
 
 function providerRows(providers: AiModelProvider[]): AiModelProvider[] {
   const rows: AiModelProvider[] = []

@@ -279,9 +279,9 @@ function ConnectedProvidersSummaryBody({
               </div>
             ) : null}
           </div>
-          {row.kind === 'account' && account ? (
-            <div className="flex shrink-0 flex-col items-end gap-1">
-              {row.status === 'ready' ? (
+          <div className="flex shrink-0 flex-col items-end gap-1">
+            {row.kind === 'account' && account ? (
+              row.status === 'ready' ? (
                 <Button
                   type="button"
                   variant="ghost"
@@ -301,6 +301,7 @@ function ConnectedProvidersSummaryBody({
                     size="sm"
                     data-testid={`settings-connected-sign-in-${row.id}`}
                     disabled={accountBusy}
+                    aria-busy={accountBusy && oauth.signingIn ? true : undefined}
                     onClick={() => { void oauth.signIn(account.id) }}
                   >
                     {accountBusy && oauth.signingIn ? 'Waiting for browser…' : account.signInLabel}
@@ -316,43 +317,40 @@ function ConnectedProvidersSummaryBody({
                     </button>
                   ) : null}
                 </>
-              )}
-            </div>
-          ) : row.action === 'none' || row.action === 'add_key' || (row.showKeyField && row.status === 'ready') ? null : (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              data-testid={`settings-connected-action-${row.id}`}
-              onClick={() => {
-                if (row.action === 'retry' && row.provider) {
-                  void retry(row)
-                  return
-                }
-                if (row.action === 'install' && row.installUrl) {
-                  void openExternalUrl(row.installUrl)
-                  return
-                }
-                onOpen({ ...row, rowId: row.targetRowId })
-              }}
-            >
-              {actionLabel(row)}
-            </Button>
-          )}
-        </div>
-        {keyReadyCollapsed ? (
-          <div className="mt-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              data-testid={`settings-connected-manage-${row.id}`}
-              onClick={() => { setManagingIds((current) => ({ ...current, [row.id]: true })) }}
-            >
-              {t('settings.connected.manage')}
-            </Button>
+              )
+            ) : keyReadyCollapsed ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                data-testid={`settings-connected-manage-${row.id}`}
+                onClick={() => { setManagingIds((current) => ({ ...current, [row.id]: true })) }}
+              >
+                {t('settings.connected.manage')}
+              </Button>
+            ) : row.action === 'none' || row.action === 'add_key' || (row.showKeyField && row.status === 'ready') ? null : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                data-testid={`settings-connected-action-${row.id}`}
+                onClick={() => {
+                  if (row.action === 'retry' && row.provider) {
+                    void retry(row)
+                    return
+                  }
+                  if (row.action === 'install' && row.installUrl) {
+                    void openExternalUrl(row.installUrl)
+                    return
+                  }
+                  onOpen({ ...row, rowId: row.targetRowId })
+                }}
+              >
+                {actionLabel(row)}
+              </Button>
+            )}
           </div>
-        ) : null}
+        </div>
         {showKeyControls ? (
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <Input

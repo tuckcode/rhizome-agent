@@ -308,7 +308,6 @@
   "settings.aiAgents.lastCheckedJustNow": "Last checked just now",
   "settings.aiAgents.lastCheckedOne": "Last checked 1 min ago",
   "settings.aiAgents.lastCheckedMany": "Last checked {count} min ago",
-  "settings.connected.title": "Connected",
   "settings.connected.description": "What's set up on this device, which models each gives, and what's missing.",
   "settings.connected.keyPlaceholder": "Paste an API key",
   "settings.connected.test": "Test connection",

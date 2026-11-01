@@ -105,14 +105,25 @@ describe('buildConnectedRows', () => {
     expect(rows.some((row) => row.name === 'Custom provider')).toBe(false)
     expect(rows.some((row) => row.name === 'Prime Agent' || row.name === 'Hermes Agent')).toBe(false)
 
+    expect(rows.find((row) => row.name === 'Taproot')).toMatchObject({
+      section: 'free',
+      status: 'ready',
+      action: 'open',
+      tab: 'api',
+      targetRowId: 'free-tier-settings',
+      models: ['Taproot'],
+    })
+
     const names = rows.map((row) => row.name)
     const chatgpt = names.indexOf('ChatGPT')
     const openai = names.indexOf('OpenAI')
     const ollama = names.indexOf('Ollama')
+    const free = names.indexOf('Taproot')
     const notInstalled = names.indexOf('OpenCode')
     expect(chatgpt).toBeLessThan(openai)
     expect(openai).toBeLessThan(ollama)
-    expect(ollama).toBeLessThan(notInstalled)
+    expect(ollama).toBeLessThan(free)
+    expect(free).toBeLessThan(notInstalled)
     expect(names.indexOf('Codex')).toBeLessThan(notInstalled)
   })
 
@@ -128,6 +139,44 @@ describe('buildConnectedRows', () => {
       status: 'ready',
       statusLabel: 'Ready',
       accountEmail: 'plus@example.com',
+    })
+  })
+
+  it('lists gpt models on the Ready ChatGPT Connected row', () => {
+    const openai = provider({
+      id: 'openai',
+      name: 'OpenAI',
+      kind: 'open_ai',
+      base_url: 'https://api.openai.com/v1',
+      models: [{ id: 'gpt-4.1-mini', display_name: 'gpt-4.1-mini', capabilities }],
+    })
+    const rows = buildConnectedRows({
+      agents: createMissingAiAgentsStatus(),
+      providers: [openai],
+      failureFor: () => null,
+      modelsFor: (item) => (item.kind === 'open_ai' ? ['gpt-4.1-mini', 'gpt-4o'] : null),
+      oauthByProvider: { openai: signedIn('plus@example.com') },
+    })
+    expect(rows.find((row) => row.name === 'ChatGPT')).toMatchObject({
+      status: 'ready',
+      models: ['gpt-4.1-mini', 'gpt-4o'],
+    })
+  })
+
+  it('includes a Free Taproot row that opens FreeTierSettings', () => {
+    const rows = buildConnectedRows({
+      agents: createMissingAiAgentsStatus(),
+      providers: [],
+      failureFor: () => null,
+      modelsFor: () => null,
+    })
+    expect(rows.find((row) => row.id === 'provider:free_tier')).toMatchObject({
+      name: 'Taproot',
+      section: 'free',
+      status: 'ready',
+      action: 'open',
+      tab: 'api',
+      targetRowId: 'free-tier-settings',
     })
   })
 

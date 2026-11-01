@@ -10,7 +10,6 @@ import {
 } from './providerOauth'
 import {
   isLocalProviderKind,
-  localModelRowLabel,
   providerListSectionFor,
   sortByProviderListOrder,
   type ProviderListReadiness,
@@ -148,11 +147,15 @@ export function buildPickerMenu(input: {
   const index: Record<string, number> = {}
   const hostOk = chatgptOfficialHostConfigured(input.providers)
 
+  const accountClaimedModelIds = new Set<string>()
+  const readyAccountKeys = new Set<string>()
+
   for (const account of ACCOUNT_SIGN_IN_PROVIDERS) {
     const status = input.oauthByProvider?.[account.id]
     const ready = hostOk && oauthAccountReady(status)
     const email = ready ? (status?.email ?? null) : null
     const key = `account:${account.id}`
+    if (ready) readyAccountKeys.add(key)
     groups.push({
       id: key,
       label: email ? `${account.label} · ${email}` : account.label,
@@ -162,21 +165,12 @@ export function buildPickerMenu(input: {
       tab: 'api',
       section: 'accounts',
       blocked: !ready,
-      hint: ready ? email : 'Needs sign-in',
+      // Email lives in the label only — do not repeat it as a header hint.
+      hint: ready ? null : 'Needs sign-in',
       attention: !ready,
       accountSignIn: !ready,
       rows: ready
-        ? [{
-            id: key,
-            modelId: '',
-            label: email ?? 'Signed in',
-            providerKind: account.providerKind,
-            providerId: account.id,
-            disabled: true,
-            reason: null,
-            action: null,
-            tab: 'api',
-          }]
+        ? []
         : [{
             id: key,
             modelId: '',
@@ -210,6 +204,18 @@ export function buildPickerMenu(input: {
     else if (!loading && failure === 'unreachable' && local) block = 'not_running'
     else if (!loading && failure === 'empty') hint = pickerBlockReason(model.providerName, 'no_models')
     else if (!loading && failure === 'timeout') hint = pickerBlockReason(model.providerName, 'load_failed')
+
+    // ChatGPT Ready owns builtin openai models (ADR-0186). Account wins overlaps
+    // with the OpenAI API key group so the same gpt-* row is not listed twice.
+    const chatgptKey = 'account:openai'
+    if (isBuiltinOpenaiModel(model) && readyAccountKeys.has(chatgptKey)) {
+      if (!accountClaimedModelIds.has(model.modelId)) {
+        accountClaimedModelIds.add(model.modelId)
+        pushModelOntoGroup(groups, index[chatgptKey], model, null, null)
+      }
+      continue
+    }
+
     // Sign in lives only on the accounts group — never on the API key row.
     pushModel(groups, index, model, block, hint, false)
   }
@@ -227,6 +233,38 @@ function openAiGroupLabel(model: PickerMenuModel): string {
     return OPENAI_API_KEY_GROUP_LABEL
   }
   return chatProviderGroupLabel(model.providerName, model.providerKind, model.baseUrl)
+}
+
+
+function isBuiltinOpenaiModel(model: PickerMenuModel): boolean {
+  if (model.providerKind !== 'open_ai') return false
+  const id = model.providerId.trim().toLowerCase()
+  return id === '' || id === 'openai' || id === 'open_ai'
+}
+
+function pushModelOntoGroup(
+  groups: PickerMenuGroup[],
+  at: number,
+  model: PickerMenuModel,
+  block: PickerBlock | null,
+  hint: string | null,
+): void {
+  const group = groups[at]
+  if (block) group.blocked = true
+  if (hint) group.hint = hint
+  group.attention = group.blocked || group.hint !== null || group.accountSignIn
+  const reason = block ? pickerBlockReason(group.label, block) : null
+  group.rows.push({
+    id: model.id,
+    modelId: model.modelId,
+    label: model.displayName.trim() || model.modelId,
+    providerKind: model.providerKind,
+    providerId: model.providerId,
+    disabled: block !== null,
+    reason,
+    action: block === 'needs_key' ? 'add_key' : block ? 'retry' : null,
+    tab: group.tab,
+  })
 }
 
 function pushModel(
@@ -274,9 +312,8 @@ function pushModel(
   const reason = block
     ? pickerBlockReason(local ? model.providerName : group.label, block)
     : null
-  const rowLabel = local
-    ? localModelRowLabel(model.displayName.trim() || model.modelId, model.providerName)
-    : (model.displayName.trim() || model.modelId)
+  // Under a provider-named group, Local rows are model-only; the chip keeps Provider · model.
+  const rowLabel = model.displayName.trim() || model.modelId
   group.rows.push({
     id: model.id,
     modelId: model.modelId,
