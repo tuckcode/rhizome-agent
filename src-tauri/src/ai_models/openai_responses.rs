@@ -25,7 +25,7 @@ const TOOL_NAMESPACE: &str = "rhizome";
 const TOOL_NAMESPACE_DESCRIPTION: &str = "Tools Rhizome runs for this chat.";
 
 /// Shown when the access token cannot be renewed.
-pub(crate) const SIGN_IN_AGAIN: &str = "Sign in again";
+pub(crate) use crate::provider_oauth::SIGN_IN_AGAIN;
 
 const USAGE_LIMIT: &str = "You've reached the ChatGPT usage limit for Rhizome. Open ChatGPT settings, then Usage, to review it.";
 const USAGE_UNAVAILABLE: &str = "ChatGPT couldn't check your usage just now. Try again later.";

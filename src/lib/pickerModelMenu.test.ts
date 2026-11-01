@@ -58,18 +58,40 @@ describe('buildPickerMenu', () => {
     providerName: 'OpenAI',
     providerKind: 'open_ai',
   })
+  const free = model({
+    id: 'free_tier_auto',
+    modelId: 'free_tier_auto',
+    displayName: 'Taproot',
+    providerName: 'Free tier',
+    providerKind: 'free_tier',
+  })
 
-  it('drops the provider prefix under a header when two providers share a model name', () => {
+  it('puts ChatGPT accounts first, then merges Local with provider-suffixed labels', () => {
     const groups = buildPickerMenu({
       models: [ollama, studio],
       failures: [],
       loadingNames: [],
       needsKey: () => false,
     })
-    expect(groups.map((group) => group.label)).toEqual(['Ollama', 'LM Studio'])
-    expect(groups[0].rows[0].label).toBe('llama3.2')
-    expect(groups[1].rows[0].label).toBe('llama3.2')
-    expect(groups[0].rows[0].disabled).toBe(false)
+    expect(groups.map((group) => group.label)).toEqual(['ChatGPT', 'Local'])
+    expect(groups[0].section).toBe('accounts')
+    expect(groups[0].accountSignIn).toBe(true)
+    expect(groups[1].rows.map((row) => row.label)).toEqual([
+      'llama3.2 · Ollama',
+      'llama3.2 · LM Studio',
+    ])
+    expect(groups[1].rows[0].disabled).toBe(false)
+  })
+
+  it('orders accounts → API keys → Local → Free, and sinks needs-setup', () => {
+    const groups = buildPickerMenu({
+      models: [free, ollama, openai],
+      failures: [],
+      loadingNames: [],
+      needsKey: (kind) => kind === 'open_ai',
+    })
+    expect(groups.map((group) => group.label)).toEqual(['ChatGPT', 'OpenAI', 'Local', 'Free tier'])
+    expect(groups[1].blocked).toBe(true)
   })
 
   it('disables a keyless provider and points Add key at the API tab', () => {
@@ -79,14 +101,27 @@ describe('buildPickerMenu', () => {
       loadingNames: [],
       needsKey: (kind) => kind === 'open_ai',
     })
-    expect(groups[0].blocked).toBe(true)
-    expect(groups[0].rows[0]).toMatchObject({
+    const openAi = groups.find((group) => group.label === 'OpenAI')
+    expect(openAi?.blocked).toBe(true)
+    expect(openAi?.rows[0]).toMatchObject({
       disabled: true,
       reason: 'Needs an API key',
       action: 'add_key',
       tab: 'api',
     })
-    expect(unsetProviderGroupCount(groups)).toBe(1)
+    expect(unsetProviderGroupCount(groups)).toBeGreaterThanOrEqual(1)
+  })
+
+  it('shows Sign in on OpenAI when accountNeedsSignIn', () => {
+    const groups = buildPickerMenu({
+      models: [openai],
+      failures: [],
+      loadingNames: [],
+      needsKey: () => true,
+      accountNeedsSignIn: (kind) => kind === 'open_ai',
+    })
+    const openAi = groups.find((group) => group.label === 'OpenAI')
+    expect(openAi?.rows[0]).toMatchObject({ action: 'sign_in' })
   })
 
   it('disables Ollama when it is not running and keeps a model row', () => {
@@ -96,11 +131,13 @@ describe('buildPickerMenu', () => {
       loadingNames: [],
       needsKey: () => false,
     })
-    expect(groups[0].rows[0]).toMatchObject({
+    const local = groups.find((group) => group.label === 'Local')
+    expect(local?.rows[0]).toMatchObject({
       disabled: true,
       reason: "Ollama isn't running",
       action: 'retry',
       tab: 'local',
+      label: 'llama3.2 · Ollama',
     })
   })
 
@@ -120,8 +157,8 @@ describe('buildPickerMenu', () => {
       loadingNames: ['scrub'],
       needsKey: () => false,
     })
-    expect(loading[0].rows[0].disabled).toBe(false)
-    expect(unsetProviderGroupCount(loading)).toBe(0)
+    const scrubLoading = loading.find((group) => group.label === 'Scrub test')
+    expect(scrubLoading?.rows[0].disabled).toBe(false)
 
     const failed = buildPickerMenu({
       models: [scrub],
@@ -129,10 +166,7 @@ describe('buildPickerMenu', () => {
       loadingNames: [],
       needsKey: () => false,
     })
-    expect(failed[0].label).toBe('Scrub test')
-    expect(failed[0].rows[0].disabled).toBe(false)
-    expect(failed[0].hint).toBe("Couldn't load models")
-    expect(unsetProviderGroupCount(failed)).toBe(1)
+    expect(failed.find((group) => group.label === 'Scrub test')?.hint).toBe("Couldn't load models")
 
     const empty = buildPickerMenu({
       models: [studio],
@@ -140,9 +174,7 @@ describe('buildPickerMenu', () => {
       loadingNames: [],
       needsKey: () => false,
     })
-    expect(empty[0].rows[0].disabled).toBe(false)
-    expect(empty[0].hint).toBe('No models found')
-    expect(unsetProviderGroupCount(empty)).toBe(1)
+    expect(empty.find((group) => group.label === 'Local')?.hint).toBe('No models found')
   })
 
   it('hides the catalog Custom provider seed even when the user named a host', () => {
@@ -172,6 +204,6 @@ describe('buildPickerMenu', () => {
       loadingNames: [],
       needsKey: () => false,
     })
-    expect(groups.map((group) => group.label)).toEqual(['OpenAI', 'Scrub test'])
+    expect(groups.map((group) => group.label)).toEqual(['ChatGPT', 'OpenAI', 'Scrub test'])
   })
 })

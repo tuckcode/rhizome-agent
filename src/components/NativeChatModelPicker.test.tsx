@@ -63,6 +63,26 @@ vi.mock('../lib/callHost', () => ({
       const target = String(args?.target ?? '')
       return target.includes('gpt-4o') ? 'yes' : 'unknown'
     }
+    if (cmd === 'oauth_status' || cmd === 'oauth_sign_out' || cmd === 'oauth_cancel') {
+      return {
+        provider: 'openai',
+        enabled: false,
+        signed_in: false,
+        usable: false,
+        email: null,
+        revoked: true,
+      }
+    }
+    if (cmd === 'oauth_sign_in') {
+      return {
+        provider: 'openai',
+        enabled: true,
+        signed_in: true,
+        usable: true,
+        email: 'plus@example.com',
+        revoked: true,
+      }
+    }
     if (cmd !== 'list_ai_model_provider_models' && cmd !== 'discover_ai_models') return []
     const provider = args?.provider as { kind?: string; id?: string } | undefined
     if (host.emptyOnce && provider?.id === 'work-openai') {
