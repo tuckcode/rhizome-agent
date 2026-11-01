@@ -85,13 +85,19 @@ export function ConnectedProvidersSummary({
       setHighlightRowId(focusRowId)
       onFocusConsumed?.()
     }, 120)
-    return () => window.clearTimeout(focusTimer)
+    return () => {
+      window.clearTimeout(focusTimer)
+    }
   }, [focusRowId, onFocusConsumed])
 
   useEffect(() => {
     if (!highlightRowId) return
-    const clearTimer = window.setTimeout(() => setHighlightRowId(null), 1600)
-    return () => window.clearTimeout(clearTimer)
+    const clearTimer = window.setTimeout(() => {
+      setHighlightRowId(null)
+    }, 1600)
+    return () => {
+      window.clearTimeout(clearTimer)
+    }
   }, [highlightRowId])
 
   const retry = async (row: ConnectedRow) => {
