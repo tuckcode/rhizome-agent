@@ -1,4 +1,5 @@
 import { useEffect, type RefObject } from 'react'
+import { isSettingsOpenAutofocusSuppressed } from '../lib/providerSettingsFocus'
 
 const hasFocusableTabIndex = (element: HTMLElement): boolean => element.tabIndex >= 0
 
@@ -56,6 +57,8 @@ export function useSettingsPanelAutofocus(panelRef: RefObject<HTMLDivElement | n
   useEffect(() => {
     if (!enabled) return
     const timer = setTimeout(() => {
+      // Add key owns focus/scroll; do not steal it for Sync's first control (#285).
+      if (isSettingsOpenAutofocusSuppressed()) return
       const focusTarget = panelRef.current?.querySelector<HTMLElement>('[data-settings-autofocus="true"]')
       focusTarget?.focus()
     }, 50)

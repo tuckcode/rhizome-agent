@@ -356,6 +356,15 @@ export function formatChatModelLabel(providerName: string, displayName: string):
   return `${provider} · ${name}`
 }
 
+/** Title-case a raw provider prefix when Settings has no matching provider. */
+function titleCaseProviderPrefix(prefix: string): string {
+  return prefix
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ')
+}
+
 /** When the listed catalog has no match yet, build Provider · model from Settings providers. */
 export function unresolvedRhizomeChatModelLabel(
   selectedId: string,
@@ -366,8 +375,10 @@ export function unresolvedRhizomeChatModelLabel(
   const provider = normalizeAiModelProviders(providers).find(
     (item) => providerKey(item) === parts.provider || item.kind === parts.provider,
   )
-  const name = provider?.name?.trim()
-  if (!name) return selectedId
+  const name =
+    provider?.name?.trim()
+    || catalogEntry(parts.provider)?.name
+    || titleCaseProviderPrefix(parts.provider)
   return formatChatModelLabel(name, parts.modelId)
 }
 

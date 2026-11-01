@@ -284,7 +284,9 @@ describe('formatChatModelLabel', () => {
       models: [{ id: 'llama3.2', display_name: 'llama3.2', capabilities }],
     }]
     expect(unresolvedRhizomeChatModelLabel('ollama/qwen2.5', providers)).toBe('Ollama · qwen2.5')
-    expect(unresolvedRhizomeChatModelLabel('ollama/qwen2.5', [])).toBe('ollama/qwen2.5')
+    // Empty providers: catalog name, then title-cased prefix — never the raw id (#285).
+    expect(unresolvedRhizomeChatModelLabel('ollama/qwen2.5', [])).toBe('Ollama · qwen2.5')
+    expect(unresolvedRhizomeChatModelLabel('mystery_vendor/foo', [])).toBe('Mystery Vendor · foo')
     expect(unresolvedRhizomeChatModelLabel('nolabel', providers)).toBe('nolabel')
   })
 

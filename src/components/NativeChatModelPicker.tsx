@@ -381,6 +381,7 @@ export function NativeChatModelPicker({
         open={open}
         onOpenChange={(next) => {
           if (next) {
+            skipCloseAutoFocusRef.current = false
             updateMenuPlacement()
             setQuery('')
             setLoadingNames(prime ? [] : pendingLiveProviderNames(providers))
@@ -415,7 +416,7 @@ export function NativeChatModelPicker({
                     className="inline-flex min-w-0 max-w-full items-center overflow-hidden"
                     data-testid="native-chat-model-trigger-label"
                   >
-                    <span className="min-w-0 truncate" data-testid="native-chat-model-trigger-provider">
+                    <span className="min-w-0 shrink-[999] truncate" data-testid="native-chat-model-trigger-provider">
                       {providerName}
                     </span>
                     <span className="shrink-0 whitespace-nowrap" aria-hidden="true">
