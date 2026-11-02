@@ -361,6 +361,22 @@ fn stream_payload(
     read_event_stream(std::io::BufReader::new(response), &mut parser, emit);
 }
 
+/// The models the signed-in ChatGPT account can use. The token never leaves
+/// the official host, so the base URL is fixed.
+pub(crate) fn chatgpt_account_models() -> Result<Vec<openai_responses::ChatGptModel>, String> {
+    let token = crate::provider_oauth::fresh_access_token(
+        crate::provider_oauth::BUILTIN_OPENAI_PROVIDER_ID,
+    )?;
+    let auth = openai_responses::BearerSession::new(token, || -> Result<String, String> {
+        Err("Model listing does not refresh the token.".to_string())
+    });
+    Ok(openai_responses::list_chatgpt_models(
+        OPENAI_API_V1,
+        &auth,
+        HttpLimits::DISCOVER,
+    ))
+}
+
 /// Lists model ids from `GET {base_url}/models`, with
 /// `HttpLimits::DISCOVER`.
 ///

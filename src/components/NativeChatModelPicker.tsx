@@ -27,6 +27,7 @@ import { primeProviderLabel } from '../lib/primeProviderLabels'
 import {
   forgetListedProviderModels,
   listProviderFailures,
+  loadChatgptAccountModels,
   loadLiveRhizomeChatModels,
   pendingLiveProviderNames,
   providerModelsCacheKey,
@@ -326,7 +327,8 @@ function NativeChatModelPickerBody({
       }
     }
     setLoadingNames(pendingLiveProviderNames(providers))
-    void loadLiveRhizomeChatModels(providers).then((next) => {
+    void loadLiveRhizomeChatModels(providers).then(async (live) => {
+      const next = oauth.chatgptReady ? await loadChatgptAccountModels(live) : live
       if (cancelled) return
       setModels(next)
       setLoadingNames([])
@@ -334,7 +336,7 @@ function NativeChatModelPickerBody({
     return () => {
       cancelled = true
     }
-  }, [open, prime, providers, reloadToken])
+  }, [open, prime, providers, reloadToken, oauth.chatgptReady])
 
   useEffect(() => {
     if (open) filterRef.current?.focus()
