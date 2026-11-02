@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { AiModelProvider } from './aiTargets'
+import { DEFAULT_MODEL_CAPABILITIES, type AiModelProvider } from './aiTargets'
 import {
   filterRhizomeChatModels,
   groupRhizomeChatModels,
@@ -223,6 +223,21 @@ describe('resolveRhizomeChatModel', () => {
   it('still resolves an old kind-keyed selection to a matching configured model', () => {
     const listed = seedRhizomeChatModels(configured.slice(0, 1))
     expect(resolveRhizomeChatModel(listed, 'open_ai/gpt-4o')?.id).toBe('work-openai/gpt-4o')
+  })
+
+  it('keeps a live-listed model when its provider row still exists', () => {
+    const xai: AiModelProvider = {
+      id: 'xai',
+      name: 'xAI',
+      kind: 'open_ai_compatible',
+      base_url: 'https://api.x.ai/v1',
+      api_key_storage: 'local_file',
+      models: [{ id: 'grok-4.3', display_name: null, capabilities: DEFAULT_MODEL_CAPABILITIES }],
+    }
+    const listed = includeRemovedProviderModel(seedRhizomeChatModels([xai]), 'xai/grok-4.7', [xai])
+    const model = resolveRhizomeChatModel(listed, 'xai/grok-4.7')
+    expect(model?.label).toBe('xAI · grok-4.7')
+    expect(model?.providerName).toBe('xAI')
   })
 
   it('keeps a deleted configured provider as a removed picker entry', () => {

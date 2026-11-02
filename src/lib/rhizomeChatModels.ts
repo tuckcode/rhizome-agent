@@ -118,11 +118,30 @@ export function resolveRhizomeChatModel(
 export function includeRemovedProviderModel(
   models: RhizomeChatModel[],
   selectedId: string | null | undefined,
+  providers?: AiModelProvider[] | null,
 ): RhizomeChatModel[] {
   const value = selectedId?.trim()
   if (!value || resolveRhizomeChatModel(models, value)) return models
   const parts = splitTarget(value)
   if (!parts || isLegacyProviderKindId(parts.provider)) return models
+  // A live-listed model is absent from the saved rows until the menu loads.
+  const configured = normalizeAiModelProviders(providers).find(
+    (provider) => providerKey(provider) === parts.provider,
+  )
+  if (configured) {
+    return [
+      {
+        id: value,
+        providerId: parts.provider,
+        providerKind: configured.kind,
+        providerName: configured.name,
+        modelId: parts.modelId,
+        displayName: parts.modelId,
+        label: `${configured.name} · ${parts.modelId}`,
+      },
+      ...models,
+    ]
+  }
   return [
     {
       id: value,
