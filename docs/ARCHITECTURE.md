@@ -1198,7 +1198,9 @@ research is grounded in reading a real checkout rather than web search:
 - **Repo cache**: remote references are shallow-cloned Rust-side into
   `<vault>/.rhizome/repo-cache/<slug>` (fetch+reset when already cached),
   with `GIT_TERMINAL_PROMPT=0` and the shared `run_cli_streaming` timeout —
-  see ADR-0151. `git` is a PATH dependency for remote references only.
+  see ADR-0151. A fresh clone runs `validate_remote_url` and places the URL
+  after `--`. An existing cache fetches `origin` and does not check the URL
+  again. `git` is a PATH dependency for remote references only.
 - **Multi-round research**: depth fast/regular/deep maps to 1/2/3 sequential
   `run_ai_agent_stream` calls with the agent subprocess's cwd pointed at the
   checkout; each round's raw response is carried into the next round's
@@ -1682,12 +1684,30 @@ Tolaria no longer implements provider-specific OAuth or remote-repository APIs. 
 
 **Flow:**
 1. User opens `CloneVaultModal` from onboarding or the vault menu
-2. User pastes any git URL and chooses a local destination
+2. User pastes a git URL and chooses a local destination. The URL must pass the guard below before git runs
 3. The `clone_git_repo()` Tauri command runs `git clone` inside a blocking Tokio task so the Tauri window stays responsive during slow or failing clones
 4. Linux AppImage builds strip AppImage loader variables from system-git and MCP Node subprocesses before spawning them, keeping `git-remote-https` and system `node` on the host library stack
 5. `git_push()` / `git_pull()` continue to use the same system git path
 6. On macOS, `git_add_remote()` asks Git's credential helper for HTTPS credentials before the first fetch so Keychain can grant access to the same saved credential item the shell uses
 7. Clone commands disable interactive terminal / askpass prompts and surface the git failure back to the UI instead of freezing the app waiting for input
+
+**Remote URL guard.**
+
+**Origin:** Grok 4.7 · 2026-10-26 · `validate_remote_url`
+
+`validate_remote_url` in `src-tauri/src/git/remote_url.rs` rejects a URL before git sees it. Three failures, with these exact strings:
+
+- Starts with `-`: `Repository URL cannot start with '-'.` Git would read `--upload-pack=…` or `-oProxyCommand=…` as an option.
+- Contains a control character: `Repository URL contains control characters.`
+- Transport helper: `Repository URL uses an unsupported transport.` The check splits on the first `::`. The left side is a helper name when it is non-empty and every character is ASCII alphanumeric, `+`, `-`, or `.`. That rejects `ext::…`, `fd::17/foo`, and `remote-foo.bar::evil`. `ssh://git@[::1]/o/r.git` stays valid because `[` is not a helper character. `https://`, `http://`, `ssh://`, `git://`, `git@host:path`, and a local path are accepted. `https://remote-foo.bar/repo.git` is accepted. The same dotted name before `::` is not.
+
+Call sites:
+
+- `clone_repo` checks the raw string, then runs `git -c protocol.ext.allow=never clone --quiet -- <url> <dest>`. A rejected URL does not create the destination.
+- `git_add_remote` trims first. Empty after trim is `Enter a repository URL before connecting a remote.` A rejected URL returns `status: error` and does not write `remote.origin.url`. A valid URL is stored with `git config --local --replace-all`, not `git remote add`.
+- Research `ensure_local_repo` checks only a fresh shallow clone, then `git clone --depth 1 -- <url> <dir>`. That path does not set `protocol.ext.allow=never`. A cache that already contains `.git` fetches `origin` and does not check the URL again. A local research path is not cloned and is not checked.
+
+The browser mock `clone_git_repo` does not apply this check. The desktop command does.
 
 **Auth model:**
 - SSH keys, Git Credential Manager, macOS Keychain helpers, `gh auth`, and other git helpers all work without app-specific setup
@@ -1811,7 +1831,7 @@ If the current vault is not a Git repository, Tolaria treats Git as unavailable 
 
 The installation-local `git_enabled` setting is a broader visibility switch. When it is `false`, Tolaria hides Git status-bar entries and Git command-palette actions completely, disables AutoGit controls in Settings, and prevents background Git refresh/sync work even for repositories that are otherwise Git-backed. Settings remains the re-enable path.
 
-The same local-only state enables the explicit Add Remote flow. `AddRemoteModal` is reachable from the `No remote` chip and the command palette. The backend `git_add_remote` command ensures the local author identity, adds `origin`, fetches it, refuses incompatible histories, and only enables tracking after a safe push or fast-forward-compatible check succeeds.
+The same local-only state enables the explicit Add Remote flow. `AddRemoteModal` is reachable from the `No remote` chip and the command palette. The backend `git_add_remote` command ensures the local author identity, rejects a URL that fails `validate_remote_url` before it writes `origin`, fetches it, refuses incompatible histories, and only enables tracking after a safe push or fast-forward-compatible check succeeds.
 
 `useCommitFlow` also exposes `runAutomaticCheckpoint()`, a dialog-free commit path shared by AutoGit and the bottom-bar Commit button. `useAutoGit` watches the last editor activity plus app focus/visibility state, and when the default vault is git-backed, all saves are flushed, and no unsaved edits remain, it triggers the deterministic `Updated N note(s)` / `Updated N file(s)` commit message path after the configured idle or inactive thresholds. In multiple-workspace mode, that checkpoint reads, commits, and pushes every active repository independently; one failed or rejected repository does not prevent the remaining repositories from being attempted. The manual commit dialog remains single-repository and requires the user to choose the target repository when more than one is active.
 
@@ -1908,7 +1928,7 @@ The vault backend (`src-tauri/src/vault/`) is split into focused submodules:
 | `git_push` | Push to remote |
 | `git_remote_status` | Get branch name + ahead/behind counts |
 | `git_file_url` | Build a remote-backed browser/git URL for a vault file |
-| `git_add_remote` | Connect a local-only vault to a compatible remote and start tracking it |
+| `git_add_remote` | Connect a local-only vault to a remote that passes `validate_remote_url`, then start tracking it |
 | `git_resolve_conflict` | Resolve a merge conflict |
 | `git_commit_conflict_resolution` | Commit conflict resolution |
 | `get_file_history` | Last N commits for a file |
@@ -1919,7 +1939,7 @@ The vault backend (`src-tauri/src/vault/`) is split into focused submodules:
 | `get_conflict_mode` | Get conflict resolution mode |
 | `get_vault_pulse` | Git activity feed (paginated) |
 | `get_last_commit_info` | Latest commit metadata |
-| `clone_repo` | Clone a remote repository into a local folder using system git |
+| `clone_repo` | Clone a remote that passes `validate_remote_url` into a local folder using system git |
 
 ### Search
 
