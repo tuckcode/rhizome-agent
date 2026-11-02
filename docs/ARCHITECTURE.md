@@ -535,9 +535,18 @@ scrub, reopen as cancelled with no restored grants. The id is a UUID. Pasted and
 JSONL. They are written beside it as `{id}.images.json` plus
 `{id}-images/` (ADR-0190), capped at 4 images and 5 MB each, PNG JPEG
 GIF or WebP. A log from before that file still opens. The next turn
-sends the saved images again. A text-only model, or a model whose
-vision support is not in the catalog, refuses the turn instead of
-dropping the image.
+sends the saved images again. A text-only model refuses the turn.
+The words are not sent with the image removed. A model with no catalog
+row asks first. **Send anyway** is stored per model id in
+`localStorage` (`rhizome.visionSendAnyway`) and treats that model as
+vision, including free-tier routes. Undo clears it. A request keeps
+images from the last two turns (`KEPT_IMAGE_TURNS`) inside a 12 MB
+encoded budget (`MAX_REQUEST_ENCODED_BYTES`). Older image turns become
+`[image from earlier turn omitted]`. The current turn is never the one
+dropped; if its own images encode past 12 MB the turn is refused.
+Free tier skips routes that cannot take the image. When every route
+that can is cooling down, the error is "Every model that can read
+images is cooling down. Try again shortly."
 An OS file lock covers a second process and dies with it. Both windows
 may display a chat; only one turn runs. Damage and a full log keep the
 original and continue in a new session. New native chats call
