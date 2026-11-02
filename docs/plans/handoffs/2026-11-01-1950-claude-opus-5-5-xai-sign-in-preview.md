@@ -1,7 +1,7 @@
 ---
 session: 2026-11-01T19:50:00-05:00
 model: Claude Opus 5.5
-description: xAI sign-in preview (ADR-0186 decision 3). Device-code flow, client id setting, plain 403 with API key fallback. A real device-code sign-in passed in a probe. The native button path is not tested.
+description: xAI sign-in preview (ADR-0186 decision 3). Device-code flow, client id setting, plain 403 with API key fallback. Real sign-in and chat passed in a native dev build.
 ---
 
 **Origin:** Claude Opus 5.5 · 2026-11-01 · Claude Code desktop, branch `claude/sleepy-spence-07168f`
@@ -38,16 +38,27 @@ A probe sent the same requests as `xai.rs`, and Atticus approved code `PHPQ-AQAM
 | Refresh | 200, the refresh token rotated |
 | Revoke | 200 |
 
+## Native QA (2026-11-01)
+
+Atticus ran these steps in a dev build, on macOS:
+
+- ✅ Settings > Connected > Sign in with xAI: the row showed Ready, the email, and 14 models.
+- ✅ A `grok-4.7` chat replied. The keychain held `xai:oauth` and no `xai` key, so the chat used the sign-in token.
+
+The test found two bugs, both fixed:
+
+- The xAI API key row said Ready with no key. Connected now hides that row while the account is Ready.
+- A reopened picker called a live-listed model "removed". `includeRemovedProviderModel` now checks the provider rows.
+
 ## Not verified
 
-- The sign-in button in a native build. The probe sent the requests from Python.
 - A real 403. This account has access, so only a mock server covers it. The evidence for the body is hermes-agent issue 26847, and a later comment there disagrees.
 - That `b1a00492-073a-47ea-816f-4c329264a828` is the current Grok CLI id. OpenCode, Hermes, and open-grok-build use it, and xAI accepted it, but Grok CLI 1.0.70 does not hold it as plain text.
 - Browser loopback PKCE. Device code replaces it.
 
 ## Follow-ups
 
-- Run the Connected sign-in in a native build and record the result here.
+- The picker lists image and video models for xAI. These models may not work in chat.
 
 ## C101: flaky native chat test
 
