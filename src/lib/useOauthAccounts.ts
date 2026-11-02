@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { trackEvent } from './telemetry'
 import {
   ACCOUNT_SIGN_IN_PROVIDERS,
   CHATGPT_ACCOUNT_PROVIDER_ID,
@@ -62,10 +63,15 @@ export function useOauthAccounts() {
     setErrorByProvider((current) => ({ ...current, [id]: '' }))
     try {
       const status = await startOauthSignIn(id)
+      trackEvent('account_sign_in_finished', { provider: id, outcome: 'signed_in' })
       setOauthByProvider((current) => ({ ...current, [id]: status }))
       return status
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
+      trackEvent('account_sign_in_finished', {
+        provider: id,
+        outcome: /does not allow API access/.test(message) ? 'no_access' : 'failed',
+      })
       setErrorByProvider((current) => ({ ...current, [id]: message || 'Sign in failed' }))
       await refresh()
       return null
