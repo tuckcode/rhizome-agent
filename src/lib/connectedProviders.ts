@@ -160,8 +160,12 @@ export function buildConnectedRows(input: {
   }
 
   const seenKinds = new Set<string>()
+  // A Ready xAI account answers for this row, so its status says nothing about a key.
+  const xaiAccountReady = accountHostConfigured(XAI_ACCOUNT_PROVIDER_ID, providers)
+    && oauthAccountReady(oauthByProvider[XAI_ACCOUNT_PROVIDER_ID])
   for (const provider of providerRows(providers)) {
     seenKinds.add(provider.kind)
+    if (xaiAccountReady && provider.id === XAI_ACCOUNT_PROVIDER_ID) continue
     const local = isLocalAiProvider(provider)
     const needsKey = !local && rhizomeProviderNeedsApiKey(provider.kind, providers)
     const listable = provider.kind !== 'anthropic' && canListProviderModelsLive(provider)

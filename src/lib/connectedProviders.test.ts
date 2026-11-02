@@ -33,6 +33,27 @@ function signedIn(email = 'user@example.com'): OauthStatus {
 }
 
 describe('buildConnectedRows', () => {
+  it('keeps one xAI row while the xAI account is Ready, and shows the key row after sign-out', () => {
+    const xai = provider({
+      id: 'xai',
+      name: 'xAI',
+      kind: 'open_ai_compatible',
+      base_url: 'https://api.x.ai/v1',
+    })
+    const rowsFor = (oauthByProvider: Record<string, OauthStatus>) => buildConnectedRows({
+      agents: createMissingAiAgentsStatus(),
+      providers: [xai],
+      failureFor: () => null,
+      modelsFor: () => ['grok-4.3'],
+      oauthByProvider,
+    }).map((row) => row.id)
+
+    const signedInIds = rowsFor({ xai: { ...signedIn(), provider: 'xai' } })
+    expect(signedInIds).toContain('account:xai')
+    expect(signedInIds).not.toContain('provider:xai')
+    expect(rowsFor({})).toContain('provider:xai')
+  })
+
   it('lists accounts, providers, and agents without Claude Code, Not installed last', () => {
     const agents = {
       ...createMissingAiAgentsStatus(),
