@@ -9,6 +9,7 @@ import {
 } from '../lib/aiTargets'
 import { NativeChatModelPicker } from './NativeChatModelPicker'
 import { ConnectedProvidersSummary } from './ConnectedProvidersSummary'
+import { useOauthAccounts } from '../lib/useOauthAccounts'
 import { LocalAgentCards } from './LocalAgentCards'
 import {
   CONNECTED_SUMMARY_ROW_ID,
@@ -1610,6 +1611,7 @@ function AiAgentSettingsSection({
   const sessionAutoDistillEnabled = vaultConfig.session_auto_distill_enabled === true
   const [providerTab, setProviderTab] = useState<ProviderSettingsTab>('agents')
   const [providerFocus, setProviderFocus] = useState<string | null>(null)
+  const oauth = useOauthAccounts()
 
   useEffect(() => {
     const apply = (focus: { tab: ProviderSettingsTab; rowId: string }) => {
@@ -1647,6 +1649,7 @@ function AiAgentSettingsSection({
             onChange={setNativeChatTarget}
             providers={aiModelProviders}
             showLabel={false}
+            oauth={oauth}
           />
         </SettingsRow>
         <SettingsRow
@@ -1712,6 +1715,7 @@ function AiAgentSettingsSection({
         focusRowId={providerFocus}
         onFocusConsumed={clearProviderFocus}
         onOpen={openProviderRow}
+        oauth={oauth}
       />
 
       <AiTargetManagementTabs

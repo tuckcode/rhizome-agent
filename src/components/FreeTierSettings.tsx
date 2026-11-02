@@ -41,7 +41,7 @@ export function FreeTierSettings() {
     return error ? <ErrorLine error={error} /> : null
   }
   return (
-    <div data-testid="free-tier-settings" className="flex flex-col gap-3 rounded-md border border-border bg-card p-3">
+    <div id="free-tier-settings" data-testid="free-tier-settings" className="flex flex-col gap-3 rounded-md border border-border bg-card p-3">
       <div>
         <div className="text-sm font-medium text-foreground">{FREE_TIER_AUTO_LABEL}</div>
         <div className="mt-1 text-xs leading-5 text-muted-foreground">

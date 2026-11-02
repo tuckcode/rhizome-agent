@@ -309,6 +309,15 @@ pub async fn discover_ai_models(
     .await?
 }
 
+/// Models for the signed-in ChatGPT account. Blocking HTTP and a keychain
+/// read, so it runs off the UI thread.
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn list_chatgpt_account_models(
+) -> Result<Vec<crate::ai_models::openai_responses::ChatGptModel>, String> {
+    run_blocking(crate::ai_models::chatgpt_account_models).await?
+}
+
 /// Model ids the provider lists for its saved key. Blocking HTTP, so it runs off the UI thread.
 #[cfg(desktop)]
 #[tauri::command]
@@ -451,6 +460,13 @@ pub async fn oauth_sign_out(
 #[cfg(mobile)]
 #[tauri::command]
 pub fn oauth_cancel() {}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub async fn list_chatgpt_account_models(
+) -> Result<Vec<crate::ai_models::openai_responses::ChatGptModel>, String> {
+    Err("ChatGPT sign-in is not available on this platform.".to_string())
+}
 
 #[cfg(mobile)]
 #[tauri::command]

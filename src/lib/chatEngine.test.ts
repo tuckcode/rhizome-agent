@@ -75,6 +75,22 @@ describe('native chat picker', () => {
     expect(options.some((option) => option.id.startsWith('anthropic/'))).toBe(false)
   })
 
+
+  it('defaults to the first ready model, not a signed-out ChatGPT / keyless OpenAI', () => {
+    const target = defaultNativeChatTarget([], {
+      openai: {
+        provider: 'openai',
+        enabled: true,
+        signed_in: false,
+        usable: false,
+        email: null,
+        revoked: true,
+      },
+    })
+    expect(target).not.toMatch(/^open_ai\//)
+    expect(target.includes('/') || target === 'free_tier_auto').toBe(true)
+  })
+
   it('refuses a saved pick from a custom-named Anthropic provider', () => {
     const workAnthropic = {
       id: 'work-anthropic',

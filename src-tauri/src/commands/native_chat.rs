@@ -2839,11 +2839,20 @@ mod tests {
                 .expect("start");
             let log_path = crate::engines::native_log::session_log_path(&id).expect("path");
             wait_for_path(&log_path);
+            // create + header write are not atomic; wait for the session id in the log
+            let deadline = Instant::now() + Duration::from_secs(2);
+            let log_text = loop {
+                let text = std::fs::read_to_string(&log_path).expect("read log");
+                if text.contains(&id) {
+                    break text;
+                }
+                assert!(Instant::now() < deadline, "header must name the session");
+                thread::sleep(Duration::from_millis(20));
+            };
             assert!(
                 !home.path().join(".prime").exists(),
                 "native log must not be written under ~/.prime"
             );
-            let log_text = std::fs::read_to_string(&log_path).expect("read log");
             assert!(
                 !log_path.starts_with(home.path().join(".prime")),
                 "log path leaked into Prime home"

@@ -65,7 +65,7 @@ test.describe('Provider UX settings focus and labels @smoke', () => {
     await expect(chipLabel).not.toHaveText('ollama/qwen2.5')
 
     await page.locator('body').click({ position: { x: 2, y: 2 } })
-    await page.keyboard.press('Control+,')
+    await page.keyboard.press('ControlOrMeta+,')
     const panel = page.getByTestId('settings-panel')
     await expect(panel).toBeVisible({ timeout: 10_000 })
 
@@ -74,8 +74,10 @@ test.describe('Provider UX settings focus and labels @smoke', () => {
     await expect(settingsLabel).not.toHaveText('ollama/qwen2.5')
   })
 
-  test('Add key focuses the OpenAI key row instead of settings-pull-interval', async ({ page }) => {
+  test('Add key focuses the provider key row instead of settings-pull-interval', async ({ page }) => {
     await openComposerModelMenu(page)
+    // OpenAI's picker header may offer ChatGPT sign-in instead of Add key (#284). Use whichever
+    // provider still exposes Add key; focus must land on that provider's Connected key field.
     const addKey = page.getByTestId('native-chat-model-add-key').first()
     await expect(addKey).toBeVisible({ timeout: 10_000 })
     await addKey.click()
@@ -83,14 +85,15 @@ test.describe('Provider UX settings focus and labels @smoke', () => {
     const panel = page.getByTestId('settings-panel')
     await expect(panel).toBeVisible({ timeout: 10_000 })
 
-    const keyField = page.locator('[data-key-for="summary-provider-row-open_ai"]')
-    await expect(keyField).toBeVisible({ timeout: 5_000 })
-    await expect(keyField).toBeFocused({ timeout: 5_000 })
+    const focusedKey = page.locator('[data-testid^="settings-connected-key-"]:focus')
+    await expect(focusedKey).toBeVisible({ timeout: 5_000 })
 
     const pullInterval = page.getByTestId('settings-pull-interval')
     await expect(pullInterval).not.toBeFocused()
 
-    const keyRow = page.locator('#summary-provider-row-open_ai')
+    const keyFor = await focusedKey.getAttribute('data-key-for')
+    expect(keyFor).toMatch(/^summary-provider-row-/)
+    const keyRow = page.locator(`[id="${keyFor}"]`)
     await expect(keyRow).toBeVisible()
     const inView = await keyRow.evaluate((el) => {
       const rect = el.getBoundingClientRect()

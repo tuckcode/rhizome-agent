@@ -25,7 +25,7 @@ const TOOL_NAMESPACE: &str = "rhizome";
 const TOOL_NAMESPACE_DESCRIPTION: &str = "Tools Rhizome runs for this chat.";
 
 /// Shown when the access token cannot be renewed.
-pub(crate) const SIGN_IN_AGAIN: &str = "Sign in again";
+pub(crate) use crate::provider_oauth::SIGN_IN_AGAIN;
 
 const USAGE_LIMIT: &str = "You've reached the ChatGPT usage limit for Rhizome. Open ChatGPT settings, then Usage, to review it.";
 const USAGE_UNAVAILABLE: &str = "ChatGPT couldn't check your usage just now. Try again later.";
@@ -106,7 +106,8 @@ where
 }
 
 /// A model the signed-in account can show in a picker.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct ChatGptModel {
     pub(crate) slug: String,
     pub(crate) display_name: String,
@@ -141,7 +142,6 @@ pub(crate) fn fallback_chatgpt_models() -> Vec<ChatGptModel> {
 /// `GET {base}/models`. A transport, HTTP, or parse failure, or a 200
 /// with no `visibility: "list"` rows, returns [`fallback_chatgpt_models`].
 /// This function has no error return.
-#[allow(dead_code)] // wired in PR 3
 pub(crate) fn list_chatgpt_models<R>(
     base_url: &str,
     auth: &BearerSession<R>,

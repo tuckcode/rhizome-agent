@@ -25,6 +25,34 @@ vi.mock('../lib/telemetry', () => ({
   trackEvent: analytics.trackEvent,
 }))
 
+vi.mock('../lib/callHost', () => ({
+  callHost: vi.fn(async (cmd: string) => {
+    if (cmd === 'oauth_status' || cmd === 'oauth_sign_out') {
+      return {
+        provider: 'openai',
+        enabled: false,
+        signed_in: false,
+        usable: false,
+        email: null,
+        revoked: true,
+      }
+    }
+    if (cmd === 'oauth_sign_in') {
+      return {
+        provider: 'openai',
+        enabled: true,
+        signed_in: true,
+        usable: true,
+        email: 'plus@example.com',
+        revoked: true,
+      }
+    }
+    if (cmd === 'oauth_cancel') return null
+    return []
+  }),
+}))
+
+
 const capabilities = {
   streaming: false,
   tools: false,
@@ -270,4 +298,46 @@ describe('ConnectedProvidersSummary', () => {
     expect(document.activeElement).not.toBe(field)
   })
 
+  it('opens FreeTierSettings from the Free Taproot Manage action', async () => {
+    const onOpen = vi.fn()
+    render(
+      <ConnectedProvidersSummary
+        t={createTranslator('en')}
+        agents={createMissingAiAgentsStatus()}
+        providers={[provider]}
+        onChange={vi.fn()}
+        onOpen={onOpen}
+      />,
+    )
+    expect(await screen.findByTestId('settings-connected-section-free')).toHaveTextContent('Free')
+    const row = screen.getByTestId('settings-connected-row-provider:free_tier')
+    expect(row).toHaveAttribute('data-section', 'free')
+    fireEvent.click(screen.getByTestId('settings-connected-action-provider:free_tier'))
+    expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({
+      id: 'provider:free_tier',
+      targetRowId: 'free-tier-settings',
+      tab: 'api',
+      action: 'open',
+      rowId: 'free-tier-settings',
+    }))
+  })
+
+  it('lists ChatGPT under Your accounts and keeps Not installed collapsed', async () => {
+    render(
+      <ConnectedProvidersSummary
+        t={createTranslator('en')}
+        agents={createMissingAiAgentsStatus()}
+        providers={[provider]}
+        onChange={vi.fn()}
+        onOpen={vi.fn()}
+      />,
+    )
+    expect(await screen.findByTestId('settings-connected-row-account:openai')).toBeInTheDocument()
+    expect(screen.getByTestId('settings-connected-section-accounts')).toHaveTextContent('Your accounts')
+    expect(screen.getByTestId('settings-connected-not-installed-toggle')).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByTestId('settings-connected-row-agent:opencode')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByTestId('settings-connected-not-installed-toggle'))
+    expect(screen.getByTestId('settings-connected-row-agent:opencode')).toBeInTheDocument()
+    expect(screen.queryByTestId('settings-connected-row-agent:claude_code')).not.toBeInTheDocument()
+  })
 })
