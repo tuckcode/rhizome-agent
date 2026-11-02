@@ -55,6 +55,13 @@ describe('AiPanelComposer collapsed box', () => {
     expect(editor.className).toMatch(/max-h-\[120px\]/)
   })
 
+  it('draws the focus ring around the whole composer box', () => {
+    renderComposer('')
+
+    expect(screen.getByTestId('chat-composer-box').className).toMatch(/focus-within:ring-\[3px\]/)
+    expect(screen.getByTestId('agent-input').className).toMatch(/outline-none/)
+  })
+
   it('still grows with multi-line text instead of staying a single row', () => {
     const getScrollHeight = vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get')
     getScrollHeight.mockImplementation(function (this: HTMLElement) {

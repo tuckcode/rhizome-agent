@@ -274,7 +274,8 @@ function ComposerInput({
       commandInstantLabel={commandInstantLabel}
       onCommandAction={onCommandAction}
       onBrowsePromptHistory={onBrowsePromptHistory}
-      editorClassName="max-h-[120px] min-h-[30px] overflow-y-auto overscroll-contain border-0 px-1 py-1 leading-5"
+      // The composer box draws the focus ring around the whole field.
+      editorClassName="max-h-[120px] min-h-[30px] overflow-y-auto overscroll-contain border-0 px-1 py-1 leading-5 outline-none"
       editorStyle={{ maxHeight: 120, overflowY: 'auto', overscrollBehavior: 'contain' }}
     />
   )
@@ -1362,7 +1363,7 @@ export function AiPanelComposer({
       ) : null}
       <div
         ref={boxRef}
-        className="flex items-center gap-1 rounded-xl border border-border bg-background p-1 shadow-xs data-[multiline=true]:items-end"
+        className="flex items-center gap-1 rounded-xl border border-border bg-background p-1 shadow-xs transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/50 data-[multiline=true]:items-end"
         data-testid="chat-composer-box"
         data-multiline="false"
       >
