@@ -257,6 +257,46 @@ function liveChatModel(provider: AiModelProvider, model: ListedProviderModel): R
   }
 }
 
+export interface ChatgptAccountModel {
+  slug: string
+  displayName: string
+}
+
+/** Replaces built-in OpenAI rows with the signed-in account's models. */
+export function withChatgptAccountModels(
+  models: RhizomeChatModel[],
+  account: ChatgptAccountModel[],
+): RhizomeChatModel[] {
+  if (account.length === 0) return models
+  const isBuiltinOpenai = (model: RhizomeChatModel) =>
+    model.providerKind === 'open_ai' && model.providerId === 'openai'
+  const providerName = models.find(isBuiltinOpenai)?.providerName ?? 'OpenAI'
+  const rows = account.map((model): RhizomeChatModel => ({
+    id: `openai/${model.slug}`,
+    providerId: 'openai',
+    providerKind: 'open_ai',
+    providerName,
+    modelId: model.slug,
+    displayName: model.displayName,
+    label: `${providerName} · ${model.displayName}`,
+  }))
+  const others = models.filter((model) => !isBuiltinOpenai(model))
+  const at = others.findIndex((model) => model.providerKind === 'free_tier')
+  return at < 0 ? [...others, ...rows] : [...others.slice(0, at), ...rows, ...others.slice(at)]
+}
+
+/** Live models for the signed-in ChatGPT account. A failed list keeps the seed rows. */
+export async function loadChatgptAccountModels(
+  models: RhizomeChatModel[],
+): Promise<RhizomeChatModel[]> {
+  try {
+    const account = await callHost<ChatgptAccountModel[]>('list_chatgpt_account_models')
+    return Array.isArray(account) ? withChatgptAccountModels(models, account) : models
+  } catch {
+    return models
+  }
+}
+
 /** Seed catalog plus a live list per keyed or local provider. Cached for the session. */
 export async function loadLiveRhizomeChatModels(
   providers?: AiModelProvider[] | null,
