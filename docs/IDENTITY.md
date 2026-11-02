@@ -17,6 +17,7 @@ Do not push this repo to the Desktop remote. Do not rename the product back to D
 | Bundle id | `ai.rhizome.desktop` | `ai.rhizome.agent` |
 | Product name (menus, window) | Rhizome | Rhizome |
 | Binary (Cargo) | `Rhizome` | `RhizomeAgent` (kept; Desktop already uses `Rhizome` on PATH) |
+| Binary (installed app) | `Rhizome` | `Rhizome` (`mainBinaryName`) |
 
 ## Origin
 
