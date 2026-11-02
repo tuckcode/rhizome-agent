@@ -2,7 +2,6 @@ import { CONNECTED_EXTERNAL_AGENT_IDS } from './providerListOrder'
 import { getAiAgentDefinition, type AiAgentId, type AiAgentsStatus, getAiAgentAvailability } from './aiAgents'
 import {
   aiModelProviderCatalog,
-  aiModelProviderCatalogEntry,
   isLocalAiProvider,
   normalizeAiModelProviders,
   type AiModelProvider,
@@ -105,6 +104,8 @@ export function buildConnectedRows(input: {
   modelsFor: (provider: AiModelProvider) => string[] | null
   /** oauth_status by account provider id. Missing → signed out. */
   oauthByProvider?: Record<string, OauthStatus | null | undefined> | null
+  /** Display names from the signed-in ChatGPT account. */
+  chatgptModels?: string[] | null
 }): ConnectedRow[] {
   const providers = normalizeAiModelProviders(input.providers)
   const rows: ConnectedRow[] = []
@@ -124,7 +125,7 @@ export function buildConnectedRows(input: {
       statusLabel: ready ? 'Ready' : 'Needs sign-in',
       action: ready ? 'open' : 'none',
       tab: 'api',
-      models: ready ? accountModelLabels(account.id, providers, input.modelsFor) : [],
+      models: ready ? accountModelLabels(account.id, providers, input.modelsFor, input.chatgptModels) : [],
       showKeyField: false,
       installUrl: null,
       provider: null,
@@ -263,8 +264,10 @@ function accountModelLabels(
   accountId: string,
   providers: AiModelProvider[],
   modelsFor: (provider: AiModelProvider) => string[] | null,
+  accountModels?: string[] | null,
 ): string[] {
   const xai = accountId === XAI_ACCOUNT_PROVIDER_ID
+  if (!xai && accountModels && accountModels.length > 0) return accountModels
   const row = xai
     ? providers.find((provider) => provider.id === XAI_ACCOUNT_PROVIDER_ID)
     : providers.find(isBuiltinOpenaiProvider)
@@ -277,9 +280,7 @@ function accountModelLabels(
     const saved = savedModelLabels(row)
     if (saved.length > 0) return saved
   }
-  return xai
-    ? [xaiAccountProviderRow().models[0].id]
-    : [aiModelProviderCatalogEntry('open_ai').default_model_id]
+  return xai ? [xaiAccountProviderRow().models[0].id] : []
 }
 
 

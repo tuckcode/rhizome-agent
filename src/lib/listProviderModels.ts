@@ -285,6 +285,16 @@ export function withChatgptAccountModels(
   return at < 0 ? [...others, ...rows] : [...others.slice(0, at), ...rows, ...others.slice(at)]
 }
 
+/** Display names for the signed-in ChatGPT account. A failed list returns none. */
+export async function loadChatgptAccountModelLabels(): Promise<string[]> {
+  try {
+    const account = await callHost<ChatgptAccountModel[]>('list_chatgpt_account_models')
+    return Array.isArray(account) ? account.map((model) => model.displayName) : []
+  } catch {
+    return []
+  }
+}
+
 /** Live models for the signed-in ChatGPT account. A failed list keeps the seed rows. */
 export async function loadChatgptAccountModels(
   models: RhizomeChatModel[],

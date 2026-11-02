@@ -60,6 +60,6 @@ The test found two bugs, both fixed:
 
 - The picker lists image and video models for xAI. These models may not work in chat.
 
-## C101: flaky native chat test
+## C102: flaky native chat test
 
 `commands::native_chat::tests::forked_session_sends_kept_history_on_the_next_turn` failed once in the pre-push Rust lane with `send: "native chat worker closed"`. It passed 3 of 3 runs alone. This branch does not touch that code. The cause is unknown. It may be a race with another test in the full run.

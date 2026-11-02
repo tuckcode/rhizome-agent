@@ -1,5 +1,5 @@
 name: Bug report
-description: Something in Rhizome Agent does not work as expected.
+description: Something in Rhizome does not work as expected.
 labels: [needs-triage]
 body:
   - type: textarea
@@ -29,7 +29,7 @@ body:
     id: versions
     attributes:
       label: Versions
-      description: macOS version, Rhizome Agent version (Settings → About), and `prime-agent --version`.
+      description: macOS version, Rhizome version (Settings → About), and `prime-agent --version`.
     validations:
       required: true
   - type: textarea

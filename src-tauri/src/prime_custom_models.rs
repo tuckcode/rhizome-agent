@@ -242,7 +242,7 @@ fn read_models_json(path: &Path) -> Result<Value, String> {
 pub fn fetch_nous_catalog() -> Result<Vec<NousCatalogModel>, String> {
     let client = reqwest::blocking::Client::builder()
         .timeout(FETCH_TIMEOUT)
-        .user_agent("Rhizome Agent")
+        .user_agent("Rhizome")
         .build()
         .map_err(|error| format!("Could not reach Nous Portal: {error}"))?;
     let response = client

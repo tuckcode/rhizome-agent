@@ -339,3 +339,26 @@ describe('formatChatModelLabel', () => {
     expect(rhizomeChatModelTriggerLabel(removed, 'fallback')).toBe(REMOVED_PROVIDER_LABEL)
   })
 })
+
+describe('includeRemovedProviderModel with a configured provider', () => {
+  const xai = {
+    id: 'xai',
+    name: 'xAI',
+    kind: 'open_ai_compatible',
+    base_url: 'https://api.x.ai/v1',
+    api_key_storage: 'local_file',
+    api_key_env_var: null,
+    headers: null,
+    models: [{ id: 'grok-4.3', display_name: null, context_window: null, capabilities: {} }],
+  } as unknown as AiModelProvider
+
+  it('keeps the provider name when only the model left the list', () => {
+    const [row] = includeRemovedProviderModel([], 'xai/grok-4.7', [xai])
+    expect(row).toMatchObject({ providerName: 'xAI', label: 'xAI · grok-4.7' })
+  })
+
+  it('says Provider removed when the provider is gone', () => {
+    const [row] = includeRemovedProviderModel([], 'xai/grok-4.7', [])
+    expect(row.label).toBe('Provider removed')
+  })
+})

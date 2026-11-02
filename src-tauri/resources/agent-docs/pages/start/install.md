@@ -48,7 +48,7 @@ Prime stops when the terminal that started it closes. To keep it running in the 
 
 ## If you already have a built copy
 
-Quit `/Applications/Rhizome Agent.app` before you run `pnpm tauri dev`. Both use the bundle id `ai.rhizome.agent`, so a second launch attaches to the copy that's already open.
+Quit `/Applications/Rhizome.app` before you run `pnpm tauri dev`. Both use the bundle id `ai.rhizome.agent`, so a second launch attaches to the copy that's already open.
 
 ## Look at the interface without an engine
 

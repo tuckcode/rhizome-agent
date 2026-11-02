@@ -311,7 +311,7 @@ fn rhizome_tool_file_name() -> &'static str {
 
 /// `rhizome-tool` sitting beside `exe`, if it is actually there. Both binaries
 /// come out of the same Cargo build, so a dev run
-/// (`target/debug/Rhizome` + `target/debug/rhizome-tool`) resolves, and so does
+/// (`target/debug/RhizomeAgent` + `target/debug/rhizome-tool`) resolves, and so does
 /// a packaged build — verified 2026-09-05 at
 /// `/Applications/Rhizome Agent.app/Contents/MacOS/rhizome-tool`.
 ///

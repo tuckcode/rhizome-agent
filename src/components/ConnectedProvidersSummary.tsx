@@ -14,6 +14,7 @@ import {
   cachedProviderModelLabels,
   forgetListedProviderModels,
   listAiModelProviderModels,
+  loadChatgptAccountModelLabels,
   providerListFailure,
   providersToListLive,
 } from '../lib/listProviderModels'
@@ -71,6 +72,7 @@ function ConnectedProvidersSummaryBody({
   oauth,
 }: ConnectedProvidersSummaryProps & { oauth: OauthAccounts }) {
   const [probe, setProbe] = useState(0)
+  const [chatgptModels, setChatgptModels] = useState<string[]>([])
   const [, setRevision] = useState(0)
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -102,6 +104,17 @@ function ConnectedProvidersSummaryBody({
     if (xaiReady) addXaiRow()
   }, [addXaiRow, xaiReady])
 
+  useEffect(() => {
+    if (!oauth.chatgptReady) return
+    let cancelled = false
+    void loadChatgptAccountModelLabels().then((labels) => {
+      if (!cancelled) setChatgptModels(labels)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [oauth.chatgptReady, probe])
+
   const rows = buildConnectedRows({
     agents,
     providers,
@@ -111,6 +124,7 @@ function ConnectedProvidersSummaryBody({
       return cachedProviderModelLabels(provider)
     },
     oauthByProvider: oauth.oauthByProvider,
+    chatgptModels: oauth.chatgptReady ? chatgptModels : null,
   })
 
   const sections = useMemo(() => {
