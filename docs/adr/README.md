@@ -226,3 +226,4 @@ proposed → active → superseded
 | [0187](0187-native-is-the-only-chat-engine.md) | Native is the only chat engine; Prime and Hermes are optional ACP engines; core tool policy | active (decisions 3–5 amended by [0189](0189-no-ties-to-outside-harnesses.md)) |
 | [0188](0188-rhizome-builds-its-own-kanban-board.md) | Rhizome builds its own Kanban board; the Kanban park is lifted | active |
 | [0189](0189-no-ties-to-outside-harnesses.md) | No ties to outside harnesses; Prime and Hermes come out of Rhizome | active |
+| [0191](0191-optional-claude-code-engine.md) | Optional Claude Code engine that drives the user's own install, with a harness marker on each session | proposed |
