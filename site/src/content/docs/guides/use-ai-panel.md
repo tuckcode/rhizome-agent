@@ -13,6 +13,19 @@ Chat is where you work with the agent: ask, let it use tools, keep what's worth 
 
 New chats use Rhizome's own engine (ADR-0187). See [Agents, engines and models](../concepts/ai.md).
 
+## Send an image
+
+Paste or drop a PNG, JPEG, GIF, or WebP into the composer. You can send an image with no text. A message can hold up to 4 images. Each image can be up to 5 MB.
+
+Rhizome keeps those images next to the chat log, not inside it. A reopened chat can send them again.
+
+| You see | Meaning |
+|---|---|
+| Checking image support… | Rhizome is looking up whether this model can read images |
+| The model can't read images | Remove the image, or switch to a vision model. Anthropic is not offered here yet |
+| Rhizome doesn't know if the model can read images | **Send anyway** treats it as a vision model for this request. **Undo** takes that back |
+| BMP, TIFF, or SVG refused | Those types are not attached |
+
 ## While a reply is running
 
 The message box stays open, so you can write your next message while the agent works.
@@ -20,6 +33,8 @@ The message box stays open, so you can write your next message while the agent w
 Enter does nothing until the reply finishes. Your text stays in the box; send it when the turn ends.
 
 Press Stop to end the run. With VoiceOver, Rhizome announces when a run starts, when a tool starts or fails, and when the reply is complete or stopped.
+
+If a turn hits **Agent max steps**, Chat shows **Continue** on that reply with the step count. Only the latest idle turn can continue. Continue keeps the same chat and the work already done, then adds 50 more rounds. Stop ends the run; Continue is still available after an idle cancel. Quit is final.
 
 ## Ask from the editor or about a note
 

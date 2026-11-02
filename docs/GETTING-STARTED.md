@@ -11,6 +11,11 @@ How to navigate the **Rhizome** codebase, run the app, and find what you need.
 User-facing name is **Rhizome**. The bundle is still `ai.rhizome.agent` / `Rhizome.app`.
 
 - Rhizome owns the agent loop (ADR-0180). Native is the only chat engine (ADR-0187). Prime and Hermes are no longer chat engines ([ADR-0189](adr/0189-no-ties-to-outside-harnesses.md)); leftover code is still in the repo until the follow-up PRs.
+- First launch has no Prime setup screen and no agent-runtime picker. After the vault is ready, Chat is native. `resolveEffectiveChatEngine` always returns `native`.
+- Settings → AI Agents opens on **Connected**. The model picker keeps unset providers as disabled rows. A live list that stalls for 10 seconds says Couldn't load models. Local CLI cards do not offer Use in chat.
+- Native chat accepts PNG, JPEG, GIF, and WebP (at most 4, 5 MB each). Images live beside the JSONL log (ADR-0190). Text-only models refuse. Unknown models ask **Send anyway**.
+- **Agent max steps** defaults to 50. A capped turn emits `TurnCapped` and Chat shows **Continue** (50 fresh rounds).
+- The in-app updater is Rhizome only. There is no Prime Chat-engine **Update now** offer.
 - **Taproot** is the free automatic router in the model picker (stored target id `free_tier_auto` is unchanged).
 - Graphite is the default theme. Dark is Graphite, Light is Earth light, and System follows the OS between those two. Earth dark, Loam, and Mycelium are color skins.
 - Left rail Views are Research, Graph, Mycelium, and History (Ctrl+Cmd+1–4 on Mac, Ctrl+Shift+1–4 on Windows). Changes sits next to Notes.
