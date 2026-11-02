@@ -142,6 +142,29 @@ describe('buildConnectedRows', () => {
     })
   })
 
+  it('shows the account models on the Ready ChatGPT row', () => {
+    const rows = buildConnectedRows({
+      agents: createMissingAiAgentsStatus(),
+      providers: [],
+      failureFor: () => null,
+      modelsFor: () => null,
+      oauthByProvider: { openai: signedIn('plus@example.com') },
+      chatgptModels: ['GPT-6.1-Sol', 'GPT-6-Luna'],
+    })
+    expect(rows.find((row) => row.name === 'ChatGPT')?.models).toEqual(['GPT-6.1-Sol', 'GPT-6-Luna'])
+  })
+
+  it('does not show the catalog default before the account models load', () => {
+    const rows = buildConnectedRows({
+      agents: createMissingAiAgentsStatus(),
+      providers: [],
+      failureFor: () => null,
+      modelsFor: () => null,
+      oauthByProvider: { openai: signedIn('plus@example.com') },
+    })
+    expect(rows.find((row) => row.name === 'ChatGPT')?.models).toEqual([])
+  })
+
   it('lists gpt models on the Ready ChatGPT Connected row', () => {
     const openai = provider({
       id: 'openai',

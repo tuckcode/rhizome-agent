@@ -209,7 +209,7 @@ function NativeChatModelPickerBody({
   const selectedId = prime
     ? (primeSelectedId ?? resolveNativeChatTarget(value, providers))
     : resolveNativeChatTarget(value, providers, oauth.oauthByProvider)
-  const listed = includeRemovedProviderModel(models, selectedId)
+  const listed = includeRemovedProviderModel(models, selectedId, providers)
   const selectedRhizome = resolveRhizomeChatModel(listed, selectedId)
   const selectedPrime = primeModels.find((model) => modelKey(model) === selectedId) ?? null
   const chip = variant === 'chip'
