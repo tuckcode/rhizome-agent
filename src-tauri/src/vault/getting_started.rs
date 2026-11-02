@@ -131,7 +131,9 @@ fn vault_exists_with_default_path(path: &Path, default_path: Option<&Path>) -> b
         return true;
     }
 
-    canonical_getting_started_vault_exists(path)
+    // A wiki vault can use the default folder name without the starter files.
+    crate::rhizome_write_location::is_wiki_vault(path)
+        || canonical_getting_started_vault_exists(path)
 }
 
 fn is_canonical_getting_started_path(path: &Path, default_path: Option<&Path>) -> bool {
@@ -1272,5 +1274,30 @@ Saved filters live in `views/` as `.view.json` files:
         assert!(AGENTS_MD.contains("wiki/concepts/"));
         assert!(AGENTS_MD.contains("architecture-pattern"));
         assert!(AGENTS_MD.contains("Don't distill:"));
+    }
+
+    #[test]
+    fn wiki_vault_at_the_default_path_counts_as_existing() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let vault = dir.path().join(DEFAULT_VAULT_FOLDER_NAME);
+        std::fs::create_dir_all(&vault).unwrap();
+        std::fs::write(vault.join("RHIZOME_VAULT.md"), "# Wiki\n").unwrap();
+
+        assert!(vault_exists_with_default_path(
+            &vault,
+            Some(vault.as_path())
+        ));
+    }
+
+    #[test]
+    fn partial_starter_at_the_default_path_stays_unavailable() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let vault = dir.path().join(DEFAULT_VAULT_FOLDER_NAME);
+        std::fs::create_dir_all(&vault).unwrap();
+
+        assert!(!vault_exists_with_default_path(
+            &vault,
+            Some(vault.as_path())
+        ));
     }
 }

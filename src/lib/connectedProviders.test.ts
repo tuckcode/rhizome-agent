@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { createMissingAiAgentsStatus, createAiAgentAvailability } from './aiAgents'
 import type { AiModelProvider } from './aiTargets'
 import { buildConnectedRows } from './connectedProviders'
+import type { OauthStatus } from './providerOauth'
 
 const capabilities = {
   streaming: false,
@@ -20,11 +21,23 @@ function provider(overrides: Partial<AiModelProvider> & Pick<AiModelProvider, 'i
   }
 }
 
+function signedIn(email = 'user@example.com'): OauthStatus {
+  return {
+    provider: 'openai',
+    enabled: true,
+    signed_in: true,
+    usable: true,
+    email,
+    revoked: true,
+  }
+}
+
 describe('buildConnectedRows', () => {
-  it('lists agents and providers with Ready, Needs a key, Not running, No models found, and Couldn\'t load models', () => {
+  it('lists accounts, providers, and agents without Claude Code, Not installed last', () => {
     const agents = {
       ...createMissingAiAgentsStatus(),
       claude_code: createAiAgentAvailability('installed', '2.1.289 (Claude Code)'),
+      codex: createAiAgentAvailability('installed', 'codex'),
     }
     const scrub = provider({
       id: 'scrub',
@@ -47,21 +60,29 @@ describe('buildConnectedRows', () => {
       },
     })
 
-    expect(rows.find((row) => row.name === 'Claude Code')).toMatchObject({
+    expect(rows.find((row) => row.name === 'Claude Code')).toBeUndefined()
+    expect(rows.find((row) => row.name === 'ChatGPT')).toMatchObject({
+      kind: 'account',
+      section: 'accounts',
+      statusLabel: 'Needs sign-in',
+    })
+    expect(rows.find((row) => row.name === 'Codex')).toMatchObject({
       status: 'ready',
       statusLabel: 'Ready',
       action: 'open',
       tab: 'agents',
     })
-    expect(rows.find((row) => row.name === 'Codex')).toMatchObject({
+    expect(rows.find((row) => row.name === 'OpenCode')).toMatchObject({
       statusLabel: 'Not installed',
       action: 'install',
+      section: 'not_installed',
     })
     expect(rows.find((row) => row.name === 'Ollama')).toMatchObject({
       status: 'not_running',
       statusLabel: 'Not running',
       action: 'retry',
       tab: 'local',
+      section: 'local',
     })
     expect(rows.find((row) => row.name === 'LM Studio')).toMatchObject({
       status: 'no_models',
@@ -78,11 +99,85 @@ describe('buildConnectedRows', () => {
       statusLabel: 'Needs a key',
       action: 'add_key',
       showKeyField: true,
+      section: 'api_keys',
     })
-    expect(rows.find((row) => row.name === 'Ready models')).toBeUndefined()
     expect(rows.some((row) => row.name === 'Anthropic')).toBe(false)
     expect(rows.some((row) => row.name === 'Custom provider')).toBe(false)
     expect(rows.some((row) => row.name === 'Prime Agent' || row.name === 'Hermes Agent')).toBe(false)
+
+    expect(rows.find((row) => row.name === 'Taproot')).toMatchObject({
+      section: 'free',
+      status: 'ready',
+      action: 'open',
+      tab: 'api',
+      targetRowId: 'free-tier-settings',
+      models: ['Taproot'],
+    })
+
+    const names = rows.map((row) => row.name)
+    const chatgpt = names.indexOf('ChatGPT')
+    const openai = names.indexOf('OpenAI')
+    const ollama = names.indexOf('Ollama')
+    const free = names.indexOf('Taproot')
+    const notInstalled = names.indexOf('OpenCode')
+    expect(chatgpt).toBeLessThan(openai)
+    expect(openai).toBeLessThan(ollama)
+    expect(ollama).toBeLessThan(free)
+    expect(free).toBeLessThan(notInstalled)
+    expect(names.indexOf('Codex')).toBeLessThan(notInstalled)
+  })
+
+  it('shows the signed-in ChatGPT email when oauth is ready', () => {
+    const rows = buildConnectedRows({
+      agents: createMissingAiAgentsStatus(),
+      providers: [],
+      failureFor: () => null,
+      modelsFor: () => null,
+      oauthByProvider: { openai: signedIn('plus@example.com') },
+    })
+    expect(rows.find((row) => row.name === 'ChatGPT')).toMatchObject({
+      status: 'ready',
+      statusLabel: 'Ready',
+      accountEmail: 'plus@example.com',
+    })
+  })
+
+  it('lists gpt models on the Ready ChatGPT Connected row', () => {
+    const openai = provider({
+      id: 'openai',
+      name: 'OpenAI',
+      kind: 'open_ai',
+      base_url: 'https://api.openai.com/v1',
+      models: [{ id: 'gpt-4.1-mini', display_name: 'gpt-4.1-mini', capabilities }],
+    })
+    const rows = buildConnectedRows({
+      agents: createMissingAiAgentsStatus(),
+      providers: [openai],
+      failureFor: () => null,
+      modelsFor: (item) => (item.kind === 'open_ai' ? ['gpt-4.1-mini', 'gpt-4o'] : null),
+      oauthByProvider: { openai: signedIn('plus@example.com') },
+    })
+    expect(rows.find((row) => row.name === 'ChatGPT')).toMatchObject({
+      status: 'ready',
+      models: ['gpt-4.1-mini', 'gpt-4o'],
+    })
+  })
+
+  it('includes a Free Taproot row that opens FreeTierSettings', () => {
+    const rows = buildConnectedRows({
+      agents: createMissingAiAgentsStatus(),
+      providers: [],
+      failureFor: () => null,
+      modelsFor: () => null,
+    })
+    expect(rows.find((row) => row.id === 'provider:free_tier')).toMatchObject({
+      name: 'Taproot',
+      section: 'free',
+      status: 'ready',
+      action: 'open',
+      tab: 'api',
+      targetRowId: 'free-tier-settings',
+    })
   })
 
   it('shows the models a Ready provider gives', () => {

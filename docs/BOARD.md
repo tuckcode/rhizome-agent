@@ -4,7 +4,7 @@
 **Origin:** Composer 2.5 Fast · 2026-09-27 · header refresh for swarm Wave 1.
 
 Stamped **`origin/main` = `5c37d28`**, local HEAD matches, nothing unpushed.
-Installed app = **`d0a55f8`** (2026-09-26 04:21 CDT). Source after that is not in `/Applications` until rebuild.
+Installed app = **`c2152eeb`** (2026-11-01, PR 286 branch, not main). Source after that is not in `/Applications` until rebuild.
 
 God-plan input: [`ASTRA_PACKET.md`](ASTRA_PACKET.md). Inventory:
 [`PLAN_FOR_A_PLAN.md`](PLAN_FOR_A_PLAN.md). Daily index: `HANDOFF.md`.

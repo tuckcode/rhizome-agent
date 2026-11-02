@@ -540,7 +540,7 @@ describe('aiAgentSession', () => {
         vaultPath: '/vault',
         permissionMode: 'safe',
         chatEngine: 'native',
-        nativeTarget: 'open_ai/gpt-4.1-mini',
+        nativeTarget: 'openai/gpt-4.1-mini',
       },
       prompt: { text: 'Hello Codex' },
     })
@@ -566,7 +566,7 @@ describe('aiAgentSession', () => {
         vaultPath: '/vault',
         permissionMode: 'safe',
         chatEngine: 'native',
-        nativeTarget: 'open_ai/gpt-4.1-mini',
+        nativeTarget: 'openai/gpt-4.1-mini',
       },
       prompt: { text: 'Hello Claude' },
     })
@@ -592,7 +592,7 @@ describe('aiAgentSession', () => {
         vaultPath: '/vault',
         permissionMode: 'safe',
         chatEngine: 'native',
-        nativeTarget: 'open_ai/gpt-4.1-mini',
+        nativeTarget: 'openai/gpt-4.1-mini',
       },
       prompt: { text: 'Hello' },
     })
@@ -653,12 +653,12 @@ describe('aiAgentSession', () => {
         vaultPath: '/vault',
         permissionMode: 'safe',
         chatEngine: 'native',
-        nativeTarget: 'open_ai/gpt-4.1-mini',
+        nativeTarget: 'openai/gpt-4.1-mini',
       },
       prompt: { text: 'Hello without Prime' },
     })
     expect(streamNativeChatMock).toHaveBeenCalledWith(expect.objectContaining({
-      target: 'open_ai/gpt-4.1-mini',
+      target: 'openai/gpt-4.1-mini',
     }))
     expect(streamAiAgentMock).not.toHaveBeenCalled()
     expect(trackEventMock).not.toHaveBeenCalledWith(
@@ -696,12 +696,12 @@ describe('aiAgentSession', () => {
         vaultPath: '/vault',
         permissionMode: 'safe',
         chatEngine: 'native',
-        nativeTarget: 'open_ai/gpt-4.1-mini',
+        nativeTarget: 'openai/gpt-4.1-mini',
       },
       prompt: { text: 'Hello native' },
     })
     expect(streamNativeChatMock).toHaveBeenCalledWith(expect.objectContaining({
-      target: 'open_ai/gpt-4.1-mini',
+      target: 'openai/gpt-4.1-mini',
       permissionMode: 'safe',
     }))
     expect(streamAiAgentMock).not.toHaveBeenCalled()
@@ -718,7 +718,7 @@ describe('aiAgentSession', () => {
         vaultPath: '/vault',
         permissionMode: 'safe',
         chatEngine: 'native',
-        nativeTarget: 'open_ai/gpt-4.1-mini',
+        nativeTarget: 'openai/gpt-4.1-mini',
         nativeSessionId: 'forked-id',
       },
       prompt: { text: 'What next' },
@@ -764,7 +764,7 @@ describe('aiAgentSession', () => {
         vaultPath: '/vault',
         permissionMode: 'safe',
         chatEngine: 'native',
-        nativeTarget: 'open_ai/gpt-4.1-mini',
+        nativeTarget: 'openai/gpt-4.1-mini',
         nativeSessionId: 'n1',
         nativeReadOnly: true,
       },

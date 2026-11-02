@@ -1,6 +1,6 @@
 import { describe, it, beforeEach, afterEach } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { execFileSync } from 'node:child_process'
 import os from 'node:os'
@@ -244,7 +244,9 @@ describe('S2 vault symlink boundary', () => {
         setTimeout(() => reject(new Error('findMarkdownFiles hung on symlink cycle')), 2000)
       }),
     ])
-    const relative = files.map((filePath) => path.relative(vault, filePath)).sort()
+    // macOS tmpdir is a symlink, and findMarkdownFiles returns real paths.
+    const vaultRoot = realpathSync(vault)
+    const relative = files.map((filePath) => path.relative(vaultRoot, filePath)).sort()
     assert.deepEqual(relative, ['normal.md', 'note/nested.md'])
   })
 
