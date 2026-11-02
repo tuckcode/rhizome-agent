@@ -249,7 +249,7 @@ pub fn delete_ai_model_provider_api_key(provider_id: String) -> Result<(), Strin
     crate::ai_models::delete_provider_api_key(provider_id)
 }
 
-/// Browser sign-in for one provider account. ChatGPT is the first provider.
+/// Browser sign-in for one provider account: ChatGPT or the xAI preview.
 /// The opener error is not logged: the address can carry an ID-token hint.
 #[cfg(desktop)]
 #[tauri::command]
@@ -257,12 +257,17 @@ pub async fn oauth_sign_in(
     app: tauri::AppHandle,
     provider: String,
 ) -> Result<crate::provider_oauth::OauthStatus, String> {
+    use tauri::Emitter;
     use tauri_plugin_opener::OpenerExt;
 
     tokio::task::spawn_blocking(move || {
-        crate::provider_oauth::oauth_sign_in(&provider, |url| {
-            app.opener().open_url(url, None::<&str>).is_ok()
-        })
+        crate::provider_oauth::oauth_sign_in(
+            &provider,
+            |url| app.opener().open_url(url, None::<&str>).is_ok(),
+            |code| {
+                let _ = app.emit("oauth-user-code", code);
+            },
+        )
     })
     .await
     .map_err(|_| "Sign-in task failed.".to_string())?

@@ -70,6 +70,8 @@ impl Endpoints {
 
 pub(super) enum RefreshFail {
     Again(Box<super::Record>),
+    /// xAI answered 403: this account has no API access.
+    NoAccess,
     Temporary,
 }
 
@@ -87,8 +89,14 @@ pub(super) enum IdCheck {
     Failed,
 }
 
-struct Attempt<'a> {
+pub(super) struct Attempt<'a> {
     env: &'a Env,
+}
+
+impl<'a> Attempt<'a> {
+    pub(super) fn new(env: &'a Env) -> Self {
+        Self { env }
+    }
 }
 
 impl Drop for Attempt<'_> {
@@ -289,7 +297,7 @@ pub(super) fn revoke(env: &Env, record: &super::Record) -> Result<(), ()> {
     }
 }
 
-fn begin_attempt(env: &Env) -> Result<Arc<AtomicBool>, String> {
+pub(super) fn begin_attempt(env: &Env) -> Result<Arc<AtomicBool>, String> {
     let mut slot = env
         .attempt
         .lock()
@@ -419,7 +427,7 @@ fn oauth_error_code(response: reqwest::blocking::Response) -> String {
         .unwrap_or_default()
 }
 
-fn unusable_refresh(code: &str) -> bool {
+pub(super) fn unusable_refresh(code: &str) -> bool {
     matches!(
         code,
         "invalid_grant"
