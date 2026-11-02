@@ -50,7 +50,7 @@ describe('AiPanelComposer collapsed box', () => {
 
     expect(editor.className).toMatch(/min-h-\[30px\]/)
     expect(editor.className).not.toMatch(/min-h-\[34px\]/)
-    expect(editor.className).toMatch(/py-1/)
+    expect(editor.className).toMatch(/py-\[6px\]/)
     expect(editor.className).not.toMatch(/py-\[8px\]/)
     expect(editor.className).toMatch(/max-h-\[120px\]/)
   })
@@ -59,7 +59,8 @@ describe('AiPanelComposer collapsed box', () => {
     renderComposer('')
 
     expect(screen.getByTestId('chat-composer-box').className).toMatch(/focus-within:ring-\[3px\]/)
-    expect(screen.getByTestId('agent-input').className).toMatch(/outline-none/)
+    const editor = screen.getByTestId('agent-input').className
+    expect(editor).toMatch(/focus-visible:outline-none!/)
   })
 
   it('still grows with multi-line text instead of staying a single row', () => {
@@ -115,7 +116,7 @@ describe('AiPanelComposer collapsed box', () => {
 
     const placeholder = screen.getByText('Ask Claude')
     expect(placeholder.className.split(/\s+/)).toEqual(
-      expect.arrayContaining(['p-1', 'text-[13px]', 'leading-5']),
+      expect.arrayContaining(['px-1', 'py-[6px]', 'text-[13px]', 'leading-5']),
     )
     expect(placeholder.className).not.toMatch(/px-\[10px\]/)
     expect(placeholder.className).not.toMatch(/py-\[8px\]/)

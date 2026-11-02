@@ -261,7 +261,8 @@ function ComposerInput({
       disabled={disabled}
       placeholder={shownPlaceholder}
       placeholderClassName={cn(
-        'flex items-center p-1 text-[13px] leading-5',
+        // Same box as the editor, so the caret and the placeholder share one line.
+        'block px-1 py-[6px] text-[13px] leading-5',
         completion && 'italic',
       )}
       placeholderTestId={completion ? 'composer-reply-completion' : undefined}
@@ -275,7 +276,7 @@ function ComposerInput({
       onCommandAction={onCommandAction}
       onBrowsePromptHistory={onBrowsePromptHistory}
       // The composer box draws the focus ring around the whole field.
-      editorClassName="max-h-[120px] min-h-[30px] overflow-y-auto overscroll-contain border-0 px-1 py-1 leading-5 outline-none"
+      editorClassName="max-h-[120px] min-h-[30px] overflow-y-auto overscroll-contain border-0 px-1 py-[6px] leading-5 focus-visible:outline-none!"
       editorStyle={{ maxHeight: 120, overflowY: 'auto', overscrollBehavior: 'contain' }}
     />
   )
