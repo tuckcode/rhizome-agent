@@ -1,7 +1,7 @@
 ---
 session: 2026-11-01T19:50:00-05:00
 model: Claude Opus 5.5
-description: xAI sign-in preview (ADR-0186 decision 3). Device-code flow, client id setting, plain 403 with API key fallback. Real sign-in still needs one approval.
+description: xAI sign-in preview (ADR-0186 decision 3). Device-code flow, client id setting, plain 403 with API key fallback. A real device-code sign-in passed in a probe. The native button path is not tested.
 ---
 
 **Origin:** Claude Opus 5.5 · 2026-11-01 · Claude Code desktop, branch `claude/sleepy-spence-07168f`
@@ -24,17 +24,30 @@ description: xAI sign-in preview (ADR-0186 decision 3). Device-code flow, client
 
 ADR-0186 allows browser PKCE or device code. I chose device code because it is the only flow I confirmed live. `curl` to `/oauth2/authorize` returned 403, and the built-in browser blocks `auth.x.ai`, so the loopback flow is unverified.
 
+## Real sign-in result (2026-11-01)
+
+A probe sent the same requests as `xai.rs`, and Atticus approved code `PHPQ-AQAM` on a real account. It held tokens in memory and revoked them.
+
+| Step | Result |
+|---|---|
+| Device code, token | 200. Scope includes `api:access`. `expires_in` 21600 |
+| `/oauth2/userinfo` | 200, with `sub` and `email` |
+| `GET /v1/models` | 200, 14 models |
+| `POST /v1/chat/completions`, `grok-4.3` | 200 |
+| `POST /v1/responses`, `grok-4.3` | 200 |
+| Refresh | 200, the refresh token rotated |
+| Revoke | 200 |
+
 ## Not verified
 
-- A real sign-in from Rhizome. A probe with the same requests waits for approval.
-- Chat with a sign-in token. Chat completions on `api.x.ai` is an assumption. Hermes uses the Responses API.
-- That `b1a00492-073a-47ea-816f-4c329264a828` is the current Grok CLI id. OpenCode, Hermes, and open-grok-build use it, but Grok CLI 1.0.70 does not hold it as plain text. The string search matched zero times.
-- The 403 body and tier rules. The evidence is hermes-agent issue 26847, and a later comment there disagrees.
+- The sign-in button in a native build. The probe sent the requests from Python.
+- A real 403. This account has access, so only a mock server covers it. The evidence for the body is hermes-agent issue 26847, and a later comment there disagrees.
+- That `b1a00492-073a-47ea-816f-4c329264a828` is the current Grok CLI id. OpenCode, Hermes, and open-grok-build use it, and xAI accepted it, but Grok CLI 1.0.70 does not hold it as plain text.
+- Browser loopback PKCE. Device code replaces it.
 
 ## Follow-ups
 
 - Run the Connected sign-in in a native build and record the result here.
-- If chat completions rejects the token, route xAI through the Responses client.
 
 ## C101: flaky native chat test
 
