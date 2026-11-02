@@ -65,7 +65,7 @@ test.describe('Provider UX settings focus and labels @smoke', () => {
     await expect(chipLabel).not.toHaveText('ollama/qwen2.5')
 
     await page.locator('body').click({ position: { x: 2, y: 2 } })
-    await page.keyboard.press('Control+,')
+    await page.keyboard.press('ControlOrMeta+,')
     const panel = page.getByTestId('settings-panel')
     await expect(panel).toBeVisible({ timeout: 10_000 })
 
