@@ -14,6 +14,7 @@ import {
   providerModelsCacheKey,
   providersToListLive,
   resetListProviderModelsCache,
+  withChatgptAccountModels,
 } from './listProviderModels'
 
 vi.mock('./callHost', () => ({
@@ -263,5 +264,36 @@ describe('liveProviderHeadingNames', () => {
     }
     expect(liveProviderHeadingNames([home])).toContain('Home Ollama')
     expect(liveProviderHeadingNames([home])).not.toContain('Ollama')
+  })
+})
+
+describe('withChatgptAccountModels', () => {
+  const row = (id: string, providerId: string, providerKind: string) => ({
+    id,
+    providerId,
+    providerKind,
+    providerName: providerId === 'openai' ? 'OpenAI' : providerId,
+    modelId: id.split('/')[1],
+    displayName: id.split('/')[1],
+    label: id,
+  })
+  const seed = [
+    row('openai/gpt-4.1-mini', 'openai', 'open_ai'),
+    row('ollama/llama3.2', 'ollama', 'ollama'),
+    row('free_tier/auto', 'free_tier', 'free_tier'),
+  ]
+
+  it('replaces the catalog OpenAI row with the account models, above Free', () => {
+    const next = withChatgptAccountModels(seed, [{ slug: 'gpt-6-astra', displayName: 'GPT-6 Astra' }])
+    expect(next.map((model) => model.id)).toEqual([
+      'ollama/llama3.2',
+      'openai/gpt-6-astra',
+      'free_tier/auto',
+    ])
+    expect(next[1].label).toBe('OpenAI · GPT-6 Astra')
+  })
+
+  it('keeps the seed rows when the account lists nothing', () => {
+    expect(withChatgptAccountModels(seed, [])).toBe(seed)
   })
 })

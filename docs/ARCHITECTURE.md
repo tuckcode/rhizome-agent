@@ -919,7 +919,7 @@ Provider secrets are not written to `settings.json`. Hosted API targets keep the
 
 **Origin:** Grok 4.7 · 2026-10-24 · ChatGPT sign-in
 
-ChatGPT sign-in (ADR-0186) is a keychain account `openai:oauth`, plus a per-install host id at `openai:oauth-host`. The on/off switch is `oauth-sign-in.json`. Settings never stores `oauth`. `provider_is_signed_in_chatgpt` is true only for the built-in `openai` provider when that file is on and the record is usable. Chat then asks for a fresh access token. A custom OpenAI-compatible provider stays on its API key. Commands: `oauth_sign_in`, `oauth_status`, `oauth_sign_out`, `oauth_cancel`. Tokens stay out of logs, errors, Sentry, and analytics. The Responses API adapter is a later change and should call `provider_is_signed_in_chatgpt`.
+ChatGPT sign-in (ADR-0186) is a keychain account `openai:oauth`, plus a per-install host id at `openai:oauth-host`. `list_chatgpt_account_models` lists that account's models from `https://api.openai.com/v1/models`, and the picker uses them in place of the catalog OpenAI row. The on/off switch is `oauth-sign-in.json`. Settings never stores `oauth`. `provider_is_signed_in_chatgpt` is true only for the built-in `openai` provider when that file is on and the record is usable. Chat then asks for a fresh access token. A custom OpenAI-compatible provider stays on its API key. Commands: `oauth_sign_in`, `oauth_status`, `oauth_sign_out`, `oauth_cancel`. Tokens stay out of logs, errors, Sentry, and analytics. The Responses API adapter is a later change and should call `provider_is_signed_in_chatgpt`.
 
 **Origin:** Claude Opus 5.5 · 2026-11-01 · xAI sign-in preview
 
