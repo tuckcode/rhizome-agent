@@ -1,3 +1,4 @@
+import { isTauri } from '../mock-tauri'
 import { callHost } from './callHost'
 import { CHATGPT_ACCOUNT_PROVIDER_ID } from './accountSignInProviders'
 
@@ -34,6 +35,13 @@ export async function signOutOauth(provider = CHATGPT_ACCOUNT_PROVIDER_ID): Prom
 
 export async function cancelOauthSignIn(): Promise<void> {
   await callHost('oauth_cancel')
+}
+
+/** xAI's short code for the person to compare with the browser page. */
+export async function listenOauthUserCode(onCode: (code: string) => void): Promise<() => void> {
+  if (!isTauri()) return () => {}
+  const { listen } = await import('@tauri-apps/api/event')
+  return listen<string>('oauth-user-code', (event) => onCode(event.payload))
 }
 
 export function oauthAccountReady(status: OauthStatus | null | undefined): boolean {

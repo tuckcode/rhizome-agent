@@ -1,7 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { AiAgentsStatus } from '../lib/aiAgents'
 import { normalizeAiModelProviders, type AiModelProvider } from '../lib/aiTargets'
-import { buildConnectedRows, type ConnectedRow } from '../lib/connectedProviders'
+import { XAI_ACCOUNT_PROVIDER_ID, xaiAccountProviderRow } from '../lib/accountSignInProviders'
+import {
+  buildConnectedRows,
+  providerRowId,
+  summaryRowId,
+  type ConnectedRow,
+} from '../lib/connectedProviders'
+import { oauthAccountReady } from '../lib/providerOauth'
+import { requestProviderSettingsFocus } from '../lib/providerSettingsFocus'
 import {
   cachedProviderModelLabels,
   forgetListedProviderModels,
@@ -82,6 +90,17 @@ function ConnectedProvidersSummaryBody({
       cancelled = true
     }
   }, [providers, probe])
+
+  const xaiReady = oauthAccountReady(oauth.oauthByProvider[XAI_ACCOUNT_PROVIDER_ID])
+  const hasXaiRow = providers.some((provider) => provider.id === XAI_ACCOUNT_PROVIDER_ID)
+  const addXaiRow = useCallback(() => {
+    if (!hasXaiRow) onChange([...providers, xaiAccountProviderRow()])
+  }, [hasXaiRow, onChange, providers])
+
+  // The chat target needs a Settings row. A sign-in may start from the picker.
+  useEffect(() => {
+    if (xaiReady) addXaiRow()
+  }, [addXaiRow, xaiReady])
 
   const rows = buildConnectedRows({
     agents,
@@ -306,6 +325,14 @@ function ConnectedProvidersSummaryBody({
                   >
                     {accountBusy && oauth.signingIn ? 'Waiting for browser…' : account.signInLabel}
                   </Button>
+                  {oauth.signingIn && oauth.busyProvider === account.id && oauth.userCode ? (
+                    <span
+                      className="text-[11px] text-muted-foreground"
+                      data-testid={`settings-connected-user-code-${row.id}`}
+                    >
+                      Confirm code {oauth.userCode} in your browser
+                    </span>
+                  ) : null}
                   {oauth.signingIn && oauth.busyProvider === account.id ? (
                     <button
                       type="button"
@@ -384,6 +411,24 @@ function ConnectedProvidersSummaryBody({
         ) : null}
         {account && oauth.errorByProvider[account.id] ? (
           <p role="alert" className="mt-1 text-xs text-destructive">{oauth.errorByProvider[account.id]}</p>
+        ) : null}
+        {account?.id === XAI_ACCOUNT_PROVIDER_ID && oauth.errorByProvider[account.id] ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-1"
+            data-testid="settings-connected-xai-add-key"
+            onClick={() => {
+              addXaiRow()
+              requestProviderSettingsFocus({
+                tab: 'api',
+                rowId: summaryRowId(providerRowId(XAI_ACCOUNT_PROVIDER_ID)),
+              })
+            }}
+          >
+            Add an xAI API key
+          </Button>
         ) : null}
       </li>
     )

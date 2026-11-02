@@ -26,7 +26,9 @@ import {
 } from './providerListOrder'
 import {
   ACCOUNT_SIGN_IN_PROVIDERS,
-  chatgptOfficialHostConfigured,
+  accountHostConfigured,
+  XAI_ACCOUNT_PROVIDER_ID,
+  xaiAccountProviderRow,
   type AccountSignInProvider,
 } from './accountSignInProviders'
 import { oauthAccountReady, type OauthStatus } from './providerOauth'
@@ -107,11 +109,10 @@ export function buildConnectedRows(input: {
   const providers = normalizeAiModelProviders(input.providers)
   const rows: ConnectedRow[] = []
   const oauthByProvider = input.oauthByProvider ?? {}
-  const hostOk = chatgptOfficialHostConfigured(providers)
 
   for (const account of ACCOUNT_SIGN_IN_PROVIDERS) {
     const status = oauthByProvider[account.id]
-    const ready = hostOk && oauthAccountReady(status)
+    const ready = accountHostConfigured(account.id, providers) && oauthAccountReady(status)
     const targetRowId = accountRowId(account.id)
     rows.push({
       id: `account:${account.id}`,
@@ -123,7 +124,7 @@ export function buildConnectedRows(input: {
       statusLabel: ready ? 'Ready' : 'Needs sign-in',
       action: ready ? 'open' : 'none',
       tab: 'api',
-      models: ready ? chatgptAccountModelLabels(providers, input.modelsFor) : [],
+      models: ready ? accountModelLabels(account.id, providers, input.modelsFor) : [],
       showKeyField: false,
       installUrl: null,
       provider: null,
@@ -253,22 +254,28 @@ function isBuiltinOpenaiProvider(provider: AiModelProvider): boolean {
   return id === '' || id === 'openai' || id === 'open_ai'
 }
 
-/** Labels for the ChatGPT Connected row when oauth is Ready. */
-function chatgptAccountModelLabels(
+/** Labels for an account Connected row when oauth is Ready. */
+function accountModelLabels(
+  accountId: string,
   providers: AiModelProvider[],
   modelsFor: (provider: AiModelProvider) => string[] | null,
 ): string[] {
-  const openai = providers.find(isBuiltinOpenaiProvider)
-  if (openai) {
-    const listable = openai.kind !== 'anthropic' && canListProviderModelsLive(openai)
+  const xai = accountId === XAI_ACCOUNT_PROVIDER_ID
+  const row = xai
+    ? providers.find((provider) => provider.id === XAI_ACCOUNT_PROVIDER_ID)
+    : providers.find(isBuiltinOpenaiProvider)
+  if (row) {
+    const listable = row.kind !== 'anthropic' && canListProviderModelsLive(row)
     if (listable) {
-      const live = modelsFor(openai)
+      const live = modelsFor(row)
       if (live && live.length > 0) return live
     }
-    const saved = savedModelLabels(openai)
+    const saved = savedModelLabels(row)
     if (saved.length > 0) return saved
   }
-  return [aiModelProviderCatalogEntry('open_ai').default_model_id]
+  return xai
+    ? [xaiAccountProviderRow().models[0].id]
+    : [aiModelProviderCatalogEntry('open_ai').default_model_id]
 }
 
 

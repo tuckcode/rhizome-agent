@@ -52,14 +52,17 @@ import {
   type PickerMenuGroup,
   pickerHintI18nKey,
 } from '../lib/pickerModelMenu'
+import { accountRowId, summaryRowId } from '../lib/connectedProviders'
 import { requestProviderSettingsFocus, CONNECTED_SUMMARY_ROW_ID } from '../lib/providerSettingsFocus'
 import { nativeSessionTargetForSlot } from '../lib/nativeChatTranscript'
 import { useNativeLiveSlot } from '../lib/nativeLiveSlot'
 import { visionForTargets } from '../lib/nativeVision'
 import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
 import {
+  accountSignInProvider,
   CHATGPT_ACCOUNT_PROVIDER_ID,
   chatgptOfficialHostConfigured,
+  XAI_ACCOUNT_PROVIDER_ID,
 } from '../lib/accountSignInProviders'
 import { useOauthAccounts, type OauthAccounts } from '../lib/useOauthAccounts'
 import { SETTINGS_MENU_Z_CLASS } from '../lib/settingsMenuLayer'
@@ -603,6 +606,17 @@ function NativeChatModelPickerBody({
                     ? group.rows.find((row) => row.action)?.action ?? null
                     : (!isAccount && group.hint ? 'retry' as const : null)
                 const openFix = () => {
+                  if (headerAction === 'sign_in' && group.providerId === XAI_ACCOUNT_PROVIDER_ID) {
+                    // xAI shows a code to confirm, and Settings adds its chat row.
+                    skipCloseAutoFocusRef.current = true
+                    requestProviderSettingsFocus({
+                      tab: 'api',
+                      rowId: summaryRowId(accountRowId(XAI_ACCOUNT_PROVIDER_ID)),
+                    })
+                    onOpenProviders?.()
+                    setOpen(false)
+                    return
+                  }
                   if (headerAction === 'sign_in') {
                     void oauth.signIn(CHATGPT_ACCOUNT_PROVIDER_ID)
                     return
@@ -669,7 +683,7 @@ function NativeChatModelPickerBody({
                           >
                             {oauth.signingIn && oauth.busyProvider === CHATGPT_ACCOUNT_PROVIDER_ID
                               ? 'Waiting…'
-                              : 'Sign in with ChatGPT'}
+                              : (accountSignInProvider(group.providerId)?.signInLabel ?? 'Sign in')}
                           </button>
                           {oauth.signingIn && oauth.busyProvider === CHATGPT_ACCOUNT_PROVIDER_ID ? (
                             <button
@@ -695,7 +709,7 @@ function NativeChatModelPickerBody({
                           onPointerDown={(event) => event.preventDefault()}
                           onClick={(event) => {
                             event.stopPropagation()
-                            void oauth.signOut(CHATGPT_ACCOUNT_PROVIDER_ID)
+                            void oauth.signOut(group.providerId)
                           }}
                         >
                           Sign out

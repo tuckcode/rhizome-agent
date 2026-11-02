@@ -7,6 +7,7 @@ import {
 import {
   cancelOauthSignIn,
   fetchOauthStatus,
+  listenOauthUserCode,
   oauthAccountReady,
   SIGNED_OUT_OAUTH,
   signOutOauth,
@@ -21,6 +22,7 @@ export function useOauthAccounts() {
   const [busyProvider, setBusyProvider] = useState<string | null>(null)
   const [errorByProvider, setErrorByProvider] = useState<Record<string, string>>({})
   const [signingIn, setSigningIn] = useState(false)
+  const [userCode, setUserCode] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     const next: OauthByProvider = {}
@@ -40,6 +42,19 @@ export function useOauthAccounts() {
     void refresh()
   }, [refresh])
 
+  useEffect(() => {
+    let active = true
+    let stop: (() => void) | null = null
+    void listenOauthUserCode(setUserCode).then((unlisten) => {
+      if (active) stop = unlisten
+      else unlisten()
+    }).catch(() => {})
+    return () => {
+      active = false
+      stop?.()
+    }
+  }, [])
+
   const signIn = useCallback(async (provider = CHATGPT_ACCOUNT_PROVIDER_ID) => {
     const id = normalizeOauthSignInProvider(provider)
     setBusyProvider(id)
@@ -57,6 +72,7 @@ export function useOauthAccounts() {
     } finally {
       setBusyProvider(null)
       setSigningIn(false)
+      setUserCode(null)
     }
   }, [refresh])
 
@@ -87,6 +103,7 @@ export function useOauthAccounts() {
       }
       setSigningIn(false)
       setBusyProvider(null)
+      setUserCode(null)
       await refresh()
     }
   }, [busyProvider, refresh])
@@ -98,6 +115,7 @@ export function useOauthAccounts() {
     busyProvider,
     errorByProvider,
     signingIn,
+    userCode,
     chatgptReady,
     refresh,
     signIn,
