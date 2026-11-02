@@ -35,6 +35,7 @@ describe('leftover app copy — Rhizome name, kept paths', () => {
     expect(config).toContain('const APP_CONFIG_DIR: &str = "com.rhizome.app"')
     expect(cargo).toContain('name = "RhizomeAgent"')
     expect(cargo).toContain('default-run = "RhizomeAgent"')
+    expect(tauri).toContain('"mainBinaryName": "Rhizome"')
   })
 
   it('credits Portent as the vault structure template', () => {

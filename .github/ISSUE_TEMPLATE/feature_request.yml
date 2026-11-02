@@ -1,5 +1,5 @@
 name: Feature idea
-description: Suggest something Rhizome Agent should do.
+description: Suggest something Rhizome should do.
 labels: [needs-triage]
 body:
   - type: textarea
