@@ -3,6 +3,11 @@ import { describe, expect, it, vi } from 'vitest'
 import { ToolApprovalCard } from './ToolApprovalCard'
 
 const writeClipboardText = vi.fn()
+const trackEvent = vi.fn()
+
+vi.mock('../lib/telemetry', () => ({
+  trackEvent: (name: string, properties?: Record<string, string | number>) => trackEvent(name, properties),
+}))
 
 vi.mock('../utils/clipboardText', () => ({
   writeClipboardText: (text: string) => writeClipboardText(text),
@@ -65,7 +70,8 @@ describe('ToolApprovalCard', () => {
       />,
     )
     expect(screen.getByText('Write file')).toBeInTheDocument()
-    expect(screen.getByTestId('approval-overwrite')).toHaveTextContent('Replaces the whole file')
+    expect(screen.getByTestId('tool-approval-card')).toHaveAttribute('data-risk', 'caution')
+    expect(screen.getByTestId('approval-risk')).toHaveTextContent('Replaces the whole file.')
   })
 
   it('makes Allow once the filled primary action', () => {
@@ -80,7 +86,7 @@ describe('ToolApprovalCard', () => {
       />,
     )
     expect(screen.getByRole('button', { name: 'Allow once' })).toHaveClass('bg-primary')
-    expect(screen.getByRole('button', { name: 'Allow for session' })).toHaveClass('border')
+    expect(screen.getByRole('button', { name: 'Allow this file for the session' })).toHaveClass('border')
     expect(screen.getByRole('button', { name: 'Deny' })).not.toHaveClass('bg-primary')
   })
 
@@ -289,8 +295,9 @@ describe('ToolApprovalCard', () => {
     expect(screen.getByTestId('approval-command')).toHaveTextContent('\\u{001B}')
     expect(screen.getByTestId('approval-command')).toHaveTextContent('\\u{200B}')
     expect(screen.getByTestId('approval-command')).toHaveTextContent('\\u{202E}')
-    expect(screen.getByTestId('approval-hidden-warning')).toHaveTextContent(
-      'This command contains hidden or control characters.',
+    expect(screen.getByTestId('tool-approval-card')).toHaveAttribute('data-risk', 'danger')
+    expect(screen.getByTestId('approval-risk')).toHaveTextContent(
+      'Contains hidden or control characters.',
     )
     fireEvent.click(screen.getByRole('button', { name: 'Copy command' }))
     expect(writeClipboardText).toHaveBeenCalledWith(command)
@@ -339,10 +346,70 @@ describe('ToolApprovalCard', () => {
       />,
     )
     fireEvent.click(screen.getByRole('button', { name: 'Allow once' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Allow for session' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Allow this file for the session' }))
     fireEvent.click(screen.getByRole('button', { name: 'Deny' }))
     expect(onReply).toHaveBeenCalledWith('allow_once')
     expect(onReply).toHaveBeenCalledWith('allow_session')
     expect(onReply).toHaveBeenCalledWith('deny')
+  })
+  it('gives a routine command a plain card with no risk line', () => {
+    render(
+      <ToolApprovalCard tool="bash" command="echo SAFE" options={OPTIONS} onReply={vi.fn()} />,
+    )
+    expect(screen.getByTestId('tool-approval-card')).toHaveAttribute('data-risk', 'routine')
+    expect(screen.queryByTestId('approval-risk')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Allow once' })).toHaveClass('bg-primary')
+  })
+
+  it('names the effect of a caution command and keeps Allow once primary', () => {
+    render(
+      <ToolApprovalCard
+        tool="bash"
+        command="curl https://example.com"
+        options={OPTIONS}
+        onReply={vi.fn()}
+      />,
+    )
+    expect(screen.getByTestId('tool-approval-card')).toHaveAttribute('data-risk', 'caution')
+    expect(screen.getByTestId('approval-risk')).toHaveTextContent('Uses the network.')
+    expect(screen.getByRole('button', { name: 'Allow once' })).toHaveClass('bg-primary')
+  })
+
+  it('marks a destructive command as danger and removes the primary fill from Allow once', () => {
+    render(
+      <ToolApprovalCard tool="bash" command="rm -rf ~/EVIL" options={OPTIONS} onReply={vi.fn()} />,
+    )
+    const card = screen.getByTestId('tool-approval-card')
+    expect(card).toHaveAttribute('data-risk', 'danger')
+    expect(card).toHaveClass('border-destructive')
+    expect(screen.getByTestId('approval-status')).toHaveTextContent('Destructive')
+    expect(screen.getByTestId('approval-risk')).toHaveTextContent('Deletes files. This cannot be undone.')
+    const allow = screen.getByRole('button', { name: 'Allow once' })
+    expect(allow).not.toHaveClass('bg-primary')
+    expect(allow).toHaveClass('border')
+    expect(screen.getByRole('button', { name: 'Deny' })).toBeInTheDocument()
+  })
+
+  it('still sends allow once from a danger card', () => {
+    const onReply = vi.fn()
+    render(
+      <ToolApprovalCard tool="bash" command="rm -rf ~/EVIL" options={OPTIONS} onReply={onReply} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Allow once' }))
+    expect(onReply).toHaveBeenCalledWith('allow_once')
+  })
+
+  it('reports the reply with the tool, the risk tier and the choice only', () => {
+    trackEvent.mockClear()
+    render(
+      <ToolApprovalCard tool="bash" command="rm -rf ~/EVIL" options={OPTIONS} onReply={vi.fn()} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Deny' }))
+    expect(trackEvent).toHaveBeenCalledWith('tool_approval_replied', {
+      tool: 'bash',
+      risk: 'danger',
+      choice: 'deny',
+      surface: 'card',
+    })
   })
 })

@@ -616,8 +616,44 @@ describe('AiMessage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Allow once: echo SAFE' }))
     expect(allowSafe).toHaveBeenCalledWith('allow_once')
     expect(allowEvil).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Allow once: rm -rf ~/EVIL' }))
+  })
+
+  it('makes the user open the card before a destructive command can run', () => {
+    const allowEvil = vi.fn()
+    render(
+      <AiMessage
+        userMessage="Clean"
+        actions={[pendingApprovalAction('bash', {
+          args: 'rm -rf ~/EVIL',
+          callId: 'evil',
+          onReply: allowEvil,
+        })]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    const row = screen.getByTestId('tool-use-approval-row')
+    expect(row).toHaveAttribute('data-risk', 'danger')
+    expect(screen.queryByRole('button', { name: /^Allow once/ })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Deny: rm -rf ~/EVIL' })).toBeVisible()
+    expect(screen.getByTestId('approval-risk-tag')).toHaveTextContent('Deletes files.')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Review: rm -rf ~/EVIL' }))
+    expect(screen.getByTestId('tool-approval-card')).toHaveAttribute('data-risk', 'danger')
+    fireEvent.click(screen.getByRole('button', { name: 'Allow once' }))
     expect(allowEvil).toHaveBeenCalledWith('allow_once')
+  })
+
+  it('tags a caution command on the collapsed row and keeps Allow once', () => {
+    render(
+      <AiMessage
+        userMessage="Fetch"
+        actions={[pendingApprovalAction('bash', { args: 'curl https://example.com', callId: 'net' })]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByTestId('tool-use-approval-row')).toHaveAttribute('data-risk', 'caution')
+    expect(screen.getByTestId('approval-risk-tag')).toHaveTextContent('Uses the network.')
+    expect(screen.getByRole('button', { name: 'Allow once: curl https://example.com' })).toBeVisible()
   })
 
   it('shows the path on a collapsed edit approval and hides Allow for session', () => {
@@ -802,10 +838,23 @@ describe('AiMessage', () => {
     )
     fireEvent.click(screen.getByTestId('tool-use-toggle'))
     expect(screen.getByRole('button', { name: 'Review: ls⏎rm -rf ~' })).toBeVisible()
-    expect(screen.getByTestId('approval-overflow-tag')).toHaveTextContent('Multiple lines')
+    expect(screen.getByTestId('approval-risk-tag')).toHaveTextContent('Deletes files.')
     expect(screen.queryByRole('button', { name: /^Allow once/ })).toBeNull()
     const label = screen.getByTestId('approval-review').getAttribute('aria-label') ?? ''
     expect(label).not.toContain('\n')
+  })
+
+  it('tags a harmless collapsed command of several lines as Multiple lines', () => {
+    render(
+      <AiMessage
+        userMessage="Run it"
+        actions={[pendingApprovalAction('bash', { args: 'ls\npwd', callId: 'nl2' })]}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('tool-use-toggle'))
+    expect(screen.getByTestId('approval-overflow-tag')).toHaveTextContent('Multiple lines')
+    expect(screen.queryByTestId('approval-risk-tag')).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Allow once/ })).toBeNull()
   })
 
   it('groups five identical tool names into one counted row', () => {

@@ -37,6 +37,7 @@ import {
   type NativeApprovalChoice,
   type NativeApprovalOption,
 } from '../lib/nativeToolApproval'
+import { approvalRiskTag, approvalToolForAnalytics, classifyApprovalRisk } from '../lib/approvalRisk'
 import { MarkdownContent } from './MarkdownContent'
 import { ReplySelectionPill } from './ReplySelectionPill'
 import { translate, type AppLocale } from '../lib/i18n'
@@ -457,6 +458,26 @@ function CollapsedApprovalRow({
   const verb = collapsedApprovalVerb(action)
   const visiblePath = !bash && display && !overflow.empty ? collapsePathKeepFilename(display) : display
   const overflowTag = approvalOverflowTag(overflow)
+  const risk = classifyApprovalRisk({
+    tool: action.tool,
+    command: bash ? display : undefined,
+    path: bash ? undefined : display,
+    created: action.approval?.created,
+    overwrite: action.approval?.overwrite,
+  })
+  const riskTag = approvalRiskTag(risk)
+  // A destructive call needs the full card before it can run (ADR-0192).
+  const mustReview = overflow.review || risk.tier === 'danger'
+
+  function reply(choice: string) {
+    trackEvent('tool_approval_replied', {
+      tool: approvalToolForAnalytics(action.tool),
+      risk: risk.tier,
+      choice,
+      surface: 'row',
+    })
+    action.approval?.onReply?.(choice as NativeApprovalChoice)
+  }
   const options = (action.approval?.options ?? []).filter((option) => (
     option.id === 'allow_once' || option.id === 'deny'
   ))
@@ -467,6 +488,7 @@ function CollapsedApprovalRow({
     <div
       className="mt-1 flex items-center gap-2"
       data-testid="tool-use-approval-row"
+      data-risk={risk.tier}
       data-call-id={action.approval?.callId ?? action.toolId}
       onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => event.stopPropagation()}
@@ -512,7 +534,15 @@ function CollapsedApprovalRow({
           </code>
         ) : null}
       </div>
-      {overflowTag ? (
+      {riskTag ? (
+        <span
+          className={`me-2 shrink-0 text-[11px] ${risk.tier === 'danger' ? 'text-danger-text' : 'text-warn-text'}`}
+          data-testid="approval-risk-tag"
+        >
+          {riskTag}
+        </span>
+      ) : null}
+      {overflowTag && !riskTag ? (
         <span
           className="me-2 shrink-0 text-[11px] text-muted-foreground"
           data-testid="approval-overflow-tag"
@@ -524,7 +554,7 @@ function CollapsedApprovalRow({
         className="grid w-[15rem] shrink-0 grid-cols-2 items-center gap-1.5"
         data-testid="tool-use-approval-actions"
       >
-        {overflow.review ? (
+        {mustReview ? (
           <Button
             size="sm"
             type="button"
@@ -545,7 +575,7 @@ function CollapsedApprovalRow({
             className="w-full"
             data-testid="approval-allow_once"
             aria-label={approvalAriaLabel(allow.label, display)}
-            onClick={() => action.approval?.onReply?.(allow.id as NativeApprovalChoice)}
+            onClick={() => reply(allow.id)}
           >
             {allow.label}
           </Button>
@@ -559,7 +589,7 @@ function CollapsedApprovalRow({
             className={`w-full text-destructive hover:text-destructive`}
             data-testid="approval-deny"
             aria-label={approvalAriaLabel(deny.label, display)}
-            onClick={() => action.approval?.onReply?.(deny.id as NativeApprovalChoice)}
+            onClick={() => reply(deny.id)}
           >
             {deny.label}
           </Button>

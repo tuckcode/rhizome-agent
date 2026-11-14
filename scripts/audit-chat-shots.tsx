@@ -17,6 +17,10 @@ type ShotState =
   | 'approval-bash'
   | 'approval-allow-focus'
   | 'approval-two'
+  | 'approval-two-open'
+  | 'approval-danger'
+  | 'approval-caution'
+  | 'approval-overwrite'
   | 'approval-edit'
   | 'approval-overflow'
   | 'approval-empty'
@@ -37,6 +41,10 @@ const STATES: ShotState[] = [
   'approval-bash',
   'approval-allow-focus',
   'approval-two',
+  'approval-two-open',
+  'approval-danger',
+  'approval-caution',
+  'approval-overwrite',
   'approval-edit',
   'approval-overflow',
   'approval-empty',
@@ -302,6 +310,42 @@ export function Shot() {
       <AiMessage
         userMessage="Run two"
         actions={[pendingBash('echo SAFE', 'safe'), pendingBash('rm -rf ~/EVIL', 'evil')]}
+      />
+    )
+  } else if (state === 'approval-two-open') {
+    title = 'Two pending approvals, open'
+    body = (
+      <AiMessage
+        userMessage="Run two"
+        actions={[pendingBash('echo SAFE', 'safe'), pendingBash('rm -rf ~/EVIL', 'evil')]}
+      />
+    )
+  } else if (state === 'approval-danger') {
+    title = 'Destructive command'
+    body = (
+      <AiMessage
+        userMessage="Reset the branch"
+        actions={[pendingBash('sudo git reset --hard origin/main && git push --force')]}
+      />
+    )
+  } else if (state === 'approval-caution') {
+    title = 'Command that uses the network'
+    body = (
+      <AiMessage
+        userMessage="Add the package"
+        actions={[pendingBash('pnpm add left-pad && curl https://example.com/data.json -o data.json')]}
+      />
+    )
+  } else if (state === 'approval-overwrite') {
+    title = 'Whole-file overwrite'
+    body = (
+      <AiMessage
+        userMessage="Rewrite the plan"
+        actions={[pendingAction('write_file', {
+          path: 'notes/plan.md',
+          overwrite: true,
+          preview: '@@ -1,2 +1,2 @@\n-# Plan\n-Draft.\n+# Plan\n+Ready.\n',
+        })]}
       />
     )
   } else if (state === 'approval-edit') {
