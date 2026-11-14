@@ -80,3 +80,14 @@ Sizes below are explicit pixel utilities. Weight 400 is inherited from the root 
 - ADR-0170 describes Graph and Mycelium beneath Notes. Current source also has full-canvas left rail destinations. The status Graph and session footprint use Connections. Check which entry points remain visible in the running build.
 - The handoff estimates note title at 14 px and preview at 13 px. Source specifies 13 px and 12 px. The actual rendered appearance and the clipping report need runtime confirmation.
 - The handoff records a possible transcript clearing when Notes opens as C104. That observation remains unconfirmed. This audit did not reproduce it.
+
+## Additional paths
+
+| Trigger and source | Before → after | Storage |
+|---|---|---|
+| Browse tree Changes (`src/App.tsx:2151`) | Selecting Changes in the unified Browse tree requests Notes open, then selects Changes. The right rail Changes icon uses `handleSetSelection` directly, so it does not make that request. | P for the request; selection in memory |
+| Chat note pane Back to notes (`src/components/ChatNotePane.tsx:60`, `src/components/ChatHome.tsx:287`, `src/App.tsx:2264`) | Close the read-only chat note pane, then request Notes open. Its X closes that pane without requesting Notes (`src/components/ChatHome.tsx:291`). A note can enter this pane through Ask agent about note (`src/App.tsx:606`). | P for the request; chat note selection in memory |
+| ChatHome exit (`src/components/ChatHome.tsx:331`, `src/App.tsx:2254`) | `AiPanel` receives `onClose`; its caller requests Workbench in the chat-centered shell and Notes in the classic shell. `AiPanel` passes the handler onward (`src/components/AiPanel.tsx:530`). The exact visible control and its reachability in each presentation remain **unconfirmed**. | P and session-open memory |
+| Graph, Mycelium, or Research canvas (`src/App.tsx:570`, `:654`, `:1701`) | Selecting one sets `hideNotesForCanvas`, hiding the Notes dock, rail, and restore strip. Selecting Chat or exiting Graph/Mycelium selects Inbox or All Notes (`src/App.tsx:585`, `:2463`), removing the hide condition. The preset and mode remain stored, so fitting derives their visible state again. Notes focus is cleared (`src/App.tsx:1758`). | Selection and focus in memory; P and M unchanged |
+
+`ChatNotePane` is a separate read-only pane inside ChatHome. Its drag width is 260 px minimum, 448 px default, and 880 px maximum. `usePanelWidth` stores it under `rhizome:chat-note-pane-width` (`src/components/ChatHome.tsx:200`, `:279`, `src/constants/appStorage.ts:19`). This differs from the normal open-note divider, which stores the 280/360/480 px preset width in P. In stacked mode that normal divider changes height instead, with 140/320/720 px limits under `rhizome:chat-note-editor-height` (`src/App.tsx:635`, `:2432`).
