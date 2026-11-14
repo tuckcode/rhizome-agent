@@ -27,7 +27,7 @@ The plan is [`../2026-11-14-fable-ux-run-plan.md`](../2026-11-14-fable-ux-run-pl
 | # | Branch | PR | State |
 |---|---|---|---|
 | 0 | `ux/fable-run-plan` | [#291](https://github.com/tuckcode/rhizome-agent/pull/291) | Open. Local gates green. |
-| 1 | `ux/approval-risk` | none yet | Code and tests done in the worktree. Screenshots captured. Not committed, not pushed. |
+| 1 | `ux/approval-risk` | [#292](https://github.com/tuckcode/rhizome-agent/pull/292) | Open. Commit `db8d55cc`. Local gates green (3m 25s). |
 | 2 to 12 | see the plan | none | Not started |
 
 ## Where the work is
@@ -55,4 +55,17 @@ The plan said that an unknown command is `caution`. I changed that. An unknown c
 
 ## What I would do next
 
-Follow the PR sequence in the plan. PR 2 (one run-status model) is next after PR 1.
+Follow the PR sequence in the plan. PR 2 (one run-status model) is next.
+
+Start PR 2 like this:
+
+1. Make a new worktree from `origin/main`. Do not edit a tree while its push runs, because the gate reads the working tree.
+2. Read the run-state map in section 2.1 of the plan. The five displays are the frame pulse (`AiPanel.tsx`), the session dot, the `ChatComposerFoot.tsx` spinner, `ChatRunLiveStatus.tsx`, and the pulses in `AiMessage.tsx`.
+3. Write the run-status model test first (`src/lib/chatRunLiveStatus.ts` is the nearest existing code).
+
+## Session end, 2026-11-14
+
+The session stopped after PR 1 because the usage limit was near. Nothing is uncommitted in either tree. Two tools need one note each:
+
+- `codacy-cli analyze --tool opengrep` fails with `UnicodeDecodeError` unless `PYTHONUTF8=1 LC_ALL=en_US.UTF-8` is set.
+- The worktree needed a copy of the ignored `.codacy/` folder from the main checkout.
