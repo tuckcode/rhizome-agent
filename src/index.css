@@ -655,6 +655,14 @@
 
 /* --- Tailwind v4 theme inline: register colors + radii --- */
 @theme inline {
+  /* Pixel values keep the type scale exact at the 14px root. */
+  --text-meta: 11px;
+  --text-small: 12px;
+  --text-control: 13px;
+  --text-body: 14px;
+  --text-title: 16px;
+  --text-display: 20px;
+
   /*
    * font-sans and font-mono resolved to Tailwind's built-in stacks, so Inter
    * (linked in index.html) and the monospace faces the app loads (IBM Plex
