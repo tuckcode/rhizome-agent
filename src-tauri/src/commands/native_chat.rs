@@ -352,6 +352,8 @@ impl NativeChats {
             self.note_read_only(&id);
             return Ok(id);
         }
+        // Read the saved target before the worker tries to lock the log for writing.
+        self.remember_logged_target(&id);
         let path = format!("{NATIVE_SESSION_PREFIX}{id}");
         let control = engine.control();
         let (ops, op_rx) = mpsc::channel();
@@ -432,7 +434,6 @@ impl NativeChats {
                 turn_busy,
             },
         );
-        self.remember_logged_target(&id);
         Ok(id)
     }
 
