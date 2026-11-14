@@ -145,7 +145,7 @@ Each PR is one change, with before and after screenshots in both themes and gree
 | 8 | `ux/provider-settings` | Grouped provider list with one recommended row, the stale smoke specs |
 | 9 | `ux/settings-structure` | Cut Language, Save and Cancel made true (F07), split `SettingsPanel.tsx` by section |
 | 10 | `ux/graph` | 2D, selection, labels, fit, toolbar, names, ADR that replaces ADR-0155 |
-| 11 | `ux/notes-dock` | Notes list docks, one heading, right-rail note icons |
+| 11 | `ux/notes-dock` | Side-panel rethink (Atticus, 2026-11-14): panel widths, title against preview on the note side, how the right sidebar opens and closes. Notes list docks, one heading, right-rail note icons. Map the current states first. |
 | 12 | `ux/fix-list-close` | Final status on every fix-list row, and the handoff |
 
 `App.tsx` gets a split only where one of these PRs needs it. The Prime and Hermes removal (ADR-0189) stays out.

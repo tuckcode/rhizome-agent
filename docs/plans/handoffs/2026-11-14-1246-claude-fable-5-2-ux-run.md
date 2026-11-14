@@ -22,6 +22,36 @@ The plan is [`../2026-11-14-fable-ux-run-plan.md`](../2026-11-14-fable-ux-run-pl
 6. The Notes list stops covering the open note. Not started.
 7. ADR-0192 takes the number after ADR-0191, which PR #288 proposes. If #288 does not merge, the number sequence has a gap.
 
+## Note from Atticus, 2026-11-14: side panels and the note side
+
+Atticus asked for a rethink of the side panels. PR 11 (`ux/notes-dock`) grows to cover all of it. Do the understanding step before the build step.
+
+What he named:
+
+1. **Panel width.** Look at the width of both side panels.
+2. **Text on the note side.** The note title, the body preview and the meta line look too much alike. The title must stand apart from the preview.
+3. **How the right sidebar opens and closes.** The behaviour is not clear.
+
+What the audit already shows (`docs/review-shots/ux-baseline/earth-note-open.png`):
+
+- The Notes list lies over the open note and cuts its own rows at the right edge.
+- A note row has a title at about 14px medium and a preview at about 13px. Both use nearly the same colour. Only the weight tells them apart.
+- "Notes" shows twice as a heading.
+- The right rail has a panel toggle, Inbox, All Notes, Changes, and then one icon for each recent note with no label.
+- The left sessions panel is 240px. Its rows use a mono meta line that is smaller than the note meta line.
+
+First step for PR 11: list each way the right side opens and closes today (rail icons, the panel toggle, the four pane presets of ADR-0173, shortcuts), with a screenshot of each state. Then propose one model. ADR-0170 and ADR-0173 are the recorded decisions for this area.
+
+## Delegation, 2026-11-14
+
+Atticus asked for cheaper models on the easier parts. Use this split:
+
+- **Haiku:** the scale sweep by file (PR 6), fix-list status edits (PR 12), screenshot capture scripts.
+- **Sonnet:** component tests, the lint ratchet (PR 5), the chat structure work (PR 4), Settings file split (PR 9).
+- **Opus or Fable:** the run-status model (PR 2), the run timeline design (PR 3), first run (PR 7), the graph change (PR 10), the side-panel rethink (PR 11).
+
+Give each agent its own worktree and its own files. No `codex`, `gemini` or `opencode` command is on PATH on this machine, so a ChatGPT model cannot take work from this session today. Atticus can start a ChatGPT session by hand with the brief for one PR.
+
 ## PR status
 
 | # | Branch | PR | State |
