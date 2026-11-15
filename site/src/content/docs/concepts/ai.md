@@ -19,9 +19,12 @@ New chats use **Rhizome's engine**: the loop built into the app. It does not nee
 ### Rhizome's engine
 
 - **Models:** pick a catalog model, or **Taproot**. See [Free models and routing](free-models-and-routing.md). Anthropic models aren't offered here yet.
+- **Images:** paste or attach PNG, JPEG, GIF, or WebP. A text-only model refuses the image. An unknown model asks before send. See [Chat with the agent](../guides/use-ai-panel.md#send-an-image).
+- **Step cap:** Settings → AI Agents → **Agent max steps** (default 50). A capped turn shows **Continue**, which adds 50 more rounds on the same chat.
 - **Tools:** see the table below. Read and search tools run without asking. Edits and shell commands ask first.
 - **Saved chats:** each chat is saved as it goes and can be reopened after you quit. Chats get a title automatically from the first exchange.
 - **Errors:** a problem that doesn't stop the turn shows as a notice in the chat. A problem that does stop it, such as a missing key, ends the turn with a message that says what to fix.
+- **Local CLIs:** Settings can detect Claude Code, Codex, and similar programs. They are not chat engines. There is no **Use in chat** action.
 
 | Tool | What it does | When it runs |
 |---|---|---|

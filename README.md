@@ -38,9 +38,9 @@ To look at the interface without a live engine: `pnpm dev`, then http://localhos
 ### First minute
 
 1. The first launch may ask **Help improve Rhizome**. You can decline. Telemetry stays off until you accept, and a build without a Sentry or PostHog key sends nothing. Graphite is the default theme. Dark is Graphite, Light is Earth light, and System follows the OS between those two. Earth dark, Loam, and Mycelium are color skins.
-2. Chat opens. The sessions list opens with it on a first launch. The left rail holds sessions, Views (Research, Graph, Mycelium, History), and Settings. Changes sits next to Notes. Views use Ctrl+Cmd+1–4 on Mac and Ctrl+Shift+1–4 on Windows.
+2. Chat opens on Rhizome's own engine. There is no Prime setup screen. The sessions list opens with it on a first launch. The left rail holds sessions, Views (Research, Graph, Mycelium, History), and Settings. Changes sits next to Notes. Views use Ctrl+Cmd+1–4 on Mac and Ctrl+Shift+1–4 on Windows.
 3. Create a local vault, or open a folder you already have.
-4. Send one message. On Rhizome's engine you should get an answer, a notice if a non-fatal error occurred, or a clear failure (no provider key, for example).
+4. Send one message. You should get an answer, a notice if a non-fatal error occurred, or a clear failure (no provider key, for example). Add a key or Taproot in Settings → AI Agents → Connected.
 5. Show Notes (View menu, or Cmd+2). Save a note, quit, and reopen the same file.
 
 Notes live in the vault folder you opened. Native chat logs live in the app config folder (`com.rhizome.app/native-sessions`).

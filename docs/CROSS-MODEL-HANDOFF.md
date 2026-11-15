@@ -713,3 +713,37 @@ Do not restore these claims from older briefings or from
    board UI and still no `kanban.db`. Do not copy Hermes kanban files.
 
 Chats are native.
+
+## 28. First launch, updater, images, and step caps (2026-10-24)
+
+**Origin:** docs automation · 2026-10-24 · verified against
+`src/lib/effectiveChatEngine.ts`, `src/components/ConnectedProvidersSummary.tsx`,
+`src/lib/composerAttachments.ts`, `src-tauri/src/chat_images.rs`,
+`src-tauri/src/git/remote_url.rs`, `src-tauri/src/app_updater.rs`,
+and the ADR-0189 follow-up removals.
+
+Do not restore these claims from last week's briefing or from
+`platforms-and-updates.md` before this stamp:
+
+1. **First launch still stops on Prime is ready.** False. The onboarding
+   prompt and Show AI Setup are gone. `resolveEffectiveChatEngine`
+   always returns `native`. Leftover `chat_engine` values migrate once.
+2. **Chat engine X is available / Update now.** False. That offer
+   updated `prime-agent`. `usePrimeUpdate`, `ChatEngineUpdateBanner`,
+   and `check_prime_update` are gone. The in-app updater is Rhizome
+   only (`app_updater.rs`). Starlight must not say there is no updater.
+3. **Native chat is text only.** False. Pasted and attached PNG, JPEG,
+   GIF, and WebP reach vision models (ADR-0190). Caps: 4 images, 5 MB
+   each. Text-only refuses. Unknown asks Send anyway.
+4. **A long turn just ends.** False. `agent_max_steps` defaults to 50.
+   The durable event is `TurnCapped`. Continue submits
+   `continuation: true` and gets 50 fresh rounds.
+5. **Local CLI cards offer Use in chat.** False. ADR-0189. Copy MCP
+   config is the installed-agent action. The picker keeps unset
+   providers as disabled rows.
+6. **Any git remote URL is fine.** False. `validate_remote_url` refuses
+   a leading `-`, control characters, and transport helpers (`ext::`).
+   `ssh://git@[::1]/x` is still accepted.
+
+Leftover Prime and Hermes engine code is still in the tree. Do not
+document it as a first-launch path.
