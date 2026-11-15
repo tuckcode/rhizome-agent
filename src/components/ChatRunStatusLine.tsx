@@ -6,7 +6,9 @@ import {
   WarningCircle,
   type Icon,
 } from '@phosphor-icons/react'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { writeClipboardText } from '../utils/clipboardText'
 import { useChatRunStatus } from '../hooks/useChatRunStatus'
 import { stopRunAriaKeyShortcuts, stopRunShortcutLabel } from '../hooks/useStopRunShortcut'
 import type { ChatRunActionKind, ChatRunFailure, ChatRunState } from '../lib/chatRunStatus'
@@ -18,6 +20,7 @@ interface ChatRunStatusLineProps {
   onStop?: () => void
   onContinue?: () => void
   onSignIn?: () => void
+  onRetry?: () => void
 }
 
 const GLYPH: Record<Exclude<ChatRunState, 'idle'>, Icon> = {
@@ -64,6 +67,7 @@ export function ChatRunStatusLine({
   onStop,
   onContinue,
   onSignIn,
+  onRetry,
 }: ChatRunStatusLineProps) {
   const status = useChatRunStatus(messages, isActive, failure)
   const Glyph = status.state === 'idle' ? null : GLYPH[status.state]
@@ -71,9 +75,12 @@ export function ChatRunStatusLine({
     stop: onStop,
     continue: onContinue,
     sign_in: onSignIn,
+    retry: onRetry,
   }
   const action = status.action
   const onAction = action ? handlers[action.kind] : undefined
+  const [copied, setCopied] = useState<string | null>(null)
+  const copyText = status.copyText
 
   return (
     <div
@@ -91,7 +98,10 @@ export function ChatRunStatusLine({
       {status.label ? (
         <span
           className="flex min-w-0 items-baseline"
+          // A status for navigation, not a second announcement:
+          // ChatRunLiveStatus already reads the failure once.
           role={status.state === 'failed' ? 'status' : undefined}
+          aria-live={status.state === 'failed' ? 'off' : undefined}
         >
           <span className="min-w-0 truncate">{status.label}</span>
           {status.detail ? (
@@ -116,6 +126,20 @@ export function ChatRunStatusLine({
           {action.kind === 'stop' ? (
             <kbd className="font-sans text-xs font-normal text-muted-foreground">{stopRunShortcutLabel()}</kbd>
           ) : null}
+        </Button>
+      ) : null}
+      {copyText ? (
+        <Button
+          className={ACTION_CLASS}
+          data-testid="chat-run-action-copy-error"
+          size="xs"
+          type="button"
+          variant="ghost"
+          onClick={() => {
+            void writeClipboardText(copyText).then(() => setCopied(copyText), () => {})
+          }}
+        >
+          {copied === copyText ? 'Copied' : 'Copy error'}
         </Button>
       ) : null}
     </div>

@@ -1,6 +1,8 @@
 import type { ChatRunSnapshot } from './chatRunLiveStatus'
 import { approvalTitle } from './nativeToolApproval'
-import { workerStartFailureReason } from './primeWorkerStartError'
+import { ENGINE_DID_NOT_START, workerStartFailureReason } from './primeWorkerStartError'
+
+export { ENGINE_DID_NOT_START }
 
 /**
  * The one description of what a chat run does now.
@@ -22,7 +24,7 @@ export type ChatRunState =
   | 'failed'
 
 /** The one action a state offers on the status line. */
-export type ChatRunActionKind = 'stop' | 'continue' | 'sign_in'
+export type ChatRunActionKind = 'stop' | 'continue' | 'sign_in' | 'retry'
 
 export interface ChatRunAction {
   kind: ChatRunActionKind
@@ -35,13 +37,24 @@ export interface ChatRunStatus {
   /** A short addition after the label, such as the elapsed time. */
   detail?: string
   action?: ChatRunAction
+  /** The raw cause of a failure, offered behind Copy error. Never shown in the line. */
+  copyText?: string
 }
 
-/** Why the run did not start, in words that lead with the cause. */
+/**
+ * Why the run did not start.
+ * - `chatgpt_sign_in`: the ChatGPT account sign-in expired or is missing.
+ * - `sign_in`: another provider wants a sign-in.
+ * - `engine`: the engine did not start.
+ */
+export type ChatRunFailureKind = 'chatgpt_sign_in' | 'sign_in' | 'engine'
+
 export interface ChatRunFailure {
+  kind: ChatRunFailureKind
+  /** What the line says. It never carries host text. */
   label: string
-  /** The cause is a ChatGPT sign-in that expired or is missing. */
-  signIn: boolean
+  /** The raw cause, for Copy error. */
+  cause: string
 }
 
 export interface ChatRunStatusInput {
@@ -60,22 +73,42 @@ export const QUIET_AFTER_MS = 30_000
 export const TOOL_ELAPSED_AFTER_MS = 5_000
 
 export const CHATGPT_SIGN_IN_EXPIRED = 'Your ChatGPT sign-in expired. Sign in again.'
+export const PROVIDER_SIGN_IN_NEEDED = "This model's provider needs you to sign in again."
+
+/** provider_oauth NOT_USABLE: only ChatGPT sign-in says this. */
+const CHATGPT_NOT_USABLE = /(^|:\s*)sign in with chatgpt is not usable\.?$/iu
+/** provider_oauth SIGN_IN_AGAIN, or a provider that says it has no sign-in. */
+const SIGN_IN_GONE = [/(^|:\s*)sign in again\.?$/iu, /\bnot signed in\b/iu]
+
+interface ChatRunFailureOptions {
+  /** The run's target is the ChatGPT account (the built-in OpenAI row). */
+  chatgptTarget?: boolean
+}
 
 /**
- * The host's words for a ChatGPT sign-in that is gone
- * (provider_oauth SIGN_IN_AGAIN and NOT_USABLE). A turned-off sign-in is
- * a setting, not an expiry, so it keeps its own words.
+ * Describe a failed start for the line. The line leads with the cause in
+ * plain words. The host's own text goes to `cause`, behind Copy error.
+ * A turned-off ChatGPT sign-in is a setting, not an expiry, so it counts
+ * as an engine failure with its own words in the cause.
  */
-const SIGN_IN_GONE = [/(^|:\s*)sign in again\.?$/iu, /(^|:\s*)sign in with chatgpt is not usable\.?$/iu, /\bnot signed in\b/iu]
-
-/** Describe a failed start so the cause comes first. Null when there is none. */
-export function chatRunFailure(reason: string | null | undefined): ChatRunFailure | null {
+export function chatRunFailure(
+  reason: string | null | undefined,
+  { chatgptTarget = false }: ChatRunFailureOptions = {},
+): ChatRunFailure | null {
   const cause = reason?.trim().replace(/^Error:\s*/u, '').trim()
   if (!cause) return null
-  if (SIGN_IN_GONE.some((pattern) => pattern.test(cause))) {
-    return { label: CHATGPT_SIGN_IN_EXPIRED, signIn: true }
+  const signInGone = SIGN_IN_GONE.some((pattern) => pattern.test(cause))
+  if (CHATGPT_NOT_USABLE.test(cause) || (chatgptTarget && signInGone)) {
+    return { kind: 'chatgpt_sign_in', label: CHATGPT_SIGN_IN_EXPIRED, cause }
   }
-  return { label: cause, signIn: false }
+  if (signInGone) return { kind: 'sign_in', label: PROVIDER_SIGN_IN_NEEDED, cause }
+  return { kind: 'engine', label: ENGINE_DID_NOT_START, cause }
+}
+
+/** True when a native target runs on the built-in OpenAI row, which the ChatGPT account signs. */
+export function isChatgptAccountTarget(target: string | null | undefined): boolean {
+  const provider = target?.split('/')[0]?.trim().toLowerCase()
+  return provider === 'openai' || provider === 'open_ai'
 }
 
 /** The error at the end of a failed reply: `Error: …`, after any partial text. */
@@ -86,30 +119,46 @@ function trailingError(response: string): string | null {
 
 /**
  * The failure the status line shows for a reply that ended in an error.
- * A Prime worker that did not start shows its cause. A ChatGPT sign-in
- * that is gone shows on every engine, with a way to sign in. Other chat
- * errors stay in the reply, where they already read in full.
+ * A worker that did not start shows on the line. A sign-in that is gone
+ * shows on every engine. Other chat errors stay in the reply, where they
+ * already read in full.
  */
-export function chatRunFailureFromReply(response: string | null | undefined, workerEngine: boolean): ChatRunFailure | null {
+export function chatRunFailureFromReply(
+  response: string | null | undefined,
+  options: ChatRunFailureOptions = {},
+): ChatRunFailure | null {
   if (!response) return null
   const worker = workerStartFailureReason(response)
-  const failure = chatRunFailure(worker ?? trailingError(response))
+  const failure = chatRunFailure(worker ?? trailingError(response), options)
   if (!failure) return null
-  if (failure.signIn) return failure
-  return workerEngine && worker ? failure : null
+  if (failure.kind !== 'engine') return failure
+  return worker ? failure : null
 }
 
-/** The friendly tool name the approval card uses, with a verb for the rest. */
+const PROGRESSIVE: Record<string, string> = {
+  Run: 'Running',
+  Write: 'Writing',
+  Create: 'Creating',
+  Edit: 'Editing',
+}
+
+/** The approval card's tool name, in the progressive form: "Running command". */
 export function runningToolLabel(tool: string): string {
   const friendly = approvalTitle(tool, false)
-  return friendly === tool ? `Running ${tool}` : friendly
+  if (friendly === tool) return `Running ${tool}`
+  const [verb, ...rest] = friendly.split(' ')
+  const progressive = PROGRESSIVE[verb]
+  return progressive ? [progressive, ...rest].join(' ') : friendly
 }
 
 export function chatRunStatus({ snapshot, quietMs, toolElapsedMs = 0, failure }: ChatRunStatusInput): ChatRunStatus {
   if (failure) {
-    return failure.signIn
-      ? { state: 'failed', label: failure.label, action: { kind: 'sign_in', label: 'Sign in' } }
-      : { state: 'failed', label: failure.label }
+    if (failure.kind === 'chatgpt_sign_in') {
+      return { state: 'failed', label: failure.label, action: { kind: 'sign_in', label: 'Sign in' } }
+    }
+    return failure.kind === 'engine'
+      ? { state: 'failed', label: failure.label, action: { kind: 'retry', label: 'Retry' }, copyText: failure.cause }
+      : { state: 'failed', label: failure.label, copyText: failure.cause }
   }
   if (!snapshot.isActive) {
     if (!snapshot.capped) return { state: 'idle', label: '' }
@@ -154,6 +203,7 @@ function quietDuration(quietMs: number): string {
 
 interface ActivityMessage {
   response?: string
+  streamedText?: number
   reasoning?: string
   localMarker?: string
   actions?: Array<{ tool: string; toolId?: string; status: string; approval?: unknown; output?: string }>
@@ -182,5 +232,5 @@ export function chatRunActivityKey(messages: ActivityMessage[]): string {
   const actions = (last.actions ?? [])
     .map((action) => `${action.toolId ?? action.tool}:${action.status}:${action.approval ? 'a' : ''}:${action.output?.length ?? 0}`)
     .join(',')
-  return `${turns}|${last.response?.length ?? 0}|${last.reasoning?.length ?? 0}|${actions}`
+  return `${turns}|${last.response?.length ?? 0}|${last.streamedText ?? 0}|${last.reasoning?.length ?? 0}|${actions}`
 }

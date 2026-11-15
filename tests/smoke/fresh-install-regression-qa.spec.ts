@@ -76,6 +76,21 @@ test.describe('Fresh-install regression: AI panel renders and works @smoke', () 
     await expect(page.locator('.bn-editor')).toBeVisible()
   })
 
+  test('Escape in Chat brings the notes back (ADR-0193: the key that leaves Chat keeps its job)', async ({ page }) => {
+    const panel = await openNoteWithAiPanel(page)
+    const noteList = page.getByTestId('note-list-container')
+
+    await page.evaluate(() => {
+      window.dispatchEvent(new CustomEvent('laputa:dispatch-command', { detail: 'view-editor-only' }))
+    })
+    await expect(noteList).not.toBeVisible({ timeout: 5_000 })
+
+    await page.getByTestId('agent-input').focus()
+    await page.keyboard.press('Escape')
+    await expect(noteList).toBeVisible({ timeout: 5_000 })
+    await expect(panel).toBeVisible()
+  })
+
   test('AI panel border does not pulse (ADR-0193)', async ({ page }) => {
     const panel = await openNoteWithAiPanel(page)
 

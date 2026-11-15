@@ -44,11 +44,11 @@ describe('native capped turns', () => {
       onContinueMessage,
     }
     const view = render(<AiPanelMessageHistory {...props} isActive={false} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Continue (12/50)' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Continue for 50 more steps' }))
     expect(onContinueMessage).toHaveBeenCalledExactlyOnceWith('capped')
     view.rerender(<AiPanelMessageHistory {...props} isActive />)
-    expect(screen.getByRole('button', { name: 'Continue (12/50)' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Continue for 50 more steps' })).toBeDisabled()
     view.rerender(<AiPanelMessageHistory {...props} messages={[...props.messages, { id: 'rejected', userMessage: '', actions: [], localMarker: "Continue couldn't start" }]} isActive={false} />)
-    expect(screen.getByRole('button', { name: 'Continue (12/50)' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Continue for 50 more steps' })).toBeEnabled()
   })
 })

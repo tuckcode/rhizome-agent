@@ -1,5 +1,5 @@
 import type { PrimeImageContent } from '../lib/composerAttachments'
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
 import type { AiAgentId, AiAgentReadiness } from '../lib/aiAgents'
 import type { AiTarget } from '../lib/aiTargets'
 import type { AppLocale } from '../lib/i18n'
@@ -213,16 +213,8 @@ export function useAiPanelController({
     setInput('')
   }, [agent, isActive])
 
-  // isActive stays true until the next render after a stop, so a second
-  // Stop (the button and Cmd+Period together) would stop twice. The ref
-  // allows one stop per run and clears when the run state changes.
-  const stopRequestedRef = useRef(false)
-  useEffect(() => {
-    stopRequestedRef.current = false
-  }, [isActive])
   const handleStop = useCallback(() => {
-    if (!isActive || stopRequestedRef.current) return
-    stopRequestedRef.current = true
+    if (!isActive) return
     agent.stopMessage()
   }, [agent, isActive])
 

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useAiPanelController } from './useAiPanelController'
 import { streamAiAgent } from '../utils/streamAiAgent'
 import { getAgentDocsPath } from '../lib/agentDocsPath'
-import { stopAgentMessage } from '../lib/aiAgentSession'
+import { trackAiAgentResponseStopped } from '../lib/productAnalytics'
 import { resetAiWorkspaceSessionStoreForTests } from '../lib/aiWorkspaceSessionStore'
 import { resetNativeLiveSessions } from '../lib/nativeChatTranscript'
 import type { AiTarget } from '../lib/aiTargets'
@@ -12,9 +12,9 @@ vi.mock('../utils/streamAiAgent', () => ({ streamAiAgent: vi.fn() }))
 vi.mock('../utils/streamNativeChat', () => ({ streamNativeChat: vi.fn() }))
 vi.mock('../utils/streamAiModel', () => ({ streamAiModel: vi.fn() }))
 vi.mock('../lib/agentDocsPath', () => ({ getAgentDocsPath: vi.fn() }))
-vi.mock('../lib/aiAgentSession', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../lib/aiAgentSession')>()
-  return { ...actual, stopAgentMessage: vi.fn(actual.stopAgentMessage) }
+vi.mock('../lib/productAnalytics', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../lib/productAnalytics')>()
+  return { ...actual, trackAiAgentResponseStopped: vi.fn() }
 })
 
 const claudeTarget: AiTarget = {
@@ -63,6 +63,8 @@ describe('useAiPanelController stop', () => {
     vi.mocked(streamAiAgent).mockImplementation(() => new Promise(() => {}))
   })
 
+  // stopAgentMessage guards a second stop with abortRef, so the run is
+  // stopped (and reported) once.
   it('stops a run once when two stops land before the next render', async () => {
     render(<Harness />)
     await act(async () => {
@@ -76,6 +78,6 @@ describe('useAiPanelController stop', () => {
       screen.getByRole('button', { name: 'stop twice' }).click()
     })
 
-    expect(vi.mocked(stopAgentMessage)).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(trackAiAgentResponseStopped)).toHaveBeenCalledTimes(1)
   })
 })

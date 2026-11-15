@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ChatRunStatusLine } from './ChatRunStatusLine'
-import { chatRunFailure, CHATGPT_SIGN_IN_EXPIRED } from '../lib/chatRunStatus'
+import { chatRunFailure, CHATGPT_SIGN_IN_EXPIRED, ENGINE_DID_NOT_START, PROVIDER_SIGN_IN_NEEDED } from '../lib/chatRunStatus'
 
 describe('ChatRunStatusLine', () => {
   beforeEach(() => {
@@ -34,9 +34,9 @@ describe('ChatRunStatusLine', () => {
         messages={[{ actions: [{ tool: 'bash', toolId: 't1', status: 'pending' }] }]}
       />,
     )
-    expect(screen.getByTestId('chat-run-status-line')).toHaveTextContent('Run command')
+    expect(screen.getByTestId('chat-run-status-line')).toHaveTextContent('Running command')
     act(() => { vi.advanceTimersByTime(7000) })
-    expect(screen.getByTestId('chat-run-status-line')).toHaveTextContent('Run command · 7s')
+    expect(screen.getByTestId('chat-run-status-line')).toHaveTextContent('Running command · 7s')
   })
 
   it('says that the run waits for the user', () => {
@@ -71,22 +71,49 @@ describe('ChatRunStatusLine', () => {
     expect(screen.getByTestId('chat-run-status-line')).toHaveAttribute('data-run-state', 'writing')
   })
 
-  it('shows why the worker did not start, as a status', () => {
-    render(<ChatRunStatusLine messages={[]} isActive={false} failure={chatRunFailure('Worker binary missing')} />)
+  it('says the engine did not start, offers Retry, and keeps the raw cause behind Copy error', async () => {
+    const onRetry = vi.fn()
+    const writeText = vi.fn(async () => {})
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    const cause = 'The Prime worker exited before it started: rhizome-worker not found.'
+    render(<ChatRunStatusLine messages={[]} isActive={false} failure={chatRunFailure(cause)} onRetry={onRetry} />)
     const line = screen.getByTestId('chat-run-status-line')
     expect(line).toHaveAttribute('data-run-state', 'failed')
-    expect(screen.getByRole('status')).toHaveTextContent('Worker binary missing')
-    expect(screen.queryByTestId('chat-run-action-sign_in')).toBeNull()
+    expect(screen.getByRole('status')).toHaveTextContent(ENGINE_DID_NOT_START)
+    expect(line).not.toHaveTextContent(/prime|rhizome-worker/iu)
+    fireEvent.click(screen.getByTestId('chat-run-action-retry'))
+    expect(onRetry).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('chat-run-action-copy-error'))
+    })
+    expect(writeText).toHaveBeenCalledWith(cause)
+    expect(screen.getByTestId('chat-run-action-copy-error')).toHaveTextContent('Copied')
+  })
+
+  it('keeps the failed line out of the live region so the failure reads once', () => {
+    render(<ChatRunStatusLine messages={[]} isActive={false} failure={chatRunFailure('Worker binary missing')} />)
+    expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'off')
   })
 
   it('leads an expired ChatGPT sign-in with its cause and offers Sign in', () => {
     const onSignIn = vi.fn()
     render(
-      <ChatRunStatusLine messages={[]} isActive={false} failure={chatRunFailure('Error: Sign in again')} onSignIn={onSignIn} />,
+      <ChatRunStatusLine
+        messages={[]}
+        isActive={false}
+        failure={chatRunFailure('Error: Sign in again', { chatgptTarget: true })}
+        onSignIn={onSignIn}
+      />,
     )
     expect(screen.getByRole('status')).toHaveTextContent(CHATGPT_SIGN_IN_EXPIRED)
     fireEvent.click(screen.getByTestId('chat-run-action-sign_in'))
     expect(onSignIn).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not offer the ChatGPT sign-in for another provider', () => {
+    render(<ChatRunStatusLine messages={[]} isActive={false} failure={chatRunFailure('anthropic: not signed in')} />)
+    expect(screen.getByRole('status')).toHaveTextContent(PROVIDER_SIGN_IN_NEEDED)
+    expect(screen.queryByTestId('chat-run-action-sign_in')).toBeNull()
   })
 
   it('offers Continue with the real step count at the step limit', () => {
@@ -118,7 +145,7 @@ describe('ChatRunStatusLine', () => {
     act(() => { vi.advanceTimersByTime(4000) })
     rerender(<ChatRunStatusLine isActive messages={tool('line 1')} />)
     act(() => { vi.advanceTimersByTime(3000) })
-    expect(screen.getByTestId('chat-run-status-line')).toHaveTextContent('Run command · 7s')
+    expect(screen.getByTestId('chat-run-status-line')).toHaveTextContent('Running command · 7s')
   })
 
   it('keeps the oldest tool time when a parallel tool finishes', () => {
@@ -130,7 +157,7 @@ describe('ChatRunStatusLine', () => {
     act(() => { vi.advanceTimersByTime(6000) })
     rerender(<ChatRunStatusLine isActive messages={tools('done')} />)
     act(() => { vi.advanceTimersByTime(1000) })
-    expect(screen.getByTestId('chat-run-status-line')).toHaveTextContent('Run command · 7s')
+    expect(screen.getByTestId('chat-run-status-line')).toHaveTextContent('Running command · 7s')
   })
 
   it('does not let a local marker freeze the quiet clock', () => {

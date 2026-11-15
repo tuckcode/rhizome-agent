@@ -25,6 +25,8 @@ interface ChatRunMessage {
   id?: string
   actions?: Array<{ tool: string; toolId?: string; status: string; approval?: unknown }>
   response?: string
+  isStreaming?: boolean
+  streamedText?: number
   localMarker?: string
   localMarkerTone?: 'warning'
 }
@@ -111,7 +113,7 @@ export function chatRunSnapshotFromMessages(
 
   return {
     isActive,
-    hasResponse: Boolean(latestTurn?.response?.trim()),
+    hasResponse: Boolean(latestTurn?.response?.trim()) || Boolean(latestTurn?.isStreaming && latestTurn.streamedText),
     ...(latestTurn?.capped ? { capped: latestTurn.capped } : {}),
     tools: (latestTurn?.actions ?? []).map((action) => ({
       id: action.toolId || action.tool,

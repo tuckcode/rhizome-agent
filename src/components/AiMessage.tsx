@@ -1029,17 +1029,18 @@ function ConversationMessage({ userMessage, images, references, locale = 'en', m
       {capped && (
         <div className="mt-2">
           <Button
-            variant="outline"
-            size="sm"
+            variant="ghost"
+            size="xs"
+            className="h-6 px-2 font-semibold text-foreground hover:bg-accent"
             data-testid="continue-button"
             disabled={continueDisabled || isStreaming || !messageId || !onContinue}
             onClick={() => messageId && onContinue?.(messageId)}
           >
-            Continue ({capped.steps}/{capped.max_steps})
+            Continue for {capped.max_steps} more {capped.max_steps === 1 ? 'step' : 'steps'}
           </Button>
         </div>
       )}
-      {isStreaming && !response && <StreamingIndicator isLatestReply={isLatestReply} />}
+      {isStreaming && !response && !actions.some((action) => action.status === 'pending' && action.approval) && <StreamingIndicator isLatestReply={isLatestReply} />}
     </div>
   )
 }

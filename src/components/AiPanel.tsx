@@ -5,7 +5,7 @@ import { recentNotesForChatHome } from '../lib/chatHomeNotes'
 import { ChatHomeSuggestions } from './ChatHomeSuggestions'
 import { ChatRunStatusLine } from './ChatRunStatusLine'
 import { useStopRunShortcut } from '../hooks/useStopRunShortcut'
-import { chatRunFailureFromReply, latestRunTurn } from '../lib/chatRunStatus'
+import { chatRunFailureFromReply, isChatgptAccountTarget, latestRunTurn } from '../lib/chatRunStatus'
 import { requestProviderSettingsFocus } from '../lib/providerSettingsFocus'
 import { accountRowId, summaryRowId } from '../lib/connectedProviders'
 import { CHATGPT_ACCOUNT_PROVIDER_ID } from '../lib/accountSignInProviders'
@@ -533,8 +533,9 @@ export function AiPanelView({
   const latestTurn = latestRunTurn(agent.messages)
   const cappedTurnId = !isActive && latestTurn?.capped ? latestTurn.id : undefined
   const runFailure = agent.status === 'error'
-    ? chatRunFailureFromReply(getLastAgentMessage(agent.messages), isPrimeTarget)
+    ? chatRunFailureFromReply(getLastAgentMessage(agent.messages), { chatgptTarget: isChatgptAccountTarget(modelTarget) })
     : null
+  const failedTurnId = runFailure ? latestTurn?.id : undefined
 
   // The new-chat screen: no message, no run, no picked session, and an agent that is ready.
   const chatHome = agent.messages.length === 0
@@ -745,6 +746,7 @@ export function AiPanelView({
             onStop={handleStop}
             onContinue={cappedTurnId && onContinueMessage ? () => onContinueMessage(cappedTurnId) : undefined}
             onSignIn={onOpenAiSettings ? () => openChatgptAccountRow(onOpenAiSettings) : undefined}
+            onRetry={failedTurnId ? () => void agent.regenerateMessage(failedTurnId) : undefined}
           />
         )}
         commandEntries={isPrimeTarget ? localizedCommands : undefined}

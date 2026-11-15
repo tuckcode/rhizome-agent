@@ -4,6 +4,9 @@ import {
   chatRunActivityKey,
   chatRunFailure,
   chatRunFailureFromReply,
+  ENGINE_DID_NOT_START,
+  isChatgptAccountTarget,
+  PROVIDER_SIGN_IN_NEEDED,
   chatRunStatus,
   QUIET_AFTER_MS,
   runningToolLabel,
@@ -25,7 +28,12 @@ describe('chatRunStatus', () => {
       snapshot: snapshot({ isActive: false }),
       quietMs: 0,
       failure: chatRunFailure('Worker binary missing'),
-    })).toEqual({ state: 'failed', label: 'Worker binary missing' })
+    })).toEqual({
+      state: 'failed',
+      label: ENGINE_DID_NOT_START,
+      action: { kind: 'retry', label: 'Retry' },
+      copyText: 'Worker binary missing',
+    })
   })
 
   it('says Thinking before the first text arrives', () => {
@@ -41,13 +49,13 @@ describe('chatRunStatus', () => {
   it('names the tool that runs', () => {
     const tools = [{ id: 'a', name: 'bash', status: 'pending' as const }]
     expect(chatRunStatus({ snapshot: snapshot({ tools }), quietMs: 900 }))
-      .toEqual({ state: 'tool', label: 'Run command' })
+      .toEqual({ state: 'tool', label: 'Running command' })
   })
 
   it('adds the elapsed time to a tool that runs for 5 seconds or more', () => {
     const tools = [{ id: 'a', name: 'bash', status: 'pending' as const }]
     expect(chatRunStatus({ snapshot: snapshot({ tools }), quietMs: 0, toolElapsedMs: 42_400 }))
-      .toEqual({ state: 'tool', label: 'Run command', detail: '42s' })
+      .toEqual({ state: 'tool', label: 'Running command', detail: '42s' })
   })
 
   it('counts the tools when more than one runs', () => {
@@ -129,30 +137,57 @@ describe('chatRunActivityKey', () => {
 })
 
 describe('chatRunFailure', () => {
-  it('leads an expired or missing ChatGPT sign-in with its cause', () => {
-    for (const reason of ['Sign in again', 'Error: Sign in again', 'Sign in with ChatGPT is not usable.', 'openai: Sign in again']) {
-      expect(chatRunFailure(reason)).toEqual({ label: CHATGPT_SIGN_IN_EXPIRED, signIn: true })
+  const chatgpt = { chatgptTarget: true }
+
+  it('leads an expired or missing ChatGPT sign-in with its cause on the ChatGPT target', () => {
+    for (const reason of ['Sign in again', 'Error: Sign in again', 'openai: Sign in again', 'Not signed in to ChatGPT']) {
+      expect(chatRunFailure(reason, chatgpt)).toEqual({ kind: 'chatgpt_sign_in', label: CHATGPT_SIGN_IN_EXPIRED, cause: reason.replace(/^Error:\s*/u, '') })
+    }
+    expect(chatRunFailure('Sign in with ChatGPT is not usable.')?.kind).toBe('chatgpt_sign_in')
+  })
+
+  it('gives a generic sign-in cause when the target is not the ChatGPT account', () => {
+    for (const reason of ['anthropic: not signed in', 'Sign in again']) {
+      const failure = chatRunFailure(reason)
+      expect(failure).toEqual({ kind: 'sign_in', label: PROVIDER_SIGN_IN_NEEDED, cause: reason })
+      expect(failure?.label).not.toMatch(/ChatGPT/u)
     }
   })
 
-  it('keeps other causes in their own words', () => {
-    expect(chatRunFailure('Sign in with ChatGPT is turned off.')).toEqual({ label: 'Sign in with ChatGPT is turned off.', signIn: false })
-    expect(chatRunFailure('Error: Worker binary missing')).toEqual({ label: 'Worker binary missing', signIn: false })
+  it('says the engine did not start and keeps the host words as the cause', () => {
+    const failure = chatRunFailure('Error: The Prime worker exited before it started: rhizome-worker not found.')
+    expect(failure).toEqual({
+      kind: 'engine',
+      label: ENGINE_DID_NOT_START,
+      cause: 'The Prime worker exited before it started: rhizome-worker not found.',
+    })
+    expect(failure?.label).not.toMatch(/prime/iu)
+    expect(chatRunFailure('Sign in with ChatGPT is turned off.')?.kind).toBe('engine')
     expect(chatRunFailure('  ')).toBeNull()
   })
 
   it('reads the failure from a reply', () => {
-    expect(chatRunFailureFromReply('Partial text\n\nError: Sign in again', false)?.signIn).toBe(true)
-    expect(chatRunFailureFromReply('Error: worker-failed: Worker binary missing', true)?.label).toBe('Worker binary missing')
-    expect(chatRunFailureFromReply('Error: worker-failed: Worker binary missing', false)).toBeNull()
-    expect(chatRunFailureFromReply('Error: rate limited', true)).toBeNull()
+    expect(chatRunFailureFromReply('Partial text\n\nError: Sign in again', { chatgptTarget: true })?.kind).toBe('chatgpt_sign_in')
+    expect(chatRunFailureFromReply('Partial text\n\nError: Sign in again')?.kind).toBe('sign_in')
+    expect(chatRunFailureFromReply('Error: worker-failed: Worker binary missing')).toMatchObject({ kind: 'engine', cause: 'Worker binary missing' })
+    expect(chatRunFailureFromReply('Error: rate limited')).toBeNull()
+  })
+})
+
+describe('isChatgptAccountTarget', () => {
+  it('matches the built-in OpenAI row only', () => {
+    expect(isChatgptAccountTarget('openai/gpt-5')).toBe(true)
+    expect(isChatgptAccountTarget('open_ai/gpt-5')).toBe(true)
+    expect(isChatgptAccountTarget('anthropic/claude')).toBe(false)
+    expect(isChatgptAccountTarget('work-openai/gpt-5')).toBe(false)
+    expect(isChatgptAccountTarget(null)).toBe(false)
   })
 })
 
 describe('runningToolLabel', () => {
-  it('uses the approval card names and keeps a verb for the rest', () => {
-    expect(runningToolLabel('bash')).toBe('Run command')
-    expect(runningToolLabel('edit_file')).toBe('Edit file')
+  it('uses the approval card names in the progressive form', () => {
+    expect(runningToolLabel('bash')).toBe('Running command')
+    expect(runningToolLabel('edit_file')).toBe('Editing file')
     expect(runningToolLabel('get_note')).toBe('Running get_note')
   })
 })

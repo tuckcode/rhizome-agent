@@ -39,7 +39,7 @@ const TITLES: Record<ShotState, string> = {
 
 const FAILURES: Partial<Record<ShotState, ReturnType<typeof chatRunFailure>>> = {
   failed: chatRunFailure('The Prime worker exited before it started: rhizome-worker not found.'),
-  signin: chatRunFailure('Error: Sign in again'),
+  signin: chatRunFailure('Error: Sign in again', { chatgptTarget: true }),
 }
 
 const pendingTool = { tool: 'bash', toolId: 't1', label: 'bash', status: 'pending' as const, input: '{"command":"pnpm test"}' }
@@ -98,6 +98,7 @@ export function Shot() {
             onStop={() => {}}
             onContinue={() => {}}
             onSignIn={() => {}}
+            onRetry={() => {}}
           />
           <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2">
             <Plus size={16} className="text-muted-foreground" />

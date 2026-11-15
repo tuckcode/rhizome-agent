@@ -34,9 +34,9 @@ Two earlier decisions are relevant.
    idle.
 2. **One line shows it.** `ChatRunStatusLine` sits above the composer.
    It keeps its height when idle, so the composer does not move. It is
-   not a live region, except for a start failure, which carries
-   `role="status"`. `ChatRunLiveStatus` stays the live region for run
-   events, and announces a start failure once.
+   not a live region. A start failure carries `role="status"` with
+   `aria-live="off"`, so `ChatRunLiveStatus` stays the one live region
+   and announces it once.
 3. **A tool that runs for 5 seconds shows its elapsed time.**
 4. **A run with no event for 30 seconds, and no tool that runs, shows
    "No response for N seconds" and a Stop button.** The label claims
@@ -44,7 +44,10 @@ Two earlier decisions are relevant.
    region announces this state once.
    A pause at the step limit offers "Continue for N more steps". A
    ChatGPT sign-in that expired says so first and offers Sign in, which
-   opens the account row in Settings > Connected.
+   focuses the account row's Sign in button in Settings > Connected.
+   Another provider's sign-in gets a generic cause. An engine that did
+   not start says "Rhizome couldn't start its engine." with Retry, and
+   keeps the host's words behind Copy error. The line never shows them.
 5. **The border pulse and the spinner under the input go.** The border
    stays 2px in `primary` while a run is active. It does not move.
 6. **Stop has a shortcut:** Cmd+Period on Mac and Ctrl+Period elsewhere.
