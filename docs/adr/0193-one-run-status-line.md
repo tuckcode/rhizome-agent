@@ -34,9 +34,8 @@ Two earlier decisions are relevant.
    idle.
 2. **One line shows it.** `ChatRunStatusLine` sits above the composer.
    It keeps its height when idle, so the composer does not move. It is
-   not a live region. A start failure carries `role="status"` with
-   `aria-live="off"`, so `ChatRunLiveStatus` stays the one live region
-   and announces it once.
+   not a live region, a start failure included. `ChatRunLiveStatus`
+   stays the one live region and announces a start failure once.
 3. **A tool that runs for 5 seconds shows its elapsed time.**
 4. **A run with no event for 30 seconds, and no tool that runs, shows
    "No response for N seconds" and a Stop button.** The label claims

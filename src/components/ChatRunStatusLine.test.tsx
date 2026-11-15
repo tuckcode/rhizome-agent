@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ChatRunStatusLine } from './ChatRunStatusLine'
+import { chatRunSnapshotFromMessages, nextChatRunAnnouncement } from '../lib/chatRunLiveStatus'
 import { chatRunFailure, CHATGPT_SIGN_IN_EXPIRED, ENGINE_DID_NOT_START, PROVIDER_SIGN_IN_NEEDED } from '../lib/chatRunStatus'
 
 describe('ChatRunStatusLine', () => {
@@ -79,7 +80,7 @@ describe('ChatRunStatusLine', () => {
     render(<ChatRunStatusLine messages={[]} isActive={false} failure={chatRunFailure(cause)} onRetry={onRetry} />)
     const line = screen.getByTestId('chat-run-status-line')
     expect(line).toHaveAttribute('data-run-state', 'failed')
-    expect(screen.getByRole('status')).toHaveTextContent(ENGINE_DID_NOT_START)
+    expect(screen.getByTestId('chat-run-status-line')).toHaveTextContent(ENGINE_DID_NOT_START)
     expect(line).not.toHaveTextContent(/prime|rhizome-worker/iu)
     fireEvent.click(screen.getByTestId('chat-run-action-retry'))
     expect(onRetry).toHaveBeenCalledTimes(1)
@@ -91,8 +92,14 @@ describe('ChatRunStatusLine', () => {
   })
 
   it('keeps the failed line out of the live region so the failure reads once', () => {
-    render(<ChatRunStatusLine messages={[]} isActive={false} failure={chatRunFailure('Worker binary missing')} />)
-    expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'off')
+    const failure = chatRunFailure('Worker binary missing')
+    render(<ChatRunStatusLine messages={[]} isActive={false} failure={failure} />)
+    expect(screen.queryByRole('status')).toBeNull()
+    expect(screen.getByTestId('chat-run-status-line').querySelector('[aria-live]')).toBeNull()
+    // The one announcement comes from ChatRunLiveStatus.
+    const idle = chatRunSnapshotFromMessages([], false)
+    expect(nextChatRunAnnouncement(idle, { ...idle, failure: failure?.label })).toBe(ENGINE_DID_NOT_START)
+    expect(nextChatRunAnnouncement({ ...idle, failure: failure?.label }, { ...idle, failure: failure?.label })).toBeNull()
   })
 
   it('leads an expired ChatGPT sign-in with its cause and offers Sign in', () => {
@@ -105,14 +112,14 @@ describe('ChatRunStatusLine', () => {
         onSignIn={onSignIn}
       />,
     )
-    expect(screen.getByRole('status')).toHaveTextContent(CHATGPT_SIGN_IN_EXPIRED)
+    expect(screen.getByTestId('chat-run-status-line')).toHaveTextContent(CHATGPT_SIGN_IN_EXPIRED)
     fireEvent.click(screen.getByTestId('chat-run-action-sign_in'))
     expect(onSignIn).toHaveBeenCalledTimes(1)
   })
 
   it('does not offer the ChatGPT sign-in for another provider', () => {
     render(<ChatRunStatusLine messages={[]} isActive={false} failure={chatRunFailure('anthropic: not signed in')} />)
-    expect(screen.getByRole('status')).toHaveTextContent(PROVIDER_SIGN_IN_NEEDED)
+    expect(screen.getByTestId('chat-run-status-line')).toHaveTextContent(PROVIDER_SIGN_IN_NEEDED)
     expect(screen.queryByTestId('chat-run-action-sign_in')).toBeNull()
   })
 

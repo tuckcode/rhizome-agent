@@ -96,13 +96,9 @@ export function ChatRunStatusLine({
         />
       ) : null}
       {status.label ? (
-        <span
-          className="flex min-w-0 items-baseline"
-          // A status for navigation, not a second announcement:
-          // ChatRunLiveStatus already reads the failure once.
-          role={status.state === 'failed' ? 'status' : undefined}
-          aria-live={status.state === 'failed' ? 'off' : undefined}
-        >
+        // Not a live region. ChatRunLiveStatus reads every state, a failure
+        // included, once.
+        <span className="flex min-w-0 items-baseline">
           <span className="min-w-0 truncate">{status.label}</span>
           {status.detail ? (
             <>
