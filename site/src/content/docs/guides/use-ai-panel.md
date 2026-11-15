@@ -21,6 +21,37 @@ Enter does nothing until the reply finishes. Your text stays in the box; send it
 
 Press Stop to end the run. With VoiceOver, Rhizome announces when a run starts, when a tool starts or fails, and when the reply is complete or stopped.
 
+## When a turn reaches its step limit
+
+One turn is a series of model rounds. A round is one reply from the model, including the tool calls that follow it.
+
+Settings → AI Agents → **Agent max steps** is how many rounds an ordinary turn may use. The default is 50. The smallest value is 1. The field has no maximum.
+
+When the limit is reached, the reply pauses. It is not a failure, and it is not a finished answer. The message shows **Continue (steps/max)**. VoiceOver says "Paused at step limit. Continue available."
+
+Continue sends that same request again on the same chat. Earlier text and tool results stay. Each Continue gets 50 new rounds. That 50 does not follow the setting: a limit of 10 still continues in blocks of 50, and a limit of 200 still continues in blocks of 50. The next message you type uses the setting again.
+
+Continue is on the latest turn, and only while Chat is idle. If it cannot start, the chat shows `Continue couldn't start:` and the reason. The paused turn can be tried again. Reopening the chat keeps Continue on that turn.
+
+## Attach an image
+
+Paste, drop, or use the plus menu. Rhizome accepts PNG, JPEG, GIF, and WebP. A message can carry 4 images. Each file must be 5 MB or smaller.
+
+A file that fails says `<name> wasn't attached.` and the reason:
+
+| You see | What it means |
+|---|---|
+| `Images must be 5 MB or smaller.` | That file is over the per-image cap |
+| `Use a PNG, JPEG, GIF or WebP image.` | The type is not one of those four |
+| `Only the first 4 images were attached.` | Extra images were left off this message |
+| `<model> can't read images. Remove the image or switch to a model that can.` | The catalog says this model is text-only. Send stays off. The text is not sent without the image |
+| `Rhizome doesn't know if <model> can read images.` | This model has no catalog row. **Send anyway** remembers it on this machine until you click **Undo** |
+| `Checking image support…` | The catalog lookup is still running. Send waits |
+| `This message's images are … MB encoded together. The limit is 12 MB.` | This message is too large together, even when each file is under 5 MB |
+| `Every model that can read images is cooling down. Try again shortly.` | Taproot will not fall through to a text-only model |
+
+Images are saved next to the chat log, not inside it. A later request includes images from the last two turns. Older images stay on disk. In that later request they are marked `[image from earlier turn omitted]`.
+
 ## Ask from the editor or about a note
 
 - **From the editor:** press ⌘K, then Space, and type a prompt. It uses the current note as context.

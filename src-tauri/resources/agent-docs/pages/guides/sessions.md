@@ -27,6 +27,8 @@ For chats on Rhizome's engine:
 - **One turn at a time.** Two windows can show the same chat, but only one turn can run.
 - **A damaged log** opens up to the last good line, with a warning that some history is missing. The original file is kept, and you continue in a new chat that starts from the good part.
 - **A very long chat** (100 MiB of log) continues in a new chat. History isn't dropped.
+- **A turn that reached the step limit** reopens with **Continue** still on that message. See [Chat with the agent](use-ai-panel.md#when-a-turn-reaches-its-step-limit).
+- **Images** are stored beside the log, as `<id>.images.json` and a folder `<id>-images/`. They are not inside the JSONL file. A chat saved before that file existed still opens.
 
 ## Fork and archive
 

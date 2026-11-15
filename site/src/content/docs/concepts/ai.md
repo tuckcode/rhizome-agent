@@ -7,7 +7,7 @@ Chat runs on Rhizome's own engine (ADR-0187). Prime and Hermes are no longer cha
 
 ## Terms on this page
 
-- **Agent loop:** the cycle that sends your message to a model, runs the tools the model asks for, and repeats until the answer is done.
+- **Agent loop:** the cycle that sends your message to a model, runs the tools the model asks for, and repeats until the answer is done or the step limit pauses the turn.
 - **Engine:** what runs that loop for Chat.
 - **Model:** the language model the engine talks to, hosted or running locally.
 - **Tool:** an action the agent can take, such as reading a note or running a command.
@@ -22,6 +22,8 @@ New chats use **Rhizome's engine**: the loop built into the app. It does not nee
 - **Tools:** see the table below. Read and search tools run without asking. Edits and shell commands ask first.
 - **Saved chats:** each chat is saved as it goes and can be reopened after you quit. Chats get a title automatically from the first exchange.
 - **Errors:** a problem that doesn't stop the turn shows as a notice in the chat. A problem that does stop it, such as a missing key, ends the turn with a message that says what to fix.
+- **Step limit:** an ordinary turn stops after **Agent max steps** model rounds (50 unless you change it). That pause is **Continue**, not a failed turn. Each Continue adds 50 rounds. The next message you type uses the setting again. See [Chat with the agent](../guides/use-ai-panel.md#when-a-turn-reaches-its-step-limit).
+- **Images:** PNG, JPEG, GIF, or WebP, up to 4 per message and 5 MB each. A text-only model refuses the turn. The words are not sent with the image removed. See [Chat with the agent](../guides/use-ai-panel.md#attach-an-image).
 
 | Tool | What it does | When it runs |
 |---|---|---|
