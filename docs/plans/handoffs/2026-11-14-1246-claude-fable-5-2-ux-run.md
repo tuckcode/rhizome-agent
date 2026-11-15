@@ -105,6 +105,17 @@ Start PR 2 like this:
 - Atticus named t3code as a comparison. Web pages on it describe little of its interface. Ideas taken from them: a visible permission mode beside the model chip, a per-turn review of changed files, and a per-turn revert.
 - Do not run tests or screenshot captures in a second worktree while a push runs. The first push of #302 failed in the smoke lane under that load. Alone, the lane passed 33 of 33.
 
+## Approved next, 2026-11-15
+
+Atticus approved the shell restyle in the direction of PR #303. It was not started, because the session was at 92% of its usage limit. Start it in a new worktree from `origin/main`:
+
+1. Session rows: title 13px weight 500, meta 11px mono (PR #299, section 2.5).
+2. Top bar: the session title as the focal text, and the Command Palette as a quieter control.
+3. Right rail: labels or tooltips with names, and no anonymous note icons (PR #299, section 2.3).
+4. Status bar: one calm line.
+
+Send a screenshot to Atticus before the push.
+
 ## What I would do after this
 
 1. Shell character, in the style of the chat-home PR: session rows (decision in #299), the top bar, the right rail.
