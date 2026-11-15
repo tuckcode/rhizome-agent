@@ -58,7 +58,11 @@ Give each agent its own worktree and its own files. No `codex`, `gemini` or `ope
 |---|---|---|---|
 | 0 | `ux/fable-run-plan` | [#291](https://github.com/tuckcode/rhizome-agent/pull/291) | Open. Local gates green. |
 | 1 | `ux/approval-risk` | [#292](https://github.com/tuckcode/rhizome-agent/pull/292) | Open. Commit `db8d55cc`. Local gates green (3m 25s). |
-| 2 to 12 | see the plan | none | Not started |
+| 2 | `ux/run-status` | [#302](https://github.com/tuckcode/rhizome-agent/pull/302) | Open. One run status line, the no-response state, the Stop shortcut. ADR-0193. Local gates green. |
+| extra | `ux/chat-home` | [https://github.com/tuckcode/rhizome-agent/pull/303](https://github.com/tuckcode/rhizome-agent/pull/303) | Open. New-chat screen with a focal point and recent notes. Not in the first plan. Local gates green. |
+| 11 | `docs/right-sidebar-model` | [#299](https://github.com/tuckcode/rhizome-agent/pull/299) | Open. Design decision only. 11b is Codex PR #301. |
+| 5 | `ux/type-scale` | [#294](https://github.com/tuckcode/rhizome-agent/pull/294) | Open. Codex (Sol). |
+| 3, 4, 6 to 10, 12 | see the plan | none | Not started |
 
 ## Where the work is
 
@@ -92,6 +96,20 @@ Start PR 2 like this:
 1. Make a new worktree from `origin/main`. Do not edit a tree while its push runs, because the gate reads the working tree.
 2. Read the run-state map in section 2.1 of the plan. The five displays are the frame pulse (`AiPanel.tsx`), the session dot, the `ChatComposerFoot.tsx` spinner, `ChatRunLiveStatus.tsx`, and the pulses in `AiMessage.tsx`.
 3. Write the run-status model test first (`src/lib/chatRunLiveStatus.ts` is the nearest existing code).
+
+## Second session, 2026-11-14 evening to 2026-11-15
+
+- Reviewed Codex PR #298. Found C105, which Codex repaired in #300.
+- Merged `main` into PRs #291 to #295 with the GitHub update action.
+- Atticus said that the main screen looks bland. The chat-home PR answers that for the new-chat screen. The rest of the shell (session list, top bar, right rail, status bar) still needs the same treatment.
+- Atticus named t3code as a comparison. Web pages on it describe little of its interface. Ideas taken from them: a visible permission mode beside the model chip, a per-turn review of changed files, and a per-turn revert.
+- Do not run tests or screenshot captures in a second worktree while a push runs. The first push of #302 failed in the smoke lane under that load. Alone, the lane passed 33 of 33.
+
+## What I would do after this
+
+1. Shell character, in the style of the chat-home PR: session rows (decision in #299), the top bar, the right rail.
+2. Plan item 3, the run timeline. It can now use `chatRunStatus.ts`.
+3. A visible permission mode beside the model chip.
 
 ## Session end, 2026-11-14
 
