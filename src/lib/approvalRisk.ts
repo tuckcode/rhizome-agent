@@ -504,19 +504,19 @@ function dropAssignments(tokens: string[]): string[] {
   return tokens.slice(index)
 }
 
-function dropShellKeywords(tokens: string[]): string[] {
+function dropShellKeywords(words: string[]): string[] {
   let index = 0
-  while (index < tokens.length) {
-    const token = tokens[index]
-    if (SHELL_HEADERS.has(token)) return []
-    if (token === 'function') {
+  while (index < words.length) {
+    const word = words[index]
+    if (SHELL_HEADERS.has(word)) return []
+    if (word === 'function') {
       index += 2
       continue
     }
-    if (!SHELL_KEYWORDS.has(token)) break
+    if (!SHELL_KEYWORDS.has(word)) break
     index += 1
   }
-  return tokens.slice(index)
+  return words.slice(index)
 }
 
 /** The command a wrapper runs, past its flags, their values and a `timeout` duration. */
