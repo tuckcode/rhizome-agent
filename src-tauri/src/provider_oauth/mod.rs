@@ -1,6 +1,7 @@
 //! Browser sign-in for one account per provider (ADR-0186).
 //!
-//! ChatGPT uses OpenAI's published dynamic-client flow. Tokens live in the
+//! ChatGPT uses OpenAI's published dynamic-client flow. xAI is a preview on
+//! a shared public client id (`xai.rs`). Tokens live in the
 //! OS keychain under `<provider>:oauth`, next to the API key, not in it.
 //! The on/off switch is `oauth-sign-in.json` in the app config folder, not
 //! `settings.json`, because the app saves `Settings` as one object.
@@ -11,6 +12,7 @@
 mod loopback;
 mod openai;
 mod pkce;
+mod xai;
 
 use std::collections::BTreeMap;
 use std::fs::{File, OpenOptions};
@@ -29,6 +31,7 @@ const REFRESH_WINDOW_SECS: i64 = 300;
 pub(crate) const SIGN_IN_AGAIN: &str = "Sign in again";
 pub(crate) const NOT_USABLE: &str = "Sign in with ChatGPT is not usable.";
 pub(crate) const TURNED_OFF: &str = "Sign in with ChatGPT is turned off.";
+pub(crate) use xai::NO_ACCESS as XAI_NO_ACCESS;
 
 /// What the UI can show. No token fields.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -102,6 +105,9 @@ impl Record {
 struct SignInSettings {
     #[serde(default)]
     enabled: BTreeMap<String, bool>,
+    /// Replaces a provider's built-in OAuth client id (ADR-0186, decision 3).
+    #[serde(default)]
+    client_ids: BTreeMap<String, String>,
 }
 
 pub(super) struct Env {
@@ -109,6 +115,7 @@ pub(super) struct Env {
     settings_path: PathBuf,
     lock_path: PathBuf,
     endpoints: openai::Endpoints,
+    xai_endpoints: xai::Endpoints,
     http: reqwest::blocking::Client,
     attempt: Mutex<Option<Arc<std::sync::atomic::AtomicBool>>>,
     refresh: Mutex<()>,
@@ -119,13 +126,18 @@ pub(crate) struct RefreshLock<'a> {
     _file: File,
 }
 
-/// Starts ChatGPT sign-in for `provider`. `open_url` opens the system browser.
-/// `false` means the page did not open.
+/// Starts browser sign-in for `provider`. `open_url` opens the system browser.
+/// `false` means the page did not open. `show_code` receives xAI's short code
+/// for the person to compare with the browser page.
 pub fn oauth_sign_in(
     provider: &str,
     open_url: impl FnOnce(&str) -> bool,
+    show_code: impl FnOnce(&str),
 ) -> Result<OauthStatus, String> {
     let env = current()?;
+    if provider.trim().eq_ignore_ascii_case(xai::PROVIDER_ID) {
+        return xai::sign_in(&env, open_url, show_code, SIGN_IN_TIMEOUT);
+    }
     openai::sign_in(&env, provider, open_url, SIGN_IN_TIMEOUT)
 }
 
@@ -201,6 +213,7 @@ impl Env {
             settings_path: dir.join(SETTINGS_FILE),
             lock_path: dir.join("oauth-refresh.lock"),
             endpoints: openai::Endpoints::production(),
+            xai_endpoints: xai::Endpoints::production(),
             http: http_client(),
             attempt: Mutex::new(None),
             refresh: Mutex::new(()),
@@ -269,13 +282,9 @@ fn access_token_with(
     if record.refresh_token.is_empty() {
         return Err(SIGN_IN_AGAIN.into());
     }
-    if !record.usable
-        || !record
-            .scopes
-            .iter()
-            .any(|scope| scope == openai::DIRECT_SCOPE)
-    {
-        return Err(NOT_USABLE.into());
+    let required_scope = required_scope(&provider);
+    if !record.usable || !record.scopes.iter().any(|scope| scope == required_scope) {
+        return Err(not_usable(&provider));
     }
     if !provider_enabled(env, &provider) {
         return Err(turned_off(&provider));
@@ -288,12 +297,18 @@ fn access_token_with(
     if !force && !previous_access.is_empty() && remaining > REFRESH_WINDOW_SECS {
         return Ok(previous_access);
     }
-    let parsed = match openai::refresh(env, &record) {
+    let refreshed = if provider == xai::PROVIDER_ID {
+        xai::refresh(env, &record)
+    } else {
+        openai::refresh(env, &record)
+    };
+    let parsed = match refreshed {
         Ok(parsed) => parsed,
         Err(openai::RefreshFail::Again(cleared)) => {
             let _ = save_rotated(env, &provider, &cleared);
             return Err(SIGN_IN_AGAIN.into());
         }
+        Err(openai::RefreshFail::NoAccess) => return Err(xai::NO_ACCESS.into()),
         Err(openai::RefreshFail::Temporary) => return Err("The token request failed.".into()),
     };
     let mut updated = record.clone();
@@ -311,10 +326,7 @@ fn access_token_with(
     updated.saved_at = unix_now();
     if let Some(scope) = parsed.scope.as_deref() {
         updated.scopes = openai::split_scopes(scope);
-        updated.usable = updated
-            .scopes
-            .iter()
-            .any(|scope| scope == openai::DIRECT_SCOPE);
+        updated.usable = updated.scopes.iter().any(|scope| scope == required_scope);
     }
     // The server may already have burned the previous refresh token.
     save_rotated(env, &provider, &updated)?;
@@ -339,7 +351,7 @@ fn access_token_with(
         }
     }
     if !updated.usable {
-        return Err(NOT_USABLE.into());
+        return Err(not_usable(&provider));
     }
     if force && updated.access_token == previous_access {
         return Err(SIGN_IN_AGAIN.into());
@@ -369,7 +381,13 @@ pub(crate) fn sign_out_with(env: &Env, provider: &str) -> Result<OauthStatus, St
     let _lock = lock_refresh(env)?;
     let record = load_record(env, &provider)?;
     let revoke_ok = match record.as_ref() {
-        Some(record) if !record.refresh_token.is_empty() => openai::revoke(env, record).is_ok(),
+        Some(record) if !record.refresh_token.is_empty() => {
+            if provider == xai::PROVIDER_ID {
+                xai::revoke(env, record).is_ok()
+            } else {
+                openai::revoke(env, record).is_ok()
+            }
+        }
         _ => true,
     };
     env.keys.delete_account(&oauth_account(&provider))?;
@@ -442,6 +460,15 @@ fn set_provider_enabled(env: &Env, provider: &str, on: bool) -> Result<(), Strin
         .map_err(|_| "The sign-in setting could not be saved.".to_string())
 }
 
+/// The saved client id, when the person replaced the built-in one.
+fn client_id_setting(env: &Env, provider: &str) -> Option<String> {
+    read_settings(&env.settings_path)
+        .client_ids
+        .get(provider)
+        .map(|id| id.trim().to_string())
+        .filter(|id| !id.is_empty())
+}
+
 fn read_settings(path: &Path) -> SignInSettings {
     let Ok(text) = std::fs::read_to_string(path) else {
         return SignInSettings::default();
@@ -503,20 +530,33 @@ pub(super) fn unix_now() -> i64 {
 /// under this id. A custom OpenAI-compatible provider keeps its API key.
 pub const BUILTIN_OPENAI_PROVIDER_ID: &str = "openai";
 
+/// Built-in xAI row from the provider presets. xAI sign-in is stored here.
+pub const BUILTIN_XAI_PROVIDER_ID: &str = xai::PROVIDER_ID;
+
 /// True when `provider_id` is exactly `openai`, ChatGPT sign-in is switched
 /// on, and the keychain holds a usable token. The caller also requires
 /// provider kind OpenAI before it attaches this token. A different id,
 /// including one that only matches after trim or lowercase, does not.
 pub fn provider_is_signed_in_chatgpt(provider_id: &str) -> bool {
-    current()
-        .map(|env| provider_is_signed_in_with(&env, provider_id))
-        .unwrap_or(false)
+    provider_id == BUILTIN_OPENAI_PROVIDER_ID
+        && current()
+            .map(|env| provider_is_signed_in_with(&env, provider_id))
+            .unwrap_or(false)
+}
+
+/// True when `provider_id` is exactly `xai` with a usable sign-in that is on.
+pub fn provider_is_signed_in_xai(provider_id: &str) -> bool {
+    provider_id == BUILTIN_XAI_PROVIDER_ID
+        && current()
+            .map(|env| provider_is_signed_in_with(&env, provider_id))
+            .unwrap_or(false)
 }
 
 pub(crate) fn provider_is_signed_in_with(env: &Env, provider_id: &str) -> bool {
     // Exact id. Trim and lowercase would treat " OpenAI" as the built-in row
     // and hand it the ChatGPT token.
-    if provider_id != BUILTIN_OPENAI_PROVIDER_ID || !provider_enabled(env, provider_id) {
+    let known = provider_id == BUILTIN_OPENAI_PROVIDER_ID || provider_id == BUILTIN_XAI_PROVIDER_ID;
+    if !known || !provider_enabled(env, provider_id) {
         return false;
     }
     let Ok(Some(record)) = load_record(env, provider_id) else {
@@ -528,7 +568,23 @@ pub(crate) fn provider_is_signed_in_with(env: &Env, provider_id: &str) -> bool {
         && record
             .scopes
             .iter()
-            .any(|scope| scope == openai::DIRECT_SCOPE)
+            .any(|scope| scope == required_scope(provider_id))
+}
+
+fn required_scope(provider: &str) -> &'static str {
+    if provider == xai::PROVIDER_ID {
+        xai::API_SCOPE
+    } else {
+        openai::DIRECT_SCOPE
+    }
+}
+
+fn not_usable(provider: &str) -> String {
+    if provider == xai::PROVIDER_ID {
+        xai::NOT_USABLE.to_string()
+    } else {
+        NOT_USABLE.to_string()
+    }
 }
 
 fn normalize_provider(provider: &str) -> Result<String, String> {
@@ -603,6 +659,7 @@ pub(crate) mod test_support {
                 settings_path: dir.join(SETTINGS_FILE),
                 lock_path: dir.join("oauth-refresh.lock"),
                 endpoints,
+                xai_endpoints: xai::Endpoints::offline(),
                 http: http_client(),
                 attempt: Mutex::new(None),
                 refresh: Mutex::new(()),
@@ -616,7 +673,11 @@ pub(crate) mod test_support {
 
     pub(crate) struct TestSignIn {
         _dir: tempfile::TempDir,
+        _exclusive: MutexGuard<'static, ()>,
     }
+
+    /// `install_usable_sign_in` replaces one process-wide override.
+    static SIGN_IN_TESTS: Mutex<()> = Mutex::new(());
 
     impl Drop for TestSignIn {
         fn drop(&mut self) {
@@ -628,6 +689,9 @@ pub(crate) mod test_support {
 
     /// Installs one usable OpenAI sign-in for `fresh_access_token` tests.
     pub(crate) fn install_usable_sign_in(provider: &str, access_token: &str) -> TestSignIn {
+        let exclusive = SIGN_IN_TESTS
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
         let dir = tempfile::tempdir().expect("dir");
         let env = Arc::new(Env::in_dir(dir.path(), openai::Endpoints::offline()));
         let record = Record {
@@ -641,7 +705,7 @@ pub(crate) mod test_support {
             refresh_token: "oat-secret-refresh".into(),
             token_type: "Bearer".into(),
             expires_at: unix_now() + 3600,
-            scopes: vec![openai::DIRECT_SCOPE.into()],
+            scopes: vec![required_scope(provider).into()],
             usable: true,
             saved_at: unix_now(),
         };
@@ -650,6 +714,9 @@ pub(crate) mod test_support {
         *override_env()
             .lock()
             .unwrap_or_else(|poison| poison.into_inner()) = Some(env);
-        TestSignIn { _dir: dir }
+        TestSignIn {
+            _dir: dir,
+            _exclusive: exclusive,
+        }
     }
 }

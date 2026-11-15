@@ -417,7 +417,8 @@ pub fn discover_ai_model_ids_with(
     let endpoint = format!("{}/models", rejected_on_err(normalized_base_url(&request))?);
     let client = http_client(limits)?;
     let builder = auth_on_err(apply_auth_headers(client.get(endpoint), &request))?;
-    let response = send_checked(apply_provider_headers(builder, &request))?;
+    let response = send_checked(apply_provider_headers(builder, &request))
+        .map_err(|error| explain_xai_sign_in_failure(&request, error))?;
     let json = response.json::<serde_json::Value>().map_err(|error| {
         model_error(
             ModelErrorKind::Protocol,
@@ -732,6 +733,7 @@ fn open_model_event_stream(
         request,
     ))?;
     send_checked(apply_provider_headers(builder, request))
+        .map_err(|error| explain_xai_sign_in_failure(request, error))
 }
 
 fn read_event_stream(
@@ -836,6 +838,21 @@ fn classify_http_failure(status: u16, retry_after: Option<&str>, body: &str) -> 
         status: Some(status),
         message: format!("AI provider returned {status}: {}", truncate_error(body)),
     }
+}
+
+/// A 403 for a signed-in xAI account is an access decision, and a new
+/// sign-in does not change it. The message offers the API key (ADR-0186).
+fn explain_xai_sign_in_failure(request: &AiModelStreamRequest, error: ModelError) -> ModelError {
+    if error.status == Some(403)
+        && request.api_key_override.is_none()
+        && crate::provider_oauth::provider_is_signed_in_xai(&request.provider.id)
+    {
+        return ModelError {
+            message: crate::provider_oauth::XAI_NO_ACCESS.into(),
+            ..error
+        };
+    }
+    error
 }
 
 fn model_error(kind: ModelErrorKind, message: String) -> ModelError {
@@ -1081,6 +1098,11 @@ pub(crate) const OPENAI_API_V1: &str = "https://api.openai.com/v1";
 
 pub(crate) const CHATGPT_TOKEN_WRONG_HOST: &str = "ChatGPT sign-in only calls https://api.openai.com/v1. This provider points somewhere else, so the sign-in token was not sent.";
 
+/// Official host for an xAI sign-in token. Anything else is refused.
+pub(crate) const XAI_API_V1: &str = "https://api.x.ai/v1";
+
+pub(crate) const XAI_TOKEN_WRONG_HOST: &str = "xAI sign-in only calls https://api.x.ai/v1. This provider points somewhere else, so the sign-in token was not sent.";
+
 pub(crate) fn api_key_from_provider(
     request: &AiModelStreamRequest,
 ) -> Result<Option<String>, String> {
@@ -1102,6 +1124,16 @@ pub(crate) fn api_key_from_provider(
         }
         return crate::provider_oauth::fresh_access_token(
             crate::provider_oauth::BUILTIN_OPENAI_PROVIDER_ID,
+        )
+        .map(Some);
+    }
+
+    if crate::provider_oauth::provider_is_signed_in_xai(&request.provider.id) {
+        if provider_base_url(&request.provider)? != XAI_API_V1 {
+            return Err(XAI_TOKEN_WRONG_HOST.into());
+        }
+        return crate::provider_oauth::fresh_access_token(
+            crate::provider_oauth::BUILTIN_XAI_PROVIDER_ID,
         )
         .map(Some);
     }
@@ -1280,6 +1312,52 @@ mod tests {
         let future = raw.replace("oauth", "future_storage");
         let future: AiModelProvider = serde_json::from_str(&future).unwrap();
         assert_eq!(future.api_key_storage, Some(AiModelApiKeyStorage::Unknown));
+    }
+
+    fn xai_row() -> AiModelProvider {
+        let mut xai = provider(AiModelProviderKind::OpenAiCompatible);
+        xai.id = "xai".into();
+        xai.base_url = Some(XAI_API_V1.into());
+        xai.api_key_env_var = None;
+        xai.api_key_storage = Some(AiModelApiKeyStorage::LocalFile);
+        xai
+    }
+
+    #[test]
+    fn xai_sign_in_token_goes_only_to_the_official_host() {
+        let _guard =
+            crate::provider_oauth::test_support::install_usable_sign_in("xai", "xai-secret-access");
+        let mut xai_request = request(xai_row());
+        assert_eq!(
+            api_key_from_provider(&xai_request).unwrap().as_deref(),
+            Some("xai-secret-access")
+        );
+        xai_request.provider.base_url = Some("https://evil.example/v1".into());
+        let refused = api_key_from_provider(&xai_request).unwrap_err();
+        assert_eq!(refused, XAI_TOKEN_WRONG_HOST);
+        assert!(!refused.contains("xai-secret-access"));
+        assert!(!crate::provider_oauth::provider_is_signed_in_xai(" XAI"));
+        assert!(!crate::provider_oauth::provider_is_signed_in_xai("openai"));
+    }
+
+    #[test]
+    fn a_signed_in_xai_403_offers_the_api_key_and_other_failures_keep_their_words() {
+        let _guard =
+            crate::provider_oauth::test_support::install_usable_sign_in("xai", "xai-secret-access");
+        let xai_request = request(xai_row());
+        let forbidden = classify_http_failure(403, None, "no active Grok subscription");
+        let explained = explain_xai_sign_in_failure(&xai_request, forbidden);
+        assert_eq!(explained.kind, ModelErrorKind::Auth);
+        assert_eq!(explained.status, Some(403));
+        assert!(explained.message.contains("API key"));
+        let limited = classify_http_failure(429, None, "slow");
+        let kept = explain_xai_sign_in_failure(&xai_request, limited.clone());
+        assert_eq!(kept.message, limited.message);
+        let mut with_key = request(xai_row());
+        with_key.api_key_override = Some("xai-key".into());
+        let forbidden = classify_http_failure(403, None, "denied");
+        let kept = explain_xai_sign_in_failure(&with_key, forbidden.clone());
+        assert_eq!(kept.message, forbidden.message);
     }
 
     #[test]

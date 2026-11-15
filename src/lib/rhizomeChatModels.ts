@@ -124,20 +124,20 @@ export function includeRemovedProviderModel(
   if (!value || resolveRhizomeChatModel(models, value)) return models
   const parts = splitTarget(value)
   if (!parts || isLegacyProviderKindId(parts.provider)) return models
-  // A model can leave the list while its provider stays configured.
-  const provider = normalizeAiModelProviders(providers).find(
-    (entry) => providerKey(entry) === parts.provider,
+  // A live-listed model is absent from the saved rows until the menu loads.
+  const configured = normalizeAiModelProviders(providers).find(
+    (provider) => providerKey(provider) === parts.provider,
   )
-  if (provider) {
+  if (configured) {
     return [
       {
         id: value,
         providerId: parts.provider,
-        providerKind: provider.kind,
-        providerName: provider.name,
+        providerKind: configured.kind,
+        providerName: configured.name,
         modelId: parts.modelId,
         displayName: parts.modelId,
-        label: `${provider.name} · ${parts.modelId}`,
+        label: `${configured.name} · ${parts.modelId}`,
       },
       ...models,
     ]

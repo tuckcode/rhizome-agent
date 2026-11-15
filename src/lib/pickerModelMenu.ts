@@ -2,7 +2,8 @@ import type { TranslationKey } from './i18n'
 import type { AiModelProvider, AiModelProviderKind } from './aiTargets'
 import {
   ACCOUNT_SIGN_IN_PROVIDERS,
-  chatgptOfficialHostConfigured,
+  accountHostConfigured,
+  XAI_ACCOUNT_PROVIDER_ID,
 } from './accountSignInProviders'
 import {
   oauthAccountReady,
@@ -145,14 +146,13 @@ export function buildPickerMenu(input: {
   const failureByKey = new Map(input.failures.map((failure) => [failure.cacheKey, failure.kind]))
   const groups: PickerMenuGroup[] = []
   const index: Record<string, number> = {}
-  const hostOk = chatgptOfficialHostConfigured(input.providers)
 
   const accountClaimedModelIds = new Set<string>()
   const readyAccountKeys = new Set<string>()
 
   for (const account of ACCOUNT_SIGN_IN_PROVIDERS) {
     const status = input.oauthByProvider?.[account.id]
-    const ready = hostOk && oauthAccountReady(status)
+    const ready = accountHostConfigured(account.id, input.providers) && oauthAccountReady(status)
     const email = ready ? (status?.email ?? null) : null
     const key = `account:${account.id}`
     if (ready) readyAccountKeys.add(key)
@@ -205,13 +205,15 @@ export function buildPickerMenu(input: {
     else if (!loading && failure === 'empty') hint = pickerBlockReason(model.providerName, 'no_models')
     else if (!loading && failure === 'timeout') hint = pickerBlockReason(model.providerName, 'load_failed')
 
-    // ChatGPT Ready owns builtin openai models (ADR-0186). Account wins overlaps
-    // with the OpenAI API key group so the same gpt-* row is not listed twice.
-    const chatgptKey = 'account:openai'
-    if (isBuiltinOpenaiModel(model) && readyAccountKeys.has(chatgptKey)) {
-      if (!accountClaimedModelIds.has(model.modelId)) {
-        accountClaimedModelIds.add(model.modelId)
-        pushModelOntoGroup(groups, index[chatgptKey], model, null, null)
+    // A Ready account owns its builtin models (ADR-0186). Account wins overlaps
+    // with the API key group so the same model row is not listed twice.
+    const accountKey = isBuiltinOpenaiModel(model)
+      ? 'account:openai'
+      : (model.providerId === XAI_ACCOUNT_PROVIDER_ID ? 'account:xai' : null)
+    if (accountKey && readyAccountKeys.has(accountKey)) {
+      if (!accountClaimedModelIds.has(`${accountKey}/${model.modelId}`)) {
+        accountClaimedModelIds.add(`${accountKey}/${model.modelId}`)
+        pushModelOntoGroup(groups, index[accountKey], model, null, null)
       }
       continue
     }

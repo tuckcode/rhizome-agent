@@ -322,6 +322,44 @@ describe('ConnectedProvidersSummary', () => {
     }))
   })
 
+  it('adds the xAI chat row after sign-in, once', async () => {
+    const { callHost } = await import('../lib/callHost')
+    vi.mocked(callHost).mockImplementation(async (cmd: string, args?: unknown) => {
+      if (cmd === 'oauth_status' && (args as { provider: string }).provider === 'xai') {
+        return {
+          provider: 'xai',
+          enabled: true,
+          signed_in: true,
+          usable: true,
+          email: 'mock@example.com',
+          revoked: true,
+        } as never
+      }
+      return (cmd === 'oauth_status' ? { provider: 'openai', enabled: false, signed_in: false, usable: false, email: null, revoked: true } : []) as never
+    })
+    const onChange = vi.fn()
+    renderSummary(onChange)
+    await waitFor(() => { expect(onChange).toHaveBeenCalledTimes(1) })
+    const rows = onChange.mock.calls[0][0] as AiModelProvider[]
+    expect(rows.map((row) => row.id)).toEqual(['work-openai', 'xai'])
+  })
+
+  it('offers an API key when xAI refuses the account', async () => {
+    const { callHost } = await import('../lib/callHost')
+    const refused = 'xAI does not allow API access for this account. Sign out of xAI, then add an xAI API key.'
+    vi.mocked(callHost).mockImplementation(async (cmd: string) => {
+      if (cmd === 'oauth_sign_in') throw new Error(refused)
+      return (cmd === 'oauth_status' ? { provider: 'xai', enabled: false, signed_in: false, usable: false, email: null, revoked: true } : []) as never
+    })
+    const onChange = vi.fn()
+    renderSummary(onChange)
+    fireEvent.click(await screen.findByTestId('settings-connected-sign-in-account:xai'))
+    expect(await screen.findByRole('alert')).toHaveTextContent(refused)
+    fireEvent.click(screen.getByTestId('settings-connected-xai-add-key'))
+    const rows = onChange.mock.calls[0][0] as AiModelProvider[]
+    expect(rows.at(-1)?.id).toBe('xai')
+  })
+
   it('lists ChatGPT under Your accounts and keeps Not installed collapsed', async () => {
     render(
       <ConnectedProvidersSummary

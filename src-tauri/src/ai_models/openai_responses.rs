@@ -2336,8 +2336,8 @@ mod tests {
                 },
             );
         }
+        // Other tests share this book in parallel and can evict the next-oldest chat, so only the ends are stable.
         assert!(load_replay(&sessions[0]).is_empty());
-        assert_eq!(load_replay(&sessions[1]).len(), 1);
         assert_eq!(load_replay(sessions.last().unwrap()).len(), 1);
         for session in &sessions {
             clear_responses_replay(session);

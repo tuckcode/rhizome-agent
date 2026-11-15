@@ -37,6 +37,35 @@ describe('pickerBlockReason', () => {
 })
 
 describe('buildPickerMenu', () => {
+  it('shows a Ready xAI account with its models once', () => {
+    const groups = buildPickerMenu({
+      models: [model({
+        id: 'xai/grok-4.3',
+        providerName: 'xAI',
+        providerKind: 'open_ai_compatible',
+        providerId: 'xai',
+        modelId: 'grok-4.3',
+      })],
+      failures: [],
+      loadingNames: [],
+      needsKey: () => false,
+      oauthByProvider: {
+        xai: {
+          provider: 'xai',
+          enabled: true,
+          signed_in: true,
+          usable: true,
+          email: 'mock@example.com',
+          revoked: true,
+        },
+      },
+    })
+    const account = groups.find((group) => group.id === 'account:xai')
+    expect(account?.label).toBe('xAI (preview) · mock@example.com')
+    expect(account?.rows.map((row) => row.modelId)).toEqual(['grok-4.3'])
+    expect(groups.filter((group) => group.section === 'api_keys')).toEqual([])
+  })
+
   const ollama = model({
     id: 'ollama/llama3.2',
     modelId: 'llama3.2',
@@ -75,8 +104,8 @@ describe('buildPickerMenu', () => {
       loadingNames: [],
       needsKey: () => false,
     })
-    expect(groups.map((group) => group.label)).toEqual(['ChatGPT', 'LM Studio', 'Ollama'])
-    expect(groups.map((group) => group.section)).toEqual(['accounts', 'local', 'local'])
+    expect(groups.map((group) => group.label)).toEqual(['ChatGPT', 'xAI (preview)', 'LM Studio', 'Ollama'])
+    expect(groups.map((group) => group.section)).toEqual(['accounts', 'accounts', 'local', 'local'])
     expect(groups[0].accountSignIn).toBe(true)
     expect(groups.find((group) => group.label === 'Ollama')?.rows.map((row) => row.label)).toEqual([
       'llama3.2',
@@ -93,7 +122,7 @@ describe('buildPickerMenu', () => {
       loadingNames: [],
       needsKey: (kind) => kind === 'open_ai',
     })
-    expect(groups.map((group) => group.label)).toEqual(['ChatGPT', 'OpenAI API key', 'Ollama', 'Free tier'])
+    expect(groups.map((group) => group.label)).toEqual(['ChatGPT', 'xAI (preview)', 'OpenAI API key', 'Ollama', 'Free tier'])
     expect(groups[1].blocked).toBe(true)
     // ChatGPT (no selectable model) sinks within accounts; OpenAI API key sinks in api_keys
     expect(groups[0].accountSignIn).toBe(true)
@@ -211,7 +240,7 @@ describe('buildPickerMenu', () => {
       loadingNames: [],
       needsKey: () => false,
     })
-    expect(groups.map((group) => group.label)).toEqual(['ChatGPT', 'OpenAI API key', 'Scrub test'])
+    expect(groups.map((group) => group.label)).toEqual(['ChatGPT', 'xAI (preview)', 'OpenAI API key', 'Scrub test'])
   })
 
   it('only sinks groups with no selectable model; accountNeedsSignIn does not sink API key rows', () => {
@@ -224,6 +253,7 @@ describe('buildPickerMenu', () => {
     })
     expect(groups.map((group) => group.label)).toEqual([
       'ChatGPT',
+      'xAI (preview)',
       'OpenAI API key',
       'Ollama',
       'Free tier',
