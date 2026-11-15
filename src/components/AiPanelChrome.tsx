@@ -51,7 +51,7 @@ import { workerStartFailureReason } from '../lib/primeWorkerStartError'
 import { afterPaint } from '../lib/sessionTranscriptHit'
 import { useScrollToTranscriptHit } from '../hooks/useScrollToTranscriptHit'
 import { ChatRunLiveStatus } from './ChatRunLiveStatus'
-import { prefillAiComposer } from '../utils/aiPromptBridge'
+import { BrandMark } from './BrandMark'
 
 interface AiPanelHeaderProps {
   agentLabel: string
@@ -126,6 +126,8 @@ interface AiPanelComposerProps {
   onUnsupportedAiPaste?: (message: string) => void
   /** Frame A foot row. Rendered under the box so it can see controller state. */
   foot?: ReactNode
+  /** New-chat screen: a larger input box, with this content under the foot row. */
+  home?: ReactNode
   commandEntries?: CommandMenuEntry[]
   commandDisabled?: Record<string, string>
   commandSkillLabel?: string
@@ -517,18 +519,11 @@ function AiPanelTranscriptNotice({
       className="flex min-h-full flex-col items-center justify-center text-center text-muted-foreground"
       data-testid={testId}
     >
-      <Sparkle size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
-      <p style={{ fontSize: 13, margin: '0 0 4px' }}>{title}</p>
-      <p style={{ fontSize: 11, margin: 0 }}>{description}</p>
+      <p className="text-base font-medium text-foreground">{title}</p>
+      <p className="mt-1 text-sm">{description}</p>
     </div>
   )
 }
-
-const EMPTY_CHAT_STARTERS = [
-  { label: 'Explain this repo', prompt: 'Explain this repo' },
-  { label: 'Find and fix a bug', prompt: 'Find and fix a bug' },
-  { label: 'Write tests for a file', prompt: 'Write tests for a file' },
-] as const
 
 function AiPanelEmptyState({
   agentLabel,
@@ -570,31 +565,22 @@ function AiPanelEmptyState({
 
   return (
     <div
-      className="flex min-h-full flex-1 flex-col items-center justify-center px-6 text-center"
+      className="flex min-h-full flex-1 flex-col items-center justify-end px-6 pb-5 text-center"
+      data-layout="hero"
       data-testid="ai-panel-empty-state"
     >
-      <h2 className="font-sans text-xl font-medium text-foreground">
-        Ask Rhizome
+      <BrandMark size={44} />
+      <p className="mt-3 font-mono text-sm font-semibold tracking-wide text-muted-foreground" data-testid="chat-home-wordmark">
+        rhizome
+      </p>
+      <h2 className="mt-4 font-sans text-3xl font-semibold tracking-tight text-foreground">
+        What are we working on?
       </h2>
-      <p className="mt-2 max-w-lg text-[13px] leading-5 text-muted-foreground">
+      <p className="mt-2 max-w-lg text-base leading-6 text-muted-foreground">
         {hasContext
           ? 'Rhizome can work from the open note, or from the rest of this repo.'
           : 'Rhizome can research this repo, edit files, and run commands here.'}
       </p>
-      <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-        {EMPTY_CHAT_STARTERS.map((starter) => (
-          <Button
-            key={starter.label}
-            type="button"
-            size="sm"
-            variant="outline"
-            data-testid="chat-empty-starter"
-            onClick={() => prefillAiComposer(starter.prompt)}
-          >
-            {starter.label}
-          </Button>
-        ))}
-      </div>
     </div>
   )
 }
@@ -1038,6 +1024,7 @@ export function AiPanelComposer({
   onAttachImages,
   onRemoveAttachment,
   foot,
+  home,
   commandEntries,
   commandDisabled,
   commandSkillLabel,
@@ -1182,6 +1169,7 @@ export function AiPanelComposer({
     <div
       className="chat-column flex shrink-0 flex-col"
       style={{ padding: '6px 10px' }}
+      data-chat-home={home ? 'true' : undefined}
     >
       {hasControls ? (
         <div className="mb-1.5 min-w-0">
@@ -1403,6 +1391,7 @@ export function AiPanelComposer({
         <ComposerControlsRow hasControls={false} sendButton={sendButton} />
       </div>
       {foot}
+      {home}
     </div>
   )
 }

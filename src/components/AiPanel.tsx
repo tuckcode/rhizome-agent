@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState, type MutableRefObject, type ReactNode, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { aiPanelFrameStyle } from './aiPanelPulse'
+import { recentNotesForChatHome } from '../lib/chatHomeNotes'
+import { ChatHomeSuggestions } from './ChatHomeSuggestions'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 
 import { usePanelWidth } from '../hooks/usePanelWidth'
@@ -310,6 +312,7 @@ export function AiPanelView({
   // usage reflects the exchange that just happened.
   const primeStats = usePrimeSessionStats(isPrimeTarget, agent.status)
   const { queue, refresh: refreshQueue, clear: clearQueue } = usePrimeQueue(isPrimeTarget, isActive)
+  const recentNotes = useMemo(() => recentNotesForChatHome(entries ?? []), [entries])
   // If Waiting chrome shows a follow-up, the transcript must show it too —
   // send-path append alone can lose a race with rehydrate (2026-09-06 dogfood).
   useEffect(() => {
@@ -509,6 +512,11 @@ export function AiPanelView({
     reportError: reportSwitchError,
   })
 
+  // The new-chat screen: no message, no run, no picked session, and an agent that is ready.
+  const chatHome = agent.messages.length === 0
+    && !isActive
+    && transcriptState === 'new'
+    && view.defaultAiAgentReadiness === 'ready'
   return (
     <NativeLiveSlotProvider slot={agent.getNativeLiveSlot?.() ?? null}>
     <>
@@ -664,6 +672,7 @@ export function AiPanelView({
         queue={isPrimeTarget ? queue : undefined}
         onClearQueue={isPrimeTarget ? () => void clearQueue() : undefined}
         onStop={handleStop}
+        home={chatHome ? <ChatHomeSuggestions recentNotes={recentNotes} onOpenNote={onOpenNote} /> : undefined}
         onUnsupportedAiPaste={reportAttachment}
         vision={vision}
         modelLabel={modelTarget.split('/').pop() || 'This model'}
