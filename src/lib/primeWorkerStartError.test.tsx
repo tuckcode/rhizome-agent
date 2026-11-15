@@ -1,7 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { AiMessage } from '../components/AiMessage'
-import { ChatComposerFoot } from '../components/ChatComposerFoot'
+import { chatRunFailure, ENGINE_DID_NOT_START } from './chatRunStatus'
+import { ChatRunStatusLine } from '../components/ChatRunStatusLine'
 import { createStreamCallbacks } from './aiAgentStreamCallbacks'
 import type { AiAgentMessage } from './aiAgentConversation'
 import { workerStartFailureReason } from './primeWorkerStartError'
@@ -60,13 +61,13 @@ describe('primeWorkerStartError', () => {
     expect(workerStartFailureReason('worker-failed:reason')).toBeNull()
   })
 
-  it('renders a worker start failure instead of the generic timeout', () => {
+  it('says the engine did not start instead of the generic timeout or the host words', () => {
     const message = messageAfter(WORKER_FAILED)
     const reason = workerStartFailureReason(message.response ?? '')
 
     render(
       <>
-        <ChatComposerFoot failureReason={reason} />
+        <ChatRunStatusLine messages={[]} isActive={false} failure={chatRunFailure(reason)} />
         <AiMessage
           userMessage={message.userMessage}
           actions={message.actions}
@@ -76,11 +77,13 @@ describe('primeWorkerStartError', () => {
       </>,
     )
 
-    const status = screen.getByRole('status')
-    expect(status).toHaveTextContent(REASON)
+    const status = screen.getByTestId('chat-run-status-line')
+    expect(status).toHaveTextContent(ENGINE_DID_NOT_START)
+    expect(status).not.toHaveTextContent(REASON)
     expect(status).not.toHaveTextContent('timed out')
     expect(status).not.toHaveTextContent('finished without returning a reply')
-    expect(screen.getByTestId('markdown-content')).toHaveTextContent(REASON)
+    expect(screen.getByTestId('markdown-content')).toHaveTextContent(ENGINE_DID_NOT_START)
+    expect(screen.getByTestId('markdown-content')).not.toHaveTextContent(REASON)
     expect(screen.getByTestId('markdown-content')).not.toHaveTextContent('worker-failed:')
     expect(screen.getByTestId('markdown-content')).not.toHaveTextContent('timed out')
     expect(screen.getByTestId('markdown-content')).not.toHaveTextContent('finished without returning a reply')

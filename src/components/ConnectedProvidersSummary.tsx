@@ -143,7 +143,7 @@ function ConnectedProvidersSummaryBody({
     const startedAt = performance.now()
     const FOCUS_RETRY_CAP_MS = 1000
 
-    const finish = (field: HTMLInputElement | null) => {
+    const finish = (field: HTMLElement | null) => {
       if (cancelled) return
       const row = document.getElementById(focusRowId)
       row?.scrollIntoView({ block: 'center' })
@@ -156,8 +156,9 @@ function ConnectedProvidersSummaryBody({
 
     const tryFocus = () => {
       if (cancelled) return
-      const field = document.querySelector<HTMLInputElement>(
-        `[data-key-for="${CSS.escape(focusRowId)}"]`,
+      // A key field, or an account row's Sign in button.
+      const field = document.querySelector<HTMLElement>(
+        `[data-key-for="${CSS.escape(focusRowId)}"], [data-focus-for="${CSS.escape(focusRowId)}"]`,
       )
       if (field) {
         finish(field)
@@ -314,6 +315,7 @@ function ConnectedProvidersSummaryBody({
                     variant="secondary"
                     size="sm"
                     data-testid={`settings-connected-sign-in-${row.id}`}
+                    data-focus-for={row.rowId}
                     disabled={accountBusy}
                     aria-busy={accountBusy && oauth.signingIn ? true : undefined}
                     onClick={() => { void oauth.signIn(account.id) }}

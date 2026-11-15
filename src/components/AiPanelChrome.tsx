@@ -52,6 +52,7 @@ import { afterPaint } from '../lib/sessionTranscriptHit'
 import { useScrollToTranscriptHit } from '../hooks/useScrollToTranscriptHit'
 import { ChatRunLiveStatus } from './ChatRunLiveStatus'
 import { BrandMark } from './BrandMark'
+import { stopRunAriaKeyShortcuts, stopRunShortcutLabel } from '../hooks/useStopRunShortcut'
 
 interface AiPanelHeaderProps {
   agentLabel: string
@@ -99,6 +100,8 @@ interface AiPanelMessageHistoryProps {
    * empty state never covers a conversation that is still arriving.
    */
   transcriptState?: 'new' | 'loading' | 'ready' | 'error'
+  /** Why the run did not start. The live region announces it once. */
+  runFailure?: string | null
 }
 
 interface AiPanelComposerProps {
@@ -128,6 +131,8 @@ interface AiPanelComposerProps {
   foot?: ReactNode
   /** New-chat screen: a larger input box, with this content under the foot row. */
   home?: ReactNode
+  /** The run status line. Rendered above the box. */
+  statusLine?: ReactNode
   commandEntries?: CommandMenuEntry[]
   commandDisabled?: Record<string, string>
   commandSkillLabel?: string
@@ -362,7 +367,8 @@ function ComposerStopButton({
         onStop()
       }}
       aria-label={label}
-      title={label}
+      aria-keyshortcuts={stopRunAriaKeyShortcuts()}
+      title={`${label} (${stopRunShortcutLabel()})`}
       data-testid="agent-stop"
     >
       <Stop size={16} weight="fill" />
@@ -753,6 +759,7 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
   hasContext,
   focusedTranscriptIndex = null,
   transcriptState = 'new',
+  runFailure = null,
 }: AiPanelMessageHistoryProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const endRef = useRef<HTMLDivElement>(null)
@@ -867,7 +874,7 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
           <div ref={endRef} />
         </div>
       </div>
-      <ChatRunLiveStatus messages={messages} isActive={isActive} />
+      <ChatRunLiveStatus messages={messages} isActive={isActive} failure={runFailure} />
     </div>
   )
 })
@@ -1025,6 +1032,7 @@ export function AiPanelComposer({
   onRemoveAttachment,
   foot,
   home,
+  statusLine,
   commandEntries,
   commandDisabled,
   commandSkillLabel,
@@ -1171,6 +1179,7 @@ export function AiPanelComposer({
       style={{ padding: '6px 10px' }}
       data-chat-home={home ? 'true' : undefined}
     >
+      {statusLine}
       {hasControls ? (
         <div className="mb-1.5 min-w-0">
           {controls}
