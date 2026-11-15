@@ -178,3 +178,18 @@ describe('quiet run announcement', () => {
       .toBe('Response complete')
   })
 })
+
+describe('failure announcement', () => {
+  const idle = { isActive: false, hasResponse: false, tools: [] }
+
+  it('announces why the run did not start, once', () => {
+    const failed = { ...idle, failure: 'Your ChatGPT sign-in expired. Sign in again.' }
+    expect(nextChatRunAnnouncement(idle, failed)).toBe('Your ChatGPT sign-in expired. Sign in again.')
+    expect(nextChatRunAnnouncement(failed, { ...failed })).toBeNull()
+  })
+
+  it('puts the failure before the end of the run', () => {
+    const active = { ...idle, isActive: true }
+    expect(nextChatRunAnnouncement(active, { ...idle, failure: 'Worker binary missing' })).toBe('Worker binary missing')
+  })
+})

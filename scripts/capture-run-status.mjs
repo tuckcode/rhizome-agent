@@ -20,6 +20,7 @@ const states = [
   ['quiet', 31000],
   ['capped', 0],
   ['failed', 0],
+  ['signin', 0],
 ]
 
 const browser = await chromium.launch()

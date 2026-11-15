@@ -38,7 +38,7 @@ test.afterEach(() => {
   tempVaultDir = null
 })
 
-test.describe('Fresh-install regression: AI panel renders and works', () => {
+test.describe('Fresh-install regression: AI panel renders and works @smoke', () => {
   test('AI panel has the 3-layer structure', async ({ page }) => {
     const panel = await openNoteWithAiPanel(page)
 
@@ -106,7 +106,7 @@ test.describe('Fresh-install regression: AI panel renders and works', () => {
   })
 })
 
-test.describe('Fresh-install regression: search and command palette', () => {
+test.describe('Fresh-install regression: search and command palette @smoke', () => {
   test.beforeEach(async ({ page }) => {
     await page.route('**/api/vault/ping', route => route.fulfill({ status: 503 }))
     await page.goto('/')
@@ -132,7 +132,7 @@ test.describe('Fresh-install regression: search and command palette', () => {
   })
 })
 
-test.describe('Fresh-install regression: no /api/ai/agent endpoint', () => {
+test.describe('Fresh-install regression: no /api/ai/agent endpoint @smoke', () => {
   test('fetching /api/ai/agent returns 404 or no response', async ({ page }) => {
     // In dev mode, the Vite proxy plugin handles /api/ai/agent,
     // but in production Tauri there is no HTTP server at all.

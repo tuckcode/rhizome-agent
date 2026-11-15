@@ -2,14 +2,15 @@ import { createRoot } from 'react-dom/client'
 import { PaperPlaneRight, Plus, Stop } from '@phosphor-icons/react'
 import { AiMessage } from '../src/components/AiMessage'
 import { ChatRunStatusLine } from '../src/components/ChatRunStatusLine'
+import { chatRunFailure } from '../src/lib/chatRunStatus'
 import '../src/index.css'
 import '../src/themes.css'
 import '../src/App.css'
 import './run-status-shots.css'
 
-type ShotState = 'idle' | 'thinking' | 'writing' | 'tool' | 'approval' | 'quiet' | 'capped' | 'failed'
+type ShotState = 'idle' | 'thinking' | 'writing' | 'tool' | 'approval' | 'quiet' | 'capped' | 'failed' | 'signin'
 
-const STATES: ShotState[] = ['idle', 'thinking', 'writing', 'tool', 'approval', 'quiet', 'capped', 'failed']
+const STATES: ShotState[] = ['idle', 'thinking', 'writing', 'tool', 'approval', 'quiet', 'capped', 'failed', 'signin']
 
 const params = new URLSearchParams(window.location.search)
 const theme = params.get('theme') === 'earth' ? 'earth' : 'graphite'
@@ -33,6 +34,12 @@ const TITLES: Record<ShotState, string> = {
   quiet: 'No event for 31 seconds',
   capped: 'Paused at the step limit',
   failed: 'The worker did not start',
+  signin: 'The ChatGPT sign-in expired',
+}
+
+const FAILURES: Partial<Record<ShotState, ReturnType<typeof chatRunFailure>>> = {
+  failed: chatRunFailure('The Prime worker exited before it started: rhizome-worker not found.'),
+  signin: chatRunFailure('Error: Sign in again'),
 }
 
 const pendingTool = { tool: 'bash', toolId: 't1', label: 'bash', status: 'pending' as const, input: '{"command":"pnpm test"}' }
@@ -87,8 +94,10 @@ export function Shot() {
           <ChatRunStatusLine
             messages={messages}
             isActive={isActive}
-            failureReason={state === 'failed' ? 'Sign in to ChatGPT again. The saved sign-in expired.' : null}
+            failure={FAILURES[state] ?? null}
             onStop={() => {}}
+            onContinue={() => {}}
+            onSignIn={() => {}}
           />
           <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2">
             <Plus size={16} className="text-muted-foreground" />

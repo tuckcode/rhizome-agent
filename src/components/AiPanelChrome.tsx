@@ -52,7 +52,7 @@ import { afterPaint } from '../lib/sessionTranscriptHit'
 import { useScrollToTranscriptHit } from '../hooks/useScrollToTranscriptHit'
 import { ChatRunLiveStatus } from './ChatRunLiveStatus'
 import { BrandMark } from './BrandMark'
-import { stopRunShortcutLabel } from '../hooks/useStopRunShortcut'
+import { stopRunAriaKeyShortcuts, stopRunShortcutLabel } from '../hooks/useStopRunShortcut'
 
 interface AiPanelHeaderProps {
   agentLabel: string
@@ -100,6 +100,8 @@ interface AiPanelMessageHistoryProps {
    * empty state never covers a conversation that is still arriving.
    */
   transcriptState?: 'new' | 'loading' | 'ready' | 'error'
+  /** Why the run did not start. The live region announces it once. */
+  runFailure?: string | null
 }
 
 interface AiPanelComposerProps {
@@ -365,6 +367,7 @@ function ComposerStopButton({
         onStop()
       }}
       aria-label={label}
+      aria-keyshortcuts={stopRunAriaKeyShortcuts()}
       title={`${label} (${stopRunShortcutLabel()})`}
       data-testid="agent-stop"
     >
@@ -756,6 +759,7 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
   hasContext,
   focusedTranscriptIndex = null,
   transcriptState = 'new',
+  runFailure = null,
 }: AiPanelMessageHistoryProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const endRef = useRef<HTMLDivElement>(null)
@@ -870,7 +874,7 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
           <div ref={endRef} />
         </div>
       </div>
-      <ChatRunLiveStatus messages={messages} isActive={isActive} />
+      <ChatRunLiveStatus messages={messages} isActive={isActive} failure={runFailure} />
     </div>
   )
 })

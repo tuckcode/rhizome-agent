@@ -34,16 +34,22 @@ Two earlier decisions are relevant.
    idle.
 2. **One line shows it.** `ChatRunStatusLine` sits above the composer.
    It keeps its height when idle, so the composer does not move. It is
-   not a live region. `ChatRunLiveStatus` stays the one live region.
+   not a live region, except for a start failure, which carries
+   `role="status"`. `ChatRunLiveStatus` stays the live region for run
+   events, and announces a start failure once.
 3. **A tool that runs for 5 seconds shows its elapsed time.**
 4. **A run with no event for 30 seconds, and no tool that runs, shows
    "No response for N seconds" and a Stop button.** The label claims
    what the events show. It does not say that the run is stuck. The live
    region announces this state once.
+   A pause at the step limit offers "Continue for N more steps". A
+   ChatGPT sign-in that expired says so first and offers Sign in, which
+   opens the account row in Settings > Connected.
 5. **The border pulse and the spinner under the input go.** The border
    stays 2px in `primary` while a run is active. It does not move.
 6. **Stop has a shortcut:** Cmd+Period on Mac and Ctrl+Period elsewhere.
-   The key that leaves Chat keeps its job.
+   It acts only while focus is in Chat, outside the note pane, and not
+   while a modal is open. The key that leaves Chat keeps its job.
 
 This reverses the two earlier decisions in the context. The status line
 names the tool, and Stop is no longer click-only.

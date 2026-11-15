@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { AiMessage } from '../components/AiMessage'
+import { chatRunFailure } from './chatRunStatus'
 import { ChatRunStatusLine } from '../components/ChatRunStatusLine'
 import { createStreamCallbacks } from './aiAgentStreamCallbacks'
 import type { AiAgentMessage } from './aiAgentConversation'
@@ -66,7 +67,7 @@ describe('primeWorkerStartError', () => {
 
     render(
       <>
-        <ChatRunStatusLine messages={[]} isActive={false} failureReason={reason} />
+        <ChatRunStatusLine messages={[]} isActive={false} failure={chatRunFailure(reason)} />
         <AiMessage
           userMessage={message.userMessage}
           actions={message.actions}

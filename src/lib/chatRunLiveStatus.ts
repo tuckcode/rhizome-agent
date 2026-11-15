@@ -16,6 +16,8 @@ export interface ChatRunSnapshot {
   noticeId?: string
   /** The run has had no event for 30 seconds and no tool runs. */
   quiet?: boolean
+  /** Why the run did not start, in the words the status line shows. */
+  failure?: string
 }
 
 interface ChatRunMessage {
@@ -48,6 +50,10 @@ export function nextChatRunAnnouncement(
   next: ChatRunSnapshot,
 ): string | null {
   if (!previous) return null
+
+  if (next.failure && next.failure !== previous.failure) {
+    return next.failure
+  }
 
   const lines: string[] = []
   if (next.notice && next.noticeId && next.noticeId !== previous.noticeId) {
