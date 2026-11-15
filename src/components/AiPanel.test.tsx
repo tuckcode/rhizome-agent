@@ -431,7 +431,10 @@ describe('AiPanel', () => {
       <AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" activeEntry={entry} entries={[entry]} />
     )
     expect(screen.queryByTestId('context-bar')).toBeNull()
-    expect(screen.queryByText('My Note')).toBeNull()
+    // The title shows once, in the recent notes of the new-chat screen.
+    const recent = screen.getByTestId('chat-home-recent-notes')
+    expect(screen.getAllByText('My Note')).toHaveLength(1)
+    expect(recent).toHaveTextContent('My Note')
   })
 
   it('does not show linked count in a sub-header', () => {

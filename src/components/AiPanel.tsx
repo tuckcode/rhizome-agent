@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type MutableRefObject, type ReactNode, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { aiPanelFrameStyle } from './aiPanelPulse'
+import { recentNotesForChatHome } from '../lib/chatHomeNotes'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 
 import { usePanelWidth } from '../hooks/usePanelWidth'
@@ -310,6 +311,7 @@ export function AiPanelView({
   // usage reflects the exchange that just happened.
   const primeStats = usePrimeSessionStats(isPrimeTarget, agent.status)
   const { queue, refresh: refreshQueue, clear: clearQueue } = usePrimeQueue(isPrimeTarget, isActive)
+  const recentNotes = useMemo(() => recentNotesForChatHome(entries ?? []), [entries])
   // If Waiting chrome shows a follow-up, the transcript must show it too —
   // send-path append alone can lose a race with rehydrate (2026-09-06 dogfood).
   useEffect(() => {
@@ -623,6 +625,7 @@ export function AiPanelView({
         }
         onScrollStateChange={onMessageHistoryScrollStateChange}
         hasContext={hasContext}
+        recentNotes={recentNotes}
         focusedTranscriptIndex={focusedTranscriptIndex}
         transcriptState={transcriptState}
       />

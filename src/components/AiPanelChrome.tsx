@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { ImageSquare, PaperPlaneRight, Plugs, Plus, Sparkle, Stop, Warning, X } from '@phosphor-icons/react'
+import { ArrowSquareOut, FileText, ImageSquare, PaperPlaneRight, Plugs, Plus, Sparkle, Stop, Warning, X } from '@phosphor-icons/react'
 import { AiMessage } from './AiMessage'
 import { Button } from '@/components/ui/button'
 import {
@@ -51,7 +51,10 @@ import { workerStartFailureReason } from '../lib/primeWorkerStartError'
 import { afterPaint } from '../lib/sessionTranscriptHit'
 import { useScrollToTranscriptHit } from '../hooks/useScrollToTranscriptHit'
 import { ChatRunLiveStatus } from './ChatRunLiveStatus'
+import { chatHomePrefillForNote, type ChatHomeNote } from '../lib/chatHomeNotes'
+import { relativeDate } from '../utils/noteListHelpers'
 import { prefillAiComposer } from '../utils/aiPromptBridge'
+import { trackEvent } from '../lib/telemetry'
 
 interface AiPanelHeaderProps {
   agentLabel: string
@@ -91,6 +94,8 @@ interface AiPanelMessageHistoryProps {
   onPromoteToVault?: (text: string) => void | boolean | Promise<void | boolean>
   onScrollStateChange?: (scrolled: boolean) => void
   hasContext: boolean
+  /** Notes that changed last. The new-chat screen offers them as context. */
+  recentNotes?: ChatHomeNote[]
   /** Transcript item index from a session search hit. Scrolls that turn into view. */
   focusedTranscriptIndex?: number | null
   /**
@@ -517,9 +522,8 @@ function AiPanelTranscriptNotice({
       className="flex min-h-full flex-col items-center justify-center text-center text-muted-foreground"
       data-testid={testId}
     >
-      <Sparkle size={24} style={{ marginBottom: 8, opacity: 0.5 }} />
-      <p style={{ fontSize: 13, margin: '0 0 4px' }}>{title}</p>
-      <p style={{ fontSize: 11, margin: 0 }}>{description}</p>
+      <p className="text-base font-medium text-foreground">{title}</p>
+      <p className="mt-1 text-sm">{description}</p>
     </div>
   )
 }
@@ -530,12 +534,70 @@ const EMPTY_CHAT_STARTERS = [
   { label: 'Write tests for a file', prompt: 'Write tests for a file' },
 ] as const
 
+function ChatHomeRecentNotes({
+  notes,
+  onOpenNote,
+}: {
+  notes: ChatHomeNote[]
+  onOpenNote?: (path: string) => void
+}) {
+  if (notes.length === 0) return null
+  return (
+    <section
+      aria-label="Continue from a note"
+      className="mt-8 w-full max-w-lg text-left"
+      data-testid="chat-home-recent-notes"
+    >
+      <h3 className="px-2 text-xs font-medium text-muted-foreground">Continue from a note</h3>
+      <ul className="mt-1.5 flex flex-col">
+        {notes.map((note) => (
+          <li key={note.path} className="group flex items-center gap-1 rounded-md hover:bg-[var(--state-hover)]">
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-auto min-w-0 flex-1 justify-start gap-2 px-2 py-1.5 font-normal hover:bg-transparent"
+              aria-label={`Ask about ${note.title}`}
+              data-testid="chat-home-note"
+              onClick={() => {
+                trackEvent('chat_home_note_picked')
+                prefillAiComposer(chatHomePrefillForNote(note))
+              }}
+            >
+              <FileText aria-hidden="true" className="shrink-0 text-muted-foreground" size={14} />
+              <span className="min-w-0 flex-1 truncate text-left text-sm text-foreground">{note.title}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">{relativeDate(note.modifiedAt)}</span>
+            </Button>
+            {onOpenNote ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                className="me-1 shrink-0 text-muted-foreground"
+                aria-label={`Open ${note.title}`}
+                title="Open note"
+                onClick={() => onOpenNote(note.path)}
+              >
+                <ArrowSquareOut aria-hidden="true" size={14} />
+              </Button>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 function AiPanelEmptyState({
   agentLabel,
   agentReadiness,
   hasContext,
   locale = 'en',
-}: Pick<AiPanelMessageHistoryProps, 'agentLabel' | 'agentReadiness' | 'hasContext' | 'locale'>) {
+  onOpenNote,
+  recentNotes = [],
+}: Pick<
+  AiPanelMessageHistoryProps,
+  'agentLabel' | 'agentReadiness' | 'hasContext' | 'locale' | 'onOpenNote' | 'recentNotes'
+>) {
   const t = createTranslator(locale)
 
   if (agentReadiness === 'checking') {
@@ -595,6 +657,7 @@ function AiPanelEmptyState({
           </Button>
         ))}
       </div>
+      <ChatHomeRecentNotes notes={recentNotes} onOpenNote={onOpenNote} />
     </div>
   )
 }
@@ -765,6 +828,7 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
   onPromoteToVault,
   onScrollStateChange,
   hasContext,
+  recentNotes,
   focusedTranscriptIndex = null,
   transcriptState = 'new',
 }: AiPanelMessageHistoryProps) {
@@ -855,6 +919,8 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
               agentReadiness={agentReadiness}
               locale={locale}
               hasContext={hasContext}
+              onOpenNote={onOpenNote}
+              recentNotes={recentNotes}
             />
           )}
           {messages.map((message, index) => (

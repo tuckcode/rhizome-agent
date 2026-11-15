@@ -90,4 +90,43 @@ describe('AiPanelMessageHistory empty vs selected-session states', () => {
     expect(screen.queryByText('Ask Rhizome')).toBeNull()
     expect(screen.queryByTestId('ai-panel-transcript-loading')).toBeNull()
   })
+  it('offers the notes that changed last as context for a new chat', () => {
+    const onPrefill = vi.fn()
+    const onOpenNote = vi.fn()
+    window.addEventListener('rhizome:ai-composer-prefill', onPrefill)
+    render(
+      <AiPanelMessageHistory
+        {...historyProps({
+          onOpenNote,
+          recentNotes: [
+            { path: '/vault/weekly-plan.md', title: 'Weekly Plan 4', modifiedAt: Math.floor(Date.now() / 1000) - 7200 },
+            { path: '/vault/review.md', title: 'Daily Review 3', modifiedAt: Math.floor(Date.now() / 1000) - 90000 },
+          ],
+        })}
+      />,
+    )
+
+    const section = screen.getByTestId('chat-home-recent-notes')
+    expect(section).toHaveTextContent('Continue from a note')
+    expect(section).toHaveTextContent('2h ago')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ask about Weekly Plan 4' }))
+    expect((onPrefill.mock.calls[0][0] as CustomEvent<{ text: string }>).detail.text).toBe('[[Weekly Plan 4]] ')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Daily Review 3' }))
+    expect(onOpenNote).toHaveBeenCalledWith('/vault/review.md')
+    window.removeEventListener('rhizome:ai-composer-prefill', onPrefill)
+  })
+
+  it('shows no note section when the vault has no recent note', () => {
+    render(<AiPanelMessageHistory {...historyProps({ recentNotes: [] })} />)
+    expect(screen.queryByTestId('chat-home-recent-notes')).toBeNull()
+    expect(screen.getByRole('heading', { name: 'Ask Rhizome' })).toBeInTheDocument()
+  })
+
+  it('shows a session notice in words, with no decorative icon', () => {
+    render(<AiPanelMessageHistory {...historyProps({ transcriptState: 'ready' })} />)
+    const notice = screen.getByTestId('ai-panel-transcript-empty-session')
+    expect(notice.querySelector('svg')).toBeNull()
+  })
 })
