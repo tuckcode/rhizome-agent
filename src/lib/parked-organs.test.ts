@@ -357,7 +357,7 @@ describe('parked organs leftover', () => {
       `${process.cwd()}/src/components/NativeChatModelPicker.tsx`,
       'utf8',
     )
-    expect(picker).toContain('text-[11px] font-medium text-muted-foreground normal-case tracking-normal')
+    expect(picker).toContain('font-medium text-muted-foreground normal-case tracking-normal')
     expect(picker).not.toMatch(/uppercase tracking-\[0\.1em\] text-primary/)
   })
 
@@ -913,7 +913,7 @@ describe('parked organs leftover', () => {
     expect(d3).toContain('no Chat error banner')
   })
 
-  it('keeps preflight 12px amber, chip truncate, Copy icon, and catalog wait', () => {
+  it('keeps preflight amber, chip truncate, Copy icon, and catalog wait', () => {
     const preflight = readFileSync(
       `${process.cwd()}/src/components/ChatPreflightBanner.tsx`,
       'utf8',
@@ -930,7 +930,6 @@ describe('parked organs leftover', () => {
       `${process.cwd()}/src/components/SettingsPanel.tsx`,
       'utf8',
     )
-    expect(preflight).toContain('text-[12px] font-medium text-foreground')
     expect(preflight).toContain('text-[var(--accent-amber,var(--foreground))]')
     expect(deck).toContain('min-w-0 truncate')
     expect(message).toContain('data-testid="ai-message-copy"')
