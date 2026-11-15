@@ -15,6 +15,7 @@ import {
   SpeakerHigh,
   Square,
   Terminal,
+  WarningOctagon,
 } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { ActionTooltip } from '@/components/ui/action-tooltip'
@@ -466,6 +467,7 @@ function CollapsedApprovalRow({
     overwrite: action.approval?.overwrite,
   })
   const riskTag = approvalRiskTag(risk)
+  const rowNotes = [riskTag, overflowTag]
   // A destructive call needs the full card before it can run (ADR-0192).
   const mustReview = overflow.review || risk.tier === 'danger'
 
@@ -536,13 +538,16 @@ function CollapsedApprovalRow({
       </div>
       {riskTag ? (
         <span
-          className={`me-2 shrink-0 text-[11px] ${risk.tier === 'danger' ? 'text-danger-text' : 'text-warn-text'}`}
+          className={`me-2 flex shrink-0 items-center gap-1 text-[11px] ${risk.tier === 'danger' ? 'text-danger-text' : 'text-warn-text'}`}
           data-testid="approval-risk-tag"
         >
+          {risk.tier === 'danger' ? (
+            <WarningOctagon aria-hidden="true" className="shrink-0" data-testid="approval-risk-glyph" size={12} weight="fill" />
+          ) : null}
           {riskTag}
         </span>
       ) : null}
-      {overflowTag && !riskTag ? (
+      {overflowTag ? (
         <span
           className="me-2 shrink-0 text-[11px] text-muted-foreground"
           data-testid="approval-overflow-tag"
@@ -561,7 +566,7 @@ function CollapsedApprovalRow({
             variant="outline"
             className="w-full"
             data-testid="approval-review"
-            aria-label={approvalAriaLabel('Review', display)}
+            aria-label={approvalAriaLabel('Review', display, rowNotes)}
             onClick={onReview}
           >
             Review
@@ -574,7 +579,7 @@ function CollapsedApprovalRow({
             variant="default"
             className="w-full"
             data-testid="approval-allow_once"
-            aria-label={approvalAriaLabel(allow.label, display)}
+            aria-label={approvalAriaLabel(allow.label, display, rowNotes)}
             onClick={() => reply(allow.id)}
           >
             {allow.label}
@@ -588,7 +593,7 @@ function CollapsedApprovalRow({
             variant="ghost"
             className={`w-full text-destructive hover:text-destructive`}
             data-testid="approval-deny"
-            aria-label={approvalAriaLabel(deny.label, display)}
+            aria-label={approvalAriaLabel(deny.label, display, rowNotes)}
             onClick={() => reply(deny.id)}
           >
             {deny.label}

@@ -634,10 +634,11 @@ describe('AiMessage', () => {
     const row = screen.getByTestId('tool-use-approval-row')
     expect(row).toHaveAttribute('data-risk', 'danger')
     expect(screen.queryByRole('button', { name: /^Allow once/ })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Deny: rm -rf ~/EVIL' })).toBeVisible()
-    expect(screen.getByTestId('approval-risk-tag')).toHaveTextContent('Deletes files.')
+    expect(screen.getByRole('button', { name: 'Deny: rm -rf ~/EVIL. Deletes files' })).toBeVisible()
+    expect(screen.getByTestId('approval-risk-tag')).toHaveTextContent(/^Deletes files$/)
+    expect(screen.getByTestId('approval-risk-glyph')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Review: rm -rf ~/EVIL' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Review: rm -rf ~/EVIL. Deletes files' }))
     expect(screen.getByTestId('tool-approval-card')).toHaveAttribute('data-risk', 'danger')
     fireEvent.click(screen.getByRole('button', { name: 'Allow once' }))
     expect(allowEvil).toHaveBeenCalledWith('allow_once')
@@ -652,8 +653,10 @@ describe('AiMessage', () => {
     )
     fireEvent.click(screen.getByTestId('tool-use-toggle'))
     expect(screen.getByTestId('tool-use-approval-row')).toHaveAttribute('data-risk', 'caution')
-    expect(screen.getByTestId('approval-risk-tag')).toHaveTextContent('Uses the network.')
-    expect(screen.getByRole('button', { name: 'Allow once: curl https://example.com' })).toBeVisible()
+    expect(screen.getByTestId('approval-risk-tag')).toHaveTextContent(/^Uses the network$/)
+    expect(screen.queryByTestId('approval-risk-glyph')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Allow once: curl https://example.com. Uses the network' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Deny: curl https://example.com. Uses the network' })).toBeVisible()
   })
 
   it('shows the path on a collapsed edit approval and hides Allow for session', () => {
@@ -730,7 +733,7 @@ describe('AiMessage', () => {
     expect(command).toHaveAttribute('title', path)
     expect(screen.getByTestId('approval-review')).toHaveAttribute(
       'aria-label',
-      approvalAriaLabel('Review', path),
+      approvalAriaLabel('Review', path, [screen.queryByTestId('approval-overflow-tag')?.textContent ?? null]),
     )
   })
 
@@ -743,12 +746,12 @@ describe('AiMessage', () => {
       />,
     )
     fireEvent.click(screen.getByTestId('tool-use-toggle'))
-    expect(screen.getByRole('button', { name: `Review: ${command}` })).toBeVisible()
+    expect(screen.getByRole('button', { name: `Review: ${command}. Long command` })).toBeVisible()
     const tag = screen.getByTestId('approval-overflow-tag')
     expect(tag).toHaveTextContent('Long command')
     expect(tag.className).toMatch(/me-2/)
     expect(screen.queryByRole('button', { name: `Allow once: ${command}` })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: `Review: ${command}` }))
+    fireEvent.click(screen.getByRole('button', { name: `Review: ${command}. Long command` }))
     expect(screen.getByTestId('tool-use-toggle')).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByTestId('tool-approval-card')).toBeInTheDocument()
   })
@@ -803,11 +806,11 @@ describe('AiMessage', () => {
     )
     fireEvent.click(screen.getByTestId('tool-use-toggle'))
     const review = screen.getByTestId('approval-review')
-    expect(review).toHaveAttribute('aria-label', 'Review: echo \\u{202E}secret')
+    expect(review).toHaveAttribute('aria-label', 'Review: echo \\u{202E}secret. Contains hidden or control characters')
     expect(review.getAttribute('aria-label')).not.toContain('\u202E')
     expect(screen.getByTestId('approval-deny')).toHaveAttribute(
       'aria-label',
-      'Deny: echo \\u{202E}secret',
+      'Deny: echo \\u{202E}secret. Contains hidden or control characters',
     )
   })
 
@@ -821,8 +824,8 @@ describe('AiMessage', () => {
     )
     fireEvent.click(screen.getByTestId('tool-use-toggle'))
     const label = screen.getByTestId('approval-review').getAttribute('aria-label') ?? ''
-    expect(label).toBe(approvalAriaLabel('Review', command))
-    expect(label.endsWith('…')).toBe(true)
+    expect(label).toBe(approvalAriaLabel('Review', command, ['Long command']))
+    expect(approvalAriaLabel('Review', command).endsWith('…')).toBe(true)
     expect(escapeApprovalLabel(command).endsWith('…')).toBe(true)
     expect([...escapeApprovalLabel(command)].length).toBe(APPROVAL_ARIA_LABEL_MAX + 1)
     expect(label).not.toMatch(/[\n\u202E]/u)
@@ -837,8 +840,9 @@ describe('AiMessage', () => {
       />,
     )
     fireEvent.click(screen.getByTestId('tool-use-toggle'))
-    expect(screen.getByRole('button', { name: 'Review: ls⏎rm -rf ~' })).toBeVisible()
-    expect(screen.getByTestId('approval-risk-tag')).toHaveTextContent('Deletes files.')
+    expect(screen.getByRole('button', { name: /^Review: ls⏎rm -rf ~\. Deletes files\. Multiple lines$/ })).toBeVisible()
+    expect(screen.getByTestId('approval-risk-tag')).toHaveTextContent(/^Deletes files$/)
+    expect(screen.getByTestId('approval-overflow-tag')).toHaveTextContent('Multiple lines')
     expect(screen.queryByRole('button', { name: /^Allow once/ })).toBeNull()
     const label = screen.getByTestId('approval-review').getAttribute('aria-label') ?? ''
     expect(label).not.toContain('\n')

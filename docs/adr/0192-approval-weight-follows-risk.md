@@ -34,12 +34,29 @@ and the tier sets the weight of the prompt.**
 3. `caution` adds one line that names the effect: the network, a package
    install, a file change, a git change, a path outside the vault, a
    whole-file overwrite.
-4. `danger` covers deletion, administrator rights, discarded git changes,
-   a forced push, code that the command downloads or builds, disk and
-   recursive permission changes, and hidden characters. The card gets a
-   danger border and the reasons. "Allow once" is an outline button. The
-   collapsed row offers Review only, so the user opens the card before
-   the command can run.
+4. `danger` covers deletion (including PowerShell `Remove-Item`, `del`,
+   `rd`, and inline interpreter code that calls `rmtree`, `rmSync` or
+   `unlink`), administrator rights, discarded git changes, a forced push,
+   a deleted remote branch, `git branch -D`, `git filter-branch`, code that
+   the command downloads or builds (including `curl … | python3`), encoded
+   PowerShell, disk and recursive permission changes, `docker … prune`,
+   `kubectl delete`, `terraform destroy`, shutdown and reboot,
+   `crontab -r`, and hidden characters. The card gets a danger border
+   and the reasons. "Allow once" has no fill, a red edge and red text.
+   "Deny" has a neutral fill and a `--input` edge (4.2:1 on the card in
+   Graphite, 3.8:1 in Earth light), and comes first in the tab order.
+   The collapsed row shows a danger glyph and offers Review only, so the
+   user opens the card before the command can run.
+4a. The parser skips shell keywords (`for`, `while`, `if`, `{`, `!`, …),
+   looks through wrappers (`timeout`, `nice -n N`, `nohup`, `stdbuf`,
+   `sudo -u user`), reads command names in any case, and treats
+   `command -v` as a lookup. Interpreter code given with `-c` or `-e`
+   and a script run with `bash x.sh`, `source` or `.` are at least
+   `caution`.
+4b. The collapsed row's tag is the first sentence of the first reason,
+   with no period. The row buttons' accessible names include the risk
+   tag and the overflow tag ("Long command", "Multiple lines"), and both
+   tags show together.
 5. No tier moves keyboard focus to an allow button. That rule existed
    and stays.
 6. The session grant for a file tool reads "Allow this file for the
@@ -47,9 +64,12 @@ and the tier sets the weight of the prompt.**
 
 ## Consequences
 
-- The classifier reads shell text with a small parser. It can miss a
-  dangerous command, for example one inside a script file. A miss shows
-  the `routine` look, which is the look every prompt had before.
+- The classifier reads shell text with a small parser. It does not open
+  script files, so `bash x.sh` says only "Runs a script file". It reads
+  interpreter code only for a few delete calls. It does not rate other
+  destructive verbs of cluster and container tools (`kubectl drain`,
+  `docker rm`). A miss shows the `routine` look: a filled Allow once with
+  no reason line, the same as an unrated prompt.
 - It can rate a harmless command as `caution`. The cost is one line of
   text.
 - A later change can move the classifier into the engine and send the

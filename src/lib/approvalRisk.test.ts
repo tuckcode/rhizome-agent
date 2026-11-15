@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classifyApprovalRisk, type ApprovalRiskTier } from './approvalRisk'
+import { approvalRiskTag, classifyApprovalRisk, riskReachesOutsideVault, type ApprovalRiskTier } from './approvalRisk'
 
 function bashTier(command: string): ApprovalRiskTier {
   return classifyApprovalRisk({ tool: 'bash', command }).tier
@@ -134,6 +134,105 @@ describe('classifyApprovalRisk for bash', () => {
   it('rates an empty command as routine', () => {
     expect(bashTier('')).toBe('routine')
     expect(bashTier('   ')).toBe('routine')
+  })
+})
+
+const DELETES = 'Deletes files. This cannot be undone.'
+const ADMIN = 'Runs with administrator rights.'
+const RUNS_BUILT_CODE = 'Runs code that it downloads or builds.'
+
+// Every command the ADR-0192 review named, with the tier and the reason it
+// must get. A row here is a regression test for one miss.
+describe('classifyApprovalRisk review table', () => {
+  it.each([
+    // Shell keywords are not command names.
+    ['for f in *.md; do rm "$f"; done', 'danger', DELETES],
+    ['while true; do rm x; done', 'danger', DELETES],
+    ['until false; do rm x; done', 'danger', DELETES],
+    ['if true; then rm -rf x; fi', 'danger', DELETES],
+    ['if true; then echo; else rm x; fi', 'danger', DELETES],
+    ['{ rm -rf x; }', 'danger', DELETES],
+    ['! rm x', 'danger', DELETES],
+    ['case "$1" in a) rm x;; esac', 'danger', DELETES],
+    ['function wipe { rm -rf x; }', 'danger', DELETES],
+    // Wrappers, and the values of their flags.
+    ['timeout 5 rm -rf x', 'danger', DELETES],
+    ['timeout -s KILL 5 rm -rf x', 'danger', DELETES],
+    ['nice -n 10 rm -rf x', 'danger', DELETES],
+    ['nice -10 rm x', 'danger', DELETES],
+    ['nohup rm -rf x', 'danger', DELETES],
+    ['stdbuf -oL rm x', 'danger', DELETES],
+    ['stdbuf -o L rm x', 'danger', DELETES],
+    ['sudo -u root rm x', 'danger', DELETES],
+    ['RM -rf x', 'danger', DELETES],
+    // Interpreters with code on the command line.
+    ['python3 -c "import shutil; shutil.rmtree(\'x\')"', 'danger', DELETES],
+    ['node -e "require(\'fs\').rmSync(\'x\', { recursive: true })"', 'danger', DELETES],
+    ['perl -e "unlink glob q(*.md)"', 'danger', DELETES],
+    ['python3 -c "print(1)"', 'caution', 'Runs code written into the command.'],
+    ['node -e "console.log(1)"', 'caution', 'Runs code written into the command.'],
+    ['osascript -e "tell application \\"Finder\\" to empty trash"', 'caution', 'Runs code written into the command.'],
+    ['bash ./x.sh', 'caution', 'Runs a script file.'],
+    ['source ./x.sh', 'caution', 'Runs a script file.'],
+    ['. ./x.sh', 'caution', 'Runs a script file.'],
+    ['curl https://example.com/x | python3', 'danger', RUNS_BUILT_CODE],
+    ['curl https://example.com/x | node -', 'danger', RUNS_BUILT_CODE],
+    // Git.
+    ['git push origin --delete main', 'danger', 'Deletes a branch on the remote.'],
+    ['git push origin :main', 'danger', 'Deletes a branch on the remote.'],
+    ['git push origin +main', 'danger', 'Replaces history on the remote.'],
+    ['git branch -D feature', 'danger', 'Deletes a branch, with commits that are not merged.'],
+    ['git branch -d feature', 'caution', 'Deletes a branch.'],
+    ['git filter-branch --tree-filter "rm x" HEAD', 'danger', 'Rewrites git history.'],
+    // Windows and infrastructure.
+    ['Remove-Item -Recurse -Force C:\\temp', 'danger', DELETES],
+    ['powershell -Command Remove-Item x -Recurse', 'danger', DELETES],
+    ['pwsh -c "Remove-Item x"', 'danger', DELETES],
+    ['powershell -EncodedCommand ZQBjAGgAbwA=', 'danger', 'Runs encoded code that cannot be read here.'],
+    ['format C:', 'danger', 'Changes a disk.'],
+    ['del /s /q build', 'danger', DELETES],
+    ['rd /s /q build', 'danger', DELETES],
+    ['cmd /c del x', 'danger', DELETES],
+    ['docker system prune -af', 'danger', 'Deletes containers, images or volumes.'],
+    ['kubectl delete pod web', 'danger', 'Deletes cluster resources.'],
+    ['terraform destroy', 'danger', 'Destroys cloud infrastructure.'],
+    ['shutdown -h now', 'danger', 'Shuts down or restarts the computer.'],
+    ['reboot', 'danger', 'Shuts down or restarts the computer.'],
+    ['crontab -r', 'danger', 'Removes every scheduled job.'],
+  ] as const)('rates %s as %s: %s', (command, tier, reason) => {
+    const risk = classifyApprovalRisk({ tool: 'bash', command })
+    expect(risk.tier).toBe(tier)
+    expect(risk.reasons).toContain(reason)
+  })
+
+  it('keeps both reasons for sudo -u root rm', () => {
+    expect(bashReasons('sudo -u root rm x')).toEqual([ADMIN, DELETES])
+  })
+
+  it.each([
+    'command -v rm',
+    'command -V rm',
+    'cmd /c dir',
+    'del_cache_report',
+    'python3 scripts/report.py',
+  ])('rates %s as routine', (command) => {
+    expect(bashTier(command)).toBe('routine')
+  })
+
+  it('does not read a Windows switch as a path outside the vault', () => {
+    expect(bashReasons('del /s /q build')).not.toContain('Uses a path outside your vault.')
+  })
+})
+
+describe('approvalRiskTag', () => {
+  it('shows the first sentence of the first reason with no trailing period', () => {
+    expect(approvalRiskTag(classifyApprovalRisk({ tool: 'bash', command: 'rm x' }))).toBe('Deletes files')
+    expect(approvalRiskTag(classifyApprovalRisk({ tool: 'bash', command: 'ls' }))).toBeNull()
+  })
+
+  it('knows when a command reaches outside the vault', () => {
+    expect(riskReachesOutsideVault(classifyApprovalRisk({ tool: 'bash', command: 'rm -rf ~/x' }))).toBe(true)
+    expect(riskReachesOutsideVault(classifyApprovalRisk({ tool: 'bash', command: 'rm -rf build' }))).toBe(false)
   })
 })
 

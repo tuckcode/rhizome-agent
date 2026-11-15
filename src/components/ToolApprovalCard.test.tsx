@@ -386,8 +386,36 @@ describe('ToolApprovalCard', () => {
     expect(screen.getByTestId('approval-risk')).toHaveTextContent('Deletes files. This cannot be undone.')
     const allow = screen.getByRole('button', { name: 'Allow once' })
     expect(allow).not.toHaveClass('bg-primary')
-    expect(allow).toHaveClass('border')
-    expect(screen.getByRole('button', { name: 'Deny' })).toBeInTheDocument()
+    expect(allow).not.toHaveClass('bg-background')
+    expect(allow).toHaveClass('bg-transparent', 'border', 'border-destructive', 'text-danger-text')
+    const deny = screen.getByRole('button', { name: 'Deny' })
+    expect(deny).toHaveClass('bg-secondary', 'border', 'border-input')
+  })
+
+  it('puts Deny before Allow once on a danger card, so Tab reaches Deny first', () => {
+    render(
+      <ToolApprovalCard tool="bash" command="rm -rf build" options={OPTIONS} onReply={vi.fn()} />,
+    )
+    const buttons = screen.getAllByRole('button').filter((button) => /^approval-(allow_once|deny)$/.test(button.dataset.testid ?? ''))
+    expect(buttons.map((button) => button.dataset.testid)).toEqual(['approval-deny', 'approval-allow_once'])
+  })
+
+  it('keeps the engine order when the card is not danger', () => {
+    render(
+      <ToolApprovalCard tool="bash" command="curl https://example.com" options={OPTIONS} onReply={vi.fn()} />,
+    )
+    const buttons = screen.getAllByRole('button').filter((button) => /^approval-(allow_once|deny)$/.test(button.dataset.testid ?? ''))
+    expect(buttons.map((button) => button.dataset.testid)).toEqual(['approval-allow_once', 'approval-deny'])
+  })
+
+  it('says a command reaches outside the vault instead of running in it', () => {
+    const { unmount } = render(
+      <ToolApprovalCard tool="bash" command="rm -rf ~/x" options={OPTIONS} onReply={vi.fn()} />,
+    )
+    expect(screen.getByTestId('approval-vault-note')).toHaveTextContent('Starts in your vault folder and reaches outside it.')
+    unmount()
+    render(<ToolApprovalCard tool="bash" command="rm -rf build" options={OPTIONS} onReply={vi.fn()} />)
+    expect(screen.getByTestId('approval-vault-note')).toHaveTextContent('Runs in your vault folder.')
   })
 
   it('still sends allow once from a danger card', () => {

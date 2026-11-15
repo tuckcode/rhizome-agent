@@ -8,6 +8,7 @@ import { bashTimeoutLabel } from '../lib/bashToolResult'
 import {
   approvalToolForAnalytics,
   classifyApprovalRisk,
+  riskReachesOutsideVault,
   type ApprovalRisk,
   type ApprovalRiskTier,
 } from '../lib/approvalRisk'
@@ -47,11 +48,22 @@ function ToolGlyph({ created, tool }: { created: boolean; tool: string }) {
 type OptionVariant = 'default' | 'outline' | 'ghost' | 'secondary'
 
 // On a danger card the calm choice is Deny, so Deny gets the fill and
-// Allow once loses it.
+// Allow once loses it: no fill, a red edge and red text.
 function optionVariant(id: string, tier: ApprovalRiskTier): OptionVariant {
-  if (id === 'allow_once') return tier === 'danger' ? 'outline' : 'default'
+  if (id === 'allow_once') return tier === 'danger' ? 'ghost' : 'default'
   if (id === 'deny') return tier === 'danger' ? 'secondary' : 'ghost'
   return 'outline'
+}
+
+// --input against --card is 4.2:1 in Graphite and 3.8:1 in Earth light,
+// so the Deny edge meets the 3:1 non-text minimum in both.
+const DANGER_DENY = 'border border-input'
+const DANGER_ALLOW = 'border border-destructive bg-transparent text-danger-text hover:bg-destructive/10 hover:text-danger-text dark:hover:bg-destructive/10'
+
+/** Deny comes first on a danger card, so Tab reaches it before Allow once. */
+function orderOptions(options: NativeApprovalOption[], tier: ApprovalRiskTier): NativeApprovalOption[] {
+  if (tier !== 'danger') return options
+  return [...options.filter((option) => option.id === 'deny'), ...options.filter((option) => option.id !== 'deny')]
 }
 
 const CARD_BORDER: Record<ApprovalRiskTier, string> = {
@@ -151,9 +163,10 @@ export function ToolApprovalCard({
   const showBottomFade = overflows && moreBelow
   // Shell runner omits allow_session for bash. Filter here too so main,
   // which still sends it, asks every run in v1.
-  const visibleOptions = bash
-    ? options.filter((option) => option.id !== 'allow_session')
-    : options
+  const visibleOptions = orderOptions(
+    bash ? options.filter((option) => option.id !== 'allow_session') : options,
+    risk.tier,
+  )
 
   return (
     <section
@@ -194,7 +207,11 @@ export function ToolApprovalCard({
       </header>
       <RiskReasons risk={risk} />
       {bash ? (
-        <BashApprovalBody command={command ?? ''} timeoutSecs={timeoutSecs} />
+        <BashApprovalBody
+          command={command ?? ''}
+          reachesOutside={riskReachesOutsideVault(risk)}
+          timeoutSecs={timeoutSecs}
+        />
       ) : (
         <div className="relative border-y border-border bg-muted/40">
           <div
@@ -255,9 +272,8 @@ export function ToolApprovalCard({
               option.id === 'deny' && risk.tier !== 'danger'
                 ? 'text-destructive hover:text-destructive'
                 : '',
-              option.id === 'allow_once' && risk.tier === 'danger'
-                ? 'border-destructive text-danger-text hover:text-danger-text'
-                : '',
+              option.id === 'deny' && risk.tier === 'danger' ? DANGER_DENY : '',
+              option.id === 'allow_once' && risk.tier === 'danger' ? DANGER_ALLOW : '',
               option.id === 'allow_once'
                 ? 'focus-visible:ring-offset-2 focus-visible:ring-offset-card'
                 : '',
@@ -277,9 +293,11 @@ export function ToolApprovalCard({
 
 function BashApprovalBody({
   command,
+  reachesOutside,
   timeoutSecs,
 }: {
   command: string
+  reachesOutside: boolean
   timeoutSecs?: number
 }) {
   function copyCommand() {
@@ -311,7 +329,9 @@ function BashApprovalBody({
         ) : null}
       </div>
       <p className="mt-2 text-[12px] text-muted-foreground" data-testid="approval-vault-note">
-        Runs in your vault folder. Output is shown when it finishes.
+        {reachesOutside
+          ? 'Starts in your vault folder and reaches outside it. Output is shown when it finishes.'
+          : 'Runs in your vault folder. Output is shown when it finishes.'}
       </p>
       <p className="mt-0.5 text-[12px] text-muted-foreground" data-testid="approval-timeout">
         {bashTimeoutLabel(timeoutSecs)}

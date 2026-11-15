@@ -39,6 +39,18 @@ const CHANGES_GIT = 'Changes the git repository.'
 const OUTSIDE_VAULT = 'Uses a path outside your vault.'
 const STOPS_PROGRAMS = 'Stops other programs.'
 const REPLACES_FILE = 'Replaces the whole file.'
+const INLINE_CODE = 'Runs code written into the command.'
+const SCRIPT_FILE = 'Runs a script file.'
+const ENCODED_CODE = 'Runs encoded code that cannot be read here.'
+const DELETES_REMOTE_BRANCH = 'Deletes a branch on the remote.'
+const DELETES_BRANCH = 'Deletes a branch, with commits that are not merged.'
+const DELETES_MERGED_BRANCH = 'Deletes a branch.'
+const REWRITES_HISTORY = 'Rewrites git history.'
+const DELETES_CONTAINERS = 'Deletes containers, images or volumes.'
+const DELETES_CLUSTER = 'Deletes cluster resources.'
+const DESTROYS_INFRA = 'Destroys cloud infrastructure.'
+const POWER = 'Shuts down or restarts the computer.'
+const REMOVES_CRON = 'Removes every scheduled job.'
 
 const TIER_RANK: Record<ApprovalRiskTier, number> = { routine: 0, caution: 1, danger: 2 }
 
@@ -64,10 +76,52 @@ interface ParsedCommand {
 const MAX_DEPTH = 4
 
 const SHELLS = new Set(['sh', 'bash', 'zsh', 'dash', 'fish', 'ksh'])
-const PREFIX_WRAPPERS = new Set(['time', 'nohup', 'command', 'exec', 'nice', 'builtin', 'caffeinate'])
+const PREFIX_WRAPPERS = new Set([
+  'time', 'nohup', 'command', 'exec', 'nice', 'builtin', 'caffeinate', 'timeout', 'stdbuf', 'ionice',
+])
+/** Flags of a wrapper or `sudo` that take the next token as their value. */
+const WRAPPER_VALUE_FLAGS: Record<string, Set<string>> = {
+  nice: new Set(['-n', '--adjustment']),
+  ionice: new Set(['-c', '-n', '-p', '--class', '--classdata', '--pid']),
+  timeout: new Set(['-s', '--signal', '-k', '--kill-after']),
+  stdbuf: new Set(['-i', '-o', '-e', '--input', '--output', '--error']),
+  exec: new Set(['-a']),
+  sudo: new Set([
+    '-u', '-g', '-h', '-p', '-r', '-t', '-C', '-D', '-T', '-U',
+    '--user', '--group', '--host', '--prompt', '--role', '--type', '--close-from', '--chdir',
+    '--command-timeout', '--other-user',
+  ]),
+  doas: new Set(['-u', '-C']),
+}
+/** Words that open or close shell syntax. The command follows them. */
+const SHELL_KEYWORDS = new Set([
+  '!', '{', '}', 'if', 'then', 'else', 'elif', 'fi', 'while', 'until', 'do', 'done', 'esac', 'coproc',
+])
+/** Words that start a header with no command in it: `for x in …`, `case x in`. */
+const SHELL_HEADERS = new Set(['for', 'select', 'case'])
 const ADMIN_COMMANDS = new Set(['sudo', 'doas', 'su'])
-const DELETE_COMMANDS = new Set(['rm', 'rmdir', 'unlink', 'shred'])
-const DISK_COMMANDS = new Set(['dd', 'diskutil', 'fdisk', 'parted'])
+const DELETE_COMMANDS = new Set(['rm', 'rmdir', 'unlink', 'shred', 'del', 'erase', 'rd', 'remove-item', 'ri'])
+const DISK_COMMANDS = new Set(['dd', 'diskutil', 'fdisk', 'parted', 'diskpart'])
+const POWER_COMMANDS = new Set(['shutdown', 'reboot', 'halt', 'poweroff'])
+const SOURCE_COMMANDS = new Set(['source', '.'])
+const POWERSHELLS = new Set(['powershell', 'pwsh', 'powershell.exe', 'pwsh.exe'])
+const CMD_SHELLS = new Set(['cmd', 'cmd.exe'])
+/** Interpreters, and the flag that takes code from the command line. */
+const INTERPRETERS: Record<string, RegExp> = {
+  python: /^-[a-zA-Z]*c$/,
+  python2: /^-[a-zA-Z]*c$/,
+  python3: /^-[a-zA-Z]*c$/,
+  pypy: /^-[a-zA-Z]*c$/,
+  pypy3: /^-[a-zA-Z]*c$/,
+  node: /^(-e|-p|--eval|--print|-pe)$/,
+  perl: /^-[a-zA-Z]*[eE]$/,
+  ruby: /^-[a-zA-Z]*e$/,
+  php: /^-r$/,
+  lua: /^-e$/,
+  osascript: /^-e$/,
+}
+/** Calls in inline code that delete files. */
+const CODE_DELETES = /\b(rmtree|rmSync|rmdirSync|unlinkSync|unlink|os\.remove|os\.rmdir|removedirs|fs\.rm|fs\.promises\.rm|File\.delete|FileUtils\.rm)\b/u
 const NETWORK_COMMANDS = new Set([
   'curl', 'wget', 'ssh', 'scp', 'sftp', 'rsync', 'nc', 'ncat', 'telnet', 'ftp', 'gh', 'npx', 'pnpx', 'bunx',
 ])
@@ -109,7 +163,12 @@ export function approvalRiskTag(risk: ApprovalRisk): string | null {
   const first = risk.reasons[0]
   if (!first) return null
   const end = first.indexOf('.')
-  return end >= 0 ? first.slice(0, end + 1) : first
+  return end >= 0 ? first.slice(0, end) : first
+}
+
+/** True when a reason says the call reaches outside the vault. */
+export function riskReachesOutsideVault(risk: ApprovalRisk): boolean {
+  return risk.reasons.includes(OUTSIDE_VAULT)
 }
 
 const REPORTED_TOOLS = new Set(['bash', 'edit_file', 'write_file', 'create_note'])
@@ -166,7 +225,7 @@ function collectCommandFindings(
   findings: Finding[],
 ) {
   if (depth > MAX_DEPTH) return
-  const tokens = dropAssignments(rawTokens)
+  const tokens = dropAssignments(dropShellKeywords(rawTokens))
   if (tokens.length === 0) return
   const name = commandName(tokens[0])
   const args = tokens.slice(1)
@@ -175,13 +234,25 @@ function collectCommandFindings(
     collectCommandFindings(dropAssignments(dropFlags(args)), piped, depth + 1, findings)
     return
   }
+  if (name === 'command' && args.some((arg) => arg === '-v' || arg === '-V')) return
   if (PREFIX_WRAPPERS.has(name)) {
-    collectCommandFindings(dropFlags(args), piped, depth + 1, findings)
+    collectCommandFindings(wrappedCommand(name, args), piped, depth + 1, findings)
     return
   }
   if (ADMIN_COMMANDS.has(name)) {
     findings.push({ tier: 'danger', reason: ADMIN })
-    collectCommandFindings(dropFlags(args), piped, depth + 1, findings)
+    const script = name === 'su' ? valueAfter(args, (arg) => arg === '-c' || arg === '--command') : undefined
+    if (script !== undefined) collectScriptFindings(script, depth + 1, findings)
+    else if (name !== 'su') collectCommandFindings(wrappedCommand(name, args), piped, depth + 1, findings)
+    return
+  }
+  if (POWERSHELLS.has(name)) {
+    collectPowerShellFindings(args, depth, findings)
+    return
+  }
+  if (CMD_SHELLS.has(name)) {
+    const start = args.findIndex((arg) => /^\/[ck]$/i.test(arg))
+    if (start >= 0) collectCommandFindings(args.slice(start + 1), piped, depth + 1, findings)
     return
   }
   if (name === 'xargs') {
@@ -197,12 +268,23 @@ function collectCommandFindings(
     collectShellFindings(args, piped, depth, findings)
     return
   }
+  if (SOURCE_COMMANDS.has(name)) {
+    findings.push({ tier: 'caution', reason: SCRIPT_FILE })
+    return
+  }
+  if (name in INTERPRETERS) collectInterpreterFindings(name, args, piped, findings)
   if (name === 'find') {
     collectFindFindings(args, depth, findings)
     return
   }
   if (name === 'git') {
     collectGitFindings(args, findings)
+    return
+  }
+  if (name === 'docker' || name === 'podman') {
+    if (args.includes('prune') || (args[0] === 'volume' && (args[1] === 'rm' || args[1] === 'remove'))) {
+      findings.push({ tier: 'danger', reason: DELETES_CONTAINERS })
+    }
     return
   }
   const finding = simpleCommandFinding(name, args)
@@ -219,7 +301,20 @@ function rule(tier: ApprovalRiskTier, reason: string, matches: (name: string, ar
 const COMMAND_RULES: CommandRule[] = [
   rule('danger', RUNS_BUILT_CODE, (name) => name === 'eval'),
   rule('danger', DELETES, (name) => DELETE_COMMANDS.has(name)),
-  rule('danger', DISK, (name) => DISK_COMMANDS.has(name) || name.startsWith('mkfs')),
+  rule('danger', DISK, (name, args) => (
+    DISK_COMMANDS.has(name) || name.startsWith('mkfs') || (name === 'format' && args.some((arg) => /^[a-z]:$/i.test(arg)))
+  )),
+  rule('danger', DELETES_CLUSTER, (name, args) => (name === 'kubectl' || name === 'oc') && args.includes('delete')),
+  rule('danger', DESTROYS_INFRA, (name, args) => (
+    (name === 'terraform' || name === 'tofu')
+      && (args.includes('destroy') || (args.includes('apply') && args.includes('-destroy')))
+  )),
+  rule('danger', POWER, (name, args) => (
+    POWER_COMMANDS.has(name)
+      || (name === 'systemctl' && args.some((arg) => POWER_COMMANDS.has(arg)))
+      || (name === 'stop-computer' || name === 'restart-computer')
+  )),
+  rule('danger', REMOVES_CRON, (name, args) => name === 'crontab' && args.some((arg) => /^-[a-z]*r/.test(arg))),
   rule('danger', PERMISSIONS, (name, args) => (
     (name === 'chmod' || name === 'chown') && args.some(isRecursiveFlag)
   )),
@@ -249,7 +344,42 @@ function collectShellFindings(args: string[], piped: boolean, depth: number, fin
     collectScriptFindings(script, depth + 1, findings)
     return
   }
+  const operands = args.filter((arg) => !arg.startsWith('-'))
+  if (operands.length > 0) {
+    findings.push({ tier: 'caution', reason: SCRIPT_FILE })
+    return
+  }
   if (piped) findings.push({ tier: 'danger', reason: RUNS_BUILT_CODE })
+}
+
+function collectInterpreterFindings(name: string, args: string[], piped: boolean, findings: Finding[]) {
+  const code = valueAfter(args, (arg) => INTERPRETERS[name].test(arg))
+  if (code !== undefined) {
+    findings.push(CODE_DELETES.test(code)
+      ? { tier: 'danger', reason: DELETES }
+      : { tier: 'caution', reason: INLINE_CODE })
+    return
+  }
+  // `curl … | python3` runs whatever arrives, like `curl … | sh`.
+  const operands = args.filter((arg) => !arg.startsWith('-'))
+  if (piped && (operands.length === 0 || args.includes('-'))) {
+    findings.push({ tier: 'danger', reason: RUNS_BUILT_CODE })
+  }
+}
+
+/** PowerShell `-Command` takes the rest of the line as a script. */
+function collectPowerShellFindings(args: string[], depth: number, findings: Finding[]) {
+  const lower = args.map((arg) => arg.toLowerCase())
+  if (lower.some((arg) => /^-(e|ec|enc|encodedcommand)$/.test(arg))) {
+    findings.push({ tier: 'danger', reason: ENCODED_CODE })
+    return
+  }
+  const commandAt = lower.findIndex((arg) => arg === '-c' || arg === '-command')
+  if (commandAt >= 0) {
+    collectScriptFindings(args.slice(commandAt + 1).join(' '), depth + 1, findings)
+    return
+  }
+  if (lower.includes('-file')) findings.push({ tier: 'caution', reason: SCRIPT_FILE })
 }
 
 function collectFindFindings(args: string[], depth: number, findings: Finding[]) {
@@ -276,10 +406,17 @@ function collectGitFindings(args: string[], findings: Finding[]) {
     return
   }
   if (sub === 'push') {
-    const forced = subArgs.some((arg) => arg === '-f' || arg.startsWith('--force'))
-    findings.push(forced
-      ? { tier: 'danger', reason: FORCE_PUSH }
-      : { tier: 'caution', reason: NETWORK })
+    findings.push(pushFinding(subArgs))
+    return
+  }
+  if (sub === 'filter-branch' || sub === 'filter-repo') {
+    findings.push({ tier: 'danger', reason: REWRITES_HISTORY })
+    return
+  }
+  if (sub === 'branch' && deletesBranch(subArgs)) {
+    findings.push(forcesBranchDelete(subArgs)
+      ? { tier: 'danger', reason: DELETES_BRANCH }
+      : { tier: 'caution', reason: DELETES_MERGED_BRANCH })
     return
   }
   if (GIT_NETWORK.has(sub)) {
@@ -288,6 +425,25 @@ function collectGitFindings(args: string[], findings: Finding[]) {
   }
   if ((sub === 'branch' || sub === 'remote' || sub === 'tag' || sub === 'stash') && isListing(subArgs)) return
   findings.push({ tier: 'caution', reason: CHANGES_GIT })
+}
+
+function pushFinding(args: string[]): Finding {
+  const refspecs = args.filter((arg) => !arg.startsWith('-')).slice(1)
+  if (args.includes('--delete') || args.includes('-d') || refspecs.some((ref) => ref.startsWith(':'))) {
+    return { tier: 'danger', reason: DELETES_REMOTE_BRANCH }
+  }
+  const forced = args.some((arg) => arg === '-f' || arg.startsWith('--force') || arg === '--mirror')
+    || refspecs.some((ref) => ref.startsWith('+'))
+  return forced ? { tier: 'danger', reason: FORCE_PUSH } : { tier: 'caution', reason: NETWORK }
+}
+
+function deletesBranch(args: string[]): boolean {
+  return args.some((arg) => arg === '--delete' || /^-[a-zA-Z]*[dD]/.test(arg))
+}
+
+function forcesBranchDelete(args: string[]): boolean {
+  return args.some((arg) => /^-[a-zA-Z]*D/.test(arg) || /^-[a-zA-Z]*d[a-zA-Z]*f|^-[a-zA-Z]*f[a-zA-Z]*d/.test(arg))
+    || (args.includes('--delete') && (args.includes('--force') || args.includes('-f')))
 }
 
 function discardsChanges(sub: string, args: string[]): boolean {
@@ -348,6 +504,39 @@ function dropAssignments(tokens: string[]): string[] {
   return tokens.slice(index)
 }
 
+function dropShellKeywords(tokens: string[]): string[] {
+  let index = 0
+  while (index < tokens.length) {
+    const token = tokens[index]
+    if (SHELL_HEADERS.has(token)) return []
+    if (token === 'function') {
+      index += 2
+      continue
+    }
+    if (!SHELL_KEYWORDS.has(token)) break
+    index += 1
+  }
+  return tokens.slice(index)
+}
+
+/** The command a wrapper runs, past its flags, their values and a `timeout` duration. */
+function wrappedCommand(name: string, args: string[]): string[] {
+  const valueFlags = WRAPPER_VALUE_FLAGS[name]
+  let index = 0
+  while (index < args.length && args[index].startsWith('-') && args[index] !== '--') {
+    index += valueFlags?.has(args[index]) ? 2 : 1
+  }
+  if (args[index] === '--') index += 1
+  if (name === 'timeout') index += 1
+  return args.slice(index)
+}
+
+/** The token after the first flag that matches. */
+function valueAfter(args: string[], isFlag: (arg: string) => boolean): string | undefined {
+  const at = args.findIndex(isFlag)
+  return at >= 0 ? args[at + 1] : undefined
+}
+
 function dropFlags(tokens: string[]): string[] {
   let index = 0
   while (index < tokens.length && tokens[index].startsWith('-')) index += 1
@@ -355,8 +544,8 @@ function dropFlags(tokens: string[]): string[] {
 }
 
 function commandName(token: string): string {
-  const slash = token.lastIndexOf('/')
-  return slash >= 0 ? token.slice(slash + 1) : token
+  const slash = Math.max(token.lastIndexOf('/'), token.lastIndexOf('\\'))
+  return (slash >= 0 ? token.slice(slash + 1) : token).toLowerCase()
 }
 
 function isRelativeEscape(value: string): boolean {
@@ -371,6 +560,8 @@ function isRelativeEscape(value: string): boolean {
 function isOutsideVaultPath(arg: string): boolean {
   const value = arg.includes('=') && arg.startsWith('-') ? arg.slice(arg.indexOf('=') + 1) : arg
   if (value.includes('://')) return false
+  // A Windows switch such as `/s` or `/q` is not a path.
+  if (/^\/[a-z?]$/i.test(value)) return false
   if (isRelativeEscape(value)) return true
   if (!value.startsWith('/') || value.length < 2) return false
   return !DEVICE_SINKS.has(value)
