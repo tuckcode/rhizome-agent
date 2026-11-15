@@ -20,6 +20,16 @@ Rhizome uses system Git authentication. It does not manage provider passwords di
 
 If `git fetch` fails in the terminal, fix system Git auth first.
 
+## The URL was refused
+
+These messages are not sign-in failures. Rhizome stopped before Git ran:
+
+- `Repository URL cannot start with '-'.`
+- `Repository URL contains control characters.`
+- `Repository URL uses an unsupported transport.`
+
+Paste a normal `https://`, `ssh://`, `git://`, or `git@host:path` URL. See [Connect a Git remote](../guides/connect-a-git-remote.md).
+
 ## Common fixes
 
 - Sign in with GitHub CLI.
