@@ -55,16 +55,12 @@ function optionVariant(id: string, tier: ApprovalRiskTier): OptionVariant {
   return 'outline'
 }
 
-// --input against --card is 4.2:1 in Graphite and 3.8:1 in Earth light,
-// so the Deny edge meets the 3:1 non-text minimum in both.
-const DANGER_DENY = 'border border-input'
+// The Deny edge mixes the text color into the card so it clears the 3:1
+// non-text minimum in every theme. `node scripts/deny-edge-contrast.mjs`
+// checks it; the lowest is Solarized Light at 3.25:1.
+const DANGER_DENY = 'border border-[color-mix(in_srgb,var(--foreground)_85%,var(--card))]'
 const DANGER_ALLOW = 'border border-destructive bg-transparent text-danger-text hover:bg-destructive/10 hover:text-danger-text dark:hover:bg-destructive/10'
 
-/** Deny comes first on a danger card, so Tab reaches it before Allow once. */
-function orderOptions(options: NativeApprovalOption[], tier: ApprovalRiskTier): NativeApprovalOption[] {
-  if (tier !== 'danger') return options
-  return [...options.filter((option) => option.id === 'deny'), ...options.filter((option) => option.id !== 'deny')]
-}
 
 const CARD_BORDER: Record<ApprovalRiskTier, string> = {
   routine: 'border-border',
@@ -163,10 +159,9 @@ export function ToolApprovalCard({
   const showBottomFade = overflows && moreBelow
   // Shell runner omits allow_session for bash. Filter here too so main,
   // which still sends it, asks every run in v1.
-  const visibleOptions = orderOptions(
-    bash ? options.filter((option) => option.id !== 'allow_session') : options,
-    risk.tier,
-  )
+  const visibleOptions = bash
+    ? options.filter((option) => option.id !== 'allow_session')
+    : options
 
   return (
     <section

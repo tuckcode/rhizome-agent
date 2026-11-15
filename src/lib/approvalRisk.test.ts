@@ -199,6 +199,16 @@ describe('classifyApprovalRisk review table', () => {
     ['shutdown -h now', 'danger', 'Shuts down or restarts the computer.'],
     ['reboot', 'danger', 'Shuts down or restarts the computer.'],
     ['crontab -r', 'danger', 'Removes every scheduled job.'],
+    // Round 3.
+    ['parallel rm ::: a b', 'danger', DELETES],
+    ['parallel -j 4 rm ::: a b', 'danger', DELETES],
+    ['busybox rm -rf x', 'danger', DELETES],
+    ['npm publish', 'caution', 'Publishes a package.'],
+    ['pnpm publish --access public', 'caution', 'Publishes a package.'],
+    ['python3 -c "import os; os.system(\'rm -rf x\')"', 'danger', DELETES],
+    ['python3 -c "import subprocess; subprocess.run(\'rm -rf x\', shell=True)"', 'danger', DELETES],
+    ['mv x /dev/null', 'danger', DELETES],
+    ['ri -Recurse -Force build', 'danger', DELETES],
   ] as const)('rates %s as %s: %s', (command, tier, reason) => {
     const risk = classifyApprovalRisk({ tool: 'bash', command })
     expect(risk.tier).toBe(tier)
@@ -214,6 +224,8 @@ describe('classifyApprovalRisk review table', () => {
     'command -V rm',
     'cmd /c dir',
     'del_cache_report',
+    'ri Array',
+    'ri String#split',
     'python3 scripts/report.py',
   ])('rates %s as routine', (command) => {
     expect(bashTier(command)).toBe('routine')

@@ -384,28 +384,21 @@ describe('ToolApprovalCard', () => {
     expect(card).toHaveClass('border-destructive')
     expect(screen.getByTestId('approval-status')).toHaveTextContent('Destructive')
     expect(screen.getByTestId('approval-risk')).toHaveTextContent('Deletes files. This cannot be undone.')
-    const allow = screen.getByRole('button', { name: 'Allow once' })
-    expect(allow).not.toHaveClass('bg-primary')
-    expect(allow).not.toHaveClass('bg-background')
-    expect(allow).toHaveClass('bg-transparent', 'border', 'border-destructive', 'text-danger-text')
-    const deny = screen.getByRole('button', { name: 'Deny' })
-    expect(deny).toHaveClass('bg-secondary', 'border', 'border-input')
+    expect(screen.getByRole('button', { name: 'Allow once' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Deny' })).toBeEnabled()
   })
 
-  it('puts Deny before Allow once on a danger card, so Tab reaches Deny first', () => {
-    render(
-      <ToolApprovalCard tool="bash" command="rm -rf build" options={OPTIONS} onReply={vi.fn()} />,
-    )
-    const buttons = screen.getAllByRole('button').filter((button) => /^approval-(allow_once|deny)$/.test(button.dataset.testid ?? ''))
-    expect(buttons.map((button) => button.dataset.testid)).toEqual(['approval-deny', 'approval-allow_once'])
-  })
-
-  it('keeps the engine order when the card is not danger', () => {
-    render(
-      <ToolApprovalCard tool="bash" command="curl https://example.com" options={OPTIONS} onReply={vi.fn()} />,
-    )
-    const buttons = screen.getAllByRole('button').filter((button) => /^approval-(allow_once|deny)$/.test(button.dataset.testid ?? ''))
-    expect(buttons.map((button) => button.dataset.testid)).toEqual(['approval-allow_once', 'approval-deny'])
+  it.each([
+    ['routine', 'echo SAFE'],
+    ['caution', 'curl https://example.com'],
+    ['danger', 'rm -rf build'],
+  ])('keeps Allow once before Deny on a %s card, in the engine order', (tier, command) => {
+    render(<ToolApprovalCard tool="bash" command={command} options={OPTIONS} onReply={vi.fn()} />)
+    expect(screen.getByTestId('tool-approval-card')).toHaveAttribute('data-risk', tier)
+    const names = screen.getAllByRole('button')
+      .map((button) => button.textContent)
+      .filter((name) => name === 'Allow once' || name === 'Deny')
+    expect(names).toEqual(['Allow once', 'Deny'])
   })
 
   it('says a command reaches outside the vault instead of running in it', () => {

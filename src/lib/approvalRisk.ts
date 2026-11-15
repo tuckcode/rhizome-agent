@@ -34,6 +34,7 @@ const PERMISSIONS = 'Changes permissions on many files.'
 const HIDDEN = 'Contains hidden or control characters.'
 const NETWORK = 'Uses the network.'
 const INSTALLS = 'Installs packages.'
+const PUBLISHES = 'Publishes a package.'
 const CHANGES_FILES = 'Changes files.'
 const CHANGES_GIT = 'Changes the git repository.'
 const OUTSIDE_VAULT = 'Uses a path outside your vault.'
@@ -78,6 +79,7 @@ const MAX_DEPTH = 4
 const SHELLS = new Set(['sh', 'bash', 'zsh', 'dash', 'fish', 'ksh'])
 const PREFIX_WRAPPERS = new Set([
   'time', 'nohup', 'command', 'exec', 'nice', 'builtin', 'caffeinate', 'timeout', 'stdbuf', 'ionice',
+  'parallel', 'busybox',
 ])
 /** Flags of a wrapper or `sudo` that take the next token as their value. */
 const WRAPPER_VALUE_FLAGS: Record<string, Set<string>> = {
@@ -86,6 +88,7 @@ const WRAPPER_VALUE_FLAGS: Record<string, Set<string>> = {
   timeout: new Set(['-s', '--signal', '-k', '--kill-after']),
   stdbuf: new Set(['-i', '-o', '-e', '--input', '--output', '--error']),
   exec: new Set(['-a']),
+  parallel: new Set(['-j', '--jobs', '-S', '--sshlogin', '-N', '--max-args', '--delay', '--timeout']),
   sudo: new Set([
     '-u', '-g', '-h', '-p', '-r', '-t', '-C', '-D', '-T', '-U',
     '--user', '--group', '--host', '--prompt', '--role', '--type', '--close-from', '--chdir',
@@ -100,7 +103,9 @@ const SHELL_KEYWORDS = new Set([
 /** Words that start a header with no command in it: `for x in …`, `case x in`. */
 const SHELL_HEADERS = new Set(['for', 'select', 'case'])
 const ADMIN_COMMANDS = new Set(['sudo', 'doas', 'su'])
-const DELETE_COMMANDS = new Set(['rm', 'rmdir', 'unlink', 'shred', 'del', 'erase', 'rd', 'remove-item', 'ri'])
+const DELETE_COMMANDS = new Set(['rm', 'rmdir', 'unlink', 'shred', 'del', 'erase', 'rd', 'remove-item'])
+/** PowerShell's `ri` alias. Ruby's `ri` reads docs, so only PowerShell parameters count. */
+const POWERSHELL_PATH_PARAMS = /^-(recurse|force|path|literalpath)$/i
 const DISK_COMMANDS = new Set(['dd', 'diskutil', 'fdisk', 'parted', 'diskpart'])
 const POWER_COMMANDS = new Set(['shutdown', 'reboot', 'halt', 'poweroff'])
 const SOURCE_COMMANDS = new Set(['source', '.'])
@@ -121,6 +126,8 @@ const INTERPRETERS: Record<string, RegExp> = {
   osascript: /^-e$/,
 }
 /** Calls in inline code that delete files. */
+/** A shell command that inline code hands to the system: `os.system("rm -rf x")`. */
+const CODE_RUNS_SHELL = /\b(?:os\.system|os\.popen|subprocess\.(?:run|call|Popen|check_call|check_output)|execSync|spawnSync|system)\(\s*\[?\s*(['"`])(.*?)\1/gu
 const CODE_DELETES = /\b(rmtree|rmSync|rmdirSync|unlinkSync|unlink|os\.remove|os\.rmdir|removedirs|fs\.rm|fs\.promises\.rm|File\.delete|FileUtils\.rm)\b/u
 const NETWORK_COMMANDS = new Set([
   'curl', 'wget', 'ssh', 'scp', 'sftp', 'rsync', 'nc', 'ncat', 'telnet', 'ftp', 'gh', 'npx', 'pnpx', 'bunx',
@@ -272,7 +279,7 @@ function collectCommandFindings(
     findings.push({ tier: 'caution', reason: SCRIPT_FILE })
     return
   }
-  if (name in INTERPRETERS) collectInterpreterFindings(name, args, piped, findings)
+  if (name in INTERPRETERS) collectInterpreterFindings(name, args, piped, depth, findings)
   if (name === 'find') {
     collectFindFindings(args, depth, findings)
     return
@@ -300,7 +307,11 @@ function rule(tier: ApprovalRiskTier, reason: string, matches: (name: string, ar
 /** The first rule that matches wins, so danger rules come first. */
 const COMMAND_RULES: CommandRule[] = [
   rule('danger', RUNS_BUILT_CODE, (name) => name === 'eval'),
-  rule('danger', DELETES, (name) => DELETE_COMMANDS.has(name)),
+  rule('danger', DELETES, (name, args) => (
+    DELETE_COMMANDS.has(name)
+      || (name === 'ri' && args.some((arg) => POWERSHELL_PATH_PARAMS.test(arg)))
+      || (name === 'mv' && args.at(-1) === '/dev/null')
+  )),
   rule('danger', DISK, (name, args) => (
     DISK_COMMANDS.has(name) || name.startsWith('mkfs') || (name === 'format' && args.some((arg) => /^[a-z]:$/i.test(arg)))
   )),
@@ -320,6 +331,10 @@ const COMMAND_RULES: CommandRule[] = [
   )),
   rule('caution', NETWORK, (name) => NETWORK_COMMANDS.has(name)),
   rule('caution', INSTALLS, isInstall),
+  rule('caution', PUBLISHES, (name, args) => (
+    (NODE_PACKAGE_MANAGERS.has(name) || name === 'cargo' || name === 'gem' || name === 'twine')
+      && (args.find((arg) => !arg.startsWith('-')) === 'publish' || args.includes('push') || args.includes('upload'))
+  )),
   rule('caution', CHANGES_FILES, (name, args) => (
     FILE_CHANGE_COMMANDS.has(name) || editsInPlace(name, args) || extractsArchive(name, args)
   )),
@@ -352,12 +367,19 @@ function collectShellFindings(args: string[], piped: boolean, depth: number, fin
   if (piped) findings.push({ tier: 'danger', reason: RUNS_BUILT_CODE })
 }
 
-function collectInterpreterFindings(name: string, args: string[], piped: boolean, findings: Finding[]) {
+function collectInterpreterFindings(
+  name: string,
+  args: string[],
+  piped: boolean,
+  depth: number,
+  findings: Finding[],
+) {
   const code = valueAfter(args, (arg) => INTERPRETERS[name].test(arg))
   if (code !== undefined) {
     findings.push(CODE_DELETES.test(code)
       ? { tier: 'danger', reason: DELETES }
       : { tier: 'caution', reason: INLINE_CODE })
+    for (const match of code.matchAll(CODE_RUNS_SHELL)) collectScriptFindings(match[2], depth + 1, findings)
     return
   }
   // `curl … | python3` runs whatever arrives, like `curl … | sh`.

@@ -43,14 +43,19 @@ and the tier sets the weight of the prompt.**
    `kubectl delete`, `terraform destroy`, shutdown and reboot,
    `crontab -r`, and hidden characters. The card gets a danger border
    and the reasons. "Allow once" has no fill, a red edge and red text.
-   "Deny" has a neutral fill and a `--input` edge (4.2:1 on the card in
-   Graphite, 3.8:1 in Earth light), and comes first in the tab order.
+   "Deny" has a neutral fill and an edge of the text color mixed 85%
+   into the card, which clears 3:1 against the card in every theme
+   (lowest: Solarized Light, 3.25:1; `scripts/deny-edge-contrast.mjs`).
+   Every card keeps the engine order, Allow once then Deny, so the
+   buttons do not move between tiers.
    The collapsed row shows a danger glyph and offers Review only, so the
    user opens the card before the command can run.
 4a. The parser skips shell keywords (`for`, `while`, `if`, `{`, `!`, …),
    looks through wrappers (`timeout`, `nice -n N`, `nohup`, `stdbuf`,
-   `sudo -u user`), reads command names in any case, and treats
-   `command -v` as a lookup. Interpreter code given with `-c` or `-e`
+   `parallel`, `busybox`, `sudo -u user`), reads command names in any
+   case, and treats `command -v` as a lookup. Shell commands that inline
+   code passes to `os.system` or `subprocess` are read too. `mv x
+   /dev/null` deletes. `npm publish` and similar are `caution`. Interpreter code given with `-c` or `-e`
    and a script run with `bash x.sh`, `source` or `.` are at least
    `caution`.
 4b. The collapsed row's tag is the first sentence of the first reason,
