@@ -1026,6 +1026,17 @@
   max-width: var(--chat-column-width, 46rem);
   margin-inline: auto;
 }
+/* New-chat screen: the input is the focal point, so it is larger. */
+[data-chat-home='true'] [data-testid='chat-composer-box'] {
+  padding: 0.5rem;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--text-primary) 8%, transparent),
+    0 8px 24px color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+[data-chat-home='true'] [data-testid='chat-composer-box'] [contenteditable] {
+  min-height: 3.5rem;
+  font-size: 1.125rem;
+  line-height: 1.6;
+}
 .chat-transcript {
   container-type: inline-size;
   container-name: chat-transcript;

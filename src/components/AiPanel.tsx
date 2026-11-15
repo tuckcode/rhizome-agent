@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type MutableRefObject, type React
 import { createPortal } from 'react-dom'
 import { aiPanelFrameStyle } from './aiPanelPulse'
 import { recentNotesForChatHome } from '../lib/chatHomeNotes'
+import { ChatHomeSuggestions } from './ChatHomeSuggestions'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 
 import { usePanelWidth } from '../hooks/usePanelWidth'
@@ -511,6 +512,11 @@ export function AiPanelView({
     reportError: reportSwitchError,
   })
 
+  // The new-chat screen: no message, no run, no picked session, and an agent that is ready.
+  const chatHome = agent.messages.length === 0
+    && !isActive
+    && transcriptState === 'new'
+    && view.defaultAiAgentReadiness === 'ready'
   return (
     <NativeLiveSlotProvider slot={agent.getNativeLiveSlot?.() ?? null}>
     <>
@@ -625,7 +631,6 @@ export function AiPanelView({
         }
         onScrollStateChange={onMessageHistoryScrollStateChange}
         hasContext={hasContext}
-        recentNotes={recentNotes}
         focusedTranscriptIndex={focusedTranscriptIndex}
         transcriptState={transcriptState}
       />
@@ -667,6 +672,7 @@ export function AiPanelView({
         queue={isPrimeTarget ? queue : undefined}
         onClearQueue={isPrimeTarget ? () => void clearQueue() : undefined}
         onStop={handleStop}
+        home={chatHome ? <ChatHomeSuggestions recentNotes={recentNotes} onOpenNote={onOpenNote} /> : undefined}
         onUnsupportedAiPaste={reportAttachment}
         vision={vision}
         modelLabel={modelTarget.split('/').pop() || 'This model'}

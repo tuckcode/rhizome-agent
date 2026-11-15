@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
-import { ArrowSquareOut, FileText, ImageSquare, PaperPlaneRight, Plugs, Plus, Sparkle, Stop, Warning, X } from '@phosphor-icons/react'
+import { ImageSquare, PaperPlaneRight, Plugs, Plus, Sparkle, Stop, Warning, X } from '@phosphor-icons/react'
 import { AiMessage } from './AiMessage'
 import { Button } from '@/components/ui/button'
 import {
@@ -51,10 +51,7 @@ import { workerStartFailureReason } from '../lib/primeWorkerStartError'
 import { afterPaint } from '../lib/sessionTranscriptHit'
 import { useScrollToTranscriptHit } from '../hooks/useScrollToTranscriptHit'
 import { ChatRunLiveStatus } from './ChatRunLiveStatus'
-import { chatHomePrefillForNote, type ChatHomeNote } from '../lib/chatHomeNotes'
-import { relativeDate } from '../utils/noteListHelpers'
-import { prefillAiComposer } from '../utils/aiPromptBridge'
-import { trackEvent } from '../lib/telemetry'
+import { BrandMark } from './BrandMark'
 
 interface AiPanelHeaderProps {
   agentLabel: string
@@ -94,8 +91,6 @@ interface AiPanelMessageHistoryProps {
   onPromoteToVault?: (text: string) => void | boolean | Promise<void | boolean>
   onScrollStateChange?: (scrolled: boolean) => void
   hasContext: boolean
-  /** Notes that changed last. The new-chat screen offers them as context. */
-  recentNotes?: ChatHomeNote[]
   /** Transcript item index from a session search hit. Scrolls that turn into view. */
   focusedTranscriptIndex?: number | null
   /**
@@ -131,6 +126,8 @@ interface AiPanelComposerProps {
   onUnsupportedAiPaste?: (message: string) => void
   /** Frame A foot row. Rendered under the box so it can see controller state. */
   foot?: ReactNode
+  /** New-chat screen: a larger input box, with this content under the foot row. */
+  home?: ReactNode
   commandEntries?: CommandMenuEntry[]
   commandDisabled?: Record<string, string>
   commandSkillLabel?: string
@@ -528,76 +525,12 @@ function AiPanelTranscriptNotice({
   )
 }
 
-const EMPTY_CHAT_STARTERS = [
-  { label: 'Explain this repo', prompt: 'Explain this repo' },
-  { label: 'Find and fix a bug', prompt: 'Find and fix a bug' },
-  { label: 'Write tests for a file', prompt: 'Write tests for a file' },
-] as const
-
-function ChatHomeRecentNotes({
-  notes,
-  onOpenNote,
-}: {
-  notes: ChatHomeNote[]
-  onOpenNote?: (path: string) => void
-}) {
-  if (notes.length === 0) return null
-  return (
-    <section
-      aria-label="Continue from a note"
-      className="mt-8 w-full max-w-lg text-left"
-      data-testid="chat-home-recent-notes"
-    >
-      <h3 className="px-2 text-xs font-medium text-muted-foreground">Continue from a note</h3>
-      <ul className="mt-1.5 flex flex-col">
-        {notes.map((note) => (
-          <li key={note.path} className="group flex items-center gap-1 rounded-md hover:bg-[var(--state-hover)]">
-            <Button
-              type="button"
-              variant="ghost"
-              className="h-auto min-w-0 flex-1 justify-start gap-2 px-2 py-1.5 font-normal hover:bg-transparent"
-              aria-label={`Ask about ${note.title}`}
-              data-testid="chat-home-note"
-              onClick={() => {
-                trackEvent('chat_home_note_picked')
-                prefillAiComposer(chatHomePrefillForNote(note))
-              }}
-            >
-              <FileText aria-hidden="true" className="shrink-0 text-muted-foreground" size={14} />
-              <span className="min-w-0 flex-1 truncate text-left text-sm text-foreground">{note.title}</span>
-              <span className="shrink-0 text-xs text-muted-foreground">{relativeDate(note.modifiedAt)}</span>
-            </Button>
-            {onOpenNote ? (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-xs"
-                className="me-1 shrink-0 text-muted-foreground"
-                aria-label={`Open ${note.title}`}
-                title="Open note"
-                onClick={() => onOpenNote(note.path)}
-              >
-                <ArrowSquareOut aria-hidden="true" size={14} />
-              </Button>
-            ) : null}
-          </li>
-        ))}
-      </ul>
-    </section>
-  )
-}
-
 function AiPanelEmptyState({
   agentLabel,
   agentReadiness,
   hasContext,
   locale = 'en',
-  onOpenNote,
-  recentNotes = [],
-}: Pick<
-  AiPanelMessageHistoryProps,
-  'agentLabel' | 'agentReadiness' | 'hasContext' | 'locale' | 'onOpenNote' | 'recentNotes'
->) {
+}: Pick<AiPanelMessageHistoryProps, 'agentLabel' | 'agentReadiness' | 'hasContext' | 'locale'>) {
   const t = createTranslator(locale)
 
   if (agentReadiness === 'checking') {
@@ -632,32 +565,22 @@ function AiPanelEmptyState({
 
   return (
     <div
-      className="flex min-h-full flex-1 flex-col items-center justify-center px-6 text-center"
+      className="flex min-h-full flex-1 flex-col items-center justify-end px-6 pb-5 text-center"
+      data-layout="hero"
       data-testid="ai-panel-empty-state"
     >
-      <h2 className="font-sans text-xl font-medium text-foreground">
-        Ask Rhizome
+      <BrandMark size={44} />
+      <p className="mt-3 font-mono text-sm font-semibold tracking-wide text-muted-foreground" data-testid="chat-home-wordmark">
+        rhizome
+      </p>
+      <h2 className="mt-4 font-sans text-3xl font-semibold tracking-tight text-foreground">
+        What are we working on?
       </h2>
-      <p className="mt-2 max-w-lg text-[13px] leading-5 text-muted-foreground">
+      <p className="mt-2 max-w-lg text-base leading-6 text-muted-foreground">
         {hasContext
           ? 'Rhizome can work from the open note, or from the rest of this repo.'
           : 'Rhizome can research this repo, edit files, and run commands here.'}
       </p>
-      <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-        {EMPTY_CHAT_STARTERS.map((starter) => (
-          <Button
-            key={starter.label}
-            type="button"
-            size="sm"
-            variant="outline"
-            data-testid="chat-empty-starter"
-            onClick={() => prefillAiComposer(starter.prompt)}
-          >
-            {starter.label}
-          </Button>
-        ))}
-      </div>
-      <ChatHomeRecentNotes notes={recentNotes} onOpenNote={onOpenNote} />
     </div>
   )
 }
@@ -828,7 +751,6 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
   onPromoteToVault,
   onScrollStateChange,
   hasContext,
-  recentNotes,
   focusedTranscriptIndex = null,
   transcriptState = 'new',
 }: AiPanelMessageHistoryProps) {
@@ -919,8 +841,6 @@ export const AiPanelMessageHistory = memo(function AiPanelMessageHistory({
               agentReadiness={agentReadiness}
               locale={locale}
               hasContext={hasContext}
-              onOpenNote={onOpenNote}
-              recentNotes={recentNotes}
             />
           )}
           {messages.map((message, index) => (
@@ -1104,6 +1024,7 @@ export function AiPanelComposer({
   onAttachImages,
   onRemoveAttachment,
   foot,
+  home,
   commandEntries,
   commandDisabled,
   commandSkillLabel,
@@ -1248,6 +1169,7 @@ export function AiPanelComposer({
     <div
       className="chat-column flex shrink-0 flex-col"
       style={{ padding: '6px 10px' }}
+      data-chat-home={home ? 'true' : undefined}
     >
       {hasControls ? (
         <div className="mb-1.5 min-w-0">
@@ -1469,6 +1391,7 @@ export function AiPanelComposer({
         <ComposerControlsRow hasControls={false} sendButton={sendButton} />
       </div>
       {foot}
+      {home}
     </div>
   )
 }

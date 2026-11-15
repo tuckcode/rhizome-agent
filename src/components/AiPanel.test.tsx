@@ -344,7 +344,8 @@ describe('AiPanel', () => {
 
   it('renders empty state without context', () => {
     render(<AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" />)
-    expect(screen.getAllByText('Ask Rhizome').length).toBeGreaterThan(0)
+    expect(screen.getByRole('heading', { name: 'What are we working on?' })).toBeInTheDocument()
+    expect(screen.getByTestId('chat-home-suggestions')).toBeInTheDocument()
   })
 
   it('prefills the composer from an empty-state starter', () => {
@@ -422,7 +423,7 @@ describe('AiPanel', () => {
     render(
       <AiPanel onClose={vi.fn()} vaultPath="/tmp/vault" activeEntry={entry} entries={[entry]} />
     )
-    expect(screen.getByRole('heading', { name: 'Ask Rhizome' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'What are we working on?' })).toBeTruthy()
   })
 
   it('does not render a context bar for the active entry', () => {

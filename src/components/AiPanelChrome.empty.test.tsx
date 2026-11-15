@@ -1,5 +1,5 @@
-import { fireEvent, render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
 import { AiPanelMessageHistory } from './AiPanelChrome'
 import type { AiAgentMessage } from '../lib/aiAgentConversation'
 
@@ -22,46 +22,32 @@ describe('AiPanelMessageHistory empty vs selected-session states', () => {
   it('shows the new-chat empty state only for a genuine new chat', () => {
     render(<AiPanelMessageHistory {...historyProps()} />)
 
-    expect(screen.getByRole('heading', { name: 'Ask Rhizome' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'What are we working on?' })).toBeInTheDocument()
     expect(screen.getByText(/Rhizome can research this repo/)).toBeInTheDocument()
     expect(screen.queryByTestId('ai-panel-transcript-loading')).toBeNull()
   })
 
-  it('centers the empty state and prefills the composer from a starter', () => {
-    const onPrefill = vi.fn()
-    window.addEventListener('rhizome:ai-composer-prefill', onPrefill)
+  it('puts the brand and the headline directly above the composer', () => {
     render(<AiPanelMessageHistory {...historyProps()} />)
 
-    const empty = screen.getByTestId('ai-panel-empty-state')
-    expect(empty.className).toMatch(/items-center/)
-    expect(empty.className).toMatch(/justify-center/)
-    expect(empty.className).toMatch(/min-h-full|flex-1/)
-    expect(screen.getAllByTestId('chat-empty-starter').every((button) => (
-      button.getAttribute('class')?.includes('border')
-      && !button.getAttribute('class')?.includes('bg-primary')
-    ))).toBe(true)
-    fireEvent.click(screen.getByRole('button', { name: 'Explain this repo' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Find and fix a bug' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Write tests for a file' }))
-    expect(onPrefill.mock.calls.map((call) => (call[0] as CustomEvent<{ text: string }>).detail.text)).toEqual([
-      'Explain this repo',
-      'Find and fix a bug',
-      'Write tests for a file',
-    ])
-    window.removeEventListener('rhizome:ai-composer-prefill', onPrefill)
+    const hero = screen.getByTestId('ai-panel-empty-state')
+    expect(hero).toHaveAttribute('data-layout', 'hero')
+    expect(hero.className).toMatch(/justify-end/)
+    expect(screen.getByTestId('chat-home-wordmark')).toHaveTextContent('rhizome')
+    expect(hero.querySelector('svg')).not.toBeNull()
   })
 
   it('shows a loading state while a picked session transcript is still loading', () => {
     render(<AiPanelMessageHistory {...historyProps({ transcriptState: 'loading' })} />)
 
     expect(screen.getByTestId('ai-panel-transcript-loading')).toHaveTextContent('Loading conversation')
-    expect(screen.queryByText('Ask Rhizome')).toBeNull()
+    expect(screen.queryByText('What are we working on?')).toBeNull()
   })
 
   it('does not show the new-chat empty state over a selected session that loaded empty', () => {
     render(<AiPanelMessageHistory {...historyProps({ transcriptState: 'ready' })} />)
 
-    expect(screen.queryByText('Ask Rhizome')).toBeNull()
+    expect(screen.queryByText('What are we working on?')).toBeNull()
     expect(screen.getByTestId('ai-panel-transcript-empty-session')).toHaveTextContent(
       'This session has no messages',
     )
@@ -70,7 +56,7 @@ describe('AiPanelMessageHistory empty vs selected-session states', () => {
   it('shows a load-failed state instead of the new-chat empty screen', () => {
     render(<AiPanelMessageHistory {...historyProps({ transcriptState: 'error' })} />)
 
-    expect(screen.queryByText('Ask Rhizome')).toBeNull()
+    expect(screen.queryByText('What are we working on?')).toBeNull()
     expect(screen.getByTestId('ai-panel-transcript-error')).toHaveTextContent(
       'Could not load this conversation',
     )
@@ -87,43 +73,9 @@ describe('AiPanelMessageHistory empty vs selected-session states', () => {
     )
 
     expect(screen.getByText('still here')).toBeInTheDocument()
-    expect(screen.queryByText('Ask Rhizome')).toBeNull()
+    expect(screen.queryByText('What are we working on?')).toBeNull()
     expect(screen.queryByTestId('ai-panel-transcript-loading')).toBeNull()
   })
-  it('offers the notes that changed last as context for a new chat', () => {
-    const onPrefill = vi.fn()
-    const onOpenNote = vi.fn()
-    window.addEventListener('rhizome:ai-composer-prefill', onPrefill)
-    render(
-      <AiPanelMessageHistory
-        {...historyProps({
-          onOpenNote,
-          recentNotes: [
-            { path: '/vault/weekly-plan.md', title: 'Weekly Plan 4', modifiedAt: Math.floor(Date.now() / 1000) - 7200 },
-            { path: '/vault/review.md', title: 'Daily Review 3', modifiedAt: Math.floor(Date.now() / 1000) - 90000 },
-          ],
-        })}
-      />,
-    )
-
-    const section = screen.getByTestId('chat-home-recent-notes')
-    expect(section).toHaveTextContent('Continue from a note')
-    expect(section).toHaveTextContent('2h ago')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Ask about Weekly Plan 4' }))
-    expect((onPrefill.mock.calls[0][0] as CustomEvent<{ text: string }>).detail.text).toBe('[[Weekly Plan 4]] ')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Open Daily Review 3' }))
-    expect(onOpenNote).toHaveBeenCalledWith('/vault/review.md')
-    window.removeEventListener('rhizome:ai-composer-prefill', onPrefill)
-  })
-
-  it('shows no note section when the vault has no recent note', () => {
-    render(<AiPanelMessageHistory {...historyProps({ recentNotes: [] })} />)
-    expect(screen.queryByTestId('chat-home-recent-notes')).toBeNull()
-    expect(screen.getByRole('heading', { name: 'Ask Rhizome' })).toBeInTheDocument()
-  })
-
   it('shows a session notice in words, with no decorative icon', () => {
     render(<AiPanelMessageHistory {...historyProps({ transcriptState: 'ready' })} />)
     const notice = screen.getByTestId('ai-panel-transcript-empty-session')
