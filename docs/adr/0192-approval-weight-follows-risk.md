@@ -45,7 +45,9 @@ and the tier sets the weight of the prompt.**
    and the reasons. "Allow once" has no fill, a red edge and red text.
    "Deny" has a neutral fill and an edge of the text color mixed 85%
    into the card, which clears 3:1 against the card in every theme
-   (lowest: Solarized Light, 3.25:1; `scripts/deny-edge-contrast.mjs`).
+   (lowest: Solarized Light, 3.25:1). `src/lib/denyEdgeContrast.test.ts`
+   checks every theme in CI; `scripts/deny-edge-contrast.mjs` measures
+   the same in Chromium.
    Every card keeps the engine order, Allow once then Deny, so the
    buttons do not move between tiers.
    The collapsed row shows a danger glyph and offers Review only, so the
@@ -80,3 +82,10 @@ and the tier sets the weight of the prompt.**
 - A later change can move the classifier into the engine and send the
   tier with `ApprovalRequested`. Then other clients get the same rating.
 - `bash` still has no session grant.
+- The Deny edge uses `color-mix()`, which WebKit supports from Safari
+  16.2. Older WebKit drops the declaration and the button keeps the
+  default border color, so the edge can fall under 3:1 there.
+- Inside `pwsh -c` and `powershell -Command`, `rm`, `del`, `rd`, `ri`,
+  `rmdir` and `erase` always count as Remove-Item. Outside PowerShell,
+  `ri` counts only with a Remove-Item parameter (`-r`, `-fo`, `-pa`,
+  `-li` and their longer forms), so Ruby's `ri Array` stays routine.

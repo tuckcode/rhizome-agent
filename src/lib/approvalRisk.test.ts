@@ -209,6 +209,19 @@ describe('classifyApprovalRisk review table', () => {
     ['python3 -c "import subprocess; subprocess.run(\'rm -rf x\', shell=True)"', 'danger', DELETES],
     ['mv x /dev/null', 'danger', DELETES],
     ['ri -Recurse -Force build', 'danger', DELETES],
+    // Round 4.
+    ['pwsh -c "ri x -r -fo"', 'danger', DELETES],
+    ['powershell -Command rm x', 'danger', DELETES],
+    ['pwsh -c "del x"', 'danger', DELETES],
+    ['pwsh -c "erase x; rd y"', 'danger', DELETES],
+    ['ri x -r', 'danger', DELETES],
+    ['ri x -rec', 'danger', DELETES],
+    ['ri x -fo', 'danger', DELETES],
+    ['ri -pa x', 'danger', DELETES],
+    ['ri -li x', 'danger', DELETES],
+    ['yarn npm publish', 'caution', 'Publishes a package.'],
+    ['mv -t /dev/null x', 'danger', DELETES],
+    ['mv --target-directory=/dev/null x', 'danger', DELETES],
   ] as const)('rates %s as %s: %s', (command, tier, reason) => {
     const risk = classifyApprovalRisk({ tool: 'bash', command })
     expect(risk.tier).toBe(tier)
@@ -225,11 +238,20 @@ describe('classifyApprovalRisk review table', () => {
     'cmd /c dir',
     'del_cache_report',
     'ri Array',
+    'ri -f Array',
+    'ri -p Array',
     'ri String#split',
     'python3 scripts/report.py',
   ])('rates %s as routine', (command) => {
     expect(bashTier(command)).toBe('routine')
   })
+
+  it.each(['npm run push', 'pnpm run publish-docs', 'yarn push', 'npm run upload'])(
+    'does not call %s a publish',
+    (command) => {
+      expect(bashReasons(command)).not.toContain('Publishes a package.')
+    },
+  )
 
   it('does not read a Windows switch as a path outside the vault', () => {
     expect(bashReasons('del /s /q build')).not.toContain('Uses a path outside your vault.')

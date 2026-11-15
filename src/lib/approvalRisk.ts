@@ -105,7 +105,9 @@ const SHELL_HEADERS = new Set(['for', 'select', 'case'])
 const ADMIN_COMMANDS = new Set(['sudo', 'doas', 'su'])
 const DELETE_COMMANDS = new Set(['rm', 'rmdir', 'unlink', 'shred', 'del', 'erase', 'rd', 'remove-item'])
 /** PowerShell's `ri` alias. Ruby's `ri` reads docs, so only PowerShell parameters count. */
-const POWERSHELL_PATH_PARAMS = /^-(recurse|force|path|literalpath)$/i
+const POWERSHELL_DELETE_PARAMS = ['recurse', 'force', 'path', 'literalpath']
+/** Inside PowerShell these names are all Remove-Item. */
+const POWERSHELL_DELETE_ALIASES = new Set(['ri', 'rm', 'del', 'rd', 'rmdir', 'erase', 'remove-item'])
 const DISK_COMMANDS = new Set(['dd', 'diskutil', 'fdisk', 'parted', 'diskpart'])
 const POWER_COMMANDS = new Set(['shutdown', 'reboot', 'halt', 'poweroff'])
 const SOURCE_COMMANDS = new Set(['source', '.'])
@@ -309,8 +311,8 @@ const COMMAND_RULES: CommandRule[] = [
   rule('danger', RUNS_BUILT_CODE, (name) => name === 'eval'),
   rule('danger', DELETES, (name, args) => (
     DELETE_COMMANDS.has(name)
-      || (name === 'ri' && args.some((arg) => POWERSHELL_PATH_PARAMS.test(arg)))
-      || (name === 'mv' && args.at(-1) === '/dev/null')
+      || (name === 'ri' && args.some(isPowerShellDeleteParam))
+      || (name === 'mv' && movesToDevNull(args))
   )),
   rule('danger', DISK, (name, args) => (
     DISK_COMMANDS.has(name) || name.startsWith('mkfs') || (name === 'format' && args.some((arg) => /^[a-z]:$/i.test(arg)))
@@ -333,7 +335,7 @@ const COMMAND_RULES: CommandRule[] = [
   rule('caution', INSTALLS, isInstall),
   rule('caution', PUBLISHES, (name, args) => (
     (NODE_PACKAGE_MANAGERS.has(name) || name === 'cargo' || name === 'gem' || name === 'twine')
-      && (args.find((arg) => !arg.startsWith('-')) === 'publish' || args.includes('push') || args.includes('upload'))
+      && publishVerb(name, args)
   )),
   rule('caution', CHANGES_FILES, (name, args) => (
     FILE_CHANGE_COMMANDS.has(name) || editsInPlace(name, args) || extractsArchive(name, args)
@@ -398,10 +400,47 @@ function collectPowerShellFindings(args: string[], depth: number, findings: Find
   }
   const commandAt = lower.findIndex((arg) => arg === '-c' || arg === '-command')
   if (commandAt >= 0) {
-    collectScriptFindings(args.slice(commandAt + 1).join(' '), depth + 1, findings)
+    const script = args.slice(commandAt + 1).join(' ')
+    // PowerShell maps rm, del, rd, ri and erase to Remove-Item, which
+    // takes shortened parameters, so any of them deletes here.
+    for (const segment of parseCommand(script).segments) {
+      const words = dropShellKeywords(segment.tokens)
+      if (words.length > 0 && POWERSHELL_DELETE_ALIASES.has(commandName(words[0]))) {
+        findings.push({ tier: 'danger', reason: DELETES })
+      }
+    }
+    collectScriptFindings(script, depth + 1, findings)
     return
   }
   if (lower.includes('-file')) findings.push({ tier: 'caution', reason: SCRIPT_FILE })
+}
+
+/**
+ * A PowerShell Remove-Item parameter, full or shortened (`-r`, `-fo`,
+ * `-pa`, `-li`). Ruby's `ri Array` has none, so it stays routine.
+ */
+function isPowerShellDeleteParam(arg: string): boolean {
+  const match = /^-([a-z]+)$/i.exec(arg)
+  if (!match) return false
+  const prefix = match[1].toLowerCase()
+  return POWERSHELL_DELETE_PARAMS.some((param) => (
+    param.startsWith(prefix) && (prefix.length >= 2 || param === 'recurse')
+  ))
+}
+
+function movesToDevNull(args: string[]): boolean {
+  const target = valueAfter(args, (arg) => arg === '-t')
+    ?? args.find((arg) => arg.startsWith('--target-directory='))?.slice('--target-directory='.length)
+  return target === '/dev/null' || args.at(-1) === '/dev/null'
+}
+
+/** `publish` in the subcommand position: `npm publish`, `yarn npm publish`, `gem push`, `twine upload`. */
+function publishVerb(name: string, args: string[]): boolean {
+  const words = args.filter((arg) => !arg.startsWith('-'))
+  if (name === 'gem') return words[0] === 'push'
+  if (name === 'twine') return words[0] === 'upload'
+  if (name === 'yarn' && words[0] === 'npm') return words[1] === 'publish'
+  return words[0] === 'publish'
 }
 
 function collectFindFindings(args: string[], depth: number, findings: Finding[]) {
