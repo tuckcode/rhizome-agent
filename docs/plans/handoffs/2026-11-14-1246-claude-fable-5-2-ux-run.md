@@ -105,6 +105,25 @@ Start PR 2 like this:
 - Atticus named t3code as a comparison. Web pages on it describe little of its interface. Ideas taken from them: a visible permission mode beside the model chip, a per-turn review of changed files, and a per-turn revert.
 - Do not run tests or screenshot captures in a second worktree while a push runs. The first push of #302 failed in the smoke lane under that load. Alone, the lane passed 33 of 33.
 
+## Plan for the last two Fable sessions (Atticus agreed, 2026-11-15)
+
+Atticus has about two more Fable sessions. He agreed to spend them on two things only.
+
+| Session | Work |
+|---|---|
+| 1 | **The shell.** Session list, top bar, right rail, status bar and the message transcript, as one visual system in the direction of PR #303. |
+| 2 | **The run view.** A summary line per turn, step outcomes, and the files that the turn changed, with a diff. It builds on PR #302. |
+
+Rules for both sessions:
+
+1. Start in a new conversation. Read this file first.
+2. Fable designs and writes the code, and commits to a local branch. Codex runs the gates, the screenshots and the PR from one brief.
+3. Send Atticus a screenshot in the first third of the session.
+4. Do no Rust review, no audit, and no record edit beyond one short entry at the end.
+5. Write one short spec for Codex per session for the items that Fable does not build: first run with a model step, Settings and the provider list, the graph in 2D, the side panel state model (11c in PR #299), the type sweep, and the smoke spec scoping.
+
+This replaces the order in the plan file. The plan file stays as the list of items.
+
 ## Approved next, 2026-11-15
 
 Atticus approved the shell restyle in the direction of PR #303. It was not started, because the session was at 92% of its usage limit. Start it in a new worktree from `origin/main`:
