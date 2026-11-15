@@ -14,6 +14,8 @@ export interface ChatRunSnapshot {
   tools: ChatRunTool[]
   notice?: string
   noticeId?: string
+  /** The run has had no event for 30 seconds and no tool runs. */
+  quiet?: boolean
 }
 
 interface ChatRunMessage {
@@ -56,6 +58,9 @@ export function nextChatRunAnnouncement(
   }
   if (lines.length > 0) {
     return lines.join(' ')
+  }
+  if (next.isActive && next.quiet && !previous.quiet) {
+    return 'No response for 30 seconds'
   }
 
   for (const tool of next.tools) {

@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { AiMessage } from '../components/AiMessage'
-import { ChatComposerFoot } from '../components/ChatComposerFoot'
+import { ChatRunStatusLine } from '../components/ChatRunStatusLine'
 import { createStreamCallbacks } from './aiAgentStreamCallbacks'
 import type { AiAgentMessage } from './aiAgentConversation'
 import { workerStartFailureReason } from './primeWorkerStartError'
@@ -66,7 +66,7 @@ describe('primeWorkerStartError', () => {
 
     render(
       <>
-        <ChatComposerFoot failureReason={reason} />
+        <ChatRunStatusLine messages={[]} isActive={false} failureReason={reason} />
         <AiMessage
           userMessage={message.userMessage}
           actions={message.actions}
@@ -76,7 +76,7 @@ describe('primeWorkerStartError', () => {
       </>,
     )
 
-    const status = screen.getByRole('status')
+    const status = screen.getByTestId('chat-run-status-line')
     expect(status).toHaveTextContent(REASON)
     expect(status).not.toHaveTextContent('timed out')
     expect(status).not.toHaveTextContent('finished without returning a reply')

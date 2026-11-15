@@ -5,6 +5,7 @@ import {
   nextChatRunAnnouncement,
   type ChatRunSnapshot,
 } from '../lib/chatRunLiveStatus'
+import { useChatRunStatus } from '../hooks/useChatRunStatus'
 
 interface ChatRunLiveStatusProps {
   messages: Array<{
@@ -34,6 +35,7 @@ export function ChatRunLiveStatus({ messages, isActive }: ChatRunLiveStatusProps
   const clearFrameRef = useRef(0)
   const restoreFrameRef = useRef(0)
   const [announcement, setAnnouncement] = useState('')
+  const quiet = useChatRunStatus(messages, isActive).state === 'quiet'
 
   useEffect(() => {
     return () => {
@@ -44,7 +46,7 @@ export function ChatRunLiveStatus({ messages, isActive }: ChatRunLiveStatusProps
   }, [])
 
   useEffect(() => {
-    const next = chatRunSnapshotFromMessages(messages, isActive)
+    const next = { ...chatRunSnapshotFromMessages(messages, isActive), quiet }
     const text = nextChatRunAnnouncement(previousRef.current, next)
     previousRef.current = next
     if (!text) return
@@ -63,7 +65,7 @@ export function ChatRunLiveStatus({ messages, isActive }: ChatRunLiveStatusProps
         if (pending) setAnnouncement(pending)
       })
     })
-  }, [isActive, messages])
+  }, [isActive, messages, quiet])
 
   return (
     <div

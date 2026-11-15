@@ -164,3 +164,17 @@ describe('chatRunSnapshotFromMessages', () => {
     expect(nextChatRunAnnouncement(previous, next)).toBe('Stopped')
   })
 })
+
+describe('quiet run announcement', () => {
+  const active = { isActive: true, hasResponse: true, tools: [] }
+
+  it('announces once when a run goes quiet', () => {
+    expect(nextChatRunAnnouncement(active, { ...active, quiet: true })).toBe('No response for 30 seconds')
+    expect(nextChatRunAnnouncement({ ...active, quiet: true }, { ...active, quiet: true })).toBeNull()
+  })
+
+  it('announces the end of the run before the quiet state', () => {
+    expect(nextChatRunAnnouncement({ ...active, quiet: true }, { ...active, isActive: false, quiet: true }))
+      .toBe('Response complete')
+  })
+})

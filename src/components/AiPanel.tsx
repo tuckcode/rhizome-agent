@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom'
 import { aiPanelFrameStyle } from './aiPanelPulse'
 import { recentNotesForChatHome } from '../lib/chatHomeNotes'
 import { ChatHomeSuggestions } from './ChatHomeSuggestions'
+import { ChatRunStatusLine } from './ChatRunStatusLine'
+import { useStopRunShortcut } from '../hooks/useStopRunShortcut'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 
 import { usePanelWidth } from '../hooks/usePanelWidth'
@@ -313,6 +315,7 @@ export function AiPanelView({
   const primeStats = usePrimeSessionStats(isPrimeTarget, agent.status)
   const { queue, refresh: refreshQueue, clear: clearQueue } = usePrimeQueue(isPrimeTarget, isActive)
   const recentNotes = useMemo(() => recentNotesForChatHome(entries ?? []), [entries])
+  useStopRunShortcut(isActive, handleStop)
   // If Waiting chrome shows a follow-up, the transcript must show it too —
   // send-path append alone can lose a race with rehydrate (2026-09-06 dogfood).
   useEffect(() => {
@@ -709,13 +712,19 @@ export function AiPanelView({
           <ChatComposerBar
             locale={locale}
             deck={composerDeck}
-            working={isActive}
-            failureReason={isPrimeTarget && agent.status === 'error'
-              ? workerStartFailureReason(getLastAgentMessage(agent.messages) ?? '')
-              : null}
             stats={primeStats}
           />
         ) : undefined}
+        statusLine={(
+          <ChatRunStatusLine
+            messages={agent.messages}
+            isActive={isActive}
+            failureReason={isPrimeTarget && agent.status === 'error'
+              ? workerStartFailureReason(getLastAgentMessage(agent.messages) ?? '')
+              : null}
+            onStop={handleStop}
+          />
+        )}
         commandEntries={isPrimeTarget ? localizedCommands : undefined}
         commandDisabled={isPrimeTarget ? commandDisabled : undefined}
         commandSkillLabel={translate(locale, 'ai.command.skill')}

@@ -167,17 +167,18 @@ describe('parked organs leftover', () => {
     expect(chatHome).toContain('onClose={onExit}')
   })
 
-  it('keeps Notes sidebar seam and Stop click-only', () => {
+  it('keeps Notes sidebar seam and Escape away from Stop', () => {
     const css = readFileSync(`${process.cwd()}/src/App.css`, 'utf8')
-    const foot = readFileSync(
-      `${process.cwd()}/src/components/ChatComposerFoot.tsx`,
+    const shortcut = readFileSync(
+      `${process.cwd()}/src/hooks/useStopRunShortcut.ts`,
       'utf8',
     )
     expect(css).toContain(
       '/* Inner seam against Chat — keep this visible so the column reads as a panel. */',
     )
     expect(css).toContain('border-left: 1px solid var(--sidebar-border);')
-    expect(foot).toContain('Stop is click-only')
+    expect(shortcut).toContain("event.key !== '.'")
+    expect(shortcut).not.toContain('Escape')
   })
 
   it('keeps expanded Settings as a gear, not the word Settings', () => {
@@ -818,9 +819,9 @@ describe('parked organs leftover', () => {
     )
     expect(manifest).toContain('"fileNewNote"')
     expect(manifest).toContain('"accelerator": "CmdOrCtrl+N"')
-    expect(pulse).toContain('ai-border-pulse 2s ease-in-out infinite')
+    expect(pulse).not.toContain('animation')
     expect(layout).toContain('notesOpen')
-    expect(layout).toContain('ai-border-pulse')
+    expect(layout).toContain('aiPanelFrameStyle')
   })
 
   it('keeps Welcome clickable offline and Sessions header drag', () => {

@@ -52,6 +52,7 @@ import { afterPaint } from '../lib/sessionTranscriptHit'
 import { useScrollToTranscriptHit } from '../hooks/useScrollToTranscriptHit'
 import { ChatRunLiveStatus } from './ChatRunLiveStatus'
 import { BrandMark } from './BrandMark'
+import { stopRunShortcutLabel } from '../hooks/useStopRunShortcut'
 
 interface AiPanelHeaderProps {
   agentLabel: string
@@ -128,6 +129,8 @@ interface AiPanelComposerProps {
   foot?: ReactNode
   /** New-chat screen: a larger input box, with this content under the foot row. */
   home?: ReactNode
+  /** The run status line. Rendered above the box. */
+  statusLine?: ReactNode
   commandEntries?: CommandMenuEntry[]
   commandDisabled?: Record<string, string>
   commandSkillLabel?: string
@@ -362,7 +365,7 @@ function ComposerStopButton({
         onStop()
       }}
       aria-label={label}
-      title={label}
+      title={`${label} (${stopRunShortcutLabel()})`}
       data-testid="agent-stop"
     >
       <Stop size={16} weight="fill" />
@@ -1025,6 +1028,7 @@ export function AiPanelComposer({
   onRemoveAttachment,
   foot,
   home,
+  statusLine,
   commandEntries,
   commandDisabled,
   commandSkillLabel,
@@ -1171,6 +1175,7 @@ export function AiPanelComposer({
       style={{ padding: '6px 10px' }}
       data-chat-home={home ? 'true' : undefined}
     >
+      {statusLine}
       {hasControls ? (
         <div className="mb-1.5 min-w-0">
           {controls}
