@@ -1361,12 +1361,17 @@ mod tests {
         // ADR-0191 decision 2.8: Rhizome never reads a Claude token from the
         // user's shell. AWS_SESSION_TOKEN is a cloud provider credential the
         // user owns, read under the same rules as their terminal.
-        for name in CLAUDE_PROVIDER_ENV_KEYS {
-            let name = name.as_str();
-            assert!(!name.contains("AUTH_TOKEN"), "{name}");
-            assert!(!name.contains("OAUTH_TOKEN"), "{name}");
-            assert!(!name.starts_with("CLAUDE_CODE_OAUTH"), "{name}");
-        }
+        // The messages name no env key, so no key name reaches test output.
+        let token_names = CLAUDE_PROVIDER_ENV_KEYS
+            .iter()
+            .map(|name| name.as_str())
+            .filter(|name| {
+                name.contains("AUTH_TOKEN")
+                    || name.contains("OAUTH_TOKEN")
+                    || name.starts_with("CLAUDE_CODE_OAUTH")
+            })
+            .count();
+        assert_eq!(token_names, 0, "a bearer or OAuth token is in the env list");
     }
 
     #[test]
