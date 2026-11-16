@@ -23,10 +23,9 @@ describe('LocalAgentCards', () => {
       />,
     )
 
-    expect(screen.getByTestId('settings-agent-card-claude_code').querySelector('img')).toHaveAttribute(
-      'src',
-      '/ai-agent-icons/claude-code.svg',
-    )
+    // Neutral terminal glyph, never the Claude mark (ADR-0191 4.2).
+    expect(screen.getByTestId('settings-agent-card-claude_code').querySelector('img')).toBeNull()
+    expect(screen.getByTestId('settings-agent-card-claude_code').innerHTML).not.toContain('claude-code.svg')
     expect(screen.getByTestId('settings-agent-card-codex').querySelector('img')).toHaveAttribute(
       'src',
       '/ai-agent-icons/codex.svg',
