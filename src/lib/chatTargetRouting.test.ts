@@ -91,4 +91,15 @@ describe('chat target routing', () => {
     expect(usesNativeChatStream(undefined, 'prime', 'native')).toBe(true)
     expect(usesNativeChatStream(undefined, 'prime', undefined)).toBe(true)
   })
+
+  it('keeps a chat saved as Claude Code on the native stream', () => {
+    expect(usesNativeChatStream(claudeTarget, 'claude_code', undefined, 'agent:claude_code')).toBe(true)
+    expect(usesNativeChatStream(apiTarget, 'prime', undefined, 'agent:claude_code')).toBe(true)
+    expect(usesNativeChatStream(codexTarget, 'codex', undefined, 'agent:claude_code')).toBe(true)
+  })
+
+  it('leaves the Claude Code agent path alone until a chat is saved as Claude Code', () => {
+    expect(usesNativeChatStream(claudeTarget, 'claude_code', undefined, null)).toBe(false)
+    expect(usesNativeChatStream(claudeTarget, 'claude_code', undefined, 'free_tier_auto')).toBe(false)
+  })
 })

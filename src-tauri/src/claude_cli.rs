@@ -311,6 +311,20 @@ where
 pub(crate) fn run_agent_stream_with_approval<F>(
     req: AgentStreamRequest,
     approval: Option<&crate::claude_code_approval::ApprovalEndpoint>,
+    emit: F,
+) -> Result<String, String>
+where
+    F: FnMut(ClaudeStreamEvent),
+{
+    run_agent_stream_in_session(req, approval, None, emit)
+}
+
+/// Agent run for a native chat turn, in the Claude Code conversation that
+/// `session` names (ADR-0191 step 5).
+pub(crate) fn run_agent_stream_in_session<F>(
+    req: AgentStreamRequest,
+    approval: Option<&crate::claude_code_approval::ApprovalEndpoint>,
+    session: Option<&crate::claude_invocation::ClaudeSession>,
     mut emit: F,
 ) -> Result<String, String>
 where
@@ -318,7 +332,7 @@ where
 {
     let bin = find_claude_binary()?;
     // Keep `invocation` alive for the whole run: it owns the MCP config file.
-    let invocation = crate::claude_invocation::agent_with_approval(&req, approval)?;
+    let invocation = crate::claude_invocation::agent_in_session(&req, approval, session)?;
     run_claude_subprocess(
         ClaudeSubprocessRequest {
             bin: &bin,
