@@ -14,7 +14,7 @@
 //   CLAUDE_CODE_OAUTH_TOKEN from the child environment (names only, values
 //   are never read), so the turns test the subscription login itself.
 //
-// Cost: about 12 short turns on the model in PROBE_MODEL (default: haiku).
+// Cost: about 16 short turns on the model in PROBE_MODEL (default: haiku).
 //
 // Run from anywhere:  node claude-code-probe.mjs
 // Options (env): CLAUDE_BIN (default: claude), PROBE_MODEL (default: haiku),
@@ -67,6 +67,11 @@ function runApproveServer() {
         result: {
           tools: [
             {
+              name: "ping",
+              description: "Returns pong. Used to see whether MCP tools need approval.",
+              inputSchema: { type: "object", properties: {} },
+            },
+            {
               name: "approve",
               description: "Permission prompt tool for the Rhizome probe.",
               inputSchema: {
@@ -94,6 +99,10 @@ function runApproveServer() {
             arg_keys: Object.keys(args),
           })}\n`,
         );
+      }
+      if (msg.params?.name === "ping") {
+        send({ jsonrpc: "2.0", id: msg.id, result: { content: [{ type: "text", text: "pong" }] } });
+        return;
       }
       const body =
         decision === "allow"
@@ -465,8 +474,10 @@ async function main() {
   const writePrompt =
     "Use the Write tool to create a file named probe.txt in the current folder containing the word hello. Use no other tool. Then stop.";
   const bashPrompt = "Use the Bash tool to run exactly: echo probe-ok. Use no other tool. Then stop.";
-  async function promptToolCase(name, { mode, decision, tool, prompt, settings }) {
-    step(`${name}: ${tool} in ${mode}, prompt tool says ${decision}${settings ? ", with --settings" : ""}`);
+  async function promptToolCase(name, { mode, decision, tool, prompt, settings, promptsNone = false }) {
+    step(
+      `${name}: ${tool} in ${mode}, ${promptsNone ? "--permission-prompts none" : `prompt tool says ${decision}`}${settings ? ", with --settings" : ""}`,
+    );
     const dir = freshDir(name);
     const logPath = path.join(WORK, `${name}.approvals.jsonl`);
     const args = [
@@ -477,15 +488,18 @@ async function main() {
       mcpConfig(decision, logPath),
       "--permission-mode",
       mode,
-      "--permission-prompt-tool",
-      "mcp__probe__approve",
+      ...(promptsNone
+        ? ["--permission-prompts", "none"]
+        : ["--permission-prompt-tool", "mcp__probe__approve"]),
       "--no-session-persistence",
     ];
     if (settings) args.push("--settings", JSON.stringify(settings));
     const run = await runClaude(args, { cwd: dir });
+    const calls = readLog(logPath);
     return {
       ...summarize(run),
-      promptToolCalls: readLog(logPath),
+      promptToolCalls: calls.filter((c) => c.tool === "approve"),
+      pingRan: calls.some((c) => c.tool === "ping"),
       fileCreated: fs.existsSync(path.join(dir, "probe.txt")),
     };
   }
@@ -525,6 +539,41 @@ async function main() {
       settings: { permissions: { allow: ["Write"] } },
     }),
     note: "Allow rule passed with --settings, which stands in for ~/.claude/settings.json. The probe does not edit the user's own settings.",
+  };
+
+  // Q9: MCP tools next to --tools, and whether their calls reach the prompt tool.
+  const pingPrompt = "Call the mcp__probe__ping tool once. Use no other tool. Then stop.";
+  report.q9 = {
+    note: "Rhizome passes mcp__rhizome__* inside --tools. Does that keep MCP tools, and do MCP calls ask?",
+    mcpInToolsManualPromptDeny: await promptToolCase("q9-mcp-deny", {
+      mode: manual,
+      decision: "deny",
+      tool: "Read,mcp__probe__ping",
+      prompt: pingPrompt,
+    }),
+    mcpInToolsManualPromptAllow: await promptToolCase("q9-mcp-allow", {
+      mode: manual,
+      decision: "allow",
+      tool: "Read,mcp__probe__ping",
+      prompt: pingPrompt,
+    }),
+  };
+
+  // Q10: the step 3 profile before the bridge: --permission-prompts none.
+  report.q10 = {
+    note: "With no prompt tool and --permission-prompts none, every call that would ask should be denied.",
+    writeManualPromptsNone: await promptToolCase("q10-write-none", {
+      mode: manual,
+      tool: "Write",
+      prompt: writePrompt,
+      promptsNone: true,
+    }),
+    mcpManualPromptsNone: await promptToolCase("q10-mcp-none", {
+      mode: manual,
+      tool: "Read,mcp__probe__ping",
+      prompt: pingPrompt,
+      promptsNone: true,
+    }),
   };
 
   // Q5: resume.
