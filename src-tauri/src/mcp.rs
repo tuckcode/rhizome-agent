@@ -123,6 +123,18 @@ pub(crate) fn mcp_server_index_js_path_string() -> Result<String, String> {
     Ok(index_js_client_path(&mcp_server_dir()?))
 }
 
+/// `approval-server.js`, next to `index.js` (ADR-0191 step 4).
+pub(crate) fn mcp_approval_server_js_path_string() -> Result<String, String> {
+    let path = mcp_server_dir()?.join("approval-server.js");
+    if !path.is_file() {
+        return Err(format!(
+            "Rhizome approval server not found at {}",
+            path.display()
+        ));
+    }
+    Ok(paths::client_script_path(&path))
+}
+
 fn index_js_client_path(server_dir: &Path) -> String {
     paths::client_script_path(&server_dir.join("index.js"))
 }

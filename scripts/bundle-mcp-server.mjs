@@ -2,7 +2,7 @@
  * Bundle the mcp-server Node.js files into self-contained bundles
  * that can be shipped as Tauri resources inside the .app bundle.
  *
- * Output: src-tauri/resources/mcp-server/{index.js,ws-bridge.js,cli-call.mjs}
+ * Output: src-tauri/resources/mcp-server/{index.js,ws-bridge.js,approval-server.js,cli-call.mjs}
  *
  * `cli-call.mjs` is what the seeded `rhizome-vault` skill tells agents to run.
  * Omitting it made packaged `seed_vault_skill` fail (no file next to index.js)
@@ -47,6 +47,15 @@ await build({
   outfile: join(OUT, 'ws-bridge.js'),
 })
 
+// Claude Code engine approvals (ADR-0191 step 4). Started as its own MCP
+// server so the model never sees the approval tool.
+await build({
+  ...shared,
+  format: 'cjs',
+  entryPoints: [join(SRC, 'approval-server.js')],
+  outfile: join(OUT, 'approval-server.js'),
+})
+
 // ESM + createRequire so bundled deps that still `require()` Node builtins work,
 // while keeping top-level await from the source entry.
 await build({
@@ -67,7 +76,7 @@ copyFileSync(join(SRC, 'prime-login.mjs'), join(OUT, 'prime-login.mjs'))
 const staleCjs = join(OUT, 'cli-call.js')
 if (existsSync(staleCjs)) unlinkSync(staleCjs)
 
-const required = ['index.js', 'ws-bridge.js', 'cli-call.mjs', 'prime-login.mjs', 'package.json']
+const required = ['index.js', 'ws-bridge.js', 'approval-server.js', 'cli-call.mjs', 'prime-login.mjs', 'package.json']
 for (const name of required) {
   const path = join(OUT, name)
   if (!existsSync(path)) {
@@ -75,4 +84,4 @@ for (const name of required) {
   }
 }
 
-console.log('mcp-server bundled → src-tauri/resources/mcp-server/ (index, ws-bridge, cli-call, prime-login)')
+console.log('mcp-server bundled → src-tauri/resources/mcp-server/ (index, ws-bridge, approval-server, cli-call, prime-login)')

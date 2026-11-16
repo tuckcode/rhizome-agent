@@ -221,6 +221,14 @@ pub fn abort_ai_agent_stream(event_name: String) -> Result<bool, String> {
     crate::ai_agent_processes::abort_stream(&event_name)
 }
 
+/// Answer a Claude Code approval card (ADR-0191 step 4). Anything but
+/// `allow_once` denies. An unknown or finished prompt returns false.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn reply_ai_agent_approval(prompt_id: String, choice: String) -> bool {
+    crate::ai_agents::reply_claude_code_approval(&prompt_id, &choice)
+}
+
 #[cfg(desktop)]
 #[tauri::command]
 pub async fn stream_ai_model(
@@ -402,6 +410,12 @@ pub async fn stream_ai_agent(
     _request: AiAgentStreamRequest,
 ) -> Result<String, String> {
     Err("CLI AI agents are not available on mobile".into())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub fn reply_ai_agent_approval(_prompt_id: String, _choice: String) -> bool {
+    false
 }
 
 #[cfg(mobile)]

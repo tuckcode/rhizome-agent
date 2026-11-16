@@ -111,7 +111,7 @@ fn active_children() -> &'static Mutex<HashMap<String, SharedChild>> {
     ACTIVE_CHILDREN.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
-fn current_stream_id() -> Option<String> {
+pub(crate) fn current_stream_id() -> Option<String> {
     CURRENT_STREAM_ID.with(|cell| cell.borrow().clone())
 }
 
