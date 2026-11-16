@@ -75,6 +75,21 @@ describe('generateAiConversationTitle', () => {
     }))
   })
 
+  it('never starts a Claude Code turn for a title', async () => {
+    await expect(generateAiConversationTitleForTarget({
+      assistantResponse: 'The lookup now resolves the configured MCP server.',
+      permissionMode: 'power_user',
+      prompt: 'The MCP server cannot be found anymore',
+      target: { kind: 'agent', agent: 'claude_code', id: 'agent:claude_code', label: 'Claude Code', shortLabel: 'Claude' },
+      targetReady: true,
+      vaultPath: '/vault',
+      vaultPaths: ['/vault'],
+    })).resolves.toBe(generateAiConversationTitle('The MCP server cannot be found anymore'))
+
+    expect(streamAiAgentMock).not.toHaveBeenCalled()
+    expect(completeAiModelTextMock).not.toHaveBeenCalled()
+  })
+
   it('uses a plain completion for an API model title', async () => {
     const provider = {
       id: 'openai',

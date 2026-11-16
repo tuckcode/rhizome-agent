@@ -127,6 +127,13 @@ pub async fn get_ai_agents_status() -> AiAgentsStatus {
     crate::ai_agents::get_ai_agents_status().await
 }
 
+/// ADR-0191: install and sign-in state for Settings. Never a credential.
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn get_claude_code_engine_status() -> crate::claude_cli::ClaudeCodeEngineStatus {
+    crate::ai_agents::claude_code_engine_status().await
+}
+
 #[cfg(desktop)]
 #[tauri::command]
 pub fn get_agent_docs_path(app_handle: tauri::AppHandle) -> Result<String, String> {
@@ -343,6 +350,12 @@ pub async fn complete_ai_model_text(request: AiModelStreamRequest) -> Result<Str
 }
 
 // ── Claude CLI (mobile stubs) ───────────────────────────────────────────────
+
+#[cfg(mobile)]
+#[tauri::command]
+pub fn get_claude_code_engine_status() -> crate::claude_cli::ClaudeCodeEngineStatus {
+    crate::claude_cli::ClaudeCodeEngineStatus::not_found()
+}
 
 #[cfg(mobile)]
 #[tauri::command]

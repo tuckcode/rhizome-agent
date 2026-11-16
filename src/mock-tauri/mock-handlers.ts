@@ -204,6 +204,7 @@ let mockSettings: Settings = {
   agent_max_steps: null,
   chat_engine: null,
   native_chat_target: null,
+  claude_code_engine_enabled: null,
 }
 
 const DEFAULT_MOCK_VAULT_PATH = '/Users/mock/demo-vault-v2'
@@ -642,6 +643,12 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   },
   get_conflict_files: (): string[] => [],
   check_claude_cli: () => ({ installed: false, version: null }),
+  get_claude_code_engine_status: () => ({
+    installed: false,
+    version: null,
+    loggedIn: null,
+    authMethod: null,
+  }),
   get_ai_agents_status: () => ({
     // Browser mock only. A native build reports the real Prime version.
     // Settings hides this line when the version is the string `mock`.
@@ -1171,7 +1178,10 @@ export const mockHandlers: Record<string, (args: any) => any> = {
       multi_workspace_enabled: s.multi_workspace_enabled ?? null,
       agent_profile: s.agent_profile?.trim() || null,
       chat_engine: s.chat_engine ?? null,
-      native_chat_target: s.native_chat_target ?? null,
+      native_chat_target: s.claude_code_engine_enabled !== true && s.native_chat_target === 'agent:claude_code'
+        ? null
+        : s.native_chat_target ?? null,
+      claude_code_engine_enabled: s.claude_code_engine_enabled === true ? true : null,
       agent_max_steps: s.agent_max_steps == null ? null : Math.max(1, Math.floor(s.agent_max_steps)),
     }
     return null

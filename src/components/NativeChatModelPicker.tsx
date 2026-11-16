@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { CaretDown, Check, MagnifyingGlass } from '@phosphor-icons/react'
+import { CaretDown, Check, MagnifyingGlass, Terminal } from '@phosphor-icons/react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,6 +58,15 @@ import { nativeSessionTargetForSlot } from '../lib/nativeChatTranscript'
 import { useNativeLiveSlot } from '../lib/nativeLiveSlot'
 import { visionForTargets } from '../lib/nativeVision'
 import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
+import { CLAUDE_CODE_SESSION_TARGET, isClaudeCodeSessionTarget } from '../lib/nativeSessionTarget'
+import {
+  CLAUDE_CODE_LABEL,
+  claudeCodeStatusLine,
+  isClaudeCodeEngineReady,
+  trackClaudeCodeEngineSelected,
+  useClaudeCodeEngineEnabled,
+  useClaudeCodeEngineState,
+} from '../lib/claudeCodeEngine'
 import {
   CHATGPT_ACCOUNT_PROVIDER_ID,
   chatgptOfficialHostConfigured,
@@ -209,6 +218,12 @@ function NativeChatModelPickerBody({
   const selectedId = prime
     ? (primeSelectedId ?? resolveNativeChatTarget(value, providers))
     : resolveNativeChatTarget(value, providers, oauth.oauthByProvider)
+  // ADR-0191: Claude Code is a choice for new chats only while Settings has it on.
+  const claudeCodeEnabled = useClaudeCodeEngineEnabled()
+  const claudeCodeOffered = !prime && claudeCodeEnabled
+  const claudeCodeSelected = !prime && isClaudeCodeSessionTarget(selectedId)
+  const { state: claudeCodeState } = useClaudeCodeEngineState(claudeCodeOffered && open)
+  const claudeCodeReady = isClaudeCodeEngineReady(claudeCodeState)
   const listed = includeRemovedProviderModel(models, selectedId, providers)
   const selectedRhizome = resolveRhizomeChatModel(listed, selectedId)
   const selectedPrime = primeModels.find((model) => modelKey(model) === selectedId) ?? null
@@ -234,13 +249,17 @@ function NativeChatModelPickerBody({
     ? displayName
     : rhizomeChatModelTriggerLabel(selectedRhizome, labelFallback, { chip: false })
   // Chip and Settings share the same "Provider · model" label (#283).
-  const visibleText = prime
-    ? displayName
-    : rhizomeChatModelTriggerLabel(selectedRhizome, labelFallback, { chip })
-  const tooltipTitle = prime
-    ? (providerName ? formatChatModelLabel(providerName, displayName) : displayName)
-    : rowLabel
-  const tooltipRawId = prime ? rawId : (selectedRhizome?.id ?? selectedId)
+  const visibleText = claudeCodeSelected
+    ? CLAUDE_CODE_LABEL
+    : prime
+      ? displayName
+      : rhizomeChatModelTriggerLabel(selectedRhizome, labelFallback, { chip })
+  const tooltipTitle = claudeCodeSelected
+    ? CLAUDE_CODE_LABEL
+    : prime
+      ? (providerName ? formatChatModelLabel(providerName, displayName) : displayName)
+      : rowLabel
+  const tooltipRawId = claudeCodeSelected ? null : prime ? rawId : (selectedRhizome?.id ?? selectedId)
   const showRawId = tooltipRawId != null && tooltipRawId !== visibleText
   // WCAG 2.5.3: the accessible name starts with the text the control shows.
   const accessibleName = [visibleText, showRawId ? tooltipRawId : null]
@@ -291,10 +310,13 @@ function NativeChatModelPickerBody({
   const unsetCount = unsetProviderGroupCount(rhizomeMenu)
   const sessionTarget = prime ? null : nativeSessionTargetForSlot(liveSlot)
   const sessionModel = sessionTarget ? resolveRhizomeChatModel(listed, sessionTarget) : undefined
-  const sessionLabel = sessionModel
-    ? (sessionModel.displayName.trim() || sessionModel.modelId)
-    : null
-  const footnote = sessionLabel && sessionLabel !== displayName
+  const sessionLabel = isClaudeCodeSessionTarget(sessionTarget)
+    ? CLAUDE_CODE_LABEL
+    : sessionModel
+      ? (sessionModel.displayName.trim() || sessionModel.modelId)
+      : null
+  const pickedLabel = claudeCodeSelected ? CLAUDE_CODE_LABEL : displayName
+  const footnote = sessionLabel && sessionLabel !== pickedLabel
     ? t('ai.composer.chatStaysOn', { model: sessionLabel })
     : t('ai.composer.modelAppliesToNewChats')
   const removed = !prime && selectedRhizome?.label === REMOVED_PROVIDER_LABEL
@@ -302,11 +324,14 @@ function NativeChatModelPickerBody({
   const splitChipLabel = Boolean(
     chip
     && !prime
+    && !claudeCodeSelected
     && !removed
     && providerName
     && selectedRhizome?.providerKind !== 'free_tier',
   )
   const showFooter = chip && !prime
+  const showClaudeCode = claudeCodeOffered
+    && (!needle || CLAUDE_CODE_LABEL.toLowerCase().includes(needle))
 
   useEffect(() => {
     setModels(seedRhizomeChatModels(providers))
@@ -401,6 +426,11 @@ function NativeChatModelPickerBody({
     trackRhizomeModelChanged(providerKind)
   }
 
+  const pickClaudeCode = () => {
+    onChange(CLAUDE_CODE_SESSION_TARGET)
+    trackClaudeCodeEngineSelected()
+  }
+
   return (
     <div
       className={
@@ -466,9 +496,19 @@ function NativeChatModelPickerBody({
                     </span>
                   </span>
                 ) : (
-                  <span className="min-w-0 truncate" data-testid="native-chat-model-trigger-label">
-                    {visibleText}
-                  </span>
+                  <>
+                    {claudeCodeSelected ? (
+                      <Terminal
+                        size={chip ? 12 : 14}
+                        aria-hidden="true"
+                        className="shrink-0"
+                        data-testid="native-chat-model-claude-code-icon"
+                      />
+                    ) : null}
+                    <span className="min-w-0 truncate" data-testid="native-chat-model-trigger-label">
+                      {visibleText}
+                    </span>
+                  </>
                 )}
                 <CaretDown
                   size={chip ? 12 : 9}
@@ -529,7 +569,57 @@ function NativeChatModelPickerBody({
             className={cn('min-h-0 flex-1 overflow-y-auto', NATIVE_CHAT_MODEL_LIST_MAX_HEIGHT_CLASS)}
             data-testid="native-chat-model-list"
           >
-            {(prime ? primeMenu.length : rhizomeMenu.length) === 0 ? (
+            {showClaudeCode ? (
+              <div data-testid="native-chat-model-claude-code-group">
+                <DropdownMenuLabel
+                  className="flex items-start gap-2 px-2 pb-1 pt-2 text-[11px] font-medium text-muted-foreground normal-case tracking-normal"
+                  data-testid="native-chat-model-provider"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">Your installed Claude Code</span>
+                    {claudeCodeReady ? null : (
+                      <span
+                        className="mt-0.5 block whitespace-normal font-normal text-muted-foreground"
+                        data-testid="native-chat-model-claude-code-status"
+                      >
+                        {claudeCodeStatusLine(claudeCodeState)}
+                      </span>
+                    )}
+                  </span>
+                </DropdownMenuLabel>
+                <DropdownMenuItem
+                  ref={claudeCodeSelected ? selectedRowRef : undefined}
+                  className={cn(ROW_CLASS, !claudeCodeReady && 'text-muted-foreground')}
+                  aria-disabled={!claudeCodeReady || undefined}
+                  data-testid="native-chat-model-claude-code"
+                  data-selected={claudeCodeSelected ? 'true' : undefined}
+                  onSelect={(event) => {
+                    if (!claudeCodeReady) {
+                      event.preventDefault()
+                      return
+                    }
+                    pickClaudeCode()
+                  }}
+                >
+                  <Terminal size={14} aria-hidden="true" className="shrink-0" />
+                  <span className={cn('min-w-0 flex-1 truncate', claudeCodeReady ? 'text-foreground' : 'text-muted-foreground')}>
+                    {CLAUDE_CODE_LABEL}
+                  </span>
+                  {claudeCodeSelected ? (
+                    <Check
+                      size={16}
+                      aria-hidden="true"
+                      className="ml-auto size-4 shrink-0 text-foreground"
+                      data-testid="native-chat-model-selected-check"
+                    />
+                  ) : null}
+                </DropdownMenuItem>
+                {(prime ? primeMenu.length : rhizomeMenu.length) > 0 ? (
+                  <div className={GROUP_SEP_CLASS} data-testid="native-chat-model-group-sep" />
+                ) : null}
+              </div>
+            ) : null}
+            {(prime ? primeMenu.length : rhizomeMenu.length) === 0 && showClaudeCode ? null : (prime ? primeMenu.length : rhizomeMenu.length) === 0 ? (
               <div className="flex items-center gap-2 px-2 py-1.5 text-[13px] text-muted-foreground" data-testid="native-chat-models-empty">
                 <span>{query.trim() ? EMPTY_MATCH : t('ai.composer.modelsEmpty')}</span>
                 {query.trim() ? (

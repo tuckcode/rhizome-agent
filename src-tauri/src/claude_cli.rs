@@ -277,6 +277,90 @@ pub fn check_cli() -> ClaudeCliStatus {
     }
 }
 
+/// What Settings shows for the Claude Code engine (ADR-0191 decision 2.5).
+/// From `claude auth status --json` it keeps a yes or no and the method name.
+/// Every other field is dropped where it is parsed.
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ClaudeCodeEngineStatus {
+    pub installed: bool,
+    pub version: Option<String>,
+    /// `None` when Claude Code did not report a sign-in state Rhizome can read.
+    pub logged_in: Option<bool>,
+    pub auth_method: Option<String>,
+}
+
+impl ClaudeCodeEngineStatus {
+    pub fn not_found() -> Self {
+        Self {
+            installed: false,
+            version: None,
+            logged_in: None,
+            auth_method: None,
+        }
+    }
+}
+
+/// `claude --version` and `claude auth status --json`. Nothing else is read.
+pub fn engine_status() -> ClaudeCodeEngineStatus {
+    let Ok(bin) = find_claude_binary() else {
+        return ClaudeCodeEngineStatus::not_found();
+    };
+    let (logged_in, auth_method) = auth_status_for_binary(&bin);
+    ClaudeCodeEngineStatus {
+        installed: true,
+        version: crate::cli_agent_runtime::version_for_binary(&bin),
+        logged_in,
+        auth_method,
+    }
+}
+
+fn auth_status_for_binary(binary: &Path) -> (Option<bool>, Option<String>) {
+    let Ok(target) = crate::cli_agent_runtime::command_target_avoiding_windows_cmd_shim(binary)
+    else {
+        return (None, None);
+    };
+    let mut command = crate::hidden_command(&target.program);
+    crate::cli_agent_runtime::configure_agent_command_environment(&mut command, binary);
+    if let Some(first_arg) = target.first_arg {
+        command.arg(first_arg);
+    }
+    command
+        .args(["auth", "status", "--json"])
+        .stdin(Stdio::null());
+    match command.output() {
+        Ok(output) => parse_auth_status(&String::from_utf8_lossy(&output.stdout)),
+        Err(_) => (None, None),
+    }
+}
+
+/// Keeps `loggedIn` and, when signed in, `authMethod`. Drops everything else,
+/// so an email, organization, or account id never leaves this function.
+pub(crate) fn parse_auth_status(stdout: &str) -> (Option<bool>, Option<String>) {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(stdout.trim()) else {
+        return (None, None);
+    };
+    let logged_in = value.get("loggedIn").and_then(serde_json::Value::as_bool);
+    let method = value
+        .get("authMethod")
+        .and_then(serde_json::Value::as_str)
+        .and_then(auth_method_name);
+    match logged_in {
+        Some(true) => (Some(true), method),
+        other => (other, None),
+    }
+}
+
+/// A short method name such as `claude.ai` or `api_key`. Anything longer or
+/// with other characters could carry an account detail, so it is dropped.
+fn auth_method_name(raw: &str) -> Option<String> {
+    let name = raw.trim();
+    let plain = name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'));
+    (!name.is_empty() && name.len() <= 32 && plain && !name.contains('@')).then(|| name.to_string())
+}
+
 /// Spawn `claude -p` for a simple chat (no tools) and stream events via the
 /// provided callback.  Returns the session ID for future `--resume` calls.
 pub fn run_chat_stream<F>(req: ChatStreamRequest, mut emit: F) -> Result<String, String>
@@ -1368,6 +1452,58 @@ mod tests {
     fn claude_provider_env_keys_include_reported_anthropic_overrides() {
         assert!(CLAUDE_PROVIDER_ENV_KEYS.contains(&EnvName::trusted("ANTHROPIC_API_KEY")));
         assert!(CLAUDE_PROVIDER_ENV_KEYS.contains(&EnvName::trusted("ANTHROPIC_BASE_URL")));
+    }
+
+    #[test]
+    fn auth_status_keeps_only_the_sign_in_state_and_method() {
+        let signed_in = r#"{"loggedIn":true,"authMethod":"claude.ai","email":"someone@example.com","orgName":"Org","orgId":"org_123","subscriptionType":"max"}"#;
+        assert_eq!(
+            parse_auth_status(signed_in),
+            (Some(true), Some("claude.ai".to_string()))
+        );
+        let status = ClaudeCodeEngineStatus {
+            installed: true,
+            version: Some("2.1.325 (Claude Code)".into()),
+            logged_in: Some(true),
+            auth_method: Some("claude.ai".into()),
+        };
+        let json = serde_json::to_string(&status).unwrap();
+        assert!(!json.contains("example.com"));
+        assert!(!json.contains("org_"));
+        assert!(!json.contains("max"));
+    }
+
+    #[test]
+    fn auth_status_is_unknown_or_signed_out_when_it_says_so() {
+        assert_eq!(
+            parse_auth_status(r#"{"loggedIn":false,"authMethod":"none"}"#),
+            (Some(false), None)
+        );
+        assert_eq!(parse_auth_status("Not logged in"), (None, None));
+        assert_eq!(parse_auth_status(""), (None, None));
+        assert_eq!(
+            parse_auth_status(r#"{"authMethod":"claude.ai"}"#),
+            (None, None)
+        );
+    }
+
+    #[test]
+    fn an_auth_method_that_could_name_an_account_is_dropped() {
+        for raw in [
+            "someone@example.com",
+            "a method with spaces",
+            "x".repeat(33).as_str(),
+            "",
+        ] {
+            let stdout = serde_json::json!({ "loggedIn": true, "authMethod": raw }).to_string();
+            assert_eq!(parse_auth_status(&stdout), (Some(true), None));
+        }
+        assert_eq!(
+            parse_auth_status(r#"{"loggedIn":true,"authMethod":"api_key"}"#)
+                .1
+                .as_deref(),
+            Some("api_key")
+        );
     }
 
     #[test]

@@ -238,6 +238,10 @@ pub struct Settings {
     /// Absent uses the catalog default. Anthropic ids are dropped until 6a.
     #[serde(default)]
     pub native_chat_target: Option<String>,
+    /// ADR-0191: new chats may run on the user's installed Claude Code.
+    /// Absent or false is off. Only `true` turns it on.
+    #[serde(default)]
+    pub claude_code_engine_enabled: Option<bool>,
     /// Agent step cap per turn. Absent defaults to 50.
     #[serde(default)]
     pub agent_max_steps: Option<u32>,
@@ -537,9 +541,20 @@ fn normalize_settings(settings: Settings) -> Settings {
         multi_workspace_enabled: settings.multi_workspace_enabled,
         agent_profile: normalize_agent_profile(settings.agent_profile),
         chat_engine: normalize_chat_engine(settings.chat_engine),
-        native_chat_target: normalize_native_chat_target(settings.native_chat_target),
+        native_chat_target: normalize_native_chat_target(
+            settings.native_chat_target,
+            settings.claude_code_engine_enabled == Some(true),
+        ),
+        claude_code_engine_enabled: settings.claude_code_engine_enabled.filter(|on| *on),
         agent_max_steps: settings.agent_max_steps.map(|steps| steps.max(1)),
     }
+}
+
+/// ADR-0191 decision 1.2: Claude Code is off until the user turns it on.
+pub(crate) fn claude_code_engine_enabled() -> bool {
+    get_settings()
+        .map(|settings| settings.claude_code_engine_enabled == Some(true))
+        .unwrap_or(false)
 }
 
 /// Absent on disk means native. Leftover Prime/Hermes/garbage values become native.
@@ -590,12 +605,19 @@ fn persist_leftover_chat_engine_migration(
     }
 }
 
-fn normalize_native_chat_target(value: Option<String>) -> Option<String> {
+fn normalize_native_chat_target(
+    value: Option<String>,
+    claude_code_enabled: bool,
+) -> Option<String> {
     let target = value
         .as_deref()
         .map(str::trim)
         .filter(|text| !text.is_empty())?;
     if target.to_ascii_lowercase().starts_with("anthropic/") {
+        return None;
+    }
+    // A Claude Code default with the switch off would start chats that refuse to run.
+    if !claude_code_enabled && target == crate::engines::claude_code::CLAUDE_CODE_TARGET {
         return None;
     }
     Some(target.to_string())
@@ -824,6 +846,37 @@ mod tests {
             ..Settings::default()
         });
         assert_eq!(cleared.agent_profile, None);
+    }
+
+    #[test]
+    fn claude_code_is_off_until_turned_on_and_its_target_needs_the_switch() {
+        let fresh = normalize_settings(Settings::default());
+        assert_eq!(fresh.claude_code_engine_enabled, None);
+
+        let off = normalize_settings(Settings {
+            claude_code_engine_enabled: Some(false),
+            native_chat_target: Some("agent:claude_code".into()),
+            ..Settings::default()
+        });
+        assert_eq!(off.claude_code_engine_enabled, None);
+        assert_eq!(off.native_chat_target, None);
+
+        let on = normalize_settings(Settings {
+            claude_code_engine_enabled: Some(true),
+            native_chat_target: Some("agent:claude_code".into()),
+            ..Settings::default()
+        });
+        assert_eq!(on.claude_code_engine_enabled, Some(true));
+        assert_eq!(on.native_chat_target.as_deref(), Some("agent:claude_code"));
+
+        let model = normalize_settings(Settings {
+            native_chat_target: Some("open_ai/gpt-4.1-mini".into()),
+            ..Settings::default()
+        });
+        assert_eq!(
+            model.native_chat_target.as_deref(),
+            Some("open_ai/gpt-4.1-mini")
+        );
     }
 
     #[test]
@@ -1274,6 +1327,7 @@ mod tests {
             agent_profile: Some("Be brief.".to_string()),
             chat_engine: None,
             native_chat_target: None,
+            claude_code_engine_enabled: None,
             agent_max_steps: None,
         };
         let json = serde_json::to_string(&settings).unwrap();

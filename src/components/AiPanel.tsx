@@ -496,7 +496,8 @@ export function AiPanelView({
       const sessionId = await persistNativeFork({
         messages: agent.messages,
         messageId,
-        target: resolveNativeChatTarget(nativeTarget),
+        // The fork keeps the chat's own engine, not the picker's pick for new chats.
+        target: modelTarget,
         vaultPath,
         permissionMode,
         sourceSessionId: nativeSessionId,
