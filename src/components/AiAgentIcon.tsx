@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { Terminal } from '@phosphor-icons/react'
 import { cn } from '@/lib/utils'
 import { getAiAgentDefinition, type AiAgentId } from '../lib/aiAgents'
 
@@ -17,9 +18,10 @@ const ICON_STYLE: CSSProperties = {
   overflow: 'hidden',
 }
 
-const AI_AGENT_ICON_SOURCES: Record<AiAgentId, string> = {
+// Claude Code has no image here on purpose: Rhizome shows it with a neutral
+// Phosphor `Terminal` glyph, never the Claude or Anthropic mark (ADR-0191 4.2).
+const AI_AGENT_ICON_SOURCES: Record<Exclude<AiAgentId, 'claude_code'>, string> = {
   prime: '/ai-agent-icons/prime.png',
-  claude_code: '/ai-agent-icons/claude-code.svg',
   codex: '/ai-agent-icons/codex.svg',
   opencode: '/ai-agent-icons/opencode.svg',
   antigravity: '/ai-agent-icons/gemini.svg',
@@ -43,15 +45,19 @@ export function AiAgentIcon({
       aria-label={title ? label : undefined}
       aria-hidden={title ? undefined : true}
     >
-      <img
-        src={AI_AGENT_ICON_SOURCES[agent]}
-        alt=""
-        draggable={false}
-        width={size}
-        height={size}
-        className={agent === 'codex' || agent === 'opencode' ? 'agent-mark-invert' : undefined}
-        style={{ display: 'block', width: size, height: size, objectFit: 'contain' }}
-      />
+      {agent === 'claude_code' ? (
+        <Terminal size={size} weight="regular" aria-hidden="true" className="text-muted-foreground" />
+      ) : (
+        <img
+          src={AI_AGENT_ICON_SOURCES[agent]}
+          alt=""
+          draggable={false}
+          width={size}
+          height={size}
+          className={agent === 'codex' || agent === 'opencode' ? 'agent-mark-invert' : undefined}
+          style={{ display: 'block', width: size, height: size, objectFit: 'contain' }}
+        />
+      )}
     </span>
   )
 }

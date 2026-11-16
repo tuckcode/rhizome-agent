@@ -49,6 +49,7 @@ import { GuidanceWarning, WorkspaceHeader } from './AiWorkspaceChrome'
 import { WorkspaceResizeHandles } from './AiWorkspaceResizeHandles'
 import { AiAgentIcon } from './AiAgentIcon'
 import { BrandMark } from './BrandMark'
+import { HarnessMarker } from './HarnessMarker'
 import { ConversationSidebar } from './AiWorkspaceSidebar'
 import { ResizeHandle } from './ResizeHandle'
 import { SideWorkspaceHeader } from './AiWorkspaceSideHeader'
@@ -166,7 +167,7 @@ function TargetPickerTrigger({
         aria-label={translate(locale, 'ai.workspace.targetLabel')}
         data-testid="ai-workspace-target-trigger"
       >
-        <WorkspaceTargetIcon target={selectedTarget} size={compact ? 14 : 16} />
+        <WorkspaceHarnessIcon target={selectedTarget} size={compact ? 14 : 16} />
         <span className="truncate">{workspaceTargetChipLabel(selectedTarget)}</span>
         <CaretDown size={compact ? 12 : 13} />
       </Button>
@@ -565,6 +566,16 @@ function WorkspaceTargetIcon({ size, target }: { size: number; target: AiTarget 
   if (target.kind !== 'agent') return null
   if (isRhizomeWorkspaceTarget(target)) return <BrandMark size={size} />
   return <AiAgentIcon agent={target.agent} size={size} />
+}
+
+/**
+ * The open chat's harness marker (ADR-0191 decision 4). Native chats on an API
+ * model show the Rhizome mark; agent targets keep their own icon, which for
+ * Claude Code is the neutral terminal glyph.
+ */
+function WorkspaceHarnessIcon({ size, target }: { size: number; target: AiTarget }) {
+  if (target.kind !== 'agent') return <HarnessMarker harness="rhizome" size={size} decorative />
+  return <WorkspaceTargetIcon target={target} size={size} />
 }
 
 function ConversationSession({

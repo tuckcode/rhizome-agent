@@ -1,6 +1,6 @@
 # AI Agent Icons
 
-- Claude Code: Claude mark from the official Claude wordmark on https://claude.com/product/claude-code
+- Claude Code: no image. Rhizome shows Claude Code with the neutral Phosphor `Terminal` glyph and the plain text "Claude Code" (ADR-0191 decision 4). The Claude mark was removed.
 - Codex: OpenAI mark from https://openai.com/favicon.svg
 - OpenCode: official OpenCode brand asset from https://opencode.ai/brand
 - Pi: official Pi favicon from https://hey.pi.ai

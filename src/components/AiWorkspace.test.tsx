@@ -8,7 +8,7 @@ import {
   createMissingAiAgentsStatus,
   type AiAgentsStatus,
 } from '../lib/aiAgents'
-import type { AiModelProvider } from '../lib/aiTargets'
+import { modelTargetId, type AiModelProvider } from '../lib/aiTargets'
 import type { AgentStatus } from '../hooks/useCliAiAgent'
 import { resetVaultConfigStore } from '../utils/vaultConfigStore'
 import type { VaultEntry } from '../types'
@@ -600,6 +600,27 @@ describe('AiWorkspace', () => {
         shortLabel: 'Llama 3.2',
       }))
     })
+  })
+
+  it('marks an open native chat on an API model with the Rhizome harness marker', () => {
+    render(
+      <AiWorkspace
+        open
+        mode="window"
+        aiAgentsStatus={installedStatuses()}
+        aiModelProviders={providers}
+        conversationSettings={[
+          { id: 'model-chat', title: 'Model chat', target_id: modelTargetId('ollama-local', 'llama3.2'), archived: false },
+        ]}
+        vaultPath="/tmp/vault"
+        onClose={vi.fn()}
+      />,
+    )
+
+    const session = screen.getByTestId('ai-workspace-session-model-chat')
+    const trigger = within(session).getByTestId('ai-workspace-target-trigger')
+    expect(trigger).toHaveTextContent('Llama 3.2')
+    expect(within(trigger).getByTestId('harness-marker-rhizome')).toHaveAttribute('title', 'Rhizome')
   })
 
   it('shows Rhizome on the chip and composer for leftover Prime and Hermes chats', async () => {

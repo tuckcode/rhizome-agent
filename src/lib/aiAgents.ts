@@ -49,7 +49,8 @@ export const AI_AGENT_DEFINITIONS: readonly AiAgentDefinition[] = [
   {
     id: 'claude_code',
     label: 'Claude Code',
-    shortLabel: 'Claude',
+    // Plain text "Claude Code" on the chat chip, never just "Claude" (ADR-0191 4.2).
+    shortLabel: 'Claude Code',
     installUrl: 'https://docs.anthropic.com/en/docs/claude-code',
     productVisible: false,
   },
