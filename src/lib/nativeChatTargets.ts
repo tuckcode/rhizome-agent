@@ -13,6 +13,7 @@ import {
   sortByProviderListOrder,
 } from './providerListOrder'
 import { oauthAccountReady, type OauthStatus } from './providerOauth'
+import { CLAUDE_CODE_SESSION_TARGET, isClaudeCodeSessionTarget } from './nativeSessionTarget'
 
 export const FREE_TIER_AUTO_TARGET = 'free_tier_auto'
 export const FREE_TIER_AUTO_LABEL = 'Taproot'
@@ -81,6 +82,8 @@ export function resolveNativeChatTarget(
   providers?: AiModelProvider[] | null,
   oauthByProvider?: Record<string, OauthStatus | null | undefined> | null,
 ): string {
+  // A Claude Code chat keeps its engine; it is never swapped for a model.
+  if (isClaudeCodeSessionTarget(stored)) return CLAUDE_CODE_SESSION_TARGET
   const models = seedRhizomeChatModels(providers)
   const value = stored?.trim()
   if (value && !isAnthropicNativeTarget(value, providers)) {

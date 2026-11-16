@@ -14,9 +14,12 @@ use crate::ai_agents::AiAgentPermissionMode;
 use crate::ai_models::{
     AiModelApiKeyStorage, AiModelProvider, AiModelProviderKind, AiModelStreamRequest, HttpLimits,
 };
-use crate::engines::{EngineEvent, NativeControl, NativeEngine};
+use crate::engines::claude_code::{ClaudeCodeSettings, CLAUDE_CODE_TARGET};
+use crate::engines::{ChatControl, ChatEngine, ClaudeCodeEngine, EngineEvent, NativeEngine};
 use crate::provider_keys::ProviderKeys;
-use crate::rhizome_loop::{AgentLoop, ApprovalReply, Model};
+#[cfg(test)]
+use crate::rhizome_loop::Model;
+use crate::rhizome_loop::{AgentLoop, ApprovalReply};
 use crate::rhizome_provider_model::ProviderModel;
 use crate::rhizome_routing::{Catalog, RoutingModel, SystemClock};
 use crate::session_transcript_index::{self, IndexedTranscriptTurn};
@@ -41,6 +44,8 @@ pub const NATIVE_QUIT_BOUND: Duration = Duration::from_secs(2);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NativeChatTarget {
     FreeTier,
+    /// The user's own Claude Code (ADR-0191). Hidden until step 6.
+    ClaudeCode,
     Catalog {
         provider_kind: AiModelProviderKind,
         provider_id: String,
@@ -60,6 +65,9 @@ pub fn resolve_native_target(target: &str) -> Result<NativeChatTarget, String> {
         || trimmed.eq_ignore_ascii_case(FREE_TIER_LABEL)
     {
         return Ok(NativeChatTarget::FreeTier);
+    }
+    if trimmed.eq_ignore_ascii_case(CLAUDE_CODE_TARGET) {
+        return Ok(NativeChatTarget::ClaudeCode);
     }
     let (provider_id, model_id) = match trimmed.split_once('/') {
         Some((provider, model)) => (provider.to_string(), model.to_string()),
@@ -82,6 +90,7 @@ pub fn resolve_native_target(target: &str) -> Result<NativeChatTarget, String> {
 pub fn model_kind_for_target(target: &NativeChatTarget) -> &'static str {
     match target {
         NativeChatTarget::FreeTier => "routing",
+        NativeChatTarget::ClaudeCode => "claude_code",
         NativeChatTarget::Catalog { .. } => "provider",
     }
 }
@@ -117,7 +126,7 @@ pub struct NativeChats {
 }
 
 struct LiveNativeChat {
-    control: NativeControl,
+    control: Box<dyn ChatControl>,
     ops: mpsc::Sender<ChatOp>,
     worker: Option<thread::JoinHandle<()>>,
     read_only: bool,
@@ -154,13 +163,13 @@ impl NativeChats {
         )
     }
 
-    pub fn start_named<M: Model + Send + 'static>(
+    pub fn start_named<E: ChatEngine>(
         &self,
         id: String,
         prompt: &str,
         images: &[crate::chat_images::ChatImage],
         send_anyway: bool,
-        engine: NativeEngine<M>,
+        engine: E,
         emit: impl FnMut(EngineEvent) + Send + 'static,
     ) -> Result<String, String> {
         let path = format!("{NATIVE_SESSION_PREFIX}{id}");
@@ -337,10 +346,10 @@ impl NativeChats {
             .contains_key(session_id)
     }
 
-    pub fn open_with_engine<M: Model + Send + 'static>(
+    pub fn open_with_engine<E: ChatEngine>(
         &self,
         id: String,
-        engine: NativeEngine<M>,
+        engine: E,
         emit: impl FnMut(EngineEvent) + Send + 'static,
     ) -> Result<String, String> {
         if self.is_live(&id) {
@@ -826,8 +835,15 @@ pub fn set_native_session_archived(session_id: String, archived: bool) -> Result
 pub fn open_native_session_record(session_id: &str) -> Result<NativeChatOpenResult, String> {
     let opened = crate::engines::native_log::open_session_log(session_id)?;
     let mut error = None;
-    if let Err(err) = resolve_native_target(&opened.header.target) {
-        error = Some(err);
+    match resolve_native_target(&opened.header.target) {
+        Err(err) => error = Some(err),
+        Ok(NativeChatTarget::ClaudeCode) => {
+            let live_id = opened.successor_id.as_deref().unwrap_or(session_id);
+            if crate::engines::claude_code::conversation_lost(live_id, !opened.events.is_empty()) {
+                error = Some(crate::engines::claude_code::RESUME_FAILED.to_string());
+            }
+        }
+        Ok(_) => {}
     }
     let warning = Some(match &opened.warning {
         Some(damage) => format!("{} {damage}", crate::engines::native_log::REOPEN_WARNING),
@@ -851,6 +867,7 @@ pub fn delete_native_session(chats: &NativeChats, session_id: &str) -> Result<()
     let path = format!("{NATIVE_SESSION_PREFIX}{session_id}");
     session_transcript_index::remove_session(&path)?;
     crate::engines::native_log::delete_session_log(session_id)?;
+    crate::engines::claude_code::forget_conversation(session_id);
     Ok(())
 }
 
@@ -976,6 +993,7 @@ fn gate_images(
     crate::chat_images::ensure_current_turn_fits(images)?;
     let model_label = target.rsplit('/').next().unwrap_or(target);
     match resolve_native_target(target)? {
+        NativeChatTarget::ClaudeCode => Err(crate::chat_images::text_only_refusal("Claude Code")),
         NativeChatTarget::FreeTier => {
             let catalog = crate::rhizome_routing::Catalog::pinned();
             let mut any_yes = false;
@@ -1122,8 +1140,25 @@ fn start_named_request(
         .map(|path| crate::commands::expand_tilde(path).into_owned());
     let vault_paths = request.vault_paths.clone();
     let mode = request.permission_mode;
+    if target == NativeChatTarget::ClaudeCode {
+        let engine = ClaudeCodeEngine::new(ClaudeCodeSettings {
+            vault_path,
+            vault_paths,
+            permission_mode: mode,
+            system_prompt: request.system_prompt.clone(),
+        });
+        return chats.start_named(
+            id,
+            &request.prompt,
+            &request.images,
+            request.send_anyway,
+            engine,
+            emit,
+        );
+    }
     let reasoning = user_reasoning(chats, &id, request.reasoning_level.clone());
     match target {
+        NativeChatTarget::ClaudeCode => unreachable!("handled above"),
         NativeChatTarget::FreeTier => {
             let (tx, rx) = mpsc::channel();
             let reporter = tx.clone();
@@ -1282,6 +1317,7 @@ pub fn native_model_vision(target: String) -> Result<String, String> {
     let resolved = resolve_native_target(&target)?;
     let state = match resolved {
         NativeChatTarget::FreeTier => free_tier_vision_state(),
+        NativeChatTarget::ClaudeCode => crate::chat_images::VisionState::No,
         NativeChatTarget::Catalog {
             provider_kind,
             provider_id,
@@ -1431,8 +1467,22 @@ where
         .clone()
         .or_else(|| composed_system_prompt(None));
     let emit = emit_for(&live_id);
+    if target == NativeChatTarget::ClaudeCode {
+        // The saved target decides the engine, so a Claude Code chat stays
+        // on Claude Code after a restart.
+        let engine = ClaudeCodeEngine::new(ClaudeCodeSettings {
+            vault_path: request.vault_path.clone(),
+            vault_paths: request.vault_paths.clone(),
+            permission_mode: request.permission_mode,
+            system_prompt: opened.header.system_prompt.clone(),
+        });
+        chats.remember_target(&live_id, &request.target);
+        chats.open_with_engine(live_id, engine, emit)?;
+        return Ok(record);
+    }
     let reasoning = user_reasoning(chats, &live_id, opened.header.reasoning_level.clone());
     match target {
+        NativeChatTarget::ClaudeCode => unreachable!("handled above"),
         NativeChatTarget::FreeTier => {
             let (tx, rx) = mpsc::channel();
             let reporter = tx.clone();
@@ -2592,6 +2642,64 @@ mod tests {
                 agent.session_grants().is_empty(),
                 "D13: grants must not come back"
             );
+        });
+    }
+
+    #[test]
+    fn claude_code_is_its_own_native_target() {
+        assert_eq!(
+            resolve_native_target(CLAUDE_CODE_TARGET),
+            Ok(NativeChatTarget::ClaudeCode)
+        );
+        assert_eq!(
+            model_kind_for_target(&NativeChatTarget::ClaudeCode),
+            "claude_code"
+        );
+    }
+
+    #[test]
+    fn claude_code_chats_refuse_images() {
+        let image = tiny_png();
+        let error = gate_images(CLAUDE_CODE_TARGET, &[image], true).unwrap_err();
+        assert!(error.contains("Claude Code"), "{error}");
+    }
+
+    #[test]
+    fn a_claude_code_chat_reopens_on_claude_code() {
+        with_temp_home(|_| {
+            write_native_log("claude-open", 1, CLAUDE_CODE_TARGET, &[]);
+            let chats = NativeChats::new();
+            let record =
+                open_named_session(&chats, &log_id("claude-open"), Err("unused".into()), |_| {
+                    |_| {}
+                })
+                .expect("open");
+            assert!(!record.read_only, "{:?}", record.error);
+            assert!(chats.is_live(&log_id("claude-open")));
+            assert_eq!(
+                chats.target_for(&log_id("claude-open")).unwrap(),
+                CLAUDE_CODE_TARGET
+            );
+            chats.end(&log_id("claude-open")).unwrap();
+        });
+    }
+
+    #[test]
+    fn a_claude_code_chat_with_no_conversation_opens_read_only() {
+        with_temp_home(|_| {
+            write_native_log("claude-lost", 1, CLAUDE_CODE_TARGET, &two_turn_events());
+            let chats = NativeChats::new();
+            let record =
+                open_named_session(&chats, &log_id("claude-lost"), Err("unused".into()), |_| {
+                    |_| {}
+                })
+                .expect("open");
+            assert!(record.read_only);
+            assert_eq!(
+                record.error.as_deref(),
+                Some(crate::engines::claude_code::RESUME_FAILED)
+            );
+            assert!(!chats.is_live(&log_id("claude-lost")));
         });
     }
 

@@ -311,6 +311,20 @@ where
 pub(crate) fn run_agent_stream_with_approval<F>(
     req: AgentStreamRequest,
     approval: Option<&crate::claude_code_approval::ApprovalEndpoint>,
+    emit: F,
+) -> Result<String, String>
+where
+    F: FnMut(ClaudeStreamEvent),
+{
+    run_agent_stream_in_session(req, approval, None, emit)
+}
+
+/// Agent run for a native chat turn, in the Claude Code conversation that
+/// `session` names (ADR-0191 step 5).
+pub(crate) fn run_agent_stream_in_session<F>(
+    req: AgentStreamRequest,
+    approval: Option<&crate::claude_code_approval::ApprovalEndpoint>,
+    session: Option<&crate::claude_invocation::ClaudeSession>,
     mut emit: F,
 ) -> Result<String, String>
 where
@@ -318,7 +332,7 @@ where
 {
     let bin = find_claude_binary()?;
     // Keep `invocation` alive for the whole run: it owns the MCP config file.
-    let invocation = crate::claude_invocation::agent_with_approval(&req, approval)?;
+    let invocation = crate::claude_invocation::agent_in_session(&req, approval, session)?;
     run_claude_subprocess(
         ClaudeSubprocessRequest {
             bin: &bin,
@@ -1361,12 +1375,17 @@ mod tests {
         // ADR-0191 decision 2.8: Rhizome never reads a Claude token from the
         // user's shell. AWS_SESSION_TOKEN is a cloud provider credential the
         // user owns, read under the same rules as their terminal.
-        for name in CLAUDE_PROVIDER_ENV_KEYS {
-            let name = name.as_str();
-            assert!(!name.contains("AUTH_TOKEN"), "{name}");
-            assert!(!name.contains("OAUTH_TOKEN"), "{name}");
-            assert!(!name.starts_with("CLAUDE_CODE_OAUTH"), "{name}");
-        }
+        // The messages name no env key, so no key name reaches test output.
+        let token_names = CLAUDE_PROVIDER_ENV_KEYS
+            .iter()
+            .map(|name| name.as_str())
+            .filter(|name| {
+                name.contains("AUTH_TOKEN")
+                    || name.contains("OAUTH_TOKEN")
+                    || name.starts_with("CLAUDE_CODE_OAUTH")
+            })
+            .count();
+        assert_eq!(token_names, 0, "a bearer or OAuth token is in the env list");
     }
 
     #[test]

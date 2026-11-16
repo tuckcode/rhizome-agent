@@ -64,13 +64,38 @@ pub(crate) fn chat(req: &ChatStreamRequest) -> ClaudeInvocation {
     chat_with_windows_limit(req, cfg!(windows))
 }
 
+/// Which Claude Code conversation a native chat turn belongs to
+/// (ADR-0191 step 5). Rhizome picks the id; it never reads Claude's own
+/// session files.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum ClaudeSession {
+    /// First turn: `--session-id <id>` makes Claude Code use Rhizome's id.
+    New(String),
+    /// Later turns: `--resume <id>`.
+    Resume(String),
+}
+
+impl ClaudeSession {
+    fn args(&self) -> Result<[String; 2], String> {
+        let (flag, id) = match self {
+            ClaudeSession::New(id) => ("--session-id", id),
+            ClaudeSession::Resume(id) => ("--resume", id),
+        };
+        let id = uuid::Uuid::parse_str(id)
+            .map_err(|_| "This Claude Code session id is not valid.".to_string())?;
+        Ok([flag.to_string(), id.hyphenated().to_string()])
+    }
+}
+
 /// The engine profile. With an approval endpoint, Claude Code asks Rhizome
 /// through `--permission-prompt-tool`. Without one, every prompt denies.
-pub(crate) fn agent_with_approval(
+/// `session` names the conversation for a native chat turn.
+pub(crate) fn agent_in_session(
     req: &AgentStreamRequest,
     approval: Option<&ApprovalEndpoint>,
+    session: Option<&ClaudeSession>,
 ) -> Result<ClaudeInvocation, String> {
-    agent_with_windows_limit(req, approval, cfg!(windows))
+    agent_session_with_windows_limit(req, approval, session, cfg!(windows))
 }
 
 fn chat_with_windows_limit(
@@ -103,22 +128,36 @@ fn chat_with_windows_limit(
     }
 }
 
-/// The Claude Code engine profile. No weaker fallback: a `claude` too old for
-/// these flags fails with an update message instead of running unconfined.
+/// Test shorthand: the engine profile with no native chat session.
+#[cfg(test)]
 fn agent_with_windows_limit(
     req: &AgentStreamRequest,
     approval: Option<&ApprovalEndpoint>,
     enforce_windows_limit: bool,
 ) -> Result<ClaudeInvocation, String> {
+    agent_session_with_windows_limit(req, approval, None, enforce_windows_limit)
+}
+
+/// The Claude Code engine profile. No weaker fallback: a `claude` too old for
+/// these flags fails with an update message instead of running unconfined.
+fn agent_session_with_windows_limit(
+    req: &AgentStreamRequest,
+    approval: Option<&ApprovalEndpoint>,
+    session: Option<&ClaudeSession>,
+    enforce_windows_limit: bool,
+) -> Result<ClaudeInvocation, String> {
+    let session_args = session.map(ClaudeSession::args).transpose()?;
     let (mcp_config_arg, mcp_config_file) = engine_mcp_config(req, approval)?;
-    let args = engine_args(req, &mcp_config_arg, approval, PromptSource::Argument);
+    let mut args = engine_args(req, &mcp_config_arg, approval, PromptSource::Argument);
     let stdin = should_pipe_prompt_for_windows(enforce_windows_limit, &args, &[]);
+    if stdin {
+        args = engine_args(req, &mcp_config_arg, approval, PromptSource::Stdin);
+    }
+    if let Some(session_args) = session_args {
+        args.extend(session_args);
+    }
     Ok(ClaudeInvocation {
-        args: if stdin {
-            engine_args(req, &mcp_config_arg, approval, PromptSource::Stdin)
-        } else {
-            args
-        },
+        args,
         fallback_args: Vec::new(),
         stdin_text: stdin.then(|| stdin_prompt(&req.message, req.system_prompt.as_deref())),
         env: vec![CLAUDE_ENGINE_DISABLE_AUTO_MEMORY_ENV],
@@ -825,5 +864,62 @@ mod tests {
                 "[\"/tmp/test-vault\",\"/tmp/secondary-vault\"]"
             );
         }
+    }
+
+    #[test]
+    fn a_first_native_turn_names_the_claude_session() {
+        let id = "7d1f0a52-3c1e-4f0b-9d8e-2a6b1c4d5e6f";
+        let req = agent_request("Hi", None, AiAgentPermissionMode::Safe);
+        let args = agent_session_with_windows_limit(
+            &req,
+            None,
+            Some(&ClaudeSession::New(id.into())),
+            false,
+        )
+        .unwrap()
+        .args;
+        assert_eq!(arg_value_after(&args, "--session-id"), Some(id));
+        assert!(!args.iter().any(|arg| arg == "--resume"));
+    }
+
+    #[test]
+    fn a_later_native_turn_resumes_the_claude_session() {
+        let id = "7d1f0a52-3c1e-4f0b-9d8e-2a6b1c4d5e6f";
+        let req = agent_request("Again", None, AiAgentPermissionMode::Safe);
+        let args = agent_session_with_windows_limit(
+            &req,
+            None,
+            Some(&ClaudeSession::Resume(id.into())),
+            true,
+        )
+        .unwrap()
+        .args;
+        assert_eq!(arg_value_after(&args, "--resume"), Some(id));
+        assert!(!args.iter().any(|arg| arg == "--session-id"));
+        assert!(!args.iter().any(|arg| arg == "--continue"));
+    }
+
+    #[test]
+    fn a_session_id_must_be_a_uuid() {
+        let req = agent_request("Hi", None, AiAgentPermissionMode::Safe);
+        let error = agent_session_with_windows_limit(
+            &req,
+            None,
+            Some(&ClaudeSession::Resume(
+                "--dangerously-skip-permissions".into(),
+            )),
+            false,
+        )
+        .unwrap_err();
+        assert!(error.contains("not valid"));
+    }
+
+    #[test]
+    fn the_shared_agent_path_names_no_session() {
+        let req = agent_request("Hi", None, AiAgentPermissionMode::Safe);
+        let args = agent_with_windows_limit(&req, None, false).unwrap().args;
+        assert!(!args
+            .iter()
+            .any(|arg| arg == "--session-id" || arg == "--resume"));
     }
 }

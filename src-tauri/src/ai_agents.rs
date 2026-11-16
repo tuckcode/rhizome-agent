@@ -297,6 +297,22 @@ where
     })
 }
 
+/// One native chat turn on the Claude Code engine (ADR-0191 step 5): the
+/// same broker and profile as the agent path, in the conversation that
+/// `session` names.
+pub(crate) fn run_claude_engine_turn<F>(
+    req: crate::claude_cli::AgentStreamRequest,
+    session: Option<crate::claude_invocation::ClaudeSession>,
+    emit: F,
+) -> Result<String, String>
+where
+    F: FnMut(AiAgentStreamEvent),
+{
+    run_with_approval_broker(req, emit, move |req, approval, emit_claude| {
+        crate::claude_cli::run_agent_stream_in_session(req, approval, session.as_ref(), emit_claude)
+    })
+}
+
 /// Run one Claude Code turn with an approval broker beside it.
 ///
 /// Claude Code blocks on stdout while it waits for an approval, so the run
