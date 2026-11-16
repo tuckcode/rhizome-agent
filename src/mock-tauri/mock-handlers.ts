@@ -1090,6 +1090,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   stream_claude_chat: () => 'mock-session',
   stream_ai_agent: () => null,
   abort_ai_agent_stream: () => false,
+  reply_ai_agent_approval: () => false,
   start_rhizome_job: () => null,
   cancel_rhizome_job: () => true,
   call_rhizome_tool: (args: { name: string }) => {

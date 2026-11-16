@@ -299,12 +299,26 @@ where
 }
 
 /// Spawn `claude -p` with full tool access and MCP vault tools for an agent task.
-pub fn run_agent_stream<F>(req: AgentStreamRequest, mut emit: F) -> Result<String, String>
+pub fn run_agent_stream<F>(req: AgentStreamRequest, emit: F) -> Result<String, String>
+where
+    F: FnMut(ClaudeStreamEvent),
+{
+    run_agent_stream_with_approval(req, None, emit)
+}
+
+/// Agent run that asks Rhizome for permission through `approval`.
+/// `None` denies every permission prompt.
+pub(crate) fn run_agent_stream_with_approval<F>(
+    req: AgentStreamRequest,
+    approval: Option<&crate::claude_code_approval::ApprovalEndpoint>,
+    mut emit: F,
+) -> Result<String, String>
 where
     F: FnMut(ClaudeStreamEvent),
 {
     let bin = find_claude_binary()?;
-    let invocation = crate::claude_invocation::agent(&req)?;
+    // Keep `invocation` alive for the whole run: it owns the MCP config file.
+    let invocation = crate::claude_invocation::agent_with_approval(&req, approval)?;
     run_claude_subprocess(
         ClaudeSubprocessRequest {
             bin: &bin,

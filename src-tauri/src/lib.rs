@@ -13,6 +13,7 @@ mod app_icon;
 pub mod app_updater;
 mod board;
 pub mod claude_cli;
+mod claude_code_approval;
 mod claude_invocation;
 mod cli_agent_runtime;
 pub mod codex_cli;
@@ -765,6 +766,7 @@ macro_rules! app_invoke_handler {
             commands::stream_ai_agent,
             commands::speak_reply,
             commands::abort_ai_agent_stream,
+            commands::reply_ai_agent_approval,
             commands::get_prime_session_host_status,
             commands::list_prime_running_sessions,
             commands::get_prime_session_stats,
