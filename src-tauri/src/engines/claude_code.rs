@@ -28,6 +28,9 @@ pub const CLAUDE_CODE_TARGET: &str = "agent:claude_code";
 /// Shown when Claude Code has lost the conversation behind a chat.
 pub const RESUME_FAILED: &str = "Claude Code no longer has this conversation, so this chat is read-only. Start a new chat to keep going.";
 
+/// Shown when a Claude Code chat runs with the Settings switch off.
+pub const ENGINE_OFF: &str = "Claude Code is off in Settings. Turn on \"Run chats with your installed Claude Code\" to use this chat.";
+
 const NO_VAULT: &str = "Claude Code needs a vault to work in. Open a vault, then start a new chat.";
 const NO_CONVERSATION: &str = "No conversation found";
 const ALREADY_IN_USE: &str = "already in use";
@@ -58,6 +61,9 @@ pub(crate) type ClaudeRunner = Arc<
         + Send
         + Sync,
 >;
+
+/// Whether the Settings switch is on. Read at every turn.
+pub(crate) type EngineGate = Arc<dyn Fn() -> bool + Send + Sync>;
 
 /// What Rhizome keeps about the Claude Code conversation behind a chat.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -134,6 +140,7 @@ struct Shared {
 pub struct ClaudeCodeEngine {
     settings: ClaudeCodeSettings,
     runner: ClaudeRunner,
+    enabled: EngineGate,
     shared: Arc<Shared>,
     writer: Option<NativeSessionWriter>,
     log_id: String,
@@ -148,12 +155,20 @@ impl ClaudeCodeEngine {
                 crate::ai_agents::run_claude_engine_turn(req, session, emit)
             }),
         )
+        .with_gate(Arc::new(crate::settings::claude_code_engine_enabled))
+    }
+
+    /// Replaces the Settings check. Tests run with the switch on by default.
+    pub(crate) fn with_gate(mut self, enabled: EngineGate) -> Self {
+        self.enabled = enabled;
+        self
     }
 
     pub(crate) fn with_runner(settings: ClaudeCodeSettings, runner: ClaudeRunner) -> Self {
         Self {
             settings,
             runner,
+            enabled: Arc::new(|| true),
             shared: Arc::new(Shared {
                 stream_id: Mutex::new(String::new()),
                 running: AtomicBool::new(false),
@@ -274,6 +289,10 @@ impl ChatEngine for ClaudeCodeEngine {
 
 impl ClaudeCodeEngine {
     fn drive(&mut self, prompt: &str, turn: &mut Turn<'_>) -> Result<(), String> {
+        if !(self.enabled)() {
+            turn.emit(EngineEvent::error(ENGINE_OFF, true));
+            return Ok(());
+        }
         if self.sidecar.resume_failed {
             turn.emit(EngineEvent::error(RESUME_FAILED, true));
             return Ok(());
@@ -884,6 +903,32 @@ mod tests {
                 EngineEvent::ApprovalRequested { prompt_id, call_id, .. }
                     if prompt_id == "p1" && call_id == "toolu_9"
             )));
+        });
+    }
+
+    #[test]
+    fn a_turn_with_the_switch_off_never_runs_claude() {
+        with_temp_home(|| {
+            let (runner, seen) = scripted(tool_turn(), Ok(String::new()));
+            let mut engine =
+                ClaudeCodeEngine::with_runner(settings(), runner).with_gate(Arc::new(|| false));
+            engine.ensure_log(&chat(12)).unwrap();
+            let events = turn(&mut engine, "Read a.md");
+            assert_eq!(events, vec![EngineEvent::error(ENGINE_OFF, true)]);
+            assert!(seen.lock().unwrap().is_empty());
+            let opened = native_log::open_session_log(&chat(12)).unwrap();
+            assert!(opened.events.is_empty());
+        });
+    }
+
+    #[test]
+    fn the_switch_is_off_until_settings_turn_it_on() {
+        with_temp_home(|| {
+            assert!(!crate::settings::claude_code_engine_enabled());
+            let mut stored = crate::settings::get_settings().unwrap();
+            stored.claude_code_engine_enabled = Some(true);
+            crate::settings::save_settings(stored).unwrap();
+            assert!(crate::settings::claude_code_engine_enabled());
         });
     }
 

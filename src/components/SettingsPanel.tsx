@@ -86,6 +86,8 @@ import { GitSettingsSection } from './GitSettingsSection'
 import { PrivacySettingsSection } from './PrivacySettingsSection'
 import { AboutSettingsSection } from './AboutSettingsSection'
 import { SessionImportSettingsSection } from './SessionImportSettingsSection'
+import { ClaudeCodeEngineSettingsSection } from './ClaudeCodeEngineSettingsSection'
+import { isClaudeCodeSessionTarget } from '../lib/nativeSessionTarget'
 import { SettingsBodyNav } from './SettingsBodyNav'
 import {
   SectionHeading,
@@ -185,6 +187,7 @@ interface SettingsDraft {
   initialH1AutoRename: boolean
   hideGitignoredFiles: boolean
   blockSecretFiles: boolean
+  claudeCodeEngineEnabled: boolean
   allNotesFileVisibility: AllNotesFileVisibility
   multiWorkspaceEnabled: boolean
   crashReporting: boolean
@@ -251,6 +254,8 @@ interface SettingsBodyProps {
   setHideGitignoredFiles: (value: boolean) => void
   blockSecretFiles: boolean
   setBlockSecretFiles: (value: boolean) => void
+  claudeCodeEngineEnabled: boolean
+  setClaudeCodeEngineEnabled: (value: boolean) => void
   allNotesFileVisibility: AllNotesFileVisibility
   setAllNotesFileVisibility: (value: AllNotesFileVisibility) => void
   multiWorkspaceEnabled: boolean
@@ -327,6 +332,7 @@ function createSettingsDraft(
     initialH1AutoRename: settings.initial_h1_auto_rename_enabled ?? true,
     hideGitignoredFiles: shouldHideGitignoredFiles(settings),
     blockSecretFiles: shouldBlockSecretFiles(settings),
+    claudeCodeEngineEnabled: settings.claude_code_engine_enabled === true,
     allNotesFileVisibility: resolveAllNotesFileVisibility(settings),
     multiWorkspaceEnabled: settings.multi_workspace_enabled === true,
     crashReporting: settings.crash_reporting_enabled ?? false,
@@ -398,7 +404,11 @@ function buildSettingsFromDraft(settings: Settings, draft: SettingsDraft): Setti
     agent_profile: draft.agentProfile.trim() || null,
     agent_max_steps: draft.agentMaxSteps,
     chat_engine: 'native',
-    native_chat_target: draft.nativeChatTarget,
+    // A Claude Code default with the switch off would start chats that refuse to run.
+    native_chat_target: !draft.claudeCodeEngineEnabled && isClaudeCodeSessionTarget(draft.nativeChatTarget)
+      ? null
+      : draft.nativeChatTarget,
+    claude_code_engine_enabled: draft.claudeCodeEngineEnabled ? true : null,
     ai_model_providers: draft.aiModelProviders.length > 0 ? draft.aiModelProviders : null,
     hide_gitignored_files: draft.hideGitignoredFiles,
     block_secret_files: draft.blockSecretFiles,
@@ -956,6 +966,8 @@ function SettingsBodyFromDraft({
       setHideGitignoredFiles={setHideGitignoredFiles}
       blockSecretFiles={draft.blockSecretFiles}
       setBlockSecretFiles={(value) => updateDraft('blockSecretFiles', value)}
+      claudeCodeEngineEnabled={draft.claudeCodeEngineEnabled}
+      setClaudeCodeEngineEnabled={(value) => updateDraft('claudeCodeEngineEnabled', value)}
       allNotesFileVisibility={draft.allNotesFileVisibility}
       setAllNotesFileVisibility={setAllNotesFileVisibility}
       initialSectionId={initialSectionId}
@@ -1163,6 +1175,8 @@ function SettingsAgentWorkflowSections({
   setAgentProfile,
   blockSecretFiles,
   setBlockSecretFiles,
+  claudeCodeEngineEnabled,
+  setClaudeCodeEngineEnabled,
   nativeChatTarget,
   setNativeChatTarget,
   aiAgentsStatus,
@@ -1196,6 +1210,8 @@ function SettingsAgentWorkflowSections({
           setAgentProfile={setAgentProfile}
           blockSecretFiles={blockSecretFiles}
           setBlockSecretFiles={setBlockSecretFiles}
+          claudeCodeEngineEnabled={claudeCodeEngineEnabled}
+          setClaudeCodeEngineEnabled={setClaudeCodeEngineEnabled}
           nativeChatTarget={nativeChatTarget}
           setNativeChatTarget={setNativeChatTarget}
           aiAgentsStatus={aiAgentsStatus}
@@ -1580,6 +1596,8 @@ function AiAgentSettingsSection({
   setAgentProfile,
   blockSecretFiles,
   setBlockSecretFiles,
+  claudeCodeEngineEnabled,
+  setClaudeCodeEngineEnabled,
   nativeChatTarget,
   setNativeChatTarget,
   aiAgentsStatus,
@@ -1599,6 +1617,8 @@ function AiAgentSettingsSection({
   | 'setAgentProfile'
   | 'blockSecretFiles'
   | 'setBlockSecretFiles'
+  | 'claudeCodeEngineEnabled'
+  | 'setClaudeCodeEngineEnabled'
   | 'nativeChatTarget'
   | 'setNativeChatTarget'
   | 'aiAgentsStatus'
@@ -1690,6 +1710,11 @@ function AiAgentSettingsSection({
           <SecretFilesSettingRow checked={blockSecretFiles} onChange={setBlockSecretFiles} />
         </SettingsGroup>
       </div>
+
+      <ClaudeCodeEngineSettingsSection
+        enabled={claudeCodeEngineEnabled}
+        onEnabledChange={setClaudeCodeEngineEnabled}
+      />
 
       <SettingsGroup>
         <SettingsRow

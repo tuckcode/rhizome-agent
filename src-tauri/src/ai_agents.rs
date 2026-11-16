@@ -3,6 +3,8 @@ use std::time::Duration;
 use tokio::task::JoinHandle;
 
 const AI_AGENT_STATUS_PROBE_TIMEOUT: Duration = Duration::from_secs(5);
+/// `--version` and `auth status` run one after the other.
+const CLAUDE_CODE_STATUS_PROBE_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -187,6 +189,16 @@ pub async fn get_ai_agents_status() -> AiAgentsStatus {
         antigravity,
         kiro,
         hermes,
+    }
+}
+
+/// Settings status for the Claude Code engine. A probe that hangs counts as
+/// not found, so Settings never waits on it.
+pub async fn claude_code_engine_status() -> crate::claude_cli::ClaudeCodeEngineStatus {
+    let probe = tokio::task::spawn_blocking(crate::claude_cli::engine_status);
+    match tokio::time::timeout(CLAUDE_CODE_STATUS_PROBE_TIMEOUT, probe).await {
+        Ok(Ok(status)) => status,
+        Ok(Err(_)) | Err(_) => crate::claude_cli::ClaudeCodeEngineStatus::not_found(),
     }
 }
 
