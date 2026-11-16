@@ -1,5 +1,7 @@
+import { FirstRunModelStep, type FirstRunModelPatch } from './FirstRunModelStep'
 import { TelemetryConsentDialog } from './TelemetryConsentDialog'
 import { WelcomeScreen } from './WelcomeScreen'
+import { completeModelStep } from '../lib/firstRunModelStep'
 import type { useOnboarding } from '../hooks/useOnboarding'
 import type { useVaultSwitcher } from '../hooks/useVaultSwitcher'
 import type { Settings } from '../types'
@@ -21,6 +23,8 @@ export interface StartupScreenParams {
   settings: Settings
   settingsLoaded: boolean
   shouldResumeFreshStartOnboarding: boolean
+  /** First run: the vault is ready and no model is connected yet. */
+  shouldShowModelStep?: boolean
   vaultSwitcher: VaultSwitcherState
 }
 
@@ -113,6 +117,21 @@ export function StartupScreen(params: StartupScreenParams) {
         isOffline={params.isOffline}
         locale={params.locale}
       />
+    )
+  }
+
+  if (params.shouldShowModelStep && !params.noteWindowParams) {
+    return (
+      <div className="app-shell">
+        <FirstRunModelStep
+          providers={params.settings.ai_model_providers}
+          onConnected={async (patch: Partial<FirstRunModelPatch>) => {
+            if (Object.keys(patch).length > 0) await params.saveSettingsPatch(patch)
+            completeModelStep()
+          }}
+          onSkip={completeModelStep}
+        />
+      </div>
     )
   }
 

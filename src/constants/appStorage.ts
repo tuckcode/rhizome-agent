@@ -27,6 +27,9 @@ export const APP_STORAGE_KEYS = {
   commandRailCompactLocked: 'rhizome:command-rail-compact-locked',
   commandRailWidth: 'rhizome:command-rail-width',
   welcomeDismissed: 'rhizome_welcome_dismissed',
+  // First-run model step: 'pending' after the vault step, 'done' after it.
+  // New in this generation, so it has no `tolaria` twin.
+  firstRunModelStep: 'rhizome:first-run-model-step',
 } as const
 
 /**
