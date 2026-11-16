@@ -174,6 +174,7 @@ import { syncVaultAssetScope, useNoteWindowLifecycle } from './hooks/useNoteWind
 import { useVaultRenameDetection } from './hooks/useVaultRenameDetection'
 import { useVaultOpenedTelemetry } from './hooks/useVaultOpenedTelemetry'
 import { useStartupScreenState } from './hooks/useStartupScreenState'
+import { shouldShowModelStep as modelStepWanted, useModelStepPending } from './lib/firstRunModelStep'
 import { useGitFileWorkflows } from './hooks/useGitFileWorkflows'
 import { useAutoGitWork } from './hooks/useAutoGitWork'
 import { useAppAiWorkspaceBridge } from './hooks/useAppAiWorkspaceBridge'
@@ -1845,10 +1846,12 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     return () => cancelAnimationFrame(frameId)
   }, [activeTabEntry, activeTabPath, pendingNoteListPdfExportPath, pdfExportRef])
 
+  const modelStepPending = useModelStepPending()
   const {
     isStartupLoading,
     isVaultContentLoading,
     shouldResumeFreshStartOnboarding,
+    shouldShowModelStep,
     shouldShowStartupScreen,
   } = useStartupScreenState({
     isNoteWindow: Boolean(noteWindowParams),
@@ -1857,6 +1860,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     runtimeMissingVaultPath,
     selectedVaultPath,
     settingsLoaded,
+    modelStepPending: modelStepWanted({ pending: modelStepPending, providers: settings.ai_model_providers }),
     telemetryConsent: settings.telemetry_consent,
     vaultIsLoading: vault.isLoading,
     vaultSwitcher,
@@ -2125,6 +2129,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         settings={settings}
         settingsLoaded={settingsLoaded}
         shouldResumeFreshStartOnboarding={shouldResumeFreshStartOnboarding}
+        shouldShowModelStep={shouldShowModelStep}
         vaultSwitcher={vaultSwitcher}
       />
     )

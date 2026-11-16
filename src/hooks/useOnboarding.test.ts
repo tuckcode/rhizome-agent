@@ -122,6 +122,8 @@ describe('useOnboarding', () => {
     const { result } = await renderOnboarding('/vault/path')
 
     expect(result.current.state).toEqual({ status: 'ready', vaultPath: '/vault/path' })
+    // A user who already has a vault never gets the first-run model step.
+    expect(localStorage.getItem(APP_STORAGE_KEYS.firstRunModelStep)).toBeNull()
   })
 
   it('stays loading until the initial vault path has been resolved', async () => {
@@ -409,6 +411,8 @@ describe('useOnboarding', () => {
     expect(result.current.state).toEqual({ status: 'ready', vaultPath: '/selected/folder' })
     expect(registerVault).toHaveBeenCalledWith('/selected/folder', 'folder')
     expect(localStorage.getItem(APP_STORAGE_KEYS.welcomeDismissed)).toBe('1')
+    // The model step follows the vault step.
+    expect(localStorage.getItem(APP_STORAGE_KEYS.firstRunModelStep)).toBe('pending')
   })
 
   it('shows a visible error when vault registration fails during onboarding', async () => {

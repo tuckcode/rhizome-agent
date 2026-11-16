@@ -186,6 +186,8 @@ test('keyboard onboarding can create an empty vault and the first note', async (
   await page.keyboard.press('Tab')
   await expect(page.getByTestId('welcome-create-new')).toBeFocused()
   await page.keyboard.press('Enter')
+  // First run now asks for a model after the vault step.
+  await page.getByTestId('first-run-model-skip').click()
 
   await expect(page.getByTestId('note-list-container')).toBeVisible({ timeout: 5_000 })
   await expectFreshVaultSeedEntries(page)

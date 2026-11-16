@@ -9,6 +9,7 @@ import {
   labelFromPath,
 } from '../utils/gettingStartedVault'
 import { formatFolderPickerActionError, pickFolder } from '../utils/vault-dialog'
+import { markModelStepPending } from '../lib/firstRunModelStep'
 
 type OnboardingState =
   | { status: 'loading' }
@@ -103,6 +104,8 @@ function markVaultReady(
   vaultPath: string,
 ) {
   markDismissed()
+  // The vault step is done; the model step comes next (run plan 3.4).
+  markModelStepPending()
   setState({ status: 'ready', vaultPath })
 }
 

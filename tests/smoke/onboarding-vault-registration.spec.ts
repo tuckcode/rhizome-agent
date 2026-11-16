@@ -162,6 +162,8 @@ test('opening an existing vault from onboarding persists the selection and survi
 
   await expect(page.getByTestId('welcome-screen')).toBeVisible()
   await page.getByTestId('welcome-open-folder').click()
+  // First run now asks for a model after the vault step.
+  await page.getByTestId('first-run-model-skip').click()
 
   await expect(page.getByTestId('note-list-container')).toBeVisible({ timeout: 5_000 })
   await expect(page.getByTestId('status-vault-trigger')).toContainText('Work')
@@ -190,6 +192,8 @@ test('creating Rhizome Vault from onboarding persists the default vault and surv
 
   await expect(page.getByTestId('welcome-screen')).toBeVisible()
   await page.getByTestId('welcome-create-vault').click()
+  // First run now asks for a model after the vault step.
+  await page.getByTestId('first-run-model-skip').click()
 
   await expect(page.getByTestId('note-list-container')).toBeVisible({ timeout: 5_000 })
   await expect(page.getByTestId('status-vault-trigger')).toContainText('Rhizome Vault')
