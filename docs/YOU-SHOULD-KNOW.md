@@ -41,9 +41,8 @@ Vault knowledge lands as markdown. In-app Chat
 gets Hermes/Pi *manners* from the vault skill (answer first, CLI not
 IPython), not a second runtime.
 
-This machine’s Prime is **0.9.3** (106 public daemon commands). Recheck
-with `pnpm prime:surface` / `pnpm prime:surface:github`. Snapshot:
-`docs/prime-adapter-surface.json`. Do not clone upstream Prime.
+Prime is no longer part of Rhizome (ADR-0189). Its adapter snapshot and
+`pnpm prime:surface` check were removed. Do not clone upstream Prime.
 
 ---
 

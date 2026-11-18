@@ -39,7 +39,6 @@
   Uncommitted files are not "someone else's mess" — they are the last session's unfinished commit. Unpushed commits are not "already done" — another clone will not see them. If either is present, finish that first (commit, push, or surface it in your handoff) before starting new work. Demo-vault dirt is the exception already covered below; everything else counts.
 
   **Why:** this has now bitten three times in about a day. GPT-5.6 Luna's handoff sat uncommitted across a session boundary and was recovered only because a later session happened to run `git status` before wrapping up. The option-2 harness-composition slice plus Grok's C47 work then sat local-only while origin was still at the doctrine commit. The third was the C47 follow-up that skipped Tauri `listen` outside the native app — it was sitting uncommitted in the working tree, and without it `git push` failed the frontend coverage lane and a Playwright smoke on `transformCallback`. This file already warns agents about *creating* unpushed work and checks `git status` only for demo-vault dirt. Nothing told a fresh agent to look for work stranded by a previous session.
-- **Prime adapter work: check the snapshot, do not ingest Prime.** Run `pnpm prime:surface` (and `pnpm prime:surface:github`) before changing the host. Do **not** clone `PrimeIntellect-ai/prime-agent`. The snapshot lists command names only. For behaviour, read Prime's installed docs at `~/.local/lib/node_modules/prime-agent/docs/`. Order of trust: **live daemon > Prime's docs > this repo's notes.** Full rule and the incidents behind it: [`docs/agents/prime-adapter.md`](docs/agents/prime-adapter.md).
 
 
   The general failure is worth naming: **a document written by a previous agent in this repo is not a primary source.** `HANDOFF.md`, `NEXT.md`, the design notes and the ADRs are all agent-authored, confident in tone, and cited by later agents as if they were verified. Three separate errors on 2026-08-29 had exactly this shape. When a claim about *external* behaviour matters — Prime's, macOS's, a library's — go to that thing's own documentation or run it, and cite what you actually read.
@@ -273,16 +272,6 @@ gated now, and the 150 that were not are listed by name in that file's
 `pnpm typecheck:tests:backlog` prints what is still exempt, worst file first
 — clearing one means deleting its line from `exclude`. That command is
 advisory, not a gate, for the same reason `pnpm deadcode` is. C33.
-
-**`pnpm test:live-prime` runs the six `#[ignore]`d Rust tests that need a real
-Prime daemon.** Not in the push gate on purpose — it depends on a background
-service on your machine, and a gate that fails for reasons unrelated to the
-diff is a gate people learn to ignore. Run it when you touch the adapter. No
-daemon is a clean skip, not a failure.
-
-Three of its five current failures state their own missing setup (a started
-session, a scheduled job, `RHIZOME_TEST_DAEMON_SOCKET`) and are not defects.
-Two are real and tracked as C56 — read the message before assuming rot.
 
 `pnpm test:mcp` exists because vitest's `include` is
 `src/**/*.{test,spec}.{ts,tsx}`, so nothing under `mcp-server/` was ever run
