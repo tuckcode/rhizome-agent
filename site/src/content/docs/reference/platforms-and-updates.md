@@ -23,10 +23,6 @@ There's no in-app updater. To update:
 
 If you built an `.app` before, replace it with a new build.
 
-## Update Prime
-
-If you still use Prime from the CLI or in a legacy Prime-locked chat, Rhizome may check for Prime updates but never installs one on its own. When an update is ready, click **Update now**. If it fails, update Prime from a terminal.
-
 ## Report a platform bug
 
 Open an issue on [GitHub](https://github.com/tuckcode/rhizome-agent/issues) and include:

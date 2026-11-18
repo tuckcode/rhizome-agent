@@ -3,7 +3,7 @@
 Source: troubleshooting/model-provider-connection.md
 URL: /troubleshooting/model-provider-connection
 
-Use this checklist when a model provider doesn't answer. It applies to Rhizome's own engine. Prime handles its own providers; see [Chat doesn't answer](chat-doesnt-answer.md).
+Use this checklist when a model provider doesn't answer. It applies to Rhizome's own engine. For other cases, see [Chat doesn't answer](chat-doesnt-answer.md).
 
 ## Local providers
 

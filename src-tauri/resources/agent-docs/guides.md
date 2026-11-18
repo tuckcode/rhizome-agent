@@ -62,7 +62,7 @@ If you already use Claude Code, Hermes Agent, Cursor or Prime, a lot of what you
 
 ## The one big difference
 
-In most harnesses, memory is a file or store that belongs to the tool: `MEMORY.md`, `USER.md`, a database, a cloud account. In Rhizome, memory is your **vault**, a folder of Markdown notes. You choose what's saved with **Save to vault**. With Prime, answers that use a note say it came from your vault. With Git, every change can be diffed and reverted. See [Your vault is the agent's memory](../concepts/vault-as-memory.md).
+In most harnesses, memory is a file or store that belongs to the tool: `MEMORY.md`, `USER.md`, a database, a cloud account. In Rhizome, memory is your **vault**, a folder of Markdown notes. You choose what's saved with **Save to vault**. Answers that read a note say it came from your vault. With Git, every change can be diffed and reverted. See [Your vault is the agent's memory](../concepts/vault-as-memory.md).
 
 ## From Claude Code
 
@@ -83,7 +83,7 @@ Rhizome doesn't run Claude Code inside Chat. Keep using Claude Code in the termi
 |---|---|
 | `MEMORY.md` / `USER.md` | Vault notes you save on purpose. Automatic saving exists but is off by default |
 | Memory writes you approve | **Save to vault** is an explicit click. It writes straight away, so review the note after, or undo with Git |
-| Observable, interruptible runs | Stop any run; with Prime, send a follow-up while it works; see a Prime run's file footprint in [Mycelium](../concepts/mycelium.md) |
+| Observable, interruptible runs | Stop any run; see an old Prime run's file footprint in [Mycelium](../concepts/mycelium.md) |
 | Skills | Rhizome's own plugin system is planned |
 | Your choice of provider | Your own providers, local models or **Taproot**. Keys live in the system keychain |
 
@@ -383,9 +383,9 @@ A **session** is one chat with the agent. Rhizome lists your sessions on the lef
 
 ## Two kinds of session
 
-Which kind you get depends on the engine that ran the chat. See [Agents, engines and models](../concepts/ai.md).
+New chats always run on Rhizome's engine. Sessions that Prime saved before it stopped being a chat engine are the other kind. See [Agents, engines and models](../concepts/ai.md).
 
-| | Prime sessions | Chats on Rhizome's engine |
+| | Old Prime sessions | Chats on Rhizome's engine |
 |---|---|---|
 | Kept in | `~/.prime/agent/sessions/` | `native-sessions/` in the app config folder |
 | Owned by | Prime | Rhizome |
@@ -553,7 +553,7 @@ See [Agents, engines and models](../concepts/ai.md#permission-modes).
 ## See what the agent did
 
 - **Changes:** next to All Notes in the sidebar. The files that changed, with diffs. Commit or revert.
-- **Mycelium:** for Prime sessions, a map of which files the run searched, read or edited. See [Mycelium](../concepts/mycelium.md). Native chats are not drawn in Mycelium.
+- **Mycelium:** for old Prime sessions, a map of which files the run searched, read or edited. See [Mycelium](../concepts/mycelium.md). Native chats are not drawn in Mycelium.
 
 ## Requests that work well
 

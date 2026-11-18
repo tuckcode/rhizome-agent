@@ -38,7 +38,4 @@
   are needed. The hook has no platform branch, so this is the first thing a
   Windows push trips on.
 
-  **On Windows, Prime speaks a named pipe** (`\\.\pipe\prime-agent-daemon`). Setup
-  and troubleshooting: **`docs/WINDOWS-DEV.md`**. Chat/sessions/goals need a
-  live `prime-agent` daemon on that machine. Everything else works, and
-  `pnpm dev` against `mock-tauri` drives the session list without a daemon.
+  Windows setup is in **`docs/WINDOWS-DEV.md`**.

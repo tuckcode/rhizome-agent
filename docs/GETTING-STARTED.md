@@ -22,7 +22,7 @@ User-facing name is **Rhizome**. The bundle is still `ai.rhizome.agent` / `Rhizo
 - **Node.js** `^20.19.0` or `>=22.12.0` (Vite 7) and **pnpm**
 - **Rust** 1.77.2+ (for the Tauri backend)
 - **git** CLI (required by the git integration features)
-- **Prime Agent** on `PATH` is not required for Chat. `./install.sh` may still fetch it until the leftover engine code is removed. Not vendored.
+- **Prime Agent** is not needed. `./install.sh` does not fetch it.
 
 ### Linux system dependencies
 

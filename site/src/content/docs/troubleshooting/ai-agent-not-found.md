@@ -1,31 +1,22 @@
 ---
 title: AI agent not found
-description: Fix "Prime is missing" when Prime Agent is installed but Rhizome can't find it.
+description: What to do when Rhizome says an agent you picked is not available on this machine.
 ---
 
-Rhizome runs Prime Agent as a separate program. It can only use Prime when Prime is installed and Rhizome can find it.
+Chat runs on Rhizome's own engine, which is built into the app and needs nothing else installed. Other agents, such as a command-line tool you picked as a chat target, run as separate programs. Rhizome can only use one when it is installed and Rhizome can find it.
 
-You don't need Prime for Chat. Rhizome's own engine is the only chat engine, and Prime is no longer a chat engine (ADR-0189); its leftover code is still in the repo until the follow-up PRs.
+Prime and Hermes are no longer chat engines (ADR-0189). A chat that used to run on them now runs on Rhizome's engine.
 
 ## Symptoms
 
-- Chat says Prime is missing.
-- `prime-agent` works in one terminal but not from Rhizome.
+- The command palette says an agent "is not available on this machine".
+- The agent's command works in one terminal but not from Rhizome.
 
-## Checks
+## Fixes
 
-1. Open a terminal and run:
-
-   ```bash
-   prime-agent status
-   ```
-
-2. If the command isn't found, run `./install.sh` in your `rhizome-agent` folder. It installs Prime when it's missing.
-3. If Prime is installed but not running, start the daemon:
-
-   ```bash
-   (prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status
-   ```
+1. Click **Use Rhizome instead** to send the prompt to Rhizome's own engine.
+2. Or click **Install**, follow that agent's install steps, then try again.
+3. If the agent is installed but still not found, check your `PATH` below.
 
 ## Path issues
 

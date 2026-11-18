@@ -25,7 +25,7 @@ When users ask how to improve a knowledge base, structure notes, choose types, m
 - [Free models and routing](pages/concepts/free-models-and-routing.md): How Rhizome routes Chat across free hosted models and falls back when one fails.
 - [Git](pages/concepts/git.md): Git gives your vault history, diffs, undo and sync, including for changes the agent makes.
 - [Inbox](pages/concepts/inbox.md): The Inbox holds notes you captured but haven't organized yet.
-- [Mycelium](pages/concepts/mycelium.md): Replay where a Prime run went, meaning which files it searched, read and edited. Uses Mindwalk.
+- [Mycelium](pages/concepts/mycelium.md): Replay where an old Prime run went, meaning which files it searched, read and edited. Uses Mindwalk.
 - [Notes](pages/concepts/notes.md): A note is a Markdown file with optional YAML frontmatter. Its first H1 is its title.
 - [Properties](pages/concepts/properties.md): Properties are frontmatter fields Rhizome can show, filter and edit.
 - [Relationships](pages/concepts/relationships.md): Link notes with wikilinks in the body or in frontmatter fields, and navigate the links both ways.
@@ -67,8 +67,8 @@ When users ask how to improve a knowledge base, structure notes, choose types, m
 
 ## Troubleshooting
 
-- [AI agent not found](pages/troubleshooting/ai-agent-not-found.md): Fix "Prime is missing" when Prime Agent is installed but Rhizome can't find it.
-- [Chat doesn't answer](pages/troubleshooting/chat-doesnt-answer.md): What to do when a message gets no reply, for Rhizome's own engine and for Prime.
+- [AI agent not found](pages/troubleshooting/ai-agent-not-found.md): What to do when Rhizome says an agent you picked is not available on this machine.
+- [Chat doesn't answer](pages/troubleshooting/chat-doesnt-answer.md): What to do when a message gets no reply on Rhizome's own engine.
 - [Git authentication](pages/troubleshooting/git-auth.md): Fix push and pull failures caused by Git sign-in.
 - [Model provider connection](pages/troubleshooting/model-provider-connection.md): What to check when a local or hosted model provider won't connect.
 - [Sync conflicts](pages/troubleshooting/sync-conflicts.md): Resolve conflicts when local and remote changes touch the same note.
