@@ -21,15 +21,9 @@ cd rhizome-agent
 pnpm tauri dev
 ```
 
-`./install.sh` installs this repo and may fetch Prime Agent when that program is not already on the machine. Chat runs on Rhizome's own engine (ADR-0187). Chat does not use Prime. That install step comes out with the leftover engine code.
+`./install.sh` clones this repo if needed and installs its packages. It downloads nothing else. Chat runs on Rhizome's own engine (ADR-0187).
 
 The full list of tools, the first minute in the app, and what to do when it fails: [Getting started](docs/start/README.md).
-
-`prime-agent` stops when that terminal closes. To leave it running for CLI use outside Rhizome:
-
-```bash
-(prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status
-```
 
 Quit the installed Rhizome app before `pnpm tauri dev`. Both use the bundle id `ai.rhizome.agent`, and a second launch attaches to the one already open. A current install may still be named `Rhizome Agent.app`; a new build uses `Rhizome.app`. The executable inside stays `RhizomeAgent`.
 
