@@ -16,8 +16,7 @@
     "src/mock-tauri.ts",
     "src/types/mockTauriBridge.ts",
     "src/types/rhizomeTestBridge.ts",
-    "mcp-server/cli-call.mjs",
-    "mcp-server/prime-login.mjs"
+    "mcp-server/cli-call.mjs"
   ],
   "ignoreDependencies": [
     "@tauri-apps/plugin-updater",

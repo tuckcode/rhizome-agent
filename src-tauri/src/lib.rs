@@ -49,7 +49,6 @@ mod prime_custom_models;
 mod prime_daemon_pipe;
 mod prime_discovery;
 mod prime_events;
-mod prime_login;
 pub mod prime_session_host;
 pub mod prime_sessions;
 mod prime_settings;
@@ -807,8 +806,6 @@ macro_rules! app_invoke_handler {
             commands::list_prime_sessions,
             commands::get_connected_providers,
             commands::get_prime_provider_status,
-            commands::sign_in_prime_provider,
-            commands::save_prime_provider_key,
             commands::ensure_nous_portal_models,
             commands::preflight_chat,
             commands::start_mindwalk_sidecar,
