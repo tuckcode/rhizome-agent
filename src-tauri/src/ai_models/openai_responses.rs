@@ -1426,25 +1426,31 @@ fn store_replay(session: &str, turn: ReplayTurn) {
     if session.is_empty() {
         return;
     }
-    let mut book = replay_book()
+    replay_book()
         .lock()
-        .unwrap_or_else(|error| error.into_inner());
-    let bucket = book.sessions.entry(session.to_string()).or_default();
-    bucket.push_back(turn);
-    while bucket.len() > MAX_REPLAY_TURNS {
-        bucket.pop_front();
-    }
-    let mut bytes = bucket.iter().map(replay_bytes).sum::<usize>();
-    while bytes > MAX_REPLAY_BYTES && bucket.len() > 1 {
-        if let Some(old) = bucket.pop_front() {
-            bytes = bytes.saturating_sub(replay_bytes(&old));
+        .unwrap_or_else(|error| error.into_inner())
+        .store(session, turn);
+}
+
+impl ReplayBook {
+    fn store(&mut self, session: &str, turn: ReplayTurn) {
+        let bucket = self.sessions.entry(session.to_string()).or_default();
+        bucket.push_back(turn);
+        while bucket.len() > MAX_REPLAY_TURNS {
+            bucket.pop_front();
         }
-    }
-    book.order.retain(|id| id != session);
-    book.order.push_back(session.to_string());
-    while book.order.len() > MAX_REPLAY_SESSIONS {
-        if let Some(old) = book.order.pop_front() {
-            book.sessions.remove(&old);
+        let mut bytes = bucket.iter().map(replay_bytes).sum::<usize>();
+        while bytes > MAX_REPLAY_BYTES && bucket.len() > 1 {
+            if let Some(old) = bucket.pop_front() {
+                bytes = bytes.saturating_sub(replay_bytes(&old));
+            }
+        }
+        self.order.retain(|id| id != session);
+        self.order.push_back(session.to_string());
+        while self.order.len() > MAX_REPLAY_SESSIONS {
+            if let Some(old) = self.order.pop_front() {
+                self.sessions.remove(&old);
+            }
         }
     }
 }
@@ -2320,11 +2326,17 @@ mod tests {
 
     #[test]
     fn replay_map_drops_the_oldest_chat_after_64() {
+        // A book of its own: the shared one also takes turns from tests
+        // running in parallel, which can evict a second chat here.
+        let mut book = ReplayBook {
+            sessions: HashMap::new(),
+            order: VecDeque::new(),
+        };
         let sessions = (0..=MAX_REPLAY_SESSIONS)
             .map(|index| format!("evict-chat-{index}"))
             .collect::<Vec<_>>();
         for session in &sessions {
-            store_replay(
+            book.store(
                 session,
                 ReplayTurn {
                     items: vec![json!({
@@ -2336,12 +2348,11 @@ mod tests {
                 },
             );
         }
-        assert!(load_replay(&sessions[0]).is_empty());
-        assert_eq!(load_replay(&sessions[1]).len(), 1);
-        assert_eq!(load_replay(sessions.last().unwrap()).len(), 1);
-        for session in &sessions {
-            clear_responses_replay(session);
-        }
+        let len = |session: &String| book.sessions.get(session).map_or(0, VecDeque::len);
+        assert_eq!(len(&sessions[0]), 0);
+        assert_eq!(len(&sessions[1]), 1);
+        assert_eq!(len(sessions.last().unwrap()), 1);
+        assert_eq!(book.order.len(), MAX_REPLAY_SESSIONS);
     }
 
     #[test]
