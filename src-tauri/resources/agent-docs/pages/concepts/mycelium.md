@@ -16,7 +16,7 @@ Mycelium uses [Mindwalk](https://github.com/cosmtrek/mindwalk) (MIT) © 2026 Ric
 ## Before you start
 
 1. Install Mindwalk so that the `mindwalk` program is on your path. See [Mindwalk](https://github.com/cosmtrek/mindwalk) for install steps.
-2. Chat with Prime as the engine. Mycelium reads Prime sessions from `~/.prime/agent/sessions/`. It doesn't show chats from Rhizome's own engine, and the agent can't search old Mycelium sessions.
+2. Have Prime sessions on disk. Mycelium reads sessions that Prime saved in `~/.prime/agent/sessions/` before it stopped being a chat engine (ADR-0189). It doesn't show chats from Rhizome's own engine yet, and the agent can't search old Mycelium sessions.
 
 If Mindwalk is missing, Mycelium says **Install Mindwalk, then retry**.
 

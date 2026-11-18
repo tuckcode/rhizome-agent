@@ -40,8 +40,6 @@ Type a message and press Enter. You should get an answer, or a clear failure:
 | You see | Do this |
 |---|---|
 | No provider key | Add a key in Settings → AI Agents → API model, or turn on a free provider. See [Set up models and keys](../guides/configure-ai-models.md) |
-| Prime is installed, but Chat still says it's missing | Applies to Prime-locked chats only. Wait a few seconds. The check repeats |
-| The provider login expired (Prime) | Run `prime-agent` and `/login` in a terminal. Settings no longer has a Prime sign-in |
 
 More cases: [Chat doesn't answer](../troubleshooting/chat-doesnt-answer.md).
 
@@ -58,7 +56,7 @@ Show Notes with ⌘2 (or the View menu), open the note, quit Rhizome with ⌘Q, 
 | What | Where |
 |---|---|
 | Notes, attachments, types, saved views | Your vault folder |
-| Prime chat sessions | `~/.prime/agent/sessions/` |
+| Old Prime chat sessions, read by Mycelium | `~/.prime/agent/sessions/` |
 | Chats from Rhizome's own engine | `native-sessions/` in the app config folder (`com.rhizome.app`) |
 | API keys | The system keychain |
 | Settings, window size, recent vaults | Local app settings |

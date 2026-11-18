@@ -36,7 +36,6 @@
     "headings": [
       "Before you start",
       "Build and run",
-      "Set up Prime (legacy)",
       "If you already have a built copy",
       "Look at the interface without an engine",
       "Next"
@@ -159,7 +158,7 @@
   },
   {
     "title": "Mycelium",
-    "description": "Replay where a Prime run went, meaning which files it searched, read and edited. Uses Mindwalk.",
+    "description": "Replay where an old Prime run went, meaning which files it searched, read and edited. Uses Mindwalk.",
     "path": "pages/concepts/mycelium.md",
     "url": "/concepts/mycelium",
     "section": "concepts",
@@ -567,7 +566,6 @@
     "section": "reference",
     "headings": [
       "Update Rhizome",
-      "Update Prime",
       "Report a platform bug"
     ]
   },
@@ -633,26 +631,25 @@
   },
   {
     "title": "AI agent not found",
-    "description": "Fix \"Prime is missing\" when Prime Agent is installed but Rhizome can't find it.",
+    "description": "What to do when Rhizome says an agent you picked is not available on this machine.",
     "path": "pages/troubleshooting/ai-agent-not-found.md",
     "url": "/troubleshooting/ai-agent-not-found",
     "section": "troubleshooting",
     "headings": [
       "Symptoms",
-      "Checks",
+      "Fixes",
       "Path issues"
     ]
   },
   {
     "title": "Chat doesn't answer",
-    "description": "What to do when a message gets no reply, for Rhizome's own engine and for Prime.",
+    "description": "What to do when a message gets no reply on Rhizome's own engine.",
     "path": "pages/troubleshooting/chat-doesnt-answer.md",
     "url": "/troubleshooting/chat-doesnt-answer",
     "section": "troubleshooting",
     "headings": [
       "Rhizome's engine",
-      "Prime Agent",
-      "Either engine"
+      "Anything else"
     ]
   },
   {

@@ -42,7 +42,7 @@ Type is not inferred from folder location. It comes from frontmatter, and relati
 | `AGENTS.md` | Your conventions for AI agents working in this vault. |
 | `CLAUDE.md` | A compatibility copy for tools that look for that name. |
 
-Chats from Rhizome's engine aren't kept in the vault. They're in `native-sessions/` in the app config folder. Prime keeps its sessions in `~/.prime/agent/sessions/`.
+Chats from Rhizome's engine aren't kept in the vault. They're in `native-sessions/` in the app config folder. Sessions saved by Prime before it was removed stay in `~/.prime/agent/sessions/`, where Mycelium reads them.
 
 PDFs, images, and other non-Markdown files stay as normal files. Folder browsing can show them in place, and Settings controls whether PDFs, images, and unsupported files appear in All Notes.
 
