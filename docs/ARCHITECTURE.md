@@ -1060,8 +1060,6 @@ flowchart LR
 | `spawn_ws_bridge(vault_path)` | Spawns `ws-bridge.js` as child process with `VAULT_PATH`/`VAULT_PATHS` env |
 | `sync_mcp_bridge_vault(vault_path?)` | Starts, restarts, or stops the desktop WebSocket bridge as the selected vault changes |
 | `get_prime_provider_status` | Read-only connection status per provider (no keys). Settings waits until Agents is visible |
-| `sign_in_prime_provider` | OAuth sign-in in the system browser via `mcp-server/prime-login.mjs` and Prime's `AuthStorage`, then reload the session (ADR-0176) |
-| `save_prime_provider_key` | Store a pasted API key through Prime's `AuthStorage` (key on stdin), then reload the session (ADR-0176) |
 | `settle_prime_session` | Settle the owned session on hide, then stop ws-bridge + Mindwalk. Spawned Prime stays warm (C75) |
 | `latest_prime_session_for_restore` | Newest resumable session for idle Chat restore — not the full list |
 | `extract_mcp_server_to_stable_dir(app_version)` | On Linux AppImage launches, copies bundled MCP files to `~/.local/share/rhizome/mcp-server/` with version-gated replacement so external clients can keep a stable `index.js` path |

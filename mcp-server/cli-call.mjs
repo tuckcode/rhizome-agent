@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * One-shot Rhizome MCP tool caller for Prime (and other agents).
+ * One-shot Rhizome MCP tool caller for agents that shell out to it.
  *
  * Usage:
  *   node cli-call.mjs <toolName> [jsonArgs]

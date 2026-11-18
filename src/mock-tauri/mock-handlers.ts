@@ -1053,8 +1053,6 @@ export const mockHandlers: Record<string, (args: any) => any> = {
     modelCount: 1,
     reloaded: true,
   }),
-  sign_in_prime_provider: () => null,
-  save_prime_provider_key: () => null,
   set_prime_model_allow_list: () => null,
   fork_prime_session: () => ({ sessionId: 'mock-fork', branchedFrom: 'branch point' }),
   settle_prime_session: () => ({ outcome: 'keep_session_running' }),
