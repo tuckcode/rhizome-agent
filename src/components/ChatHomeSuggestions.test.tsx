@@ -37,7 +37,8 @@ describe('ChatHomeSuggestions', () => {
 
   it('says what each starter does', () => {
     render(<ChatHomeSuggestions />)
-    expect(screen.getByRole('button', { name: 'Find and fix a bug' })).toHaveTextContent('Reproduce it, then repair it')
+    // The pill shows the label. The detail shows on hover.
+    expect(screen.getByRole('button', { name: 'Find and fix a bug' })).toHaveAttribute('title', 'Reproduce it, then repair it')
   })
 
   it('offers the notes that changed last as context for a new chat', () => {

@@ -569,23 +569,33 @@ function AiPanelEmptyState({
     )
   }
 
+  const subline = hasContext
+    ? 'Rhizome can work from the open note, or from the rest of this repo.'
+    : 'Rhizome can research this repo, edit files, and run commands here.'
+
   return (
     <div
-      className="flex min-h-full flex-1 flex-col items-center justify-end px-6 pb-5 text-center"
+      className="relative flex min-h-full flex-1 flex-col items-center justify-end px-6 pb-8 text-center"
       data-layout="hero"
       data-testid="ai-panel-empty-state"
     >
-      <BrandMark size={44} />
-      <p className="mt-3 font-mono text-sm font-semibold tracking-wide text-muted-foreground" data-testid="chat-home-wordmark">
-        rhizome
-      </p>
-      <h2 className="mt-4 font-sans text-3xl font-semibold tracking-tight text-foreground">
-        What are we working on?
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute bottom-0 left-1/2 h-72 w-[36rem] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl"
+      />
+      <div className="relative inline-flex items-center gap-2 rounded-full border border-border bg-background/60 py-1 pl-1.5 pr-3">
+        <BrandMark size={20} />
+        <p className="font-mono text-xs font-semibold tracking-wide text-muted-foreground" data-testid="chat-home-wordmark">
+          rhizome
+        </p>
+      </div>
+      <h2 className="relative mt-6 font-sans text-6xl font-semibold leading-none tracking-tighter text-foreground">
+        What are we{' '}
+        <br />
+        working on?
       </h2>
-      <p className="mt-2 max-w-lg text-base leading-6 text-muted-foreground">
-        {hasContext
-          ? 'Rhizome can work from the open note, or from the rest of this repo.'
-          : 'Rhizome can research this repo, edit files, and run commands here.'}
+      <p className="relative mt-5 max-w-md text-base leading-6 text-muted-foreground">
+        {subline}
       </p>
     </div>
   )
