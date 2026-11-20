@@ -244,6 +244,8 @@ export async function generateAiConversationTitleForTarget(
 ): Promise<string | null> {
   const fallbackTitle = generateAiConversationTitle(request.prompt)
   if (!request.targetReady || !request.vaultPath.trim()) return fallbackTitle
+  // ADR-0191 decision 1.4: a title is not a turn the user sent, so it never runs on Claude Code.
+  if (request.target.kind === 'agent' && request.target.agent === 'claude_code') return fallbackTitle
 
   try {
     return await generateAiTitleText(request) ?? fallbackTitle

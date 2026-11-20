@@ -7,7 +7,9 @@ use std::process::{ExitStatus, Stdio};
 
 const CLAUDE_PROVIDER_ENV_KEYS: &[EnvName<'static>] = &[
     EnvName::trusted("ANTHROPIC_API_KEY"),
-    EnvName::trusted("ANTHROPIC_AUTH_TOKEN"),
+    // No ANTHROPIC_AUTH_TOKEN: it is a bearer token, and Rhizome must not read
+    // one from the user's shell (ADR-0191 decision 2.8). A value already in
+    // the process environment still passes through, unread.
     EnvName::trusted("ANTHROPIC_BASE_URL"),
     EnvName::trusted("ANTHROPIC_CUSTOM_HEADERS"),
     EnvName::trusted("ANTHROPIC_MODEL"),
@@ -275,6 +277,90 @@ pub fn check_cli() -> ClaudeCliStatus {
     }
 }
 
+/// What Settings shows for the Claude Code engine (ADR-0191 decision 2.5).
+/// From `claude auth status --json` it keeps a yes or no and the method name.
+/// Every other field is dropped where it is parsed.
+#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ClaudeCodeEngineStatus {
+    pub installed: bool,
+    pub version: Option<String>,
+    /// `None` when Claude Code did not report a sign-in state Rhizome can read.
+    pub logged_in: Option<bool>,
+    pub auth_method: Option<String>,
+}
+
+impl ClaudeCodeEngineStatus {
+    pub fn not_found() -> Self {
+        Self {
+            installed: false,
+            version: None,
+            logged_in: None,
+            auth_method: None,
+        }
+    }
+}
+
+/// `claude --version` and `claude auth status --json`. Nothing else is read.
+pub fn engine_status() -> ClaudeCodeEngineStatus {
+    let Ok(bin) = find_claude_binary() else {
+        return ClaudeCodeEngineStatus::not_found();
+    };
+    let (logged_in, auth_method) = auth_status_for_binary(&bin);
+    ClaudeCodeEngineStatus {
+        installed: true,
+        version: crate::cli_agent_runtime::version_for_binary(&bin),
+        logged_in,
+        auth_method,
+    }
+}
+
+fn auth_status_for_binary(binary: &Path) -> (Option<bool>, Option<String>) {
+    let Ok(target) = crate::cli_agent_runtime::command_target_avoiding_windows_cmd_shim(binary)
+    else {
+        return (None, None);
+    };
+    let mut command = crate::hidden_command(&target.program);
+    crate::cli_agent_runtime::configure_agent_command_environment(&mut command, binary);
+    if let Some(first_arg) = target.first_arg {
+        command.arg(first_arg);
+    }
+    command
+        .args(["auth", "status", "--json"])
+        .stdin(Stdio::null());
+    match command.output() {
+        Ok(output) => parse_auth_status(&String::from_utf8_lossy(&output.stdout)),
+        Err(_) => (None, None),
+    }
+}
+
+/// Keeps `loggedIn` and, when signed in, `authMethod`. Drops everything else,
+/// so an email, organization, or account id never leaves this function.
+pub(crate) fn parse_auth_status(stdout: &str) -> (Option<bool>, Option<String>) {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(stdout.trim()) else {
+        return (None, None);
+    };
+    let logged_in = value.get("loggedIn").and_then(serde_json::Value::as_bool);
+    let method = value
+        .get("authMethod")
+        .and_then(serde_json::Value::as_str)
+        .and_then(auth_method_name);
+    match logged_in {
+        Some(true) => (Some(true), method),
+        other => (other, None),
+    }
+}
+
+/// A short method name such as `claude.ai` or `api_key`. Anything longer or
+/// with other characters could carry an account detail, so it is dropped.
+fn auth_method_name(raw: &str) -> Option<String> {
+    let name = raw.trim();
+    let plain = name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-'));
+    (!name.is_empty() && name.len() <= 32 && plain && !name.contains('@')).then(|| name.to_string())
+}
+
 /// Spawn `claude -p` for a simple chat (no tools) and stream events via the
 /// provided callback.  Returns the session ID for future `--resume` calls.
 pub fn run_chat_stream<F>(req: ChatStreamRequest, mut emit: F) -> Result<String, String>
@@ -290,18 +376,47 @@ where
             fallback_args: &invocation.fallback_args,
             stdin_text: invocation.stdin_text.as_deref(),
             cwd: None,
+            env: &invocation.env,
         },
         &mut emit,
     )
 }
 
 /// Spawn `claude -p` with full tool access and MCP vault tools for an agent task.
-pub fn run_agent_stream<F>(req: AgentStreamRequest, mut emit: F) -> Result<String, String>
+pub fn run_agent_stream<F>(req: AgentStreamRequest, emit: F) -> Result<String, String>
+where
+    F: FnMut(ClaudeStreamEvent),
+{
+    run_agent_stream_with_approval(req, None, emit)
+}
+
+/// Agent run that asks Rhizome for permission through `approval`.
+/// `None` denies every permission prompt.
+pub(crate) fn run_agent_stream_with_approval<F>(
+    req: AgentStreamRequest,
+    approval: Option<&crate::claude_code_approval::ApprovalEndpoint>,
+    emit: F,
+) -> Result<String, String>
+where
+    F: FnMut(ClaudeStreamEvent),
+{
+    run_agent_stream_in_session(req, approval, None, emit)
+}
+
+/// Agent run for a native chat turn, in the Claude Code conversation that
+/// `session` names (ADR-0191 step 5).
+pub(crate) fn run_agent_stream_in_session<F>(
+    req: AgentStreamRequest,
+    approval: Option<&crate::claude_code_approval::ApprovalEndpoint>,
+    session: Option<&crate::claude_invocation::ClaudeSession>,
+    mut emit: F,
+) -> Result<String, String>
 where
     F: FnMut(ClaudeStreamEvent),
 {
     let bin = find_claude_binary()?;
-    let invocation = crate::claude_invocation::agent(&req)?;
+    // Keep `invocation` alive for the whole run: it owns the MCP config file.
+    let invocation = crate::claude_invocation::agent_in_session(&req, approval, session)?;
     run_claude_subprocess(
         ClaudeSubprocessRequest {
             bin: &bin,
@@ -309,6 +424,7 @@ where
             fallback_args: &invocation.fallback_args,
             stdin_text: invocation.stdin_text.as_deref(),
             cwd: Some(&req.vault_path),
+            env: &invocation.env,
         },
         &mut emit,
     )
@@ -331,12 +447,14 @@ struct ClaudeSubprocessRequest<'a> {
     fallback_args: &'a [Vec<String>],
     stdin_text: Option<&'a str>,
     cwd: Option<&'a str>,
+    env: &'a [(&'static str, &'static str)],
 }
 
 struct ClaudeCommandRequest<'a> {
     bin: &'a Path,
     args: &'a [String],
     cwd: Option<&'a str>,
+    env: &'a [(&'static str, &'static str)],
 }
 
 #[derive(Clone, Copy)]
@@ -408,6 +526,7 @@ where
             bin: request.bin,
             args: attempt_args,
             cwd: request.cwd,
+            env: request.env,
         })?;
         let process = crate::cli_agent_runtime::JsonLineProcess::new(cmd, "claude")
             .with_stdin(request.stdin_text);
@@ -457,6 +576,9 @@ fn build_claude_command(
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    for (name, value) in request.env {
+        cmd.env(name, value);
+    }
     if let Some(dir) = request.cwd {
         cmd.current_dir(dir);
     }
@@ -469,6 +591,10 @@ fn configure_claude_command_environment(cmd: &mut std::process::Command, bin: &P
 }
 
 fn format_failed_claude_exit(failure: ClaudeFailure<'_>) -> String {
+    if is_unsupported_engine_flag_error(failure.stderr) {
+        return CLAUDE_TOO_OLD_MESSAGE.into();
+    }
+
     if is_claude_too_many_redirects_error(failure.stderr) {
         return localized_error(CLAUDE_TOO_MANY_REDIRECTS_KEY);
     }
@@ -507,6 +633,42 @@ fn is_claude_auth_error(stderr: ClaudeStderr<'_>) -> bool {
     ["not logged in", "authentication", "auth"]
         .iter()
         .any(|pattern| lower.contains(pattern))
+}
+
+const CLAUDE_TOO_OLD_MESSAGE: &str =
+    "This Claude Code is too old for Rhizome. Run `claude update` in your terminal, then try again.";
+
+/// Flags the engine profile needs. A `claude` that rejects one is older than
+/// the version floor; the engine has no weaker fallback (ADR-0191).
+const CLAUDE_ENGINE_FLAGS: &[&str] = &[
+    "--setting-sources",
+    "--settings",
+    "--strict-mcp-config",
+    "--permission-mode",
+    "--permission-prompts",
+    "--tools",
+    "--add-dir",
+];
+
+fn looks_like_unsupported_option(lower: &str) -> bool {
+    [
+        "unknown option",
+        "unknown argument",
+        "unrecognized option",
+        "unexpected argument",
+        "unknown command-line option",
+        "invalid choice",
+        "invalid argument",
+        "is invalid. allowed choices",
+    ]
+    .iter()
+    .any(|pattern| lower.contains(pattern))
+}
+
+fn is_unsupported_engine_flag_error(stderr: ClaudeStderr<'_>) -> bool {
+    let lower = stderr.to_ascii_lowercase();
+    CLAUDE_ENGINE_FLAGS.iter().any(|flag| lower.contains(flag))
+        && looks_like_unsupported_option(&lower)
 }
 
 fn is_unsupported_claude_flag_error(stderr: ClaudeStderr<'_>) -> bool {
@@ -1215,6 +1377,7 @@ mod tests {
             bin: &bin,
             args: &args,
             cwd: Some("/tmp/vault"),
+            env: &[],
         })
         .unwrap();
         let actual_args: Vec<OsString> = command.get_args().map(OsStr::to_os_string).collect();
@@ -1267,6 +1430,7 @@ mod tests {
             bin: &shim,
             args: &args,
             cwd: Some("/tmp/vault"),
+            env: &[],
         })
         .unwrap();
         let actual_args = command.get_args().collect::<Vec<_>>();
@@ -1288,6 +1452,113 @@ mod tests {
     fn claude_provider_env_keys_include_reported_anthropic_overrides() {
         assert!(CLAUDE_PROVIDER_ENV_KEYS.contains(&EnvName::trusted("ANTHROPIC_API_KEY")));
         assert!(CLAUDE_PROVIDER_ENV_KEYS.contains(&EnvName::trusted("ANTHROPIC_BASE_URL")));
+    }
+
+    #[test]
+    fn auth_status_keeps_only_the_sign_in_state_and_method() {
+        let signed_in = r#"{"loggedIn":true,"authMethod":"claude.ai","email":"someone@example.com","orgName":"Org","orgId":"org_123","subscriptionType":"max"}"#;
+        assert_eq!(
+            parse_auth_status(signed_in),
+            (Some(true), Some("claude.ai".to_string()))
+        );
+        let status = ClaudeCodeEngineStatus {
+            installed: true,
+            version: Some("2.1.325 (Claude Code)".into()),
+            logged_in: Some(true),
+            auth_method: Some("claude.ai".into()),
+        };
+        let json = serde_json::to_string(&status).unwrap();
+        assert!(!json.contains("example.com"));
+        assert!(!json.contains("org_"));
+        assert!(!json.contains("max"));
+    }
+
+    #[test]
+    fn auth_status_is_unknown_or_signed_out_when_it_says_so() {
+        assert_eq!(
+            parse_auth_status(r#"{"loggedIn":false,"authMethod":"none"}"#),
+            (Some(false), None)
+        );
+        assert_eq!(parse_auth_status("Not logged in"), (None, None));
+        assert_eq!(parse_auth_status(""), (None, None));
+        assert_eq!(
+            parse_auth_status(r#"{"authMethod":"claude.ai"}"#),
+            (None, None)
+        );
+    }
+
+    #[test]
+    fn an_auth_method_that_could_name_an_account_is_dropped() {
+        for raw in [
+            "someone@example.com",
+            "a method with spaces",
+            "x".repeat(33).as_str(),
+            "",
+        ] {
+            let stdout = serde_json::json!({ "loggedIn": true, "authMethod": raw }).to_string();
+            assert_eq!(parse_auth_status(&stdout), (Some(true), None));
+        }
+        assert_eq!(
+            parse_auth_status(r#"{"loggedIn":true,"authMethod":"api_key"}"#)
+                .1
+                .as_deref(),
+            Some("api_key")
+        );
+    }
+
+    #[test]
+    fn claude_shell_env_list_reads_no_bearer_or_oauth_token() {
+        // ADR-0191 decision 2.8: Rhizome never reads a Claude token from the
+        // user's shell. AWS_SESSION_TOKEN is a cloud provider credential the
+        // user owns, read under the same rules as their terminal.
+        // The messages name no env key, so no key name reaches test output.
+        let token_names = CLAUDE_PROVIDER_ENV_KEYS
+            .iter()
+            .map(|name| name.as_str())
+            .filter(|name| {
+                name.contains("AUTH_TOKEN")
+                    || name.contains("OAUTH_TOKEN")
+                    || name.starts_with("CLAUDE_CODE_OAUTH")
+            })
+            .count();
+        assert_eq!(token_names, 0, "a bearer or OAuth token is in the env list");
+    }
+
+    #[test]
+    fn build_claude_command_sets_the_invocation_env() {
+        let bin = PathBuf::from("claude");
+        let args = vec!["-p".to_string(), "hello".to_string()];
+        let command = build_claude_command(ClaudeCommandRequest {
+            bin: &bin,
+            args: &args,
+            cwd: None,
+            env: &[crate::claude_invocation::CLAUDE_ENGINE_DISABLE_AUTO_MEMORY_ENV],
+        })
+        .unwrap();
+
+        let value = command
+            .get_envs()
+            .find(|(key, _)| *key == OsStr::new("CLAUDE_CODE_DISABLE_AUTO_MEMORY"))
+            .and_then(|(_, value)| value.map(OsStr::to_os_string));
+        assert_eq!(value, Some(OsString::from("1")));
+    }
+
+    #[test]
+    fn an_old_claude_that_rejects_an_engine_flag_is_told_to_update() {
+        for stderr in [
+            "error: unknown option '--permission-prompts'",
+            "error: unknown option '--setting-sources'",
+            "error: option '--permission-mode <mode>' argument 'manual' is invalid. Allowed choices are acceptEdits, bypassPermissions, default, plan.",
+        ] {
+            let message = format_failed_claude_exit(ClaudeFailure {
+                stderr: ClaudeStderr(stderr),
+                status: failed_exit_status(),
+            });
+            assert_eq!(message, CLAUDE_TOO_OLD_MESSAGE, "{stderr}");
+        }
+        assert!(!is_unsupported_engine_flag_error(ClaudeStderr(
+            "Claude CLI is not authenticated"
+        )));
     }
 
     #[cfg(unix)]
@@ -1336,6 +1607,7 @@ mod tests {
                 fallback_args: &[],
                 stdin_text: stdin_text.0,
                 cwd: None,
+                env: &[],
             },
             &mut |e| events.push(e),
         );
@@ -1392,6 +1664,7 @@ mod tests {
                 fallback_args: &fallback_args,
                 stdin_text: None,
                 cwd: None,
+                env: &[],
             },
             &mut |event| events.push(event),
         );
@@ -1693,6 +1966,7 @@ mod tests {
                 fallback_args: &[],
                 stdin_text: None,
                 cwd: None,
+                env: &[],
             },
             &mut |e| events.push(e),
         );

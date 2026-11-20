@@ -304,6 +304,62 @@ describe('streamAiAgent', () => {
     expect(unlistenMock).toHaveBeenCalledTimes(1)
   })
 
+  it('shows Claude Code approval asks and sends the answer back', async () => {
+    isTauriState.value = true
+    const unlistenMock = vi.fn()
+    let eventHandler: ((event: { payload: unknown }) => void) | undefined
+
+    listenMock.mockImplementation(async (_eventName: string, handler: typeof eventHandler) => {
+      eventHandler = handler
+      return unlistenMock
+    })
+    invokeMock.mockImplementation(async (command: string) => {
+      if (command === 'reply_ai_agent_approval') return true
+      eventHandler?.({
+        payload: {
+          kind: 'ApprovalRequested',
+          prompt_id: 'prompt-1',
+          tool: 'Bash',
+          args: '{"command":"ls"}',
+          options: [{ id: 'allow_once', label: 'Allow once' }, { id: 'deny', label: 'Deny' }],
+          call_id: 'toolu_1',
+        },
+      })
+      eventHandler?.({ payload: { kind: 'ApprovalDismissed', prompt_id: 'prompt-2' } })
+      return 'session-3'
+    })
+
+    const callbacks = {
+      ...createCallbacks(),
+      onApprovalRequested: vi.fn(),
+      onApprovalDismissed: vi.fn(),
+    }
+    await streamAiAgent({
+      agent: 'claude_code',
+      message: 'List files',
+      vaultPath: '/vault',
+      callbacks,
+    })
+
+    expect(callbacks.onApprovalDismissed).toHaveBeenCalledWith('prompt-2')
+    const prompt = callbacks.onApprovalRequested.mock.calls[0][0]
+    expect(prompt).toMatchObject({
+      promptId: 'prompt-1',
+      tool: 'Bash',
+      args: '{"command":"ls"}',
+      callId: 'toolu_1',
+    })
+    expect(prompt.options.map((option: { id: string }) => option.id)).toEqual(['allow_once', 'deny'])
+
+    prompt.reply('allow_once')
+    await vi.waitFor(() => {
+      expect(invokeMock).toHaveBeenCalledWith('reply_ai_agent_approval', {
+        promptId: 'prompt-1',
+        choice: 'allow_once',
+      })
+    })
+  })
+
   it('aborts the active native stream by scoped event name', async () => {
     isTauriState.value = true
     const controller = new AbortController()

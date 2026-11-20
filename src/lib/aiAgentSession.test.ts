@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { rememberNativeSessionTarget } from './nativeSessionTarget'
 import type { AgentStatus, AiAgentMessage } from './aiAgentConversation'
 import type { AiModelDefinition, AiModelProvider, AiTarget } from './aiTargets'
 
@@ -572,6 +573,33 @@ describe('aiAgentSession', () => {
     })
     expect(streamAiAgentMock).toHaveBeenCalledWith(expect.objectContaining({ agent: 'claude_code' }))
     expect(streamNativeChatMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps a chat saved as Claude Code on the native engine', async () => {
+    nextMessageIdMock.mockReturnValue('msg-claude-saved-native')
+    rememberNativeSessionTarget('claude-code-chat', 'agent:claude_code')
+    const session = createRuntime()
+    await sendAgentMessage({
+      runtime: session.runtime,
+      context: {
+        agent: 'claude_code',
+        target: {
+          kind: 'agent',
+          agent: 'claude_code',
+          id: 'agent:claude_code',
+          label: 'Claude Code',
+          shortLabel: 'Claude',
+        },
+        ready: true,
+        vaultPath: '/vault',
+        permissionMode: 'safe',
+        chatEngine: 'native',
+        nativeSessionId: 'claude-code-chat',
+      },
+      prompt: { text: 'Hello again' },
+    })
+    expect(streamNativeChatMock).toHaveBeenCalledWith(expect.objectContaining({ sessionId: 'claude-code-chat' }))
+    expect(streamAiAgentMock).not.toHaveBeenCalled()
   })
 
   it('blocks a missing Codex target even when the Chat engine is native', async () => {

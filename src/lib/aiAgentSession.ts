@@ -21,6 +21,7 @@ import { streamNativeChat } from '../utils/streamNativeChat'
 import { usesNativeChatStream } from './chatTargetRouting'
 import { resolveNativeChatTarget } from '../lib/nativeChatTargets'
 import { rememberNativeSession } from './nativeChatTranscript'
+import { nativeSessionTarget } from './nativeSessionTarget'
 import { hydrateNoteReferences } from '../utils/ai-reference-content'
 import { formatPromptWithReferences } from '../utils/ai-context'
 import { createTranslator } from './i18n'
@@ -100,6 +101,11 @@ function blockUnavailableAgent(runtime: AiAgentSessionRuntime, context: AgentExe
   )
 }
 
+/** The open chat's saved target, else the one picked for a new chat. */
+function savedNativeTarget(context: AgentExecutionContext): string | null {
+  return nativeSessionTarget(context.nativeSessionId) ?? context.nativeTarget ?? null
+}
+
 async function streamWithSelectedTarget({
   context,
   formattedMessage,
@@ -121,7 +127,7 @@ async function streamWithSelectedTarget({
     return
   }
 
-  if (usesNativeChatStream(context.target, context.agent, context.chatEngine)) {
+  if (usesNativeChatStream(context.target, context.agent, context.chatEngine, savedNativeTarget(context))) {
     const sessionId = await streamNativeChat({
       target: resolveNativeChatTarget(context.nativeTarget),
       message: formattedMessage,
@@ -172,7 +178,7 @@ export async function sendAgentMessage({
 
   if (shouldIgnorePrompt(currentStatus, normalizedPrompt)) return
 
-  const nativeStream = usesNativeChatStream(context.target, context.agent, context.chatEngine)
+  const nativeStream = usesNativeChatStream(context.target, context.agent, context.chatEngine, savedNativeTarget(context))
 
   if (nativeStream && context.nativeReadOnly) {
     appendLocalMarker(runtime.setMessages, 'This chat is read-only.')

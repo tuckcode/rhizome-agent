@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { publishClaudeCodeEngineEnabled } from '../lib/claudeCodeEngine'
 import { invoke } from '@tauri-apps/api/core'
 import { isTauri, mockInvoke } from '../mock-tauri'
 import { normalizeStoredAiAgent } from '../lib/aiAgents'
@@ -192,6 +193,10 @@ export function useSettings() {
   useEffect(() => {
     loadSettings()
   }, [loadSettings])
+
+  useEffect(() => {
+    publishClaudeCodeEngineEnabled(settings.claude_code_engine_enabled === true)
+  }, [settings.claude_code_engine_enabled])
 
   useEffect(() => {
     if (typeof window === 'undefined') return

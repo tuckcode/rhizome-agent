@@ -3,6 +3,7 @@ import { chatEngineAllowsSendWithoutPrime } from './chatEngine'
 import { isKeptExternalAgentId } from './migrateRemovedHarnessChoices'
 import { aiTargetReady, type AiTarget } from './aiTargets'
 import type { AiAgentsStatus } from './aiAgents'
+import { isClaudeCodeSessionTarget } from './nativeSessionTarget'
 
 function isNativeHarnessAgent(agent: string | null | undefined): boolean {
   return agent === 'prime' || agent === 'hermes'
@@ -31,12 +32,19 @@ export function quickPromptTargetIsReady(
   return aiTargetReady(target, statuses)
 }
 
+/**
+ * `nativeTarget` is the open native chat's saved target. A chat saved as
+ * Claude Code stays on the native stream whatever the composer shows, so
+ * the engine is locked per chat (ADR-0191 step 5).
+ */
 export function usesNativeChatStream(
   target: AiTarget | null | undefined,
   agent: string | null | undefined,
   chatEngine: ChatEngine | undefined,
+  nativeTarget?: string | null,
 ): boolean {
   void chatEngine
+  if (isClaudeCodeSessionTarget(nativeTarget)) return true
   if (target?.kind === 'api_model') return false
   if (target?.kind === 'agent' && isKeptExternalAgentId(target.agent)) return false
   if (!target && isKeptExternalAgentId(agent)) return false

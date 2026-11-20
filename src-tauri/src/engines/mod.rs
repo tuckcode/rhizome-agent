@@ -3,11 +3,13 @@
 //! Chat still talks to Prime directly. Phase 6 adds the toggle.
 //! Native maps quit to cancel. Prime detaches. Hermes uses ACP.
 
+pub mod claude_code;
 mod hermes;
 mod native;
 pub mod native_log;
 mod prime;
 
+pub use claude_code::ClaudeCodeEngine;
 pub use hermes::HermesEngine;
 pub use native::{NativeControl, NativeEngine};
 pub use prime::PrimeEngine;
@@ -115,6 +117,59 @@ pub trait Engine {
     fn cancel(&mut self, cause: &str);
     fn reply_approval(&mut self, prompt_id: &str, reply: ApprovalReply);
     fn settle_on_quit(&mut self);
+}
+
+/// What a native chat needs while a turn runs on another thread.
+pub trait ChatControl: Send {
+    fn cancel(&self, cause: &str);
+    fn reply_approval(&self, prompt_id: &str, reply: ApprovalReply);
+    fn settle_on_quit(&self);
+}
+
+/// An engine a native chat can drive: Rhizome's own loop or Claude Code
+/// (ADR-0191 step 5). The chat's saved target decides which.
+pub trait ChatEngine: Send + 'static {
+    fn control(&self) -> Box<dyn ChatControl>;
+    fn ensure_log(&mut self, session_id: &str) -> Result<(), String>;
+    fn start_turn(
+        &mut self,
+        prompt: &str,
+        continuation: bool,
+        sink: Box<dyn FnMut(EngineEvent) + Send>,
+    ) -> Result<(), String>;
+}
+
+impl ChatControl for NativeControl {
+    fn cancel(&self, cause: &str) {
+        NativeControl::cancel(self, cause);
+    }
+
+    fn reply_approval(&self, prompt_id: &str, reply: ApprovalReply) {
+        NativeControl::reply_approval(self, prompt_id, reply);
+    }
+
+    fn settle_on_quit(&self) {
+        NativeControl::settle_on_quit(self);
+    }
+}
+
+impl<M: crate::rhizome_loop::Model + Send + 'static> ChatEngine for NativeEngine<M> {
+    fn control(&self) -> Box<dyn ChatControl> {
+        Box::new(NativeEngine::control(self))
+    }
+
+    fn ensure_log(&mut self, session_id: &str) -> Result<(), String> {
+        NativeEngine::ensure_log(self, session_id)
+    }
+
+    fn start_turn(
+        &mut self,
+        prompt: &str,
+        continuation: bool,
+        sink: Box<dyn FnMut(EngineEvent) + Send>,
+    ) -> Result<(), String> {
+        NativeEngine::start_turn(self, prompt, continuation, sink)
+    }
 }
 
 #[cfg(test)]

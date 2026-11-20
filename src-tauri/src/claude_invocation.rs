@@ -1,5 +1,6 @@
 use crate::ai_agents::AiAgentPermissionMode;
 use crate::claude_cli::ChatStreamRequest;
+use crate::claude_code_approval::{ApprovalEndpoint, APPROVAL_PROMPT_TOOL, APPROVAL_SERVER_NAME};
 use crate::cli_agent_runtime::AgentStreamRequest;
 
 // `--strict-mcp-config` only lets a run call tools it's explicitly allowed;
@@ -18,10 +19,25 @@ const CLAUDE_POWER_USER_AGENT_TOOLS: &str =
     "Read,Edit,MultiEdit,Write,Glob,Grep,LS,Bash,mcp__rhizome__*";
 const CLAUDE_CHAT_DISALLOWED_TOOLS_COMPAT: &str =
     "Bash,Glob,Grep,Read,Edit,Write,NotebookEdit,WebFetch,WebSearch,TodoWrite,Task,MultiEdit,LS";
-const CLAUDE_SAFE_DISALLOWED_TOOLS_COMPAT: &str =
-    "Bash,NotebookEdit,WebFetch,WebSearch,TodoWrite,Task";
-const CLAUDE_POWER_USER_DISALLOWED_TOOLS_COMPAT: &str =
-    "NotebookEdit,WebFetch,WebSearch,TodoWrite,Task";
+
+// Claude Code engine profile (ADR-0191 decisions 5 and 6).
+//
+// `--setting-sources user` keeps a vault folder's own `.claude/settings.json`
+// (hooks, permission rules) from running: without it, a `-p` run in a synced
+// vault runs that folder's hooks with no trust prompt. `--strict-mcp-config`
+// does the same for the folder's `.mcp.json`. Both are pinned by tests.
+const CLAUDE_ENGINE_SETTING_SOURCES: &str = "user";
+// Claude Code auto memory stays off so no second memory store grows beside
+// the vault. Set twice on purpose: in `--settings` and in the environment.
+const CLAUDE_ENGINE_SETTINGS: &str = r#"{"autoMemoryEnabled":false}"#;
+pub(crate) const CLAUDE_ENGINE_DISABLE_AUTO_MEMORY_ENV: (&str, &str) =
+    ("CLAUDE_CODE_DISABLE_AUTO_MEMORY", "1");
+// Limited mode asks on every edit, so it never runs in `acceptEdits`.
+const CLAUDE_ENGINE_LIMITED_PERMISSION_MODE: &str = "manual";
+const CLAUDE_ENGINE_POWER_USER_PERMISSION_MODE: &str = "acceptEdits";
+// Until the approval bridge (plan step 4) answers prompts, nothing answers
+// them: every call that would ask is denied. Fail closed.
+const CLAUDE_ENGINE_PERMISSION_PROMPTS: &str = "none";
 const WINDOWS_COMMAND_LINE_STDIN_THRESHOLD: usize = 24 * 1024;
 
 #[derive(Debug)]
@@ -29,6 +45,13 @@ pub(crate) struct ClaudeInvocation {
     pub(crate) args: Vec<String>,
     pub(crate) fallback_args: Vec<Vec<String>>,
     pub(crate) stdin_text: Option<String>,
+    /// Extra environment set on the process. Never a credential.
+    pub(crate) env: Vec<(&'static str, &'static str)>,
+    /// Owner-only MCP config file, kept open for the run. Set only when the
+    /// config holds the approval token, so the token is never in `argv`.
+    /// Held only for its `Drop`, which deletes the file after the run.
+    #[allow(dead_code)]
+    pub(crate) mcp_config_file: Option<tempfile::NamedTempFile>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -41,8 +64,38 @@ pub(crate) fn chat(req: &ChatStreamRequest) -> ClaudeInvocation {
     chat_with_windows_limit(req, cfg!(windows))
 }
 
-pub(crate) fn agent(req: &AgentStreamRequest) -> Result<ClaudeInvocation, String> {
-    agent_with_windows_limit(req, cfg!(windows))
+/// Which Claude Code conversation a native chat turn belongs to
+/// (ADR-0191 step 5). Rhizome picks the id; it never reads Claude's own
+/// session files.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum ClaudeSession {
+    /// First turn: `--session-id <id>` makes Claude Code use Rhizome's id.
+    New(String),
+    /// Later turns: `--resume <id>`.
+    Resume(String),
+}
+
+impl ClaudeSession {
+    fn args(&self) -> Result<[String; 2], String> {
+        let (flag, id) = match self {
+            ClaudeSession::New(id) => ("--session-id", id),
+            ClaudeSession::Resume(id) => ("--resume", id),
+        };
+        let id = uuid::Uuid::parse_str(id)
+            .map_err(|_| "This Claude Code session id is not valid.".to_string())?;
+        Ok([flag.to_string(), id.hyphenated().to_string()])
+    }
+}
+
+/// The engine profile. With an approval endpoint, Claude Code asks Rhizome
+/// through `--permission-prompt-tool`. Without one, every prompt denies.
+/// `session` names the conversation for a native chat turn.
+pub(crate) fn agent_in_session(
+    req: &AgentStreamRequest,
+    approval: Option<&ApprovalEndpoint>,
+    session: Option<&ClaudeSession>,
+) -> Result<ClaudeInvocation, String> {
+    agent_session_with_windows_limit(req, approval, session, cfg!(windows))
 }
 
 fn chat_with_windows_limit(
@@ -61,6 +114,8 @@ fn chat_with_windows_limit(
                 PromptSource::Stdin,
             )],
             stdin_text: Some(stdin_prompt(&req.message, req.system_prompt.as_deref())),
+            env: Vec::new(),
+            mcp_config_file: None,
         };
     }
 
@@ -68,46 +123,69 @@ fn chat_with_windows_limit(
         args,
         fallback_args,
         stdin_text: None,
+        env: Vec::new(),
+        mcp_config_file: None,
     }
 }
 
+/// Test shorthand: the engine profile with no native chat session.
+#[cfg(test)]
 fn agent_with_windows_limit(
     req: &AgentStreamRequest,
+    approval: Option<&ApprovalEndpoint>,
     enforce_windows_limit: bool,
 ) -> Result<ClaudeInvocation, String> {
-    let args = agent_args(req)?;
-    let fallback_args = vec![
-        agent_args_without_session_persistence(req)?,
-        agent_args_compat(req)?,
-    ];
-    if should_pipe_prompt_for_windows(enforce_windows_limit, &args, &fallback_args) {
-        return Ok(ClaudeInvocation {
-            args: agent_args_with_tool_policy(
-                req,
-                AgentToolPolicy::strict(req.permission_mode),
-                PromptSource::Stdin,
-            )?,
-            fallback_args: vec![
-                agent_args_with_tool_policy(
-                    req,
-                    AgentToolPolicy::strict_without_session_persistence(req.permission_mode),
-                    PromptSource::Stdin,
-                )?,
-                agent_args_with_tool_policy(
-                    req,
-                    AgentToolPolicy::compat(req.permission_mode),
-                    PromptSource::Stdin,
-                )?,
-            ],
-            stdin_text: Some(stdin_prompt(&req.message, req.system_prompt.as_deref())),
-        });
-    }
+    agent_session_with_windows_limit(req, approval, None, enforce_windows_limit)
+}
 
+/// The Claude Code engine profile. No weaker fallback: a `claude` too old for
+/// these flags fails with an update message instead of running unconfined.
+fn agent_session_with_windows_limit(
+    req: &AgentStreamRequest,
+    approval: Option<&ApprovalEndpoint>,
+    session: Option<&ClaudeSession>,
+    enforce_windows_limit: bool,
+) -> Result<ClaudeInvocation, String> {
+    let session_args = session.map(ClaudeSession::args).transpose()?;
+    let (mcp_config_arg, mcp_config_file) = engine_mcp_config(req, approval)?;
+    let mut args = engine_args(req, &mcp_config_arg, approval, PromptSource::Argument);
+    let stdin = should_pipe_prompt_for_windows(enforce_windows_limit, &args, &[]);
+    if stdin {
+        args = engine_args(req, &mcp_config_arg, approval, PromptSource::Stdin);
+    }
+    if let Some(session_args) = session_args {
+        args.extend(session_args);
+    }
     Ok(ClaudeInvocation {
         args,
-        fallback_args,
-        stdin_text: None,
+        fallback_args: Vec::new(),
+        stdin_text: stdin.then(|| stdin_prompt(&req.message, req.system_prompt.as_deref())),
+        env: vec![CLAUDE_ENGINE_DISABLE_AUTO_MEMORY_ENV],
+        mcp_config_file,
     })
+}
+
+/// Inline JSON when there is no secret in it. With approvals, an owner-only
+/// temp file, so the token stays out of the process list.
+fn engine_mcp_config(
+    req: &AgentStreamRequest,
+    approval: Option<&ApprovalEndpoint>,
+) -> Result<(String, Option<tempfile::NamedTempFile>), String> {
+    let config = mcp_config_value(&req.vault_path, &req.vault_paths, approval)?;
+    let json = serde_json::to_string(&config)
+        .map_err(|e| format!("Failed to serialise MCP config: {e}"))?;
+    if approval.is_none() {
+        return Ok((json, None));
+    }
+    let mut file = tempfile::Builder::new()
+        .prefix("rhizome-claude-mcp-")
+        .suffix(".json")
+        .tempfile()
+        .map_err(|e| format!("Failed to write MCP config: {e}"))?;
+    std::io::Write::write_all(&mut file, json.as_bytes())
+        .map_err(|e| format!("Failed to write MCP config: {e}"))?;
+    let path = file.path().display().to_string();
+    Ok((path, Some(file)))
 }
 
 fn chat_args(req: &ChatStreamRequest) -> Vec<String> {
@@ -153,35 +231,12 @@ fn chat_args_with_tool_policy(
     args
 }
 
-fn agent_args(req: &AgentStreamRequest) -> Result<Vec<String>, String> {
-    agent_args_with_tool_policy(
-        req,
-        AgentToolPolicy::strict(req.permission_mode),
-        PromptSource::Argument,
-    )
-}
-
-fn agent_args_without_session_persistence(req: &AgentStreamRequest) -> Result<Vec<String>, String> {
-    agent_args_with_tool_policy(
-        req,
-        AgentToolPolicy::strict_without_session_persistence(req.permission_mode),
-        PromptSource::Argument,
-    )
-}
-
-fn agent_args_compat(req: &AgentStreamRequest) -> Result<Vec<String>, String> {
-    agent_args_with_tool_policy(
-        req,
-        AgentToolPolicy::compat(req.permission_mode),
-        PromptSource::Argument,
-    )
-}
-
-fn agent_args_with_tool_policy(
+fn engine_args(
     req: &AgentStreamRequest,
-    policy: AgentToolPolicy,
+    mcp_config_arg: &str,
+    approval: Option<&ApprovalEndpoint>,
     prompt_source: PromptSource,
-) -> Result<Vec<String>, String> {
+) -> Vec<String> {
     let mut args: Vec<String> = vec!["-p".into()];
     if prompt_source == PromptSource::Argument {
         args.push(req.message.clone());
@@ -191,25 +246,30 @@ fn agent_args_with_tool_policy(
         "stream-json".into(),
         "--verbose".into(),
         "--include-partial-messages".into(),
+        "--setting-sources".into(),
+        CLAUDE_ENGINE_SETTING_SOURCES.into(),
+        "--settings".into(),
+        CLAUDE_ENGINE_SETTINGS.into(),
         "--mcp-config".into(),
-        mcp_config(&req.vault_path, &req.vault_paths)?,
+        mcp_config_arg.into(),
         "--strict-mcp-config".into(),
         "--permission-mode".into(),
-        "acceptEdits".into(),
-        policy.tool_flag.into(),
-        policy.tool_value.into(),
+        engine_permission_mode(req.permission_mode).into(),
     ]);
-
-    if policy.include_session_persistence_flag {
-        args.push("--no-session-persistence".into());
+    match approval {
+        Some(_) => args.extend([
+            "--permission-prompt-tool".into(),
+            APPROVAL_PROMPT_TOOL.into(),
+        ]),
+        None => args.extend([
+            "--permission-prompts".into(),
+            CLAUDE_ENGINE_PERMISSION_PROMPTS.into(),
+        ]),
     }
-    if let Some(allowed_tools) = policy.preapproved_tools {
-        args.push("--allowedTools".into());
-        args.push(allowed_tools.into());
-    }
-    if let Some(disallowed_tools) = policy.disallowed_tools {
-        args.push("--disallowedTools".into());
-        args.push(disallowed_tools.into());
+    args.extend(["--tools".into(), agent_tools(req.permission_mode).into()]);
+    for dir in engine_add_dirs(&req.vault_path, &req.vault_paths) {
+        args.push("--add-dir".into());
+        args.push(dir);
     }
     if prompt_source == PromptSource::Argument {
         append_non_empty_arg_pair(
@@ -219,7 +279,26 @@ fn agent_args_with_tool_policy(
         );
     }
 
-    Ok(args)
+    args
+}
+
+/// Every vault the chat may read, once each, in order.
+fn engine_add_dirs(vault_path: &str, vault_paths: &[String]) -> Vec<String> {
+    let mut dirs: Vec<String> = Vec::new();
+    for dir in std::iter::once(vault_path).chain(vault_paths.iter().map(String::as_str)) {
+        let dir = dir.trim();
+        if !dir.is_empty() && !dirs.iter().any(|seen| seen == dir) {
+            dirs.push(dir.to_string());
+        }
+    }
+    dirs
+}
+
+fn engine_permission_mode(permission_mode: AiAgentPermissionMode) -> &'static str {
+    match permission_mode {
+        AiAgentPermissionMode::Safe => CLAUDE_ENGINE_LIMITED_PERMISSION_MODE,
+        AiAgentPermissionMode::PowerUser => CLAUDE_ENGINE_POWER_USER_PERMISSION_MODE,
+    }
 }
 
 fn append_non_empty_arg_pair(args: &mut Vec<String>, flag: &str, value: Option<&str>) {
@@ -233,9 +312,13 @@ fn stdin_prompt(message: &str, system_prompt: Option<&str>) -> String {
     crate::cli_agent_runtime::build_prompt(message, system_prompt)
 }
 
-fn mcp_config(vault_path: &str, vault_paths: &[String]) -> Result<String, String> {
+fn mcp_config_value(
+    vault_path: &str,
+    vault_paths: &[String],
+    approval: Option<&ApprovalEndpoint>,
+) -> Result<serde_json::Value, String> {
     let mcp_server_path = crate::cli_agent_runtime::mcp_server_path_string()?;
-    let config = serde_json::json!({
+    let mut config = serde_json::json!({
         "mcpServers": {
             "rhizome": crate::cli_agent_runtime::rhizome_node_mcp_server(
                 &mcp_server_path,
@@ -245,7 +328,18 @@ fn mcp_config(vault_path: &str, vault_paths: &[String]) -> Result<String, String
             )
         }
     });
-    serde_json::to_string(&config).map_err(|e| format!("Failed to serialise MCP config: {e}"))
+    if let Some(endpoint) = approval {
+        let approval_server_path = crate::mcp::mcp_approval_server_js_path_string()?;
+        config["mcpServers"][APPROVAL_SERVER_NAME] =
+            crate::cli_agent_runtime::rhizome_approval_mcp_server(&approval_server_path, endpoint);
+    }
+    Ok(config)
+}
+
+#[cfg(test)]
+fn mcp_config(vault_path: &str, vault_paths: &[String]) -> Result<String, String> {
+    serde_json::to_string(&mcp_config_value(vault_path, vault_paths, None)?)
+        .map_err(|e| format!("Failed to serialise MCP config: {e}"))
 }
 
 fn should_pipe_prompt_for_windows(
@@ -267,61 +361,10 @@ fn windows_command_line_utf16_units(args: &[String]) -> usize {
     args.iter().map(|arg| arg.encode_utf16().count() + 3).sum()
 }
 
-struct AgentToolPolicy {
-    tool_flag: &'static str,
-    tool_value: &'static str,
-    include_session_persistence_flag: bool,
-    preapproved_tools: Option<&'static str>,
-    disallowed_tools: Option<&'static str>,
-}
-
-impl AgentToolPolicy {
-    fn strict(permission_mode: AiAgentPermissionMode) -> Self {
-        Self {
-            tool_flag: "--tools",
-            tool_value: agent_tools(permission_mode),
-            include_session_persistence_flag: true,
-            preapproved_tools: preapproved_agent_tools(permission_mode),
-            disallowed_tools: None,
-        }
-    }
-
-    fn strict_without_session_persistence(permission_mode: AiAgentPermissionMode) -> Self {
-        Self {
-            include_session_persistence_flag: false,
-            ..Self::strict(permission_mode)
-        }
-    }
-
-    fn compat(permission_mode: AiAgentPermissionMode) -> Self {
-        Self {
-            tool_flag: "--allowedTools",
-            tool_value: agent_tools(permission_mode),
-            include_session_persistence_flag: false,
-            preapproved_tools: None,
-            disallowed_tools: Some(disallowed_agent_tools_compat(permission_mode)),
-        }
-    }
-}
-
 fn agent_tools(permission_mode: AiAgentPermissionMode) -> &'static str {
     match permission_mode {
         AiAgentPermissionMode::Safe => CLAUDE_SAFE_AGENT_TOOLS,
         AiAgentPermissionMode::PowerUser => CLAUDE_POWER_USER_AGENT_TOOLS,
-    }
-}
-
-fn preapproved_agent_tools(permission_mode: AiAgentPermissionMode) -> Option<&'static str> {
-    match permission_mode {
-        AiAgentPermissionMode::Safe => None,
-        AiAgentPermissionMode::PowerUser => Some("Bash"),
-    }
-}
-
-fn disallowed_agent_tools_compat(permission_mode: AiAgentPermissionMode) -> &'static str {
-    match permission_mode {
-        AiAgentPermissionMode::Safe => CLAUDE_SAFE_DISALLOWED_TOOLS_COMPAT,
-        AiAgentPermissionMode::PowerUser => CLAUDE_POWER_USER_DISALLOWED_TOOLS_COMPAT,
     }
 }
 
@@ -467,7 +510,7 @@ mod tests {
             Some("Read the active vault first."),
             AiAgentPermissionMode::Safe,
         );
-        let agent_invocation = agent_with_windows_limit(&agent_req, true).unwrap();
+        let agent_invocation = agent_with_windows_limit(&agent_req, None, true).unwrap();
 
         assert_eq!(
             agent_invocation.args.first().map(String::as_str),
@@ -496,125 +539,298 @@ mod tests {
         assert!(agent_stdin.contains(&long_message));
     }
 
+    fn engine(mode: AiAgentPermissionMode) -> ClaudeInvocation {
+        agent_with_windows_limit(&agent_request("Rename the note", None, mode), None, false)
+            .unwrap()
+    }
+
+    fn arg_values_after<'a>(args: &'a [String], name: &str) -> Vec<&'a str> {
+        args.windows(2)
+            .filter(|pair| pair[0] == name)
+            .map(|pair| pair[1].as_str())
+            .collect()
+    }
+
+    const BOTH_MODES: [AiAgentPermissionMode; 2] = [
+        AiAgentPermissionMode::Safe,
+        AiAgentPermissionMode::PowerUser,
+    ];
+
     #[test]
     fn agent_args_with_system_prompt() {
-        if let Ok(args) = agent_args(&agent_request(
-            "do it",
-            Some("Act as expert."),
-            AiAgentPermissionMode::Safe,
-        )) {
-            assert_args_contain!(args, ["--append-system-prompt", "Act as expert."]);
-        }
+        let args = agent_with_windows_limit(
+            &agent_request("do it", Some("Act as expert."), AiAgentPermissionMode::Safe),
+            None,
+            false,
+        )
+        .unwrap()
+        .args;
+        assert_eq!(
+            arg_value_after(&args, "--append-system-prompt"),
+            Some("Act as expert.")
+        );
     }
 
     #[test]
     fn agent_args_empty_system_prompt_is_skipped() {
-        if let Ok(args) = agent_args(&agent_request("x", Some(""), AiAgentPermissionMode::Safe)) {
-            assert!(!args.contains(&"--append-system-prompt".to_string()));
+        let args = agent_with_windows_limit(
+            &agent_request("x", Some(""), AiAgentPermissionMode::Safe),
+            None,
+            false,
+        )
+        .unwrap()
+        .args;
+        assert_args_lack!(args, ["--append-system-prompt"]);
+    }
+
+    #[test]
+    fn engine_loads_user_settings_only_and_strict_mcp_in_every_mode() {
+        for mode in BOTH_MODES {
+            let args = engine(mode).args;
+            assert_eq!(
+                arg_value_after(&args, "--setting-sources"),
+                Some("user"),
+                "{mode:?}"
+            );
+            assert_args_contain!(args, ["--strict-mcp-config", "--mcp-config"]);
         }
     }
 
     #[test]
-    fn agent_args_without_session_persistence_keeps_tools_allowlist() {
-        let args = agent_args_without_session_persistence(&agent_request(
-            "Rename the note",
-            None,
-            AiAgentPermissionMode::Safe,
-        ))
-        .unwrap();
-
-        assert_args_contain!(
-            args,
-            [
-                "--tools",
-                "Read,Edit,MultiEdit,Write,Glob,Grep,LS,mcp__rhizome__*"
-            ]
-        );
-        assert_args_lack!(args, ["--no-session-persistence"]);
+    fn engine_turns_claude_code_auto_memory_off() {
+        for mode in BOTH_MODES {
+            let invocation = engine(mode);
+            let settings: serde_json::Value =
+                serde_json::from_str(arg_value_after(&invocation.args, "--settings").unwrap())
+                    .unwrap();
+            assert_eq!(
+                settings["autoMemoryEnabled"],
+                serde_json::Value::Bool(false)
+            );
+            assert!(invocation
+                .env
+                .contains(&("CLAUDE_CODE_DISABLE_AUTO_MEMORY", "1")));
+        }
     }
 
     #[test]
-    fn agent_args_compat_uses_allowed_and_disallowed_tools_without_removed_flags() {
-        let args = agent_args_compat(&agent_request(
-            "Rename the note",
-            None,
-            AiAgentPermissionMode::Safe,
-        ))
-        .unwrap();
+    fn engine_limited_mode_asks_on_every_edit_and_has_no_bash() {
+        let args = engine(AiAgentPermissionMode::Safe).args;
 
+        assert_eq!(arg_value_after(&args, "--permission-mode"), Some("manual"));
+        assert_args_lack!(args, ["acceptEdits", "--allowedTools"]);
         assert_eq!(
-            arg_value_after(&args, "--allowedTools"),
+            arg_value_after(&args, "--tools"),
             Some("Read,Edit,MultiEdit,Write,Glob,Grep,LS,mcp__rhizome__*")
         );
-        assert_args_contain!(args, ["--disallowedTools"]);
-        assert_args_lack!(args, ["--tools"]);
-        assert_args_lack!(args, ["--no-session-persistence"]);
-    }
-
-    #[test]
-    fn agent_args_use_safe_mode_without_bash_by_default() {
-        let args = agent_args(&agent_request(
-            "Rename the note",
-            None,
-            AiAgentPermissionMode::Safe,
-        ))
-        .unwrap();
-
-        assert_args_contain!(
-            args,
-            ["--strict-mcp-config", "--permission-mode", "acceptEdits"]
-        );
-        assert_args_contain!(
-            args,
-            ["Read,Edit,MultiEdit,Write,Glob,Grep,LS,mcp__rhizome__*"]
-        );
         assert_no_arg_contains!(args, "Bash");
-        assert_args_lack!(args, ["--allowedTools"]);
-        assert_args_lack!(args, ["--dangerously-skip-permissions"]);
     }
 
     #[test]
-    fn agent_args_allow_bash_in_power_user_mode_without_dangerous_bypass() {
-        let args = agent_args(&agent_request(
-            "Rename the note",
-            None,
-            AiAgentPermissionMode::PowerUser,
-        ))
-        .unwrap();
+    fn engine_power_user_accepts_edits_but_never_preapproves_bash() {
+        let args = engine(AiAgentPermissionMode::PowerUser).args;
 
-        assert_args_contain!(args, ["--strict-mcp-config"]);
-        assert_args_contain!(
-            args,
-            ["Read,Edit,MultiEdit,Write,Glob,Grep,LS,Bash,mcp__rhizome__*"]
+        assert_eq!(
+            arg_value_after(&args, "--permission-mode"),
+            Some("acceptEdits")
         );
-        assert_args_lack!(args, ["--dangerously-skip-permissions"]);
+        assert_eq!(
+            arg_value_after(&args, "--tools"),
+            Some("Read,Edit,MultiEdit,Write,Glob,Grep,LS,Bash,mcp__rhizome__*")
+        );
+        assert_args_lack!(args, ["--allowedTools", "--allowed-tools"]);
+    }
+
+    #[test]
+    fn engine_without_an_approval_bridge_denies_every_prompt() {
+        for mode in BOTH_MODES {
+            let invocation = engine(mode);
+            assert_eq!(
+                arg_value_after(&invocation.args, "--permission-prompts"),
+                Some("none")
+            );
+            assert_args_lack!(invocation.args, ["--permission-prompt-tool"]);
+            assert!(invocation.mcp_config_file.is_none());
+        }
+    }
+
+    fn test_endpoint() -> ApprovalEndpoint {
+        ApprovalEndpoint {
+            addr: "127.0.0.1:4100".parse().unwrap(),
+            token: "f".repeat(64),
+            timeout: std::time::Duration::from_secs(600),
+        }
+    }
+
+    fn engine_with_approval(mode: AiAgentPermissionMode) -> ClaudeInvocation {
+        let endpoint = test_endpoint();
+        agent_with_windows_limit(
+            &agent_request("Rename the note", None, mode),
+            Some(&endpoint),
+            false,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn engine_with_an_approval_bridge_asks_rhizome() {
+        for mode in BOTH_MODES {
+            let invocation = engine_with_approval(mode);
+            let args = &invocation.args;
+            assert_eq!(
+                arg_value_after(args, "--permission-prompt-tool"),
+                Some("mcp__rhizome_approval__approve"),
+                "{mode:?}"
+            );
+            assert_args_lack!(args, ["--permission-prompts"]);
+            // The other engine pins still hold with approvals on.
+            assert_eq!(arg_value_after(args, "--setting-sources"), Some("user"));
+            assert_args_contain!(args, ["--strict-mcp-config"]);
+            assert_args_lack!(args, ["--bare", "--allowedTools", "bypassPermissions"]);
+        }
+    }
+
+    #[test]
+    fn approval_token_is_never_on_the_command_line() {
+        let invocation = engine_with_approval(AiAgentPermissionMode::PowerUser);
+        let token = test_endpoint().token;
+        assert!(!invocation.args.iter().any(|arg| arg.contains(&token)));
+        assert!(!invocation
+            .env
+            .iter()
+            .any(|(_, value)| value.contains(&token)));
+
+        let file = invocation.mcp_config_file.as_ref().expect("config file");
+        assert_eq!(
+            arg_value_after(&invocation.args, "--mcp-config"),
+            Some(file.path().to_str().unwrap())
+        );
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(file.path()).unwrap().permissions().mode();
+            assert_eq!(mode & 0o077, 0, "config file must be owner-only");
+        }
+        let config: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(file.path()).unwrap()).unwrap();
+        let approval = &config["mcpServers"]["rhizome_approval"];
+        assert!(approval["args"][0]
+            .as_str()
+            .unwrap()
+            .ends_with("approval-server.js"));
+        assert_eq!(approval["env"]["RHIZOME_APPROVAL_ADDR"], "127.0.0.1:4100");
+        assert_eq!(approval["env"]["RHIZOME_APPROVAL_TOKEN"], token.as_str());
+        assert_eq!(approval["env"]["RHIZOME_APPROVAL_TIMEOUT_MS"], "615000");
+        assert!(approval["env"].get("VAULT_PATH").is_none());
+        assert!(config["mcpServers"]["rhizome"]["env"]
+            .get("RHIZOME_APPROVAL_TOKEN")
+            .is_none());
+    }
+
+    #[test]
+    fn the_model_cannot_see_the_approval_tool() {
+        for mode in BOTH_MODES {
+            let invocation = engine_with_approval(mode);
+            let tools = arg_value_after(&invocation.args, "--tools").unwrap();
+            for entry in tools.split(',') {
+                let prefix = entry.trim_end_matches('*');
+                assert!(
+                    !"mcp__rhizome_approval__approve".starts_with(prefix) || prefix.is_empty(),
+                    "{entry} would expose the approval tool"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_config_file_is_removed_after_the_run() {
+        let invocation = engine_with_approval(AiAgentPermissionMode::Safe);
+        let path = invocation
+            .mcp_config_file
+            .as_ref()
+            .unwrap()
+            .path()
+            .to_path_buf();
+        assert!(path.exists());
+        drop(invocation);
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn engine_never_runs_bare_unconfined_or_without_sessions() {
+        for mode in BOTH_MODES {
+            let invocation = engine(mode);
+            assert_args_lack!(
+                invocation.args,
+                [
+                    "--bare",
+                    "--dangerously-skip-permissions",
+                    "bypassPermissions",
+                    "--no-session-persistence",
+                    "--disallowedTools",
+                ]
+            );
+            assert!(invocation.fallback_args.is_empty(), "no weaker fallback");
+        }
+    }
+
+    #[test]
+    fn engine_passes_no_credential_to_claude() {
+        for mode in BOTH_MODES {
+            let invocation = engine(mode);
+            let all = invocation
+                .args
+                .iter()
+                .map(String::as_str)
+                .chain(
+                    invocation
+                        .env
+                        .iter()
+                        .flat_map(|(name, value)| [*name, *value]),
+                )
+                .collect::<Vec<_>>()
+                .join(" ")
+                .to_ascii_uppercase();
+            for fragment in [
+                "TOKEN",
+                "API_KEY",
+                "CREDENTIALS",
+                "SETUP-TOKEN",
+                "CLAUDE.JSON",
+            ] {
+                assert!(!all.contains(fragment), "found {fragment}");
+            }
+        }
+    }
+
+    #[test]
+    fn engine_adds_each_vault_once() {
+        let req = AgentStreamRequest {
+            vault_paths: vec![
+                "/tmp/vault".into(),
+                "/tmp/second".into(),
+                " ".into(),
+                "/tmp/second".into(),
+            ],
+            ..agent_request("search", None, AiAgentPermissionMode::Safe)
+        };
+        let args = agent_with_windows_limit(&req, None, false).unwrap().args;
+
+        assert_eq!(
+            arg_values_after(&args, "--add-dir"),
+            vec!["/tmp/vault", "/tmp/second"]
+        );
     }
 
     #[test]
     fn agent_args_power_user_and_safe_modes_can_reach_the_rhizome_mcp_server() {
-        for mode in [
-            AiAgentPermissionMode::Safe,
-            AiAgentPermissionMode::PowerUser,
-        ] {
-            let args = agent_args(&agent_request("search the vault", None, mode)).unwrap();
-            assert_args_contain!(args, ["--strict-mcp-config"]);
+        for mode in BOTH_MODES {
+            let args = engine(mode).args;
             assert!(
                 args.iter().any(|a| a.contains("mcp__rhizome__*")),
                 "mode {mode:?} did not allow mcp__rhizome__* tools: {args:?}"
             );
         }
-    }
-
-    #[test]
-    fn agent_args_preapprove_bash_for_power_user_runs() {
-        let args = agent_args(&agent_request(
-            "Run a local script",
-            None,
-            AiAgentPermissionMode::PowerUser,
-        ))
-        .unwrap();
-
-        assert_eq!(arg_value_after(&args, "--allowedTools"), Some("Bash"));
     }
 
     #[test]
@@ -624,7 +840,7 @@ mod tests {
             Some("Read the active vault first."),
             AiAgentPermissionMode::Safe,
         );
-        let invocation = agent_with_windows_limit(&req, true).unwrap();
+        let invocation = agent_with_windows_limit(&req, None, true).unwrap();
 
         assert_args_contain!(
             invocation.args,
@@ -648,5 +864,62 @@ mod tests {
                 "[\"/tmp/test-vault\",\"/tmp/secondary-vault\"]"
             );
         }
+    }
+
+    #[test]
+    fn a_first_native_turn_names_the_claude_session() {
+        let id = "7d1f0a52-3c1e-4f0b-9d8e-2a6b1c4d5e6f";
+        let req = agent_request("Hi", None, AiAgentPermissionMode::Safe);
+        let args = agent_session_with_windows_limit(
+            &req,
+            None,
+            Some(&ClaudeSession::New(id.into())),
+            false,
+        )
+        .unwrap()
+        .args;
+        assert_eq!(arg_value_after(&args, "--session-id"), Some(id));
+        assert!(!args.iter().any(|arg| arg == "--resume"));
+    }
+
+    #[test]
+    fn a_later_native_turn_resumes_the_claude_session() {
+        let id = "7d1f0a52-3c1e-4f0b-9d8e-2a6b1c4d5e6f";
+        let req = agent_request("Again", None, AiAgentPermissionMode::Safe);
+        let args = agent_session_with_windows_limit(
+            &req,
+            None,
+            Some(&ClaudeSession::Resume(id.into())),
+            true,
+        )
+        .unwrap()
+        .args;
+        assert_eq!(arg_value_after(&args, "--resume"), Some(id));
+        assert!(!args.iter().any(|arg| arg == "--session-id"));
+        assert!(!args.iter().any(|arg| arg == "--continue"));
+    }
+
+    #[test]
+    fn a_session_id_must_be_a_uuid() {
+        let req = agent_request("Hi", None, AiAgentPermissionMode::Safe);
+        let error = agent_session_with_windows_limit(
+            &req,
+            None,
+            Some(&ClaudeSession::Resume(
+                "--dangerously-skip-permissions".into(),
+            )),
+            false,
+        )
+        .unwrap_err();
+        assert!(error.contains("not valid"));
+    }
+
+    #[test]
+    fn the_shared_agent_path_names_no_session() {
+        let req = agent_request("Hi", None, AiAgentPermissionMode::Safe);
+        let args = agent_with_windows_limit(&req, None, false).unwrap().args;
+        assert!(!args
+            .iter()
+            .any(|arg| arg == "--session-id" || arg == "--resume"));
     }
 }

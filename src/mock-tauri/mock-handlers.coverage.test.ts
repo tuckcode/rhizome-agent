@@ -195,6 +195,7 @@ describe('mockHandlers coverage', () => {
       agent_max_steps: null,
       chat_engine: null,
       native_chat_target: null,
+      claude_code_engine_enabled: null,
     })
 
     const list = {

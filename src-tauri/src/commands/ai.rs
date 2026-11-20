@@ -127,6 +127,13 @@ pub async fn get_ai_agents_status() -> AiAgentsStatus {
     crate::ai_agents::get_ai_agents_status().await
 }
 
+/// ADR-0191: install and sign-in state for Settings. Never a credential.
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn get_claude_code_engine_status() -> crate::claude_cli::ClaudeCodeEngineStatus {
+    crate::ai_agents::claude_code_engine_status().await
+}
+
 #[cfg(desktop)]
 #[tauri::command]
 pub fn get_agent_docs_path(app_handle: tauri::AppHandle) -> Result<String, String> {
@@ -219,6 +226,14 @@ pub fn abort_ai_agent_stream(event_name: String) -> Result<bool, String> {
     }
 
     crate::ai_agent_processes::abort_stream(&event_name)
+}
+
+/// Answer a Claude Code approval card (ADR-0191 step 4). Anything but
+/// `allow_once` denies. An unknown or finished prompt returns false.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn reply_ai_agent_approval(prompt_id: String, choice: String) -> bool {
+    crate::ai_agents::reply_claude_code_approval(&prompt_id, &choice)
 }
 
 #[cfg(desktop)]
@@ -338,6 +353,12 @@ pub async fn complete_ai_model_text(request: AiModelStreamRequest) -> Result<Str
 
 #[cfg(mobile)]
 #[tauri::command]
+pub fn get_claude_code_engine_status() -> crate::claude_cli::ClaudeCodeEngineStatus {
+    crate::claude_cli::ClaudeCodeEngineStatus::not_found()
+}
+
+#[cfg(mobile)]
+#[tauri::command]
 pub fn check_claude_cli() -> ClaudeCliStatus {
     ClaudeCliStatus {
         installed: false,
@@ -402,6 +423,12 @@ pub async fn stream_ai_agent(
     _request: AiAgentStreamRequest,
 ) -> Result<String, String> {
     Err("CLI AI agents are not available on mobile".into())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub fn reply_ai_agent_approval(_prompt_id: String, _choice: String) -> bool {
+    false
 }
 
 #[cfg(mobile)]
