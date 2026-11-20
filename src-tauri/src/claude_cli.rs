@@ -334,6 +334,32 @@ fn auth_status_for_binary(binary: &Path) -> (Option<bool>, Option<String>) {
     }
 }
 
+/// ADR-0191 decision 2.6: run the unmodified `claude auth login`. Claude Code
+/// opens Anthropic's own sign-in page and keeps the token in its own store.
+/// Rhizome reads no output and holds no token. It only waits for the exit,
+/// then the caller asks `claude auth status` again.
+pub fn start_login() -> Result<(), String> {
+    let bin = find_claude_binary()?;
+    let target = crate::cli_agent_runtime::command_target_avoiding_windows_cmd_shim(&bin)?;
+    let mut command = crate::hidden_command(&target.program);
+    crate::cli_agent_runtime::configure_agent_command_environment(&mut command, &bin);
+    if let Some(first_arg) = target.first_arg {
+        command.arg(first_arg);
+    }
+    let status = command
+        .args(["auth", "login"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map_err(|err| format!("Could not start Claude Code sign-in: {err}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err("Claude Code sign-in did not finish.".into())
+    }
+}
+
 /// Keeps `loggedIn` and, when signed in, `authMethod`. Drops everything else,
 /// so an email, organization, or account id never leaves this function.
 pub(crate) fn parse_auth_status(stdout: &str) -> (Option<bool>, Option<String>) {

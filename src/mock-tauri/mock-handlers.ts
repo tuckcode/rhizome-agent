@@ -643,12 +643,21 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   },
   get_conflict_files: (): string[] => [],
   check_claude_cli: () => ({ installed: false, version: null }),
-  get_claude_code_engine_status: () => ({
-    installed: false,
-    version: null,
-    loggedIn: null,
-    authMethod: null,
-  }),
+  // Preview only: set localStorage `rhizome:mock-claude-code` to `signed_out`
+  // or `ready` to see those states in the browser. Default is not installed.
+  get_claude_code_engine_status: () => {
+    const preview = typeof localStorage === 'undefined' ? null : localStorage.getItem('rhizome:mock-claude-code')
+    if (preview === 'signed_out' || preview === 'ready') {
+      return { installed: true, version: '2.1.0 (Claude Code)', loggedIn: preview === 'ready', authMethod: preview === 'ready' ? 'claude.ai' : null }
+    }
+    return { installed: false, version: null, loggedIn: null, authMethod: null }
+  },
+  start_claude_code_login: () => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('rhizome:mock-claude-code') === 'signed_out') {
+      localStorage.setItem('rhizome:mock-claude-code', 'ready')
+    }
+    return null
+  },
   get_ai_agents_status: () => ({
     // Browser mock only. A native build reports the real Prime version.
     // Settings hides this line when the version is the string `mock`.

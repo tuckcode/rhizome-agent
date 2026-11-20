@@ -17,16 +17,12 @@ import {
 } from './firstRunModelStep'
 
 describe('recommendedModelPath', () => {
-  it('leads with a local model when one answered', () => {
-    expect(recommendedModelPath({ local: { kind: 'ollama', name: 'Ollama', models: ['llama3.2'] } })).toBe('local')
+  it('leads with Claude when Claude Code is signed in', () => {
+    expect(recommendedModelPath({ claudeCodeReady: true })).toBe('claude_code')
   })
 
-  it('leads with ChatGPT sign-in when no local model answered', () => {
-    expect(recommendedModelPath({ local: null })).toBe('chatgpt')
-  })
-
-  it('does not lead with a local server that has no models', () => {
-    expect(recommendedModelPath({ local: { kind: 'ollama', name: 'Ollama', models: [] } })).toBe('chatgpt')
+  it('leads with ChatGPT sign-in otherwise', () => {
+    expect(recommendedModelPath({ claudeCodeReady: false })).toBe('chatgpt')
   })
 })
 
@@ -86,7 +82,7 @@ describe('provider rows', () => {
   })
 
   it('keeps the paths in the order the step shows them', () => {
-    expect(FIRST_RUN_MODEL_PATHS).toEqual(['local', 'chatgpt', 'api_key'])
+    expect(FIRST_RUN_MODEL_PATHS).toEqual(['chatgpt', 'claude_code', 'local', 'api_key'])
   })
 })
 

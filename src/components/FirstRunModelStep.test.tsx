@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { FirstRunModelStep } from './FirstRunModelStep'
+import { resetClaudeCodeEngineForTests } from '../lib/claudeCodeEngine'
 
 const mocks = vi.hoisted(() => ({
   listModels: vi.fn<(provider: { kind: string }) => Promise<string[]>>(),
@@ -40,6 +41,7 @@ function renderStep() {
 }
 
 beforeEach(() => {
+  resetClaudeCodeEngineForTests()
   mocks.listModels.mockReset()
   mocks.testProvider.mockReset()
   mocks.saveKey.mockReset().mockResolvedValue(undefined)
@@ -48,12 +50,13 @@ beforeEach(() => {
 })
 
 describe('FirstRunModelStep', () => {
-  it('recommends a detected local model and saves it as the chat model', async () => {
+  it('saves a detected local model as the chat model', async () => {
     mocks.listModels.mockImplementation(async (provider) => (provider.kind === 'ollama' ? ['llama3.2', 'qwen2.5'] : []))
     const { onConnected } = renderStep()
+    await waitFor(() => expect(screen.getByTestId('first-run-model-path-chatgpt')).toHaveAttribute('aria-pressed', 'true'))
 
+    fireEvent.click(screen.getByTestId('first-run-model-path-local'))
     expect(await screen.findByText('Ollama is running with 2 models.')).toBeInTheDocument()
-    expect(screen.getByTestId('first-run-model-path-local')).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(screen.getByTestId('first-run-model-local-use'))
 
     await waitFor(() => expect(onConnected).toHaveBeenCalledTimes(1))
@@ -62,7 +65,7 @@ describe('FirstRunModelStep', () => {
     expect(patch.ai_model_providers.map((provider: { kind: string }) => provider.kind)).toEqual(['ollama'])
   })
 
-  it('recommends ChatGPT sign-in when no local model answers', async () => {
+  it('leads with ChatGPT sign-in when Claude Code is not signed in', async () => {
     mocks.listModels.mockResolvedValue([])
     renderStep()
 
@@ -140,6 +143,38 @@ describe('FirstRunModelStep', () => {
 
     fireEvent.click(await screen.findByTestId('first-run-model-chatgpt-continue'))
     await waitFor(() => expect(onConnected).toHaveBeenCalledWith({ native_chat_target: 'openai/gpt-6-luna' }))
+  })
+
+  it('leads with Claude when Claude Code is signed in, and turns the engine on', async () => {
+    mocks.listModels.mockResolvedValue([])
+    mocks.callHost.mockImplementation(async (command) => (command === 'get_claude_code_engine_status'
+      ? { installed: true, version: '2.1.0 (Claude Code)', loggedIn: true, authMethod: 'claude.ai' }
+      : Promise.reject(new Error('no host'))))
+    const { onConnected } = renderStep()
+
+    await waitFor(() => expect(screen.getByTestId('first-run-model-path-claude_code')).toHaveAttribute('aria-pressed', 'true'))
+    fireEvent.click(screen.getByTestId('first-run-model-claude-code-use'))
+    await waitFor(() => expect(onConnected).toHaveBeenCalledWith({
+      claude_code_engine_enabled: true,
+      native_chat_target: 'agent:claude_code',
+    }))
+  })
+
+  it('starts Claude Code sign-in and checks the status again', async () => {
+    mocks.listModels.mockResolvedValue([])
+    let loggedIn = false
+    mocks.callHost.mockImplementation(async (command) => {
+      if (command === 'get_claude_code_engine_status') return { installed: true, version: '2.1.0', loggedIn, authMethod: loggedIn ? 'claude.ai' : null }
+      if (command === 'start_claude_code_login') { loggedIn = true; return null }
+      throw new Error('no host')
+    })
+    renderStep()
+    await waitFor(() => expect(screen.getByTestId('first-run-model-path-chatgpt')).toHaveAttribute('aria-pressed', 'true'))
+
+    fireEvent.click(screen.getByTestId('first-run-model-path-claude_code'))
+    fireEvent.click(await screen.findByTestId('first-run-model-claude-code-sign-in'))
+    expect(mocks.callHost).toHaveBeenCalledWith('start_claude_code_login')
+    expect(await screen.findByTestId('first-run-model-claude-code-use')).toBeInTheDocument()
   })
 
   it('ends the step with nothing saved on Set up later', async () => {

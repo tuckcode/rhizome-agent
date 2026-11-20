@@ -92,8 +92,9 @@ test('fresh profile connects a detected local model after the vault step @smoke'
 
   const step = page.getByTestId('first-run-model-step')
   await expect(step).toBeVisible({ timeout: 5_000 })
-  // The browser mock answers as a running Ollama, so the local path leads.
-  await expect(page.getByTestId('first-run-model-path-local')).toHaveAttribute('aria-pressed', 'true')
+  // Cloud sign-in leads. The browser mock has no Claude Code, so ChatGPT is selected.
+  await expect(page.getByTestId('first-run-model-path-chatgpt')).toHaveAttribute('aria-pressed', 'true')
+  await page.getByTestId('first-run-model-path-local').click()
   await expect(step).toContainText('Ollama is running with 2 models.')
   await page.getByTestId('first-run-model-local-use').click()
 

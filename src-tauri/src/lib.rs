@@ -760,6 +760,7 @@ macro_rules! app_invoke_handler {
             commands::check_claude_cli,
             commands::get_ai_agents_status,
             commands::get_claude_code_engine_status,
+            commands::start_claude_code_login,
             commands::get_agent_docs_path,
             commands::get_vault_ai_guidance_status,
             commands::restore_vault_ai_guidance,

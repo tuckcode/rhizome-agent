@@ -134,6 +134,15 @@ pub async fn get_claude_code_engine_status() -> crate::claude_cli::ClaudeCodeEng
     crate::ai_agents::claude_code_engine_status().await
 }
 
+/// ADR-0191: start Claude Code's own sign-in. Rhizome never sees the token.
+#[cfg(desktop)]
+#[tauri::command]
+pub async fn start_claude_code_login() -> Result<(), String> {
+    tokio::task::spawn_blocking(crate::claude_cli::start_login)
+        .await
+        .map_err(|err| err.to_string())?
+}
+
 #[cfg(desktop)]
 #[tauri::command]
 pub fn get_agent_docs_path(app_handle: tauri::AppHandle) -> Result<String, String> {
@@ -355,6 +364,12 @@ pub async fn complete_ai_model_text(request: AiModelStreamRequest) -> Result<Str
 #[tauri::command]
 pub fn get_claude_code_engine_status() -> crate::claude_cli::ClaudeCodeEngineStatus {
     crate::claude_cli::ClaudeCodeEngineStatus::not_found()
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub fn start_claude_code_login() -> Result<(), String> {
+    Err("Claude Code is not available on mobile.".into())
 }
 
 #[cfg(mobile)]

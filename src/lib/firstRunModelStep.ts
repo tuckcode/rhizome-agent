@@ -19,14 +19,22 @@ import { providerForDiscover } from './rhizomeChatModels'
  */
 
 /**
- * Ways to connect, in the order the step offers them when none is detected.
+ * Ways to connect, in the order the step offers them.
  *
- * Extension point: a new engine (for example Claude Code, ADR-0191) adds its
- * id here, a case in `recommendedModelPath`, and a panel in
- * `FirstRunModelStep.tsx`. Nothing else in first run needs to change.
+ * Cloud sign-in leads: ChatGPT, then the user's own Claude Code (ADR-0191).
+ * A local model and an API key follow as other ways.
+ *
+ * Extension point: a new engine adds its id here, a case in
+ * `recommendedModelPath`, and a panel in `FirstRunModelStep.tsx`. Nothing
+ * else in first run needs to change.
  */
-export const FIRST_RUN_MODEL_PATHS = ['local', 'chatgpt', 'api_key'] as const
+export const FIRST_RUN_MODEL_PATHS = ['chatgpt', 'claude_code', 'local', 'api_key'] as const
 export type FirstRunModelPath = typeof FIRST_RUN_MODEL_PATHS[number]
+
+/** Paths that sign in to a cloud account. The step shows them first. */
+export const FIRST_RUN_SIGN_IN_PATHS = ['chatgpt', 'claude_code'] as const satisfies readonly FirstRunModelPath[]
+/** Paths that need no cloud account sign-in. */
+export const FIRST_RUN_OTHER_PATHS = ['local', 'api_key'] as const satisfies readonly FirstRunModelPath[]
 
 /** Local servers the step probes, in order. Both are in the provider catalog. */
 export const FIRST_RUN_LOCAL_KINDS = ['ollama', 'lm_studio'] as const satisfies readonly AiModelProviderKind[]
@@ -54,15 +62,14 @@ export function firstRunKeyPresets(): ProviderPreset[] {
 }
 
 /**
- * The one path the step leads with. A model already on this computer needs
- * no account and no key, so it comes first. Otherwise ChatGPT sign-in, which
- * needs no key to paste. A key is always offered as the third path.
+ * The one path the step selects first. Cloud sign-in leads. Claude Code
+ * leads when it is installed and signed in, because it then needs no more
+ * steps. Otherwise ChatGPT sign-in, which needs no key to paste.
  */
 export function recommendedModelPath(input: {
-  local: DetectedLocalModels | null
+  claudeCodeReady: boolean
 }): FirstRunModelPath {
-  if (input.local && input.local.models.length > 0) return 'local'
-  return 'chatgpt'
+  return input.claudeCodeReady ? 'claude_code' : 'chatgpt'
 }
 
 /** The first local server that answered with at least one model. */

@@ -5,9 +5,9 @@ import { trackEvent } from './telemetry'
 /**
  * ADR-0191: the optional Claude Code engine, as Settings and the picker see it.
  *
- * Rhizome only asks `claude --version` and `claude auth status --json`. The
- * host keeps a yes or no and the method name. There is no sign-in here: a
- * signed-out user is told to run `claude auth login` in their own terminal.
+ * Rhizome asks `claude --version` and `claude auth status --json`. The host
+ * keeps a yes or no and the method name. Sign-in runs `claude auth login`,
+ * so Claude Code does the OAuth and Rhizome never holds a Claude token.
  */
 export interface ClaudeCodeEngineStatus {
   installed: boolean
@@ -81,6 +81,15 @@ function normalizeStatus(raw: Partial<ClaudeCodeEngineStatus> | null | undefined
     loggedIn: typeof raw?.loggedIn === 'boolean' ? raw.loggedIn : null,
     authMethod: typeof raw?.authMethod === 'string' && raw.authMethod.trim() ? raw.authMethod.trim() : null,
   }
+}
+
+/**
+ * Runs the unmodified `claude auth login`. Claude Code opens Anthropic's
+ * sign-in page in the browser and keeps the token itself. Resolves when
+ * Claude Code exits. The caller then asks for the status again.
+ */
+export function startClaudeCodeLogin(): Promise<void> {
+  return callHost<null>('start_claude_code_login').then(() => undefined)
 }
 
 let statusRequest: Promise<ClaudeCodeEngineStatus> | null = null
