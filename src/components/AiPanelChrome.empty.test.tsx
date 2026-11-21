@@ -32,7 +32,10 @@ describe('AiPanelMessageHistory empty vs selected-session states', () => {
 
     const hero = screen.getByTestId('ai-panel-empty-state')
     expect(hero).toHaveAttribute('data-layout', 'hero')
-    expect(hero.className).toMatch(/justify-end/)
+    // An auto top margin sits the hero on the composer, and it shrinks to 0 in
+    // a short window, so the top of the hero never goes out of reach.
+    expect(screen.getByTestId('chat-home-wordmark').parentElement?.className).toMatch(/\bmt-auto\b/)
+    expect(hero.className).not.toMatch(/justify-end|overflow-hidden/)
     expect(screen.getByTestId('chat-home-wordmark')).toHaveTextContent('rhizome')
     expect(hero.querySelector('svg')).not.toBeNull()
   })

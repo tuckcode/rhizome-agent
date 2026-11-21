@@ -575,7 +575,7 @@ function AiPanelEmptyState({
 
   return (
     <div
-      className="relative flex min-h-full flex-1 flex-col items-center justify-end overflow-hidden px-6 pb-8 text-center"
+      className="relative flex min-h-full flex-1 flex-col items-center px-6 pb-8 text-center"
       data-layout="hero"
       data-testid="ai-panel-empty-state"
     >
@@ -586,7 +586,9 @@ function AiPanelEmptyState({
         // chat column never cuts it into hard edges the way a blur would.
         style={{ backgroundImage: 'radial-gradient(closest-side, color-mix(in oklab, var(--primary) 14%, transparent), transparent)' }}
       />
-      <div className="relative inline-flex items-center gap-2 rounded-full border border-border bg-background/60 py-1 pl-1.5 pr-3">
+      {/* mt-auto sits the hero at the bottom when there is room. In a short
+          window it shrinks to 0, so the pill stays in view and can scroll. */}
+      <div className="relative mt-auto inline-flex items-center gap-2 rounded-full border border-border bg-background/60 py-1 pl-1.5 pr-3">
         <BrandMark size={20} />
         <p className="font-mono text-xs font-semibold tracking-wide text-muted-foreground" data-testid="chat-home-wordmark">
           rhizome
