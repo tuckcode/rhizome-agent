@@ -189,3 +189,26 @@ describe('loadPanePreferences', () => {
     expect(loadPanePreferences('/Vault').active).toMatchObject({ id: 'read', readNotes: true })
   })
 })
+
+describe('note lead', () => {
+  const context = { shellWidth: 1512, noteOpen: true, railPinned: true, noteLead: true }
+
+  it('gives the open note 60 percent of the note-plus-Chat room and folds the rail', () => {
+    const fit = fitPanePreset({ id: 'chat', widths: {} }, context)
+    expect(fit.railPinned).toBe(false)
+    expect(fit.split).toBe('side-by-side')
+    const shared = fit.widths.note + fit.chatWidth
+    expect(fit.widths.note).toBe(Math.round(shared * 0.6))
+    expect(fit.chatWidth).toBeGreaterThanOrEqual(420)
+  })
+
+  it('keeps a dragged note share through save and load', () => {
+    const fit = fitPanePreset({ id: 'chat', widths: {} }, context)
+    const dragged = resizePresetWidth({ id: 'chat', widths: {} }, 'note', fit.widths.note - 100, context)
+    expect(dragged.noteShare).toBeLessThan(0.6)
+    localStorage.setItem(panePresetStorageKey('main'), JSON.stringify({ version: 1, active: dragged, savedWidths: {} }))
+    const loaded = loadPanePreferences('main').active
+    expect(loaded.noteShare).toBeCloseTo(dragged.noteShare!)
+    expect(fitPanePreset(loaded, context).widths.note).toBe(fit.widths.note - 100)
+  })
+})

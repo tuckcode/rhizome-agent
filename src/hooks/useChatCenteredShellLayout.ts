@@ -19,7 +19,7 @@ interface UseChatCenteredShellLayoutArgs extends PaneControls {
 export function useChatCenteredShellLayout(args: UseChatCenteredShellLayoutArgs) {
   const { kind, panePreset, setViewMode, updatePanePreset, noteOpen, railPinned, hideNotesForCanvas } = args
   const { shellRef, width } = useShellCompactLayout(kind === 'chat-centered', noteOpen)
-  const context = { shellWidth: width, noteOpen, railPinned, hideNotesForCanvas }
+  const context = { shellWidth: width, noteOpen, railPinned, hideNotesForCanvas, noteLead: true }
   const fit = fitPanePreset(panePreset, context)
   // Whether an expanded Sessions rail could take its own column right now.
   // When it cannot, the rail opens as a temporary drawer over Chat.
@@ -42,7 +42,7 @@ export function useChatCenteredShellLayout(args: UseChatCenteredShellLayoutArgs)
   useEffect(() => {
     liveResize.current = {
       panePreset,
-      context: { shellWidth: width, noteOpen, railPinned, hideNotesForCanvas },
+      context: { shellWidth: width, noteOpen, railPinned, hideNotesForCanvas, noteLead: true },
       updatePanePreset,
       fitted: fit.widths,
     }

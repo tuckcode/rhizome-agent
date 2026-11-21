@@ -10,6 +10,9 @@ export type PanePresetState = {
   readNotes?: boolean
   /** The user chose On top. Otherwise an open note goes beside Chat when it fits. */
   stacked?: boolean
+  /** Note lead: the share of the note-plus-Chat room the open note takes.
+   *  Set by dragging the note divider. Unset means NOTE_LEAD_SHARE. */
+  noteShare?: number
 }
 
 /**
@@ -57,7 +60,13 @@ export type PaneFitContext = {
   noteOpen?: boolean
   railPinned?: boolean
   hideNotesForCanvas?: boolean
+  /** Note lead: an open note takes most of the room beside Chat, and the
+   *  Sessions rail folds while the note is open. The app shell turns it on. */
+  noteLead?: boolean
 }
+
+/** Share of the note-plus-Chat room that an open note takes in note-lead layout. */
+export const NOTE_LEAD_SHARE = 0.6
 
 /** Fit actual columns, including both rails. Shrinking never overwrites saved widths. */
 export function fitPanePreset(preset: PanePresetState, context: PaneFitContext) {
@@ -67,6 +76,10 @@ export function fitPanePreset(preset: PanePresetState, context: PaneFitContext) 
   let browseOpen = preset.id === 'workbench' && notesOpen
   let railPinned = context.railPinned === true
   let beside = preset.id === 'read' && context.noteOpen === true
+  const noteLead = context.noteLead === true && context.noteOpen === true && preset.stacked !== true
+  // Note-lead: the Sessions rail folds while a note is open. This is a
+  // temporary fold, so the saved rail choice does not change.
+  if (noteLead) railPinned = false
   const available = context.shellWidth && context.shellWidth > 0 ? context.shellWidth : Infinity
   const used = () => (railPinned ? widths.rail : RAIL_WIDTH)
     + (notesOpen ? widths.notes : context.hideNotesForCanvas ? 0 : RESTORE_WIDTH)
@@ -93,6 +106,12 @@ export function fitPanePreset(preset: PanePresetState, context: PaneFitContext) 
     widths.note = Math.min(widths.note, besideRoom())
     beside = true
   }
+  if (noteLead && beside) {
+    // Room for the note and Chat together, after every other column.
+    const shared = available - (used() - widths.note - NOTE_DIVIDER_WIDTH) - NOTE_DIVIDER_WIDTH
+    const target = Math.round(shared * (preset.noteShare ?? NOTE_LEAD_SHARE))
+    widths.note = Math.max(noteFloor, Math.min(target, shared - CHAT_MIN_WIDTH))
+  }
   const workspace: WorkspaceState = context.noteOpen !== true ? 'conversation'
     : beside ? 'desk'
       : besideRoom() >= noteFloor ? 'stacked'
@@ -114,6 +133,16 @@ function columnResizeRoom(preset: PanePresetState, column: PaneColumn, context: 
 
 /** A drag cannot steal the space occupied by another column or Chat. */
 export function resizePresetWidth(preset: PanePresetState, column: PaneColumn, requested: number, context: PaneFitContext): PanePresetState {
+  if (column === 'note' && context.noteLead === true && context.noteOpen === true && preset.stacked !== true) {
+    const fit = fitPanePreset(preset, context)
+    if (fit.split === 'side-by-side') {
+      // Note and Chat share this room. Keep the note share, so the drag holds
+      // when the window size changes.
+      const shared = fit.widths.note + fit.chatWidth
+      const width = Math.max(PANE_LIMITS.note.min, Math.min(requested, shared - CHAT_MIN_WIDTH))
+      return { ...preset, noteShare: width / shared }
+    }
+  }
   const width = normalizedWidths({ [column]: Math.min(requested, columnResizeRoom(preset, column, context)) })[column]
   return { ...preset, widths: { ...preset.widths, [column]: width } }
 }

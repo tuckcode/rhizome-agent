@@ -40,6 +40,9 @@ function parsePreset(raw: unknown): PanePresetState | null {
     widths,
     readNotes: 'readNotes' in raw && raw.readNotes === true,
     ...('stacked' in raw && raw.stacked === true ? { stacked: true } : {}),
+    ...('noteShare' in raw && typeof raw.noteShare === 'number' && raw.noteShare > 0 && raw.noteShare < 1
+      ? { noteShare: raw.noteShare }
+      : {}),
   }
 }
 
