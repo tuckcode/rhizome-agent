@@ -575,13 +575,16 @@ function AiPanelEmptyState({
 
   return (
     <div
-      className="relative flex min-h-full flex-1 flex-col items-center justify-end px-6 pb-8 text-center"
+      className="relative flex min-h-full flex-1 flex-col items-center justify-end overflow-hidden px-6 pb-8 text-center"
       data-layout="hero"
       data-testid="ai-panel-empty-state"
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute bottom-0 left-1/2 h-72 w-[36rem] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl"
+        className="pointer-events-none absolute bottom-0 left-1/2 h-80 w-full max-w-[36rem] -translate-x-1/2"
+        // A radial gradient fades to clear inside its own box, so a narrow
+        // chat column never cuts it into hard edges the way a blur would.
+        style={{ backgroundImage: 'radial-gradient(closest-side, color-mix(in oklab, var(--primary) 14%, transparent), transparent)' }}
       />
       <div className="relative inline-flex items-center gap-2 rounded-full border border-border bg-background/60 py-1 pl-1.5 pr-3">
         <BrandMark size={20} />
