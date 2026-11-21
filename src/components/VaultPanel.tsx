@@ -28,7 +28,6 @@ interface VaultPanelProps {
   onFocusToggle?: () => void
   mode?: NotesPanelMode
   onModeChange?: (mode: NotesPanelMode) => void
-  onModeMenuOpenChange?: (open: boolean) => void
   modeButtonRef?: Ref<HTMLButtonElement>
   windowTooNarrow?: boolean
   openForNow?: boolean
@@ -46,7 +45,6 @@ export function VaultPanel({
   onFocusToggle,
   mode,
   onModeChange,
-  onModeMenuOpenChange,
   modeButtonRef,
   windowTooNarrow = false,
   openForNow = false,
@@ -132,7 +130,6 @@ export function VaultPanel({
           <NotesPanelModeControl
             mode={mode}
             onModeChange={onModeChange}
-            onMenuOpenChange={onModeMenuOpenChange}
             triggerRef={modeButtonRef}
             windowTooNarrow={windowTooNarrow}
             openForNow={openForNow}

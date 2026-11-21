@@ -30,7 +30,7 @@ export function useChatCenteredShellLayout(args: UseChatCenteredShellLayoutArgs)
     && withRail.browseOpen === fit.browseOpen
     && withRail.split === fit.split
   const layout = resolveShellLayout({
-    ...args, preset: panePreset, split: fit.split, shellWidth: width, compactVaultPanelOpen: false,
+    ...args, noteLead: true, preset: panePreset, split: fit.split, shellWidth: width, compactVaultPanelOpen: false,
   })
   const ensureNotesOpen = useCallback(() => {
     if (panePreset.id !== 'workbench' && panePreset.id !== 'notes') setViewMode(bumpViewModeToOpenNotes(args.viewMode))

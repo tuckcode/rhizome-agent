@@ -1696,7 +1696,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     prefillAiComposer(formatAskChatExcerpt(title, excerpt))
     trackEvent('note_excerpt_ask_chat')
   }, [activeTabEntry])
-  const [, setChatNotePaneOpen] = useState(false)
+  const [chatNotePaneOpen, setChatNotePaneOpen] = useState(false)
   const [sessionRailSlot, setSessionRailSlot] = useState<HTMLDivElement | null>(null)
   const [notesFocus, setNotesFocus] = useState(false)
   const hideNotesForCanvas = isGraphDestination || isMyceliumDestination || isResearchDestination
@@ -1724,7 +1724,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     panePreset, setPanePreset, updatePanePreset, railPinned: railPinned || railConsumesExpandedWidth(reportedRailWidth),
     viewMode,
     setViewMode: handleSetViewModeWithNotes,
-    noteOpen: Boolean(activeTab),
+    noteOpen: Boolean(activeTab || (!hideNotesForCanvas && chatNotePaneOpen)),
     inspectorOpen: !layout.inspectorCollapsed,
     hideNotesForCanvas,
     chatDestination: isChatDestination,
@@ -1767,7 +1767,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     })
   }, [])
   const [leftOverlaying, setLeftOverlaying] = useState(false)
-  const [notesMenuOpen, setNotesMenuOpen] = useState(false)
   const fittedNotesMode = fittedNotesPanelMode(storedNotesMode, notesOpen && !hideNotesForCanvas)
   const layoutNotesMode = notesSessionOpen && notesOpen && !hideNotesForCanvas ? 'open' : fittedNotesMode
   const notesWindowTooNarrow = compactVaultPanel && storedNotesMode === 'open'
@@ -1782,7 +1781,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const notesHover = useHoverExpandPanel({
     enabled: chatCentered && layoutNotesMode === 'auto' && !hideNotesForCanvas,
     peerOverlaying: leftOverlaying,
-    menuOpen: notesMenuOpen,
   })
   const handleNotesModeChange = useCallback((mode: NotesPanelMode) => {
     setNotesSessionOpen(false)
@@ -2221,7 +2219,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         onFocusToggle={handleNotesFocusToggle}
         mode={storedNotesMode}
         onModeChange={handleNotesModeChange}
-        onModeMenuOpenChange={setNotesMenuOpen}
         modeButtonRef={notesHover.modeButtonRef}
         windowTooNarrow={notesWindowTooNarrow}
         openForNow={notesOpenForNow}
@@ -2271,6 +2268,11 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         sessionsRailSlot={commandRailEnabled ? sessionRailSlot : undefined}
         onRailSessionPicked={handleRailSessionPicked}
         onNotePaneOpenChange={setChatNotePaneOpen}
+        stackNotePane={Boolean(activeTab || workspace === 'focused' || workspace === 'stacked')}
+        fittedNotePaneWidth={
+          !activeTab && workspace === 'desk' && Number.isFinite(paneWidths.note) ? paneWidths.note : undefined
+        }
+        onFittedNotePaneResize={delta => resizeColumn('note', -delta)}
         onOpenSessionFootprint={handleOpenSessionFootprint}
         onOpenCommandPalette={dialogs.openCommandPalette}
         requestedNote={chatNoteRequest}
@@ -2591,7 +2593,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               onMouseEnter={notesHover.onMouseEnter}
               onMouseLeave={notesHover.onMouseLeave}
               onFocusCapture={notesHover.onFocusCapture}
-              onMenuOpenChange={setNotesMenuOpen}
               showInbox={explicitOrganizationEnabled}
               selection={effectiveSelection}
               onSelectSection={handleSetSelection}
@@ -2613,7 +2614,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                 onFocusToggle={handleNotesFocusToggle}
                 mode={storedNotesMode}
                 onModeChange={handleNotesModeChange}
-                onModeMenuOpenChange={setNotesMenuOpen}
                 modeButtonRef={notesHover.modeButtonRef}
                 windowTooNarrow={notesWindowTooNarrow}
                 openForNow={notesOpenForNow}

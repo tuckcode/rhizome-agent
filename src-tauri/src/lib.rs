@@ -825,6 +825,7 @@ macro_rules! app_invoke_handler {
             commands::native_chat_approval_reply,
             commands::native_chat_end,
             commands::native_chat_list,
+            commands::rename_native_session,
             commands::native_chat_fork,
             commands::native_chat_open,
             commands::native_chat_delete,

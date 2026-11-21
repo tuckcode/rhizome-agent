@@ -512,6 +512,12 @@ failures and the 100 MiB rollover notice are non-fatal; missing keys,
 provider failures, and `ensure_log` failures are fatal. The Chat stream
 ends on a fatal error, `TurnEnd`, `Cancelled`, or `TurnCapped`.
 
+After the first successful reply in a new chat, the native host requests a short
+title through the configured model with no tools. Claude Code sessions use a
+local title based on the first request. The host stores the title beside its chat
+log. A manual rename takes priority over a pending model result. The host emits
+`native-chat-title-changed` so the header and Sessions list refresh.
+
 The installation setting `agent_max_steps` defaults to 50 model rounds per
 turn, with a minimum of 1. Settings → AI Agents exposes it as an integer
 input without an upper-bound control. `TurnCapped { steps, max_steps }` is

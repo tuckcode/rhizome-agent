@@ -33,13 +33,13 @@ function renderRail(overrides: Partial<React.ComponentProps<typeof NotesRail>> =
 }
 
 describe('NotesRail', () => {
-  it('keeps CommandRail collapsed width and puts the mode button first', () => {
+  it('keeps CommandRail collapsed width and puts the mode choices first', () => {
     renderRail()
     const rail = screen.getByTestId('notes-panel-rail')
     expect(rail).toHaveStyle({ width: '46px' })
     expect(rail).toHaveAttribute('data-mode', 'auto')
     expect(rail).toHaveAttribute('data-expanded', 'false')
-    const mode = screen.getByTestId('notes-panel-mode-trigger')
+    const mode = screen.getByTestId('notes-panel-mode')
     const all = screen.getByTestId('notes-rail-all')
     expect(mode.compareDocumentPosition(all) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.getByTestId('notes-rail-all')).toHaveStyle({ width: '32px', height: '32px' })

@@ -580,6 +580,51 @@ export function FirstRunModelStep({ providers, onConnected, onSkip }: FirstRunMo
     }, path)
   }, [finish, providers])
 
+  const signInSelected = selected === null || selected === 'chatgpt' || selected === 'claude_code'
+  const connectPanel = (
+    <section aria-label="Connect" className="flex flex-col gap-3" data-testid="first-run-model-panel">
+      {selected === null ? (
+        <StatusLine>
+          <CircleNotch size={16} className="animate-spin" aria-hidden="true" />
+          Checking how this computer can connect…
+        </StatusLine>
+      ) : null}
+      {selected === 'claude_code' ? (
+        <ClaudeCodePanel
+          state={claudeCode.state}
+          busy={saving}
+          onCheckAgain={claudeCode.refresh}
+          onUse={() => {
+            void finish({ claude_code_engine_enabled: true, native_chat_target: CLAUDE_CODE_SESSION_TARGET }, 'claude_code')
+          }}
+        />
+      ) : null}
+      {selected === 'local' ? (
+        <LocalPanel
+          probe={probe}
+          busy={saving}
+          onLookAgain={again}
+          onUse={(found, modelId) => {
+            void connectProvider(localProviderFor(found.kind, modelId), 'local')
+          }}
+        />
+      ) : null}
+      {selected === 'chatgpt' ? (
+        <ChatgptPanel
+          onReady={() => {
+            void firstChatgptModelTarget().then((target) => (
+              finish(target ? { native_chat_target: target } : {}, 'chatgpt')
+            ))
+          }}
+        />
+      ) : null}
+      {selected === 'api_key' ? (
+        <ApiKeyPanel onConnected={(provider) => connectProvider(provider, 'api_key')} />
+      ) : null}
+      {saveError ? <ErrorLine message={saveError} testId="first-run-model-save-error" /> : null}
+    </section>
+  )
+
   return (
     <OnboardingShell
       className="bg-sidebar"
@@ -607,6 +652,7 @@ export function FirstRunModelStep({ providers, onConnected, onSkip }: FirstRunMo
             />
           ))}
         </div>
+        {signInSelected ? connectPanel : null}
       </div>
 
       <div role="group" aria-label="Other ways" className="flex flex-col gap-2">
@@ -622,47 +668,7 @@ export function FirstRunModelStep({ providers, onConnected, onSkip }: FirstRunMo
         ))}
       </div>
 
-      <section aria-label="Connect" className="flex flex-col gap-3" data-testid="first-run-model-panel">
-        {selected === null ? (
-          <StatusLine>
-            <CircleNotch size={16} className="animate-spin" aria-hidden="true" />
-            Checking how this computer can connect…
-          </StatusLine>
-        ) : null}
-        {selected === 'claude_code' ? (
-          <ClaudeCodePanel
-            state={claudeCode.state}
-            busy={saving}
-            onCheckAgain={claudeCode.refresh}
-            onUse={() => {
-              void finish({ claude_code_engine_enabled: true, native_chat_target: CLAUDE_CODE_SESSION_TARGET }, 'claude_code')
-            }}
-          />
-        ) : null}
-        {selected === 'local' ? (
-          <LocalPanel
-            probe={probe}
-            busy={saving}
-            onLookAgain={again}
-            onUse={(found, modelId) => {
-              void connectProvider(localProviderFor(found.kind, modelId), 'local')
-            }}
-          />
-        ) : null}
-        {selected === 'chatgpt' ? (
-          <ChatgptPanel
-            onReady={() => {
-              void firstChatgptModelTarget().then((target) => (
-                finish(target ? { native_chat_target: target } : {}, 'chatgpt')
-              ))
-            }}
-          />
-        ) : null}
-        {selected === 'api_key' ? (
-          <ApiKeyPanel onConnected={(provider) => connectProvider(provider, 'api_key')} />
-        ) : null}
-        {saveError ? <ErrorLine message={saveError} testId="first-run-model-save-error" /> : null}
-      </section>
+      {!signInSelected ? connectPanel : null}
 
       <footer className="flex items-center justify-between gap-3 border-t border-border pt-4">
         <p className="text-xs text-muted-foreground">You can chat once a model is connected.</p>

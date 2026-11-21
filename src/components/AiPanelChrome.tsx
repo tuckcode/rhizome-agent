@@ -575,7 +575,7 @@ function AiPanelEmptyState({
 
   return (
     <div
-      className="relative flex min-h-full flex-1 flex-col items-center px-6 pb-8 text-center"
+      className="@container relative flex min-h-full flex-1 flex-col items-center px-6 pb-8 text-center"
       data-layout="hero"
       data-testid="ai-panel-empty-state"
     >
@@ -594,12 +594,12 @@ function AiPanelEmptyState({
           rhizome
         </p>
       </div>
-      <h2 className="relative mt-6 font-sans text-6xl font-semibold leading-none tracking-tighter text-foreground">
+      <h2 className="relative mt-4 font-sans text-4xl font-semibold leading-none tracking-tighter text-foreground @xl:mt-6 @xl:text-6xl">
         What are we{' '}
         <br />
         working on?
       </h2>
-      <p className="relative mt-5 max-w-md text-base leading-6 text-muted-foreground">
+      <p className="relative mt-3 max-w-md text-sm leading-6 text-muted-foreground @xl:mt-5 @xl:text-base">
         {subline}
       </p>
     </div>

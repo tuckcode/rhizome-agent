@@ -134,7 +134,7 @@ describe('VaultPanel', () => {
       />,
     )
 
-    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAttribute('data-mode', 'open')
+    expect(screen.getByTestId('notes-panel-mode-open')).toHaveAttribute('aria-pressed', 'true')
     expect(screen.queryByTestId('vault-panel-collapse')).not.toBeInTheDocument()
   })
 

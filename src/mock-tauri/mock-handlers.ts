@@ -210,6 +210,7 @@ let mockSettings: Settings = {
 const DEFAULT_MOCK_VAULT_PATH = '/Users/mock/demo-vault-v2'
 const mockArchivedSessions = new Set<string>()
 const mockArchivedNativeSessions = new Set<string>()
+const mockNativeSessionNames = new Map<string, string>()
 let mockForkedNative: { sessionId: string; events: unknown[] } | null = null
 
 const mockSessionNames = new Map<string, string>()
@@ -719,7 +720,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
         sessionId: 'mock-native-1',
         createdAt: new Date(Date.now() - 60_000).toISOString(),
         target: 'free_tier_auto',
-        title: 'Native hello',
+        title: mockNativeSessionNames.get('mock-native-1') ?? 'Native hello',
         archived: mockArchivedNativeSessions.has('mock-native-1'),
       },
     ]
@@ -728,11 +729,15 @@ export const mockHandlers: Record<string, (args: any) => any> = {
         sessionId: mockForkedNative.sessionId,
         createdAt: new Date().toISOString(),
         target: 'free_tier_auto',
-        title: 'Forked native chat',
+        title: mockNativeSessionNames.get(mockForkedNative.sessionId) ?? 'Forked native chat',
         archived: mockArchivedNativeSessions.has(mockForkedNative.sessionId),
       })
     }
     return rows
+  },
+  rename_native_session: (args: { sessionId: string; name: string }) => {
+    mockNativeSessionNames.set(args.sessionId, args.name)
+    return null
   },
   set_native_session_archived: (args: { sessionId?: string; archived?: boolean }) => {
     const id = args?.sessionId

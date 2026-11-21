@@ -103,6 +103,7 @@ interface AiPanelProps {
   composerSkillsLabel?: string | null
   /** Frame B note split — sits beside the transcript so the composer spans both. */
   notePane?: ReactNode
+  notePaneStacked?: boolean
   /** Docked at the far right, outside the note split. */
   sidePanel?: ReactNode
   /** Temporarily hide Sessions when the containing shell cannot fit it. */
@@ -154,6 +155,7 @@ interface AiPanelViewProps {
   composerDeck?: ReactNode
   composerSkillsLabel?: string | null
   notePane?: ReactNode
+  notePaneStacked?: boolean
   /** Docked at the far right, outside the note split. */
   sidePanel?: ReactNode
   sessionsAutoCollapsed?: boolean
@@ -279,6 +281,7 @@ export function AiPanelView({
   composerDeck,
   composerSkillsLabel,
   notePane,
+  notePaneStacked,
   sidePanel,
   sessionsAutoCollapsed = false,
   sessionsRailSlot,
@@ -588,7 +591,7 @@ export function AiPanelView({
           {switchError}
         </p>
       ) : null}
-      <div className="flex min-h-0 flex-1">
+      <div className={notePaneStacked ? "flex min-h-0 flex-1 flex-col-reverse" : "flex min-h-0 flex-1"}>
         {sessionsShown && !usesRailSessions && (
           // Design system: sessions are a column beside the transcript, never
           // a view that replaces it. Conversation owns the room — which is
@@ -820,6 +823,7 @@ export function AiPanel({
   noteListFilter,
   newChatRef,
   notePane,
+  notePaneStacked,
   sidePanel,
   sessionsAutoCollapsed,
   sessionsRailSlot,
@@ -866,6 +870,7 @@ export function AiPanel({
       onForkMessage={providedOnForkMessage}
       forkTargetsPrimeEntry={forkTargetsPrimeEntry}
       notePane={notePane}
+      notePaneStacked={notePaneStacked}
       sidePanel={sidePanel}
       sessionsAutoCollapsed={sessionsAutoCollapsed}
       sessionsRailSlot={sessionsRailSlot}

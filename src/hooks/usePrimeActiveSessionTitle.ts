@@ -4,6 +4,7 @@ import {
   isNativeSessionPath,
   nativeChatListToSummaries,
 } from '../lib/nativeChatTranscript'
+import { useNativeSessionTitleRevision } from './useNativeSessionTitleRevision'
 import type { PrimeSessionSummary } from '../lib/primeSessionMeta'
 
 /**
@@ -33,11 +34,13 @@ export function usePrimeActiveSessionTitle(
   // even for the moment between a switch and the next read resolving.
   const [read, setRead] = useState<{ path: string, title: string | null } | null>(null)
 
+  const native = isNativeSessionPath(sessionPath)
+  const titleRevision = useNativeSessionTitleRevision(native, sessionPath)
+
   useEffect(() => {
     if (!sessionPath) return
 
     let cancelled = false
-    const native = isNativeSessionPath(sessionPath)
     const command = native ? 'native_chat_list' : 'list_prime_session_summaries'
     void callHostOr<unknown>(command, []).then((rows) => {
       if (cancelled) return
@@ -57,7 +60,7 @@ export function usePrimeActiveSessionTitle(
     return () => {
       cancelled = true
     }
-  }, [sessionPath, refreshKey])
+  }, [native, sessionPath, refreshKey, titleRevision])
 
   return sessionPath && read?.path === sessionPath ? read.title : null
 }

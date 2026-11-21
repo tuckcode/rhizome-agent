@@ -53,6 +53,7 @@ import {
   trackPrimeSessionOpened,
   trackPrimeSessionRenamed,
 } from '../lib/productAnalytics'
+import { useNativeSessionTitleRevision } from '../hooks/useNativeSessionTitleRevision'
 import { usePrimeRunningSessionFiles } from '../hooks/usePrimeRunningSessionFiles'
 import { useDragRegion } from '../hooks/useDragRegion'
 import { sessionsColumnTitleBarStyle } from '../utils/trafficLights'
@@ -61,6 +62,7 @@ import { isTauri, mockInvoke } from '../mock-tauri'
 import { invoke } from '@tauri-apps/api/core'
 import {
   nativeChatListToSummaries,
+  isNativeSessionPath,
   type NativeChatListItem,
 } from '../lib/nativeChatTranscript'
 import {
@@ -564,6 +566,8 @@ export default function PrimeSessionList({
     return name
   }
 
+  const titleRevision = useNativeSessionTitleRevision(engine === 'native')
+
   useEffect(() => {
     let cancelled = false
     void (async () => {
@@ -595,7 +599,7 @@ export default function PrimeSessionList({
     return () => {
       cancelled = true
     }
-  }, [engine, activeSessionPath])
+  }, [engine, activeSessionPath, titleRevision])
 
   const ordered = useMemo(
     () => sortPrimeSessions(sessions ?? [], sortKey),
@@ -749,10 +753,14 @@ export default function PrimeSessionList({
       trackPrimeSessionRenamed()
       void (async () => {
         try {
-          if (vaultPath) {
-            await call('ensure_prime_session_host', { vaultPath })
+          if (isNativeSessionPath(session.path)) {
+            await call('rename_native_session', { sessionId: session.id, name })
+          } else {
+            if (vaultPath) {
+              await call('ensure_prime_session_host', { vaultPath })
+            }
+            await call('rename_prime_session', { path: session.path, name })
           }
-          await call('rename_prime_session', { path: session.path, name })
         } catch (e: unknown) {
           setSessions((current) =>
             (current ?? []).map((entry) =>

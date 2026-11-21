@@ -24,6 +24,7 @@ export type ShellLayoutInput = {
   viewMode: ViewMode
   split: ChatNoteSplit
   noteOpen: boolean
+  noteLead?: boolean
   shellWidth: number | null
   inspectorOpen: boolean
   compactVaultPanelOpen: boolean
@@ -62,7 +63,13 @@ export function resolveShellLayout(input: ShellLayoutInput): ShellLayoutState {
   }
 
   const preset = input.preset ?? presetFromLegacy(input.viewMode, input.split)
-  const fit = fitPanePreset(preset, { shellWidth: input.shellWidth, noteOpen: input.noteOpen, railPinned: input.railPinned, hideNotesForCanvas: input.hideNotesForCanvas })
+  const fit = fitPanePreset(preset, {
+    shellWidth: input.shellWidth,
+    noteOpen: input.noteOpen,
+    noteLead: input.noteLead,
+    railPinned: input.railPinned,
+    hideNotesForCanvas: input.hideNotesForCanvas,
+  })
   return {
     canvas: 'chat-centered',
     notesOpen: fit.notesOpen,

@@ -1,0 +1,57 @@
+{
+  "fill": {
+    "solid": "srgb:0.98,0.98,0.96,1"
+  },
+  "fill-specializations": [
+    {
+      "appearance": "dark",
+      "value": {
+        "solid": "srgb:0.04,0.13,0.10,1"
+      }
+    }
+  ],
+  "groups": [
+    {
+      "layers": [
+        {
+          "name": "Paper",
+          "image-name": "Paper.png",
+          "glass": false,
+          "hidden-specializations": [
+            {
+              "value": false
+            },
+            {
+              "appearance": "dark",
+              "value": true
+            }
+          ]
+        },
+        {
+          "name": "Evergreen",
+          "image-name": "Evergreen.png",
+          "glass": false,
+          "hidden-specializations": [
+            {
+              "value": true
+            },
+            {
+              "appearance": "dark",
+              "value": false
+            }
+          ]
+        }
+      ],
+      "specular": false,
+      "translucency": {
+        "enabled": false,
+        "value": 0
+      }
+    }
+  ],
+  "supported-platforms": {
+    "squares": [
+      "macOS"
+    ]
+  }
+}

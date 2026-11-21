@@ -1,3 +1,4 @@
+import titleSystemPrompt from '../../shared/chat-title-prompt.txt?raw'
 import type { AiAgentPermissionMode } from '../lib/aiAgentPermissionMode'
 import type { AiTarget } from '../lib/aiTargets'
 import { streamAiAgent, type AgentStreamCallbacks } from './streamAiAgent'
@@ -6,16 +7,7 @@ import { completeAiModelText } from './completeAiModelText'
 const TITLE_WORD_LIMIT = 4
 const TITLE_CHAR_LIMIT = 48
 
-const TITLE_SYSTEM_PROMPT = [
-  'Create a concise title for this chat after reading the user request and assistant answer.',
-  'Use 2 to 4 words when possible, and never exceed 48 characters.',
-  'Write a noun phrase, not a question and not a sentence.',
-  'Describe the chat topic, not the assistant process or result count.',
-  'Use sentence case: capitalize only the first word and preserve acronyms.',
-  'Do not use quotation marks, markdown, emojis, or trailing punctuation.',
-  'Return only the title.',
-  'Do not inspect files or use tools.',
-].join(' ')
+const TITLE_SYSTEM_PROMPT = titleSystemPrompt.trim()
 
 const STOP_WORDS = new Set([
   'a',

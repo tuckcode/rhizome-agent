@@ -70,7 +70,9 @@ describe('FirstRunModelStep', () => {
     renderStep()
 
     await waitFor(() => expect(screen.getByTestId('first-run-model-path-chatgpt')).toHaveAttribute('aria-pressed', 'true'))
-    expect(screen.getByTestId('first-run-model-chatgpt-sign-in')).toBeInTheDocument()
+    const signIn = screen.getByTestId('first-run-model-chatgpt-sign-in')
+    const otherWays = screen.getByRole('group', { name: 'Other ways' })
+    expect(signIn.compareDocumentPosition(otherWays) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('says no server answered and looks again on request', async () => {

@@ -3,6 +3,8 @@
 //! Chat still talks to Prime. Step 4 adds the Settings toggle.
 //! These commands exist so the toggle has a backend to call.
 
+mod titles;
+
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
@@ -705,6 +707,33 @@ fn catalog_provider(kind: AiModelProviderKind, id: &str) -> Result<AiModelProvid
     Err(REMOVED_PROVIDER.into())
 }
 
+fn catalog_request(
+    provider_kind: AiModelProviderKind,
+    provider_id: &str,
+    model_id: String,
+    system_prompt: Option<String>,
+) -> Result<AiModelStreamRequest, String> {
+    Ok(AiModelStreamRequest {
+        provider: catalog_provider(provider_kind, provider_id)?,
+        model_id,
+        message: String::new(),
+        system_prompt,
+        vault_path: None,
+        vault_paths: Vec::new(),
+        api_key_override: None,
+        event_name: None,
+        reasoning_level: None,
+        reasoning_slot: None,
+        reasoning_notice_tx: None,
+        reasoning_notices_seen: None,
+        chat_images: Vec::new(),
+        vision_state: crate::chat_images::VisionState::Unknown,
+        send_anyway: false,
+        defer_image_skip: false,
+        image_session_id: None,
+    })
+}
+
 #[derive(Debug, Clone, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NativeChatStartRequest {
@@ -779,10 +808,10 @@ pub fn list_native_sessions() -> Result<Vec<NativeChatListItem>, String> {
         headers
             .into_iter()
             .map(|header| NativeChatListItem {
+                title: titles::read_title(&header.session_id).unwrap_or_default(),
                 session_id: header.session_id,
                 created_at: header.created_at,
                 target: header.target,
-                title: String::new(),
                 archived: false,
             })
             .collect(),
@@ -866,9 +895,72 @@ pub fn delete_native_session(chats: &NativeChats, session_id: &str) -> Result<()
     let _ = chats.end(session_id);
     let path = format!("{NATIVE_SESSION_PREFIX}{session_id}");
     session_transcript_index::remove_session(&path)?;
-    crate::engines::native_log::delete_session_log(session_id)?;
+    titles::delete_session(session_id)?;
     crate::engines::claude_code::forget_conversation(session_id);
     Ok(())
+}
+
+#[cfg(desktop)]
+const NATIVE_CHAT_TITLE_CHANGED: &str = "native-chat-title-changed";
+
+#[cfg(desktop)]
+#[tauri::command]
+pub fn rename_native_session(
+    app: tauri::AppHandle,
+    session_id: String,
+    name: String,
+) -> Result<(), String> {
+    use tauri::Emitter;
+    titles::rename(&session_id, &name)?;
+    let _ = app.emit(NATIVE_CHAT_TITLE_CHANGED, (&session_id, false));
+    Ok(())
+}
+
+#[cfg(desktop)]
+fn native_event_sink(
+    app: tauri::AppHandle,
+    session_id: String,
+) -> impl FnMut(EngineEvent) + Send + 'static {
+    use tauri::Emitter;
+
+    let channel = native_chat_channel(&session_id);
+    let naming_started = Arc::new(AtomicBool::new(titles::read_title(&session_id).is_some()));
+    let mut reply_seen = false;
+    move |event| {
+        let _ = app.emit(&channel, &event);
+        let completed_reply = match event {
+            EngineEvent::TextDelta { ref text } if !text.trim().is_empty() => {
+                reply_seen = true;
+                false
+            }
+            EngineEvent::TurnEnd => std::mem::take(&mut reply_seen),
+            EngineEvent::Error { fatal: true, .. }
+            | EngineEvent::Cancelled { .. }
+            | EngineEvent::TurnCapped { .. } => {
+                reply_seen = false;
+                false
+            }
+            _ => false,
+        };
+        if completed_reply && !naming_started.swap(true, Ordering::SeqCst) {
+            let app = app.clone();
+            let session_id = session_id.clone();
+            let naming_started = Arc::clone(&naming_started);
+            thread::spawn(move || match titles::generate(&session_id) {
+                Ok(Some(generated)) => {
+                    let _ = app.emit(NATIVE_CHAT_TITLE_CHANGED, (&session_id, generated));
+                }
+                Ok(None) if titles::read_title(&session_id).is_none() => {
+                    naming_started.store(false, Ordering::SeqCst);
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    log::warn!("Could not save the chat title: {error}");
+                    naming_started.store(false, Ordering::SeqCst);
+                }
+            });
+        }
+    }
 }
 
 #[cfg(desktop)]
@@ -878,12 +970,9 @@ pub fn native_chat_start(
     chats: tauri::State<NativeChats>,
     request: NativeChatStartRequest,
 ) -> Result<String, String> {
-    use tauri::Emitter;
     let id = uuid::Uuid::new_v4().to_string();
-    let channel = native_chat_channel(&id);
-    start_named_request(&chats, id, request, move |event| {
-        let _ = app.emit(&channel, &event);
-    })
+    let emit = native_event_sink(app, id.clone());
+    start_named_request(&chats, id, request, emit)
 }
 
 fn normalize_reasoning_level(level: Option<String>) -> Option<String> {
@@ -1204,25 +1293,11 @@ fn start_named_request(
             provider_id,
             model_id,
         } => {
-            let mut stream = AiModelStreamRequest {
-                provider: catalog_provider(provider_kind, &provider_id)?,
-                model_id,
-                message: request.prompt.clone(),
-                system_prompt: system.clone(),
-                vault_path: vault_path.clone(),
-                vault_paths: vault_paths.clone(),
-                api_key_override: None,
-                event_name: None,
-                reasoning_level: None,
-                reasoning_slot: None,
-                reasoning_notice_tx: None,
-                reasoning_notices_seen: None,
-                chat_images: Vec::new(),
-                vision_state: crate::chat_images::VisionState::Unknown,
-                send_anyway: false,
-                defer_image_skip: false,
-                image_session_id: None,
-            };
+            let mut stream =
+                catalog_request(provider_kind, &provider_id, model_id, system.clone())?;
+            stream.message = request.prompt.clone();
+            stream.vault_path = vault_path.clone();
+            stream.vault_paths = vault_paths.clone();
             apply_catalog_reasoning(&mut stream, &reasoning);
             stamp_model_vision(&mut stream);
             let mut engine = NativeEngine::new(ProviderModel::new(stream, HttpLimits::STREAM));
@@ -1383,12 +1458,8 @@ pub fn native_chat_open(
     chats: tauri::State<NativeChats>,
     session_id: String,
 ) -> Result<NativeChatOpenResult, String> {
-    use tauri::Emitter;
     open_named_session(&chats, &session_id, ProviderKeys::for_app(), |live_id| {
-        let channel = native_chat_channel(live_id);
-        move |event| {
-            let _ = app.emit(&channel, &event);
-        }
+        native_event_sink(app, live_id.to_owned())
     })
 }
 
@@ -1530,25 +1601,10 @@ where
             provider_id,
             model_id,
         } => {
-            let mut stream = AiModelStreamRequest {
-                provider: catalog_provider(provider_kind, &provider_id)?,
-                model_id,
-                message: String::new(),
-                system_prompt: system.clone(),
-                vault_path: request.vault_path.clone(),
-                vault_paths: request.vault_paths.clone(),
-                api_key_override: None,
-                event_name: None,
-                reasoning_level: None,
-                reasoning_slot: None,
-                reasoning_notice_tx: None,
-                reasoning_notices_seen: None,
-                chat_images: Vec::new(),
-                vision_state: crate::chat_images::VisionState::Unknown,
-                send_anyway: false,
-                defer_image_skip: false,
-                image_session_id: None,
-            };
+            let mut stream =
+                catalog_request(provider_kind, &provider_id, model_id, system.clone())?;
+            stream.vault_path = request.vault_path.clone();
+            stream.vault_paths = request.vault_paths.clone();
             apply_catalog_reasoning(&mut stream, &reasoning);
             stamp_model_vision(&mut stream);
             let mut engine =
