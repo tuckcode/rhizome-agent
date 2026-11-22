@@ -545,13 +545,16 @@ const MOCK_LIBRARY = [
 ]
 
 // Fixture for the wiki graph view (rhizome_wiki_graph tool): three notes
-// and one ghost so browser dev / tests exercise both node variants.
+// one ghost, and two unlinked notes so browser dev / tests exercise every
+// node variant and the unlinked review list.
 const MOCK_WIKI_GRAPH = {
   nodes: [
     { id: 'note/daily-log.md', path: 'note/daily-log.md', title: 'Daily Log', isA: 'Note', ghost: false, snippet: 'Today I worked on the MCP server implementation.', modifiedAt: 1752300000, icon: null, linkCount: 2, backlinkCount: 0 },
     { id: 'project/test-project.md', path: 'project/test-project.md', title: 'Test Project', isA: 'Project', ghost: false, snippet: 'This is a test project.', modifiedAt: 1752200000, icon: 'flask', linkCount: 0, backlinkCount: 2 },
     { id: 'project/second-project.md', path: 'project/second-project.md', title: 'Second Project', isA: 'Project', ghost: false, snippet: 'Another project.', modifiedAt: 1752100000, icon: null, linkCount: 1, backlinkCount: 0 },
     { id: 'ghost:unwritten idea', path: null, title: 'Unwritten Idea', isA: null, ghost: true, snippet: '', modifiedAt: null, icon: null, linkCount: 0, backlinkCount: 1 },
+    { id: 'note/loose-thought.md', path: 'note/loose-thought.md', title: 'Loose Thought', isA: 'Note', ghost: false, snippet: 'A note with no links in or out.', modifiedAt: 1752400000, icon: null, linkCount: 0, backlinkCount: 0 },
+    { id: 'note/reading-list.md', path: 'note/reading-list.md', title: 'Reading List', isA: 'Note', ghost: false, snippet: 'Books to read. Not linked yet.', modifiedAt: 1752000000, icon: null, linkCount: 0, backlinkCount: 0 },
   ],
   edges: [
     { source: 'note/daily-log.md', target: 'project/test-project.md', kind: 'wikilink', field: null },

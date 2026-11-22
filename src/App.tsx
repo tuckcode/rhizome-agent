@@ -2231,6 +2231,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           requestedView={connectionsRequest}
           canOpenNote={vaultBridge.canOpenNoteByPath}
           exitLabel={peerToolExit}
+          activeNotePath={activeNotePath}
           onOpenNote={path => {
             handleRailSelectChat()
             vaultBridge.openNoteByPath(path)
@@ -2467,7 +2468,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                   <GraphView vaultPath={resolvedPath} onOpenNote={(path) => {
                     vaultBridge.openNoteByPath(path)
                     handleRailSelectChat()
-                  }} locale={appLocale} onExit={handleRailSelectChat} exitLabel={peerToolExit} />
+                  }} locale={appLocale} onExit={handleRailSelectChat} exitLabel={peerToolExit} activeNotePath={activeNotePath} />
                 </Suspense>
                 {effectiveShowAIChat && aiWorkspaceSurface}
               </div>

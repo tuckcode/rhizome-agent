@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  unlinkedNotes,
   buildAdjacency,
   countGhosts,
   egoSubgraph,
@@ -266,5 +267,48 @@ describe('graphNodeScale', () => {
     expect(graphNodeScale('a', 'a')).toBe(SELECTED_NODE_SCALE)
     expect(graphNodeScale('b', 'a')).toBe(1)
     expect(graphNodeScale('a', null)).toBe(1)
+  })
+})
+
+describe('unlinked notes', () => {
+  const data = {
+    nodes: [
+      { id: 'a', title: 'Alpha', isA: 'Note', ghost: false, modifiedAt: 10 },
+      { id: 'b', title: 'Beta', isA: 'Note', ghost: false, modifiedAt: 20 },
+      { id: 'c', title: 'Cut-off pair 1', isA: 'Note', ghost: false, modifiedAt: 30 },
+      { id: 'd', title: 'Cut-off pair 2', isA: 'Note', ghost: false, modifiedAt: 40 },
+      { id: 'g', title: 'Ghost', isA: null, ghost: true, modifiedAt: null },
+      { id: 'lone-old', title: 'Lone old', isA: 'Note', ghost: false, modifiedAt: 5 },
+      { id: 'lone-new', title: 'Lone new', isA: 'Note', ghost: false, modifiedAt: 50 },
+    ],
+    edges: [
+      { source: 'a', target: 'b', kind: 'wikilink', field: null },
+      { source: 'a', target: 'g', kind: 'wikilink', field: null },
+      { source: 'c', target: 'd', kind: 'related_to', field: null },
+    ],
+  } as unknown as WikiGraphData
+  const base = { query: '', hiddenTypes: new Set<string>(), hideGhosts: false }
+  const ids = (graph: WikiGraphData) => graph.nodes.map((n) => n.id)
+
+  it('lists only notes with zero edges, newest first', () => {
+    expect(unlinkedNotes(data).map((n) => n.id)).toEqual(['lone-new', 'lone-old'])
+  })
+
+  it('hides unlinked notes and keeps a cut-off linked pair', () => {
+    expect(ids(filterGraph(data, { ...base, hideUnlinked: true }))).toEqual(['a', 'b', 'c', 'd', 'g'])
+  })
+
+  it('keeps the selected or open note visible', () => {
+    const kept = filterGraph(data, { ...base, hideUnlinked: true, keepIds: new Set(['lone-old']) })
+    expect(ids(kept)).toContain('lone-old')
+    expect(ids(kept)).not.toContain('lone-new')
+  })
+
+  it('lets a search find an unlinked note', () => {
+    expect(ids(filterGraph(data, { ...base, hideUnlinked: true, query: 'lone' }))).toEqual(['lone-old', 'lone-new'])
+  })
+
+  it('shows every note when the filter is off', () => {
+    expect(filterGraph(data, { ...base, hideUnlinked: false })).toBe(data)
   })
 })

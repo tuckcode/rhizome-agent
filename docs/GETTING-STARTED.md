@@ -100,6 +100,9 @@ pnpm install
 
 # Run in browser (no Rust needed — uses mock data)
 pnpm dev
+
+# Optional: Graph reads a real vault, read-only (needs a built rhizome-tool)
+RHIZOME_DEV_GRAPH_VAULT="/path/to/vault" pnpm dev
 # Open http://localhost:5202
 # Vite pins 5202. 5173 is wrong. Playwright's config default is 5201
 # when BASE_URL is unset.

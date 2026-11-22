@@ -14,6 +14,7 @@ import {
   type Dirent,
 } from 'fs'
 import os from 'os'
+import { execFile } from 'child_process'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
@@ -982,6 +983,41 @@ function sendCaughtError(res: ServerResponse, err: unknown, fallback: string): v
   sendJson(res, { error: err instanceof Error ? err.message : fallback }, 500)
 }
 
+/**
+ * Read-only real-vault graph for browser dev (Graph view only).
+ *
+ * Set RHIZOME_DEV_GRAPH_VAULT to a vault folder and GET /api/dev-graph
+ * answers with `rhizome-tool graph <vault>`, the same graph the native app
+ * draws. Without the variable the route answers 404 and Graph keeps its
+ * sample data. The route only reads. Note edits in the browser still go to
+ * DEV_VAULT_ROOT, so a real vault named here is never written.
+ */
+function devGraphPlugin(): Plugin {
+  const vault = process.env.RHIZOME_DEV_GRAPH_VAULT
+  const tool = process.env.RHIZOME_TOOL_PATH
+    ?? path.join(__dirname, 'src-tauri', 'target', 'debug', 'rhizome-tool')
+  return {
+    name: 'dev-graph',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url !== '/api/dev-graph' || req.method !== 'GET') return next()
+        if (!vault) {
+          sendJson(res, { error: 'RHIZOME_DEV_GRAPH_VAULT is not set' }, 404)
+          return
+        }
+        execFile(tool, ['graph', vault], { maxBuffer: 64 * 1024 * 1024, timeout: 30_000 }, (err, stdout) => {
+          if (err) {
+            sendJson(res, { error: `rhizome-tool graph failed: ${err.message}` }, 500)
+            return
+          }
+          res.setHeader('Content-Type', 'application/json')
+          res.end(stdout)
+        })
+      })
+    },
+  }
+}
+
 /** WebSocket proxy info endpoint — tells the frontend where the MCP bridge is */
 function mcpBridgeInfoPlugin(): Plugin {
   return {
@@ -1001,7 +1037,7 @@ function mcpBridgeInfoPlugin(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss(), vaultApiPlugin(), mcpBridgeInfoPlugin()],
+  plugins: [react(), tailwindcss(), vaultApiPlugin(), devGraphPlugin(), mcpBridgeInfoPlugin()],
   cacheDir: process.env.TOLARIA_VITE_CACHE_DIR,
 
   resolve: {

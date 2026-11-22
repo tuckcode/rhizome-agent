@@ -23,6 +23,7 @@ import {
   findNode,
   nodeTypesIn,
   parseGraphResponse,
+  unlinkedNotes,
 } from './graphData'
 import { createTypeColorResolver } from './typeColorResolver'
 import { createEdgeColorResolver } from './edgeColorResolver'
@@ -51,6 +52,9 @@ export interface GraphViewProps {
   /** Small UI state retained by an owning panel while this WebGL view is idle. */
   retainedState?: GraphViewRetainedState
   onRetainedStateChange?: (state: GraphViewRetainedState) => void
+  /** The note open in the editor, absolute or vault-relative. It stays in the
+   *  graph even with no links, so a new note does not seem to disappear. */
+  activeNotePath?: string | null
 }
 
 export interface GraphViewRetainedState {
@@ -59,6 +63,14 @@ export interface GraphViewRetainedState {
   query: string
   hiddenTypes: string[]
   hideGhosts: boolean
+  /** Hide notes with no links in and no links out. Default: true. */
+  hideUnlinked?: boolean
+}
+
+/** Vault-relative form of a note path, the form graph node ids use. */
+function toVaultRelative(vaultPath: string, notePath: string): string {
+  const root = vaultPath.endsWith('/') ? vaultPath : `${vaultPath}/`
+  return notePath.startsWith(root) ? notePath.slice(root.length) : notePath
 }
 
 /**
@@ -76,6 +88,7 @@ export function GraphView({
   exitLabel = PEER_TOOL_EXIT_CHAT,
   retainedState,
   onRetainedStateChange,
+  activeNotePath = null,
 }: GraphViewProps) {
   const [data, setData] = useState<WikiGraphData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -86,6 +99,7 @@ export function GraphView({
   const [query, setQuery] = useState(() => retainedState?.query ?? '')
   const [hiddenTypes, setHiddenTypes] = useState<ReadonlySet<string>>(() => new Set(retainedState?.hiddenTypes ?? []))
   const [hideGhosts, setHideGhosts] = useState(() => retainedState?.hideGhosts ?? false)
+  const [hideUnlinked, setHideUnlinked] = useState(() => retainedState?.hideUnlinked ?? true)
   const [colorVersion, setColorVersion] = useState(0)
   const canvasRef = useRef<ForceGraphHandle | null>(null)
   const hostRef = useRef<HTMLDivElement | null>(null)
@@ -100,8 +114,9 @@ export function GraphView({
       query,
       hiddenTypes: [...hiddenTypes],
       hideGhosts,
+      hideUnlinked,
     })
-  }, [egoRootId, hiddenTypes, hideGhosts, onRetainedStateChange, query, selectedId])
+  }, [egoRootId, hiddenTypes, hideGhosts, hideUnlinked, onRetainedStateChange, query, selectedId])
 
   const t = useCallback(
     (key: Parameters<typeof translate>[1], values?: Parameters<typeof translate>[2]) =>
@@ -168,10 +183,20 @@ export function GraphView({
     return egoRootId ? egoSubgraph(data, egoRootId) : data
   }, [data, egoRootId])
 
+  // The selected note and the open note survive the unlinked filter.
+  const keepIds = useMemo(() => {
+    const ids = new Set<string>()
+    if (selectedId) ids.add(selectedId)
+    if (activeNotePath) ids.add(toVaultRelative(vaultPath, activeNotePath))
+    return ids
+  }, [activeNotePath, selectedId, vaultPath])
+
   const displayData = useMemo(() => {
     if (!scopedData) return null
-    return filterGraph(scopedData, { query, hiddenTypes, hideGhosts })
-  }, [scopedData, query, hiddenTypes, hideGhosts])
+    return filterGraph(scopedData, { query, hiddenTypes, hideGhosts, hideUnlinked, keepIds })
+  }, [scopedData, query, hiddenTypes, hideGhosts, hideUnlinked, keepIds])
+
+  const unlinked = useMemo(() => (scopedData ? unlinkedNotes(scopedData) : []), [scopedData])
 
   const availableTypes = useMemo(
     () => (scopedData ? nodeTypesIn(scopedData) : []),
@@ -338,6 +363,13 @@ export function GraphView({
           ghostCount={countGhosts(scopedData)}
           hideGhosts={hideGhosts}
           onToggleGhosts={() => setHideGhosts((v) => !v)}
+          unlinked={unlinked}
+          hideUnlinked={hideUnlinked}
+          onToggleUnlinked={() => setHideUnlinked((v) => !v)}
+          onPickUnlinked={(id) => {
+            trackEvent('graph_unlinked_note_picked', {})
+            selectNode(id)
+          }}
           colorForType={(type) => resolver.colorFor(type || null, false)}
           visibleCount={displayData.nodes.length}
           totalCount={scopedData.nodes.length}

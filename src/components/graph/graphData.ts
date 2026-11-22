@@ -31,6 +31,34 @@ export interface GraphFilter {
   hiddenTypes: ReadonlySet<string>
   /** Drop nodes that were never created (linked-to but missing). */
   hideGhosts: boolean
+  /** Drop notes with no links in and no links out. A search query turns
+   *  this off, so search still finds an unlinked note. */
+  hideUnlinked?: boolean
+  /** Ids that `hideUnlinked` never drops: the selected note and the open
+   *  note. A new note has no links yet and must not seem to disappear. */
+  keepIds?: ReadonlySet<string>
+}
+
+/** Ids of every node that has at least one edge of any kind. */
+function linkedIds(data: WikiGraphData): Set<string> {
+  const linked = new Set<string>()
+  for (const edge of data.edges) {
+    linked.add(edge.source)
+    linked.add(edge.target)
+  }
+  return linked
+}
+
+/**
+ * Real notes with no links in and no links out, newest first. Ghosts always
+ * have an edge, so they never appear here. Groups of two or more linked
+ * notes also never appear here, even when the group is cut off from the rest.
+ */
+export function unlinkedNotes(data: WikiGraphData): WikiGraphNode[] {
+  const linked = linkedIds(data)
+  return data.nodes
+    .filter((node) => !node.ghost && !linked.has(node.id))
+    .sort((a, b) => (b.modifiedAt ?? 0) - (a.modifiedAt ?? 0) || a.title.localeCompare(b.title))
 }
 
 /** Distinct node types present, sorted. Ghosts are excluded — they have no
@@ -45,7 +73,7 @@ export function nodeTypesIn(data: WikiGraphData): string[] {
 }
 
 /**
- * Narrow a graph by title query, hidden types, and ghost visibility.
+ * Narrow a graph by title query, hidden types, ghost and unlinked visibility.
  *
  * Edges are kept only when *both* endpoints survive: a link to a filtered-out
  * node would otherwise render as an edge into empty space, which reads as a
@@ -53,11 +81,14 @@ export function nodeTypesIn(data: WikiGraphData): string[] {
  */
 export function filterGraph(data: WikiGraphData, filter: GraphFilter): WikiGraphData {
   const query = filter.query.trim().toLowerCase()
-  const noFilters = !query && filter.hiddenTypes.size === 0 && !filter.hideGhosts
+  const hideUnlinked = Boolean(filter.hideUnlinked) && !query
+  const noFilters = !query && filter.hiddenTypes.size === 0 && !filter.hideGhosts && !hideUnlinked
   if (noFilters) return data
 
+  const linked = hideUnlinked ? linkedIds(data) : null
   const nodes = data.nodes.filter((node) => {
     if (filter.hideGhosts && node.ghost) return false
+    if (linked && !linked.has(node.id) && !filter.keepIds?.has(node.id)) return false
     // Ghosts have no type, so type filters must not silently remove them —
     // that's what hideGhosts is for.
     if (!node.ghost && filter.hiddenTypes.has(node.isA ?? '')) return false

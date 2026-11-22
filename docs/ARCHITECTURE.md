@@ -1570,6 +1570,12 @@ asks, as pure transforms over the same `GraphDto`:
   draw exactly that subgraph. Depth is clamped to `MAX_DEPTH` (5).
 - **`shortest_path(from, to)`** — BFS, endpoints included, `connected: false`
   rather than an error when there is no route.
+- **`note_pack(note, limit, read_body)`** — one note's body (frontmatter
+  removed, capped at `PACK_MAX_BODY_CHARS`, 6000) plus each direct link with
+  its snippet, direction (`out`, `in`, `both`) and edge kinds, most connected
+  first. It replaces `get_note` plus one read per linked note. `read_body` is
+  a parameter so the transform stays pure. `graph_query` passes a reader that
+  refuses paths outside the vault.
 
 `resolve_note` accepts a vault path, a path without `.md`, a title, or a
 filename stem — an agent says "Alpha" and "notes/alpha.md" meaning the same
@@ -1581,8 +1587,9 @@ Exposed the same three ways as the rest: `rhizome_api::graph_query`
 `rhizome_commands::call_rhizome_tool` (argument parsing lives in
 `rhizome_api::graph_query_from_tool` so it is testable without an
 `AppHandle`), and a `graph-query <vault_path> <kind>` subcommand on the
-`rhizome-tool` sidecar. MCP surfaces five tools —
-`rhizome_graph_health`, `_orphans`, `_dead_links`, `_neighbors`, `_path`.
+`rhizome-tool` sidecar. MCP surfaces six tools —
+`rhizome_graph_health`, `_orphans`, `_dead_links`, `_neighbors`, `_path`,
+`_pack`.
 
 **These have no Python fallback on purpose.** The older
 `rhizome_graph_summary` shells out to the external `rhizome-graph` CLI,

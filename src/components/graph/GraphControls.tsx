@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CaretDown, CaretUp, MagnifyingGlass, X } from '@phosphor-icons/react'
+import { CaretDown, CaretUp, Eye, LinkBreak, MagnifyingGlass, X } from '@phosphor-icons/react'
 import { translate, type AppLocale } from '../../lib/i18n'
 import { Input } from '../ui/input'
 
@@ -13,6 +13,12 @@ export interface GraphControlsProps {
   ghostCount: number
   hideGhosts: boolean
   onToggleGhosts: () => void
+  /** Notes with no links in and no links out, newest first. */
+  unlinked?: readonly { id: string; title: string; isA: string | null }[]
+  hideUnlinked?: boolean
+  onToggleUnlinked?: () => void
+  /** Selects an unlinked note. The selection keeps it visible in the graph. */
+  onPickUnlinked?: (id: string) => void
   /** Resolves a swatch color for a type, via the canvas's own resolver. */
   colorForType: (type: string) => string
   /** Nodes currently visible, for the "n of m" readout. */
@@ -81,6 +87,10 @@ export function GraphControls({
   ghostCount,
   hideGhosts,
   onToggleGhosts,
+  unlinked = [],
+  hideUnlinked = false,
+  onToggleUnlinked,
+  onPickUnlinked,
   colorForType,
   visibleCount,
   totalCount,
@@ -90,8 +100,13 @@ export function GraphControls({
   const t = (key: Parameters<typeof translate>[1], values?: Parameters<typeof translate>[2]) =>
     translate(locale, key, values)
   const filtered = visibleCount !== totalCount
-  const hasFilterRow = types.length > 1 || ghostCount > 0
+  const unlinkedCount = unlinked.length
+  const hasFilterRow = types.length > 1 || ghostCount > 0 || unlinkedCount > 0
+  // Hidden unlinked notes are the default, so they do not force the panel open.
   const filtersActive = hiddenTypes.size > 0 || hideGhosts || Boolean(query.trim())
+  const [reviewOpen, setReviewOpen] = useState(false)
+  // Search shows unlinked notes, so the chip only speaks when they are hidden.
+  const showUnlinkedChip = unlinkedCount > 0 && hideUnlinked && !query.trim()
 
   // Filters force the panel open; otherwise the Find toggle owns expand state.
   // (Do not sync with useEffect — that trips set-state-in-effect.)
@@ -102,7 +117,9 @@ export function GraphControls({
     <div
       data-testid="graph-controls"
       data-expanded={open ? 'true' : 'false'}
-      className="absolute bottom-3 right-3 z-10 flex max-h-[min(40%,12rem)] max-w-[min(260px,calc(100%-1.5rem))] flex-col-reverse gap-2"
+      // Each bottom corner owns at most half the width, so the controls and
+      // the legend never overlap in a narrow window (min width 480 px).
+      className={`absolute bottom-3 right-3 z-10 flex max-w-[min(260px,calc(50%-1.125rem))] flex-col-reverse gap-2 ${reviewOpen ? 'max-h-[min(70%,26rem)] w-[260px]' : 'max-h-[min(40%,12rem)]'}`}
     >
       <div
         className="flex items-center gap-1 rounded-[var(--radius)] border p-1.5"
@@ -156,6 +173,95 @@ export function GraphControls({
         )}
       </div>
 
+      {showUnlinkedChip && !reviewOpen && (
+        <button
+          type="button"
+          data-testid="graph-unlinked-chip"
+          onClick={() => setReviewOpen(true)}
+          className="flex items-center gap-1.5 self-end rounded-full border px-2.5 py-1 text-[11px] font-medium"
+          style={{
+            borderColor: 'var(--border)',
+            background: 'var(--surface-panel, var(--sidebar))',
+            color: 'var(--foreground)',
+          }}
+        >
+          <LinkBreak size={12} style={{ color: 'var(--muted-foreground)' }} />
+          {unlinkedCount === 1 ? '1 unlinked note' : `${unlinkedCount} unlinked notes`}
+          <span style={{ color: 'var(--muted-foreground)' }}>· Review</span>
+        </button>
+      )}
+
+      {reviewOpen && unlinkedCount > 0 && (
+        <section
+          aria-label="Unlinked notes"
+          data-testid="graph-unlinked-review"
+          className="flex min-h-0 flex-col overflow-hidden rounded-[var(--radius)] border"
+          style={{
+            borderColor: 'var(--border)',
+            background: 'var(--surface-panel, var(--sidebar))',
+          }}
+        >
+          <header className="flex items-start gap-2 border-b px-2.5 py-2" style={{ borderColor: 'var(--border)' }}>
+            <div className="min-w-0 flex-1">
+              <div className="text-[12px] font-semibold" style={{ color: 'var(--foreground)' }}>
+                Unlinked notes · {unlinkedCount}
+              </div>
+              <div className="text-[11px] leading-snug" style={{ color: 'var(--muted-foreground)' }}>
+                No links in or out. Pick one to place it in the graph.
+              </div>
+            </div>
+            <button
+              type="button"
+              data-testid="graph-unlinked-review-close"
+              aria-label="Close unlinked notes"
+              onClick={() => setReviewOpen(false)}
+              className="p-0.5"
+              style={{ color: 'var(--muted-foreground)' }}
+            >
+              <X size={12} />
+            </button>
+          </header>
+          <ul className="min-h-0 flex-1 overflow-y-auto py-1" data-testid="graph-unlinked-list">
+            {unlinked.map((note) => (
+              <li key={note.id}>
+                <button
+                  type="button"
+                  data-testid="graph-unlinked-row"
+                  onClick={() => onPickUnlinked?.(note.id)}
+                  className="flex w-full items-center gap-2 px-2.5 py-1 text-left text-[12px] hover:bg-[var(--muted)]"
+                  style={{ color: 'var(--foreground)' }}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="inline-block size-2 shrink-0 rounded-full"
+                    style={{ background: colorForType(note.isA ?? '') }}
+                  />
+                  <span className="min-w-0 flex-1 truncate">{note.title}</span>
+                  <span className="shrink-0 text-[10px]" style={{ color: 'var(--muted-foreground)' }}>
+                    {note.isA || 'Note'}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+          {hideUnlinked && onToggleUnlinked && (
+            <button
+              type="button"
+              data-testid="graph-unlinked-show-all"
+              onClick={() => {
+                onToggleUnlinked()
+                setReviewOpen(false)
+              }}
+              className="flex items-center justify-center gap-1.5 border-t px-2.5 py-1.5 text-[11px]"
+              style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}
+            >
+              <Eye size={12} />
+              Show all in graph
+            </button>
+          )}
+        </section>
+      )}
+
       {open && hasFilterRow && (
         <div
           className="flex min-h-0 flex-col gap-2 overflow-y-auto rounded-[var(--radius)] border p-2"
@@ -176,6 +282,14 @@ export function GraphControls({
                 onClick={() => onToggleType(type)}
               />
             ))}
+            {unlinkedCount > 0 && onToggleUnlinked && (
+              <FilterPill
+                testId="graph-type-filter-unlinked"
+                active={!hideUnlinked}
+                label={`Unlinked · ${unlinkedCount}`}
+                onClick={onToggleUnlinked}
+              />
+            )}
             {ghostCount > 0 && (
               <FilterPill
                 testId="graph-type-filter-ghosts"
