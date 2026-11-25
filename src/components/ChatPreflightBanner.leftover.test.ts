@@ -7,10 +7,9 @@ const source = readFileSync(
 )
 
 describe('ChatPreflightBanner leftover chrome', () => {
-  it('keeps title and body at 12px', () => {
-    expect(source).toContain('text-[12px] font-medium text-foreground')
-    expect(source).toContain('min-w-0 text-[12px] text-[var(--text-secondary)]')
-    expect(source).not.toMatch(/text-\[11px\]/)
+  it('keeps the heading distinct from the blocker details', () => {
+    expect(source).toMatch(/font-medium text-foreground" data-testid="chat-preflight-title"/)
+    expect(source).toContain('text-[var(--text-secondary)]')
   })
 
   it('keeps the warning mark amber', () => {

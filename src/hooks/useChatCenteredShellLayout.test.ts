@@ -112,8 +112,8 @@ describe('workspace state and the sessions drawer', () => {
   })
 
   it('opens a drawer rather than folding an open Notes column for the rail', () => {
-    // Notes preset at 700: Chat + Notes fit, but a 240px rail would fold Notes.
-    mockedShellWidth = 700
+    // At 750px, Chat and Notes fit with the collapsed rail only.
+    mockedShellWidth = 750
     const { result } = renderHook(() => {
       const controls = useViewMode()
       return useChatCenteredShellLayout({

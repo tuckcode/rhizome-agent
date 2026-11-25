@@ -363,6 +363,11 @@ impl NativeChats {
             self.note_read_only(&id);
             return Ok(id);
         }
+        // Read the saved target before the worker starts. Reading the log
+        // probes the session's write lock, and the worker takes that lock
+        // in ensure_log; probing after spawn can make the worker's lock fail
+        // and close the chat before its first send.
+        self.remember_logged_target(&id);
         let path = format!("{NATIVE_SESSION_PREFIX}{id}");
         let control = engine.control();
         let (ops, op_rx) = mpsc::channel();
@@ -443,7 +448,6 @@ impl NativeChats {
                 turn_busy,
             },
         );
-        self.remember_logged_target(&id);
         Ok(id)
     }
 

@@ -16,6 +16,11 @@ describe('pane presets', () => {
     expect(fit.chatWidth).toBeGreaterThanOrEqual(420)
   })
 
+  it('uses the new pane widths in a wide Workbench', () => {
+    const fit = fitPanePreset({ id: 'workbench', widths: {} }, { shellWidth: 1800, noteOpen: true, railPinned: true })
+    expect(fit.widths).toEqual({ rail: 240, notes: 300, browse: 240, note: 420 })
+  })
+
   it.each(['editor-only', 'editor-list', 'all'] as const)('round trips %s', viewMode => {
     expect(presetToLegacy(presetFromLegacy(viewMode, 'stacked')).viewMode).toBe(viewMode)
   })
@@ -34,14 +39,15 @@ describe('pane presets', () => {
 
   it('accounts for the rail at the exact Notes floor', () => {
     const preset = { id: 'notes', widths: {} } as const
-    expect(fitPanePreset(preset, { shellWidth: 639 }).notesOpen).toBe(false)
-    expect(fitPanePreset(preset, { shellWidth: 640 }).chatWidth).toBeGreaterThanOrEqual(420)
-    expect(fitPanePreset(preset, { shellWidth: 666 })).toMatchObject({ notesOpen: true, chatWidth: 420 })
+    const belowFloor = fitPanePreset(preset, { shellWidth: 705 })
+    expect(belowFloor.notesOpen).toBe(false)
+    expect(belowFloor.chatWidth).toBeGreaterThanOrEqual(420)
+    expect(fitPanePreset(preset, { shellWidth: 706 })).toMatchObject({ notesOpen: true, chatWidth: 420 })
   })
 
-  it('lets Notes grow past the old cap when Chat still has its minimum', () => {
+  it('caps the Notes drag at 420 even when there is room', () => {
     const next = resizePresetWidth({ id: 'notes', widths: { notes: 240 } }, 'notes', 800, { shellWidth: 1600 })
-    expect(next.widths.notes).toBe(800)
+    expect(next.widths.notes).toBe(420)
   })
 
   it('clamps a width drag before it consumes Chat', () => {
@@ -52,20 +58,20 @@ describe('pane presets', () => {
   })
 
   it('does not let siblings keep leftover from a beside-note shrink', () => {
-    const context = { shellWidth: 1000, noteOpen: true }
-    const start = resizePresetWidth({ id: 'read', widths: { note: 360 }, readNotes: true }, 'note', 360, context)
-    const shrunk = resizePresetWidth(start, 'note', (start.widths.note ?? 360) - 24, context)
+    const context = { shellWidth: 1100, noteOpen: true }
+    const start = resizePresetWidth({ id: 'read', widths: { note: 420 }, readNotes: true }, 'note', 420, context)
+    const shrunk = resizePresetWidth(start, 'note', (start.widths.note ?? 420) - 24, context)
     const restored = resizePresetWidth(shrunk, 'note', (shrunk.widths.note ?? 0) + 24, context)
-    expect(start.widths.note).toBe(330)
-    expect(shrunk.widths.note).toBe(306)
-    expect(restored.widths.note).toBe(330)
+    expect(start.widths.note).toBe(390)
+    expect(shrunk.widths.note).toBe(366)
+    expect(restored.widths.note).toBe(390)
   })
 
   it('does not ratchet a tight beside-note through +N then -N repeats', () => {
-    const context = { shellWidth: 1000, noteOpen: true }
-    let preset = resizePresetWidth({ id: 'read', widths: { note: 360 }, readNotes: true }, 'note', 360, context)
-    const grown = resizePresetWidth(preset, 'note', (preset.widths.note ?? 360) + 12, context)
-    const afterFirstMinus = resizePresetWidth(grown, 'note', (grown.widths.note ?? 360) - 12, context)
+    const context = { shellWidth: 1100, noteOpen: true }
+    let preset = resizePresetWidth({ id: 'read', widths: { note: 420 }, readNotes: true }, 'note', 420, context)
+    const grown = resizePresetWidth(preset, 'note', (preset.widths.note ?? 420) + 12, context)
+    const afterFirstMinus = resizePresetWidth(grown, 'note', (grown.widths.note ?? 420) - 12, context)
     preset = afterFirstMinus
     for (let i = 0; i < 8; i += 1) {
       const base = preset.widths.note ?? 0
@@ -73,7 +79,7 @@ describe('pane presets', () => {
       preset = resizePresetWidth(preset, 'note', (preset.widths.note ?? 0) - 12, context)
     }
     expect(preset.widths.note).toBe(afterFirstMinus.widths.note)
-    expect(preset.widths.note).toBeGreaterThan(300)
+    expect(preset.widths.note).toBeGreaterThan(320)
   })
 
   it('switches Read to the focused window when the note cannot fit beside Chat', () => {
@@ -99,14 +105,14 @@ describe('workspace states', () => {
   })
 
   it('does not fold the Notes list to make a desk; it focuses instead', () => {
-    // 46 rail + 240 notes + 284 note + 420 chat = 990 > 900.
+    // 46 rail + 300 notes + 324 note including divider + 420 chat = 1090 > 900.
     const fit = fitPanePreset({ id: 'notes', widths: {} }, { shellWidth: 900, noteOpen: true })
     expect(fit).toMatchObject({ notesOpen: true, workspace: 'focused' })
   })
 
   it('folds the pinned rail so an open note fits beside Chat', () => {
-    // Pinned: 240 rail + 240 notes + 420 chat leaves 196 for the note at 1100.
-    // Folded: 46 rail leaves 390, so the desk fits.
+    // Pinned: 240 rail + 300 notes + 420 chat leaves 136 for the note at 1100.
+    // Folded: 46 rail leaves 330, so the desk fits.
     const fit = fitPanePreset({ id: 'notes', widths: {} }, { shellWidth: 1100, noteOpen: true, railPinned: true })
     expect(fit).toMatchObject({ notesOpen: true, railPinned: false, workspace: 'desk' })
     expect(fit.chatWidth).toBeGreaterThanOrEqual(420)
@@ -118,10 +124,10 @@ describe('workspace states', () => {
   })
 
   it('narrows the desk note to fit before giving up on the desk', () => {
-    // 46 + 46 restore + 420 chat leaves 288 for divider + note at 800.
-    const fit = fitPanePreset({ id: 'chat', widths: {} }, { shellWidth: 800, noteOpen: true })
+    // 46 + 46 restore + 420 chat leaves 338 for divider + note at 850.
+    const fit = fitPanePreset({ id: 'chat', widths: {} }, { shellWidth: 850, noteOpen: true })
     expect(fit).toMatchObject({ workspace: 'desk' })
-    expect(fit.widths.note).toBe(284)
+    expect(fit.widths.note).toBe(334)
     expect(fit.chatWidth).toBe(420)
   })
 
@@ -178,6 +184,21 @@ describe('loadPanePreferences', () => {
     }))
     expect(loadPanePreferences('/Vault').active.id).toBe('notes')
     expect(loadPanePreferences('/Vault').active.widths.notes).toBe(280)
+  })
+
+  it('clamps active and saved widths when it reads them and leaves storage intact', () => {
+    const key = panePresetStorageKey('/Vault')
+    const raw = JSON.stringify({
+      version: 1,
+      active: { id: 'workbench', widths: { rail: 180, notes: 1200, browse: 320, note: 280 } },
+      savedWidths: { read: { notes: 200, note: 700 } },
+    })
+    localStorage.setItem(key, raw)
+
+    const preferences = loadPanePreferences('/Vault')
+    expect(preferences.active.widths).toEqual({ rail: 200, notes: 420, browse: 320, note: 320 })
+    expect(preferences.savedWidths.read).toEqual({ rail: 240, notes: 240, browse: 240, note: 640 })
+    expect(localStorage.getItem(key)).toBe(raw)
   })
 
   it('restores readNotes from a stored v1 Read preset', () => {
