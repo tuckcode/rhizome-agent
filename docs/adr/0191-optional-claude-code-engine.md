@@ -2,12 +2,12 @@
 type: ADR
 id: "0191"
 title: "Optional Claude Code engine that drives the user's own install, with a harness marker on each session"
-status: proposed
+status: accepted
 date: 2026-11-01
 ---
 
 **Origin:** Claude Opus 5.5 · 2026-11-01 · Claude Code desktop session, on Atticus's question about T3 Code
-**Status note:** This is the original proposal. The optional engine is implemented on this branch. The first-run sign-in button follows the later amendment in [ADR-0186](0186-rhizome-sign-in-storage-and-provider-sign-in.md). The Commercial Terms questions in section 3 still apply to release.
+**Status note:** Accepted by Atticus. The optional engine is implemented on this branch. The first-run sign-in button follows the later amendment in [ADR-0186](0186-rhizome-sign-in-storage-and-provider-sign-in.md). The Commercial Terms questions in section 3 still apply to release.
 **Would amend if accepted:** [ADR-0187](0187-native-is-the-only-chat-engine.md) decision 1, [ADR-0189](0189-no-ties-to-outside-harnesses.md) decisions 3 and 7, and the sentence in [ADR-0186](0186-rhizome-sign-in-storage-and-provider-sign-in.md) decision 4 that says there is no Claude Code engine. The Claude API key rule in 0186 stays.
 **Build plan:** [`docs/plans/2026-11-01-claude-code-engine-plan.md`](../plans/2026-11-01-claude-code-engine-plan.md)
 
@@ -41,7 +41,7 @@ Atticus asked if Claude can work in Rhizome as it does in T3 Code, with a marker
 
 ## Decision
 
-**Proposed: Rhizome may drive the user's own installed, unmodified Claude Code as an optional engine for one chat at a time. Native stays the default and the only engine that Rhizome needs. Rhizome never offers Claude login and never reads or stores a Claude token.**
+**Rhizome may drive the user's own installed, unmodified Claude Code as an optional engine for one chat at a time. Native stays the default and the only engine that Rhizome needs. Rhizome never offers Claude login and never reads or stores a Claude token.**
 
 ### 1. Position against the native-only rule
 
@@ -119,7 +119,7 @@ Turns draw on the user's own plan or key. Anthropic's support page, updated 2026
 
 ## Options considered
 
-- **A (proposed): optional engine on the user's own `claude` binary.** Matches T3 Code and fits the legal page. Reuses `claude_cli.rs`. Costs an exception to the native-only rule and a split in what Rhizome's tool policy covers.
+- **A (accepted): optional engine on the user's own `claude` binary.** Matches T3 Code and fits the legal page. Reuses `claude_cli.rs`. Costs an exception to the native-only rule and a split in what Rhizome's tool policy covers.
 - **B: keep native only, Claude through an API key.** This is ADR-0186 as written. It needs no legal work and keeps one loop. It gives subscription users no way to use their plan in Rhizome, which is the ask.
 - **C: Rhizome-owned Claude login or token reuse.** Rejected. The legal page forbids it, and 0186 already rejected it.
 - **D: `--bare` runs.** Rejected. Bare mode is the cleanest isolation, but it reads no OAuth credential or keychain, so subscription login fails. See the risk below.
