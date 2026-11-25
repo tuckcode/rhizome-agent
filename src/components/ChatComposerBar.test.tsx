@@ -37,11 +37,10 @@ describe('ChatComposerBar', () => {
     expect(screen.getByTestId('chat-composer-bar')).not.toHaveTextContent('Idle')
   })
 
-  it('shows a quiet busy mark while a turn works, not the last tool name', () => {
-    renderBar({ working: true, stats: { contextTokens: 2_000, contextWindow: 200_000 } })
-    const foot = screen.getByTestId('chat-composer-foot')
-    expect(foot).toHaveAttribute('aria-label', 'Working')
-    expect(foot).not.toHaveTextContent('last tool')
+  it('leaves run status to the status line above the input', () => {
+    renderBar({ stats: { contextTokens: 2_000, contextWindow: 200_000 } })
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('chat-composer-foot')).not.toBeInTheDocument()
     expect(screen.getByTestId('prime-context-button')).toHaveTextContent('1%')
   })
 

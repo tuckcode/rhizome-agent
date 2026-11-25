@@ -1,18 +1,26 @@
 import { useLayoutEffect, useRef, useState, type UIEvent } from 'react'
-import { Copy, FilePlus, NotePencil, PencilSimple, Terminal } from '@phosphor-icons/react'
+import { Copy, FilePlus, NotePencil, PencilSimple, Terminal, Warning, WarningOctagon } from '@phosphor-icons/react'
 import { Button } from '@/components/ui/button'
 import { DiffView } from './DiffView'
 import { APPROVAL_COLLAPSE_AFTER, compactDiffLines } from './approvalDiff'
 import { writeClipboardText } from '../utils/clipboardText'
 import { bashTimeoutLabel } from '../lib/bashToolResult'
 import {
+  approvalToolForAnalytics,
+  classifyApprovalRisk,
+  riskReachesOutsideVault,
+  type ApprovalRisk,
+  type ApprovalRiskTier,
+} from '../lib/approvalRisk'
+import { trackEvent } from '../lib/telemetry'
+import {
+  approvalOptionLabel,
   approvalTitle,
   isBashTool,
   previewLooksCreated,
   type NativeApprovalChoice,
   type NativeApprovalOption,
 } from '../lib/nativeToolApproval'
-import { commandHasHiddenChars } from '../lib/visibleCommand'
 import { VisibleCommand } from './VisibleCommand'
 
 export interface ToolApprovalCardProps {
@@ -37,10 +45,52 @@ function ToolGlyph({ created, tool }: { created: boolean; tool: string }) {
   return <PencilSimple size={14} />
 }
 
-function optionVariant(id: string): 'default' | 'outline' | 'ghost' {
-  if (id === 'allow_once') return 'default'
-  if (id === 'deny') return 'ghost'
+type OptionVariant = 'default' | 'outline' | 'ghost' | 'secondary'
+
+// On a danger card the calm choice is Deny, so Deny gets the fill and
+// Allow once loses it: no fill, a red edge and red text.
+function optionVariant(id: string, tier: ApprovalRiskTier): OptionVariant {
+  if (id === 'allow_once') return tier === 'danger' ? 'ghost' : 'default'
+  if (id === 'deny') return tier === 'danger' ? 'secondary' : 'ghost'
   return 'outline'
+}
+
+// The Deny edge mixes the text color into the card so it clears the 3:1
+// non-text minimum in every theme. `node scripts/deny-edge-contrast.mjs`
+// checks it; the lowest is Solarized Light at 3.25:1.
+const DANGER_DENY = 'border border-[color-mix(in_srgb,var(--foreground)_85%,var(--card))]'
+const DANGER_ALLOW = 'border border-destructive bg-transparent text-danger-text hover:bg-destructive/10 hover:text-danger-text dark:hover:bg-destructive/10'
+
+
+const CARD_BORDER: Record<ApprovalRiskTier, string> = {
+  routine: 'border-border',
+  caution: 'border-border',
+  danger: 'border-destructive',
+}
+
+const STATUS_LABEL: Record<ApprovalRiskTier, string> = {
+  routine: 'Needs approval',
+  caution: 'Needs approval',
+  danger: 'Destructive · needs approval',
+}
+
+function RiskReasons({ risk }: { risk: ApprovalRisk }) {
+  if (risk.reasons.length === 0) return null
+  const danger = risk.tier === 'danger'
+  const Glyph = danger ? WarningOctagon : Warning
+  return (
+    <ul
+      className={`space-y-0.5 px-3 pb-2 text-xs ${danger ? 'text-danger-text' : 'text-warn-text'}`}
+      data-testid="approval-risk"
+    >
+      {risk.reasons.map((reason) => (
+        <li key={reason} className="flex items-start gap-1.5">
+          <Glyph aria-hidden="true" className="mt-0.5 shrink-0" size={12} weight="fill" />
+          <span>{reason}</span>
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 const NEAR_EDGE_PX = 1
@@ -75,6 +125,7 @@ export function ToolApprovalCard({
   const scrollerRef = useRef<HTMLDivElement>(null)
   const lineCount = compactDiffLines(preview ?? '').length
   const overflows = !bash && !expanded && lineCount > APPROVAL_COLLAPSE_AFTER
+  const risk = classifyApprovalRisk({ tool, command, path, created, overwrite })
 
   function syncScroll(el: HTMLElement) {
     setScrollTop(el.scrollTop)
@@ -95,6 +146,12 @@ export function ToolApprovalCard({
   }
 
   function choose(optionId: string) {
+    trackEvent('tool_approval_replied', {
+      tool: approvalToolForAnalytics(tool),
+      risk: risk.tier,
+      choice: optionId,
+      surface: 'card',
+    })
     onReply(optionId as NativeApprovalChoice)
   }
 
@@ -109,7 +166,8 @@ export function ToolApprovalCard({
   return (
     <section
       aria-label={`${title} approval`}
-      className="rounded-xl border border-border bg-card text-card-foreground shadow-sm"
+      className={`rounded-xl border bg-card text-card-foreground shadow-sm ${CARD_BORDER[risk.tier]}`}
+      data-risk={risk.tier}
       data-testid="tool-approval-card"
     >
       <header className="flex items-start gap-2 px-3 py-2.5">
@@ -120,10 +178,10 @@ export function ToolApprovalCard({
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-medium text-foreground">{title}</h2>
             <span
-              className="font-sans text-[11px] text-[var(--warn-text)]"
+              className={`font-sans text-[11px] ${risk.tier === 'danger' ? 'text-danger-text' : 'text-[var(--warn-text)]'}`}
               data-testid="approval-status"
             >
-              Needs approval
+              {STATUS_LABEL[risk.tier]}
             </span>
           </div>
           {!bash && path ? (
@@ -140,18 +198,15 @@ export function ToolApprovalCard({
               New file
             </p>
           ) : null}
-          {overwrite && tool === 'write_file' ? (
-            <p
-              className="mt-0.5 text-[12px] text-[var(--warn-text)]"
-              data-testid="approval-overwrite"
-            >
-              Replaces the whole file
-            </p>
-          ) : null}
         </div>
       </header>
+      <RiskReasons risk={risk} />
       {bash ? (
-        <BashApprovalBody command={command ?? ''} timeoutSecs={timeoutSecs} />
+        <BashApprovalBody
+          command={command ?? ''}
+          reachesOutside={riskReachesOutsideVault(risk)}
+          timeoutSecs={timeoutSecs}
+        />
       ) : (
         <div className="relative border-y border-border bg-muted/40">
           <div
@@ -207,9 +262,13 @@ export function ToolApprovalCard({
             disabled={busy}
             size="sm"
             type="button"
-            variant={optionVariant(option.id)}
+            variant={optionVariant(option.id, risk.tier)}
             className={[
-              option.id === 'deny' ? 'text-destructive hover:text-destructive' : '',
+              option.id === 'deny' && risk.tier !== 'danger'
+                ? 'text-destructive hover:text-destructive'
+                : '',
+              option.id === 'deny' && risk.tier === 'danger' ? DANGER_DENY : '',
+              option.id === 'allow_once' && risk.tier === 'danger' ? DANGER_ALLOW : '',
               option.id === 'allow_once'
                 ? 'focus-visible:ring-offset-2 focus-visible:ring-offset-card'
                 : '',
@@ -219,7 +278,7 @@ export function ToolApprovalCard({
               choose(option.id)
             }}
           >
-            {option.label}
+            {approvalOptionLabel(option, tool)}
           </Button>
         ))}
       </footer>
@@ -229,17 +288,17 @@ export function ToolApprovalCard({
 
 function BashApprovalBody({
   command,
+  reachesOutside,
   timeoutSecs,
 }: {
   command: string
+  reachesOutside: boolean
   timeoutSecs?: number
 }) {
   function copyCommand() {
     if (!command) return
     void writeClipboardText(command).catch(() => {})
   }
-
-  const hidden = commandHasHiddenChars(command)
 
   return (
     <div className="border-y border-border bg-muted/40 px-3 py-2">
@@ -264,13 +323,10 @@ function BashApprovalBody({
           </Button>
         ) : null}
       </div>
-      {hidden ? (
-        <p className="mt-2 text-[12px] text-[var(--danger-text)]" data-testid="approval-hidden-warning">
-          This command contains hidden or control characters.
-        </p>
-      ) : null}
       <p className="mt-2 text-[12px] text-muted-foreground" data-testid="approval-vault-note">
-        Runs in your vault folder. Output is shown when it finishes.
+        {reachesOutside
+          ? 'Starts in your vault folder and reaches outside it. Output is shown when it finishes.'
+          : 'Runs in your vault folder. Output is shown when it finishes.'}
       </p>
       <p className="mt-0.5 text-[12px] text-muted-foreground" data-testid="approval-timeout">
         {bashTimeoutLabel(timeoutSecs)}

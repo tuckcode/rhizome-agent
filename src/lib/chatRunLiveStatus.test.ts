@@ -164,3 +164,32 @@ describe('chatRunSnapshotFromMessages', () => {
     expect(nextChatRunAnnouncement(previous, next)).toBe('Stopped')
   })
 })
+
+describe('quiet run announcement', () => {
+  const active = { isActive: true, hasResponse: true, tools: [] }
+
+  it('announces once when a run goes quiet', () => {
+    expect(nextChatRunAnnouncement(active, { ...active, quiet: true })).toBe('No response for 30 seconds')
+    expect(nextChatRunAnnouncement({ ...active, quiet: true }, { ...active, quiet: true })).toBeNull()
+  })
+
+  it('announces the end of the run before the quiet state', () => {
+    expect(nextChatRunAnnouncement({ ...active, quiet: true }, { ...active, isActive: false, quiet: true }))
+      .toBe('Response complete')
+  })
+})
+
+describe('failure announcement', () => {
+  const idle = { isActive: false, hasResponse: false, tools: [] }
+
+  it('announces why the run did not start, once', () => {
+    const failed = { ...idle, failure: 'Your ChatGPT sign-in expired. Sign in again.' }
+    expect(nextChatRunAnnouncement(idle, failed)).toBe('Your ChatGPT sign-in expired. Sign in again.')
+    expect(nextChatRunAnnouncement(failed, { ...failed })).toBeNull()
+  })
+
+  it('puts the failure before the end of the run', () => {
+    const active = { ...idle, isActive: true }
+    expect(nextChatRunAnnouncement(active, { ...idle, failure: 'Worker binary missing' })).toBe('Worker binary missing')
+  })
+})

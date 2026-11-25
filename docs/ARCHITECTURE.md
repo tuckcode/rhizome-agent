@@ -317,8 +317,8 @@ usable column. Hover must not collapse that note pane.
 
 The Show Notes restore strip is a **32px** hit target (`VaultPanelRestoreButton`);
 the visible rail stays 46px. Open Notes keeps an inner `--sidebar-border`
-against Chat. Do not cover Chat’s pulsing green working strip
-(`ai-border-pulse` on the panel’s left edge) with a stronger Sessions border.
+against Chat. Do not cover Chat’s working strip (the 2px `primary` border
+on the panel’s left edge while a turn runs) with a stronger Sessions border.
 
 Highlight in Chat or in the open note, then right-click **Copy**. Chat text
 uses the native WebKit menu via `NATIVE_CONTEXT_MENU_ALLOWLIST`
@@ -736,7 +736,11 @@ Composer Enter mid-turn is **not** a new turn. `useAiPanelSendPolicy` +
 `sendToRunningTurn` is tri-state: accepted (follow-up stays visibly queued),
 no longer running (fallback starts a new turn only from the latest idle UI
 state), or transport failure. Steer is a separate control. Escape leaves
-Chat; Stop is click-only. The composer stays focusable while a turn runs;
+Chat. Stop is a click or Cmd+Period (Ctrl+Period off Mac), through
+`useStopRunShortcut` (ADR-0193). `ChatRunStatusLine` above the composer is
+the one visible run status: thinking, writing, the tool that runs, a wait
+for approval, no response for 30 seconds, a pause at the step limit, or a
+start failure (`chatRunStatus.ts`). The composer stays focusable while a turn runs;
 only unreadiness disables it. The transcript is a `role="log"` with `aria-live="off"` so streaming
 chunks are not double-spoken. `ChatRunLiveStatus` sits beside that log
 and injects throttled tool/complete/stop lines into one empty

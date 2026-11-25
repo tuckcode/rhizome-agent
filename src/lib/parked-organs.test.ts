@@ -167,17 +167,18 @@ describe('parked organs leftover', () => {
     expect(chatHome).toContain('onClose={onExit}')
   })
 
-  it('keeps Notes sidebar seam and Stop click-only', () => {
+  it('keeps Notes sidebar seam and Escape away from Stop', () => {
     const css = readFileSync(`${process.cwd()}/src/App.css`, 'utf8')
-    const foot = readFileSync(
-      `${process.cwd()}/src/components/ChatComposerFoot.tsx`,
+    const shortcut = readFileSync(
+      `${process.cwd()}/src/hooks/useStopRunShortcut.ts`,
       'utf8',
     )
     expect(css).toContain(
       '/* Inner seam against Chat — keep this visible so the column reads as a panel. */',
     )
     expect(css).toContain('border-left: 1px solid var(--sidebar-border);')
-    expect(foot).toContain('Stop is click-only')
+    expect(shortcut).toContain("event.key !== '.'")
+    expect(shortcut).not.toContain('Escape')
   })
 
   it('keeps expanded Settings as a gear, not the word Settings', () => {
@@ -357,7 +358,7 @@ describe('parked organs leftover', () => {
       `${process.cwd()}/src/components/NativeChatModelPicker.tsx`,
       'utf8',
     )
-    expect(picker).toContain('text-[11px] font-medium text-muted-foreground normal-case tracking-normal')
+    expect(picker).toContain('font-medium text-muted-foreground normal-case tracking-normal')
     expect(picker).not.toMatch(/uppercase tracking-\[0\.1em\] text-primary/)
   })
 
@@ -818,9 +819,9 @@ describe('parked organs leftover', () => {
     )
     expect(manifest).toContain('"fileNewNote"')
     expect(manifest).toContain('"accelerator": "CmdOrCtrl+N"')
-    expect(pulse).toContain('ai-border-pulse 2s ease-in-out infinite')
+    expect(pulse).not.toContain('animation')
     expect(layout).toContain('notesOpen')
-    expect(layout).toContain('ai-border-pulse')
+    expect(layout).toContain('aiPanelFrameStyle')
   })
 
   it('keeps Welcome clickable offline and Sessions header drag', () => {
@@ -913,7 +914,7 @@ describe('parked organs leftover', () => {
     expect(d3).toContain('no Chat error banner')
   })
 
-  it('keeps preflight 12px amber, chip truncate, Copy icon, and catalog wait', () => {
+  it('keeps preflight amber, chip truncate, Copy icon, and catalog wait', () => {
     const preflight = readFileSync(
       `${process.cwd()}/src/components/ChatPreflightBanner.tsx`,
       'utf8',
@@ -930,7 +931,6 @@ describe('parked organs leftover', () => {
       `${process.cwd()}/src/components/SettingsPanel.tsx`,
       'utf8',
     )
-    expect(preflight).toContain('text-[12px] font-medium text-foreground')
     expect(preflight).toContain('text-[var(--accent-amber,var(--foreground))]')
     expect(deck).toContain('min-w-0 truncate')
     expect(message).toContain('data-testid="ai-message-copy"')

@@ -270,6 +270,7 @@ export default function ChatHome({
           forkTargetsPrimeEntry={panelEngine === 'prime'}
           newChatRef={newChatRef}
           onOpenMycelium={onOpenSessionFootprint}
+          onOpenAiSettings={onOpenAiSettings}
           notePane={
             openNote ? (
               <div

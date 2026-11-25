@@ -10,7 +10,6 @@ import {
   formatContextUsage,
   type PrimeSessionStats,
 } from '../hooks/usePrimeSessionStats'
-import { ChatComposerFoot } from './ChatComposerFoot'
 import { PrimeContextMeter } from './PrimeContextMeter'
 
 const PRESSURE_TEXT_CLASS = {
@@ -23,9 +22,6 @@ interface ChatComposerBarProps {
   locale?: AppLocale
   /** Live turn controls from ChatHome: model, thinking, context note, active agents. */
   deck?: ReactNode
-  working?: boolean
-  /** Shown in the status slot when a Prime worker failed to start. */
-  failureReason?: string | null
   stats: PrimeSessionStats
 }
 
@@ -96,8 +92,6 @@ function PrimeContextButton({ stats, locale }: { stats: PrimeSessionStats, local
 export function ChatComposerBar({
   locale = 'en',
   deck,
-  working = false,
-  failureReason = null,
   stats,
 }: ChatComposerBarProps) {
   return (
@@ -105,12 +99,6 @@ export function ChatComposerBar({
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
         {deck}
       </div>
-      {(working || failureReason) ? (
-        <ChatComposerFoot
-          working={working}
-          failureReason={failureReason}
-        />
-      ) : null}
       <PrimeContextButton stats={stats} locale={locale} />
     </div>
   )

@@ -5,6 +5,7 @@ import {
   nextChatRunAnnouncement,
   type ChatRunSnapshot,
 } from '../lib/chatRunLiveStatus'
+import { useChatRunStatus } from '../hooks/useChatRunStatus'
 
 interface ChatRunLiveStatusProps {
   messages: Array<{
@@ -16,6 +17,8 @@ interface ChatRunLiveStatusProps {
     localMarkerTone?: 'warning'
   }>
   isActive: boolean
+  /** Why the run did not start. */
+  failure?: string | null
 }
 
 /**
@@ -28,12 +31,13 @@ interface ChatRunLiveStatusProps {
  * announcement. A newer line while frames are scheduled is appended
  * ("notice. Response complete") so VoiceOver hears both. Unmount cancels.
  */
-export function ChatRunLiveStatus({ messages, isActive }: ChatRunLiveStatusProps) {
+export function ChatRunLiveStatus({ messages, isActive, failure = null }: ChatRunLiveStatusProps) {
   const previousRef = useRef<ChatRunSnapshot | null>(null)
   const pendingRef = useRef<string | null>(null)
   const clearFrameRef = useRef(0)
   const restoreFrameRef = useRef(0)
   const [announcement, setAnnouncement] = useState('')
+  const quiet = useChatRunStatus(messages, isActive).state === 'quiet'
 
   useEffect(() => {
     return () => {
@@ -44,7 +48,7 @@ export function ChatRunLiveStatus({ messages, isActive }: ChatRunLiveStatusProps
   }, [])
 
   useEffect(() => {
-    const next = chatRunSnapshotFromMessages(messages, isActive)
+    const next = { ...chatRunSnapshotFromMessages(messages, isActive), quiet, failure: failure ?? undefined }
     const text = nextChatRunAnnouncement(previousRef.current, next)
     previousRef.current = next
     if (!text) return
@@ -63,7 +67,7 @@ export function ChatRunLiveStatus({ messages, isActive }: ChatRunLiveStatusProps
         if (pending) setAnnouncement(pending)
       })
     })
-  }, [isActive, messages])
+  }, [failure, isActive, messages, quiet])
 
   return (
     <div

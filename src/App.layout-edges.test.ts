@@ -73,11 +73,10 @@ describe('shell column edges', () => {
     )
   })
 
-  it('does not turn off the Chat working pulse when Notes is open', () => {
+  it('does not turn off the Chat working border when Notes is open', () => {
     const aiPanel = readFileSync(`${process.cwd()}/src/components/AiPanel.tsx`, 'utf8')
     expect(aiPanel).toContain('aiPanelFrameStyle')
     expect(aiPanel).not.toMatch(/notesOpen[\s\S]{0,120}aiPanelFrameStyle/)
-    expect(appSource).not.toMatch(/notesOpen[\s\S]{0,80}ai-border-pulse/)
   })
 
   it('keeps Chat mounted when Notes is open unless Notes fills the window', () => {

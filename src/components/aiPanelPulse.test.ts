@@ -1,69 +1,26 @@
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { aiPanelFrameStyle } from './aiPanelPulse'
 
 /**
- * `ai-border-pulse` is applied to the <aside> wrapping the entire AI panel.
- * Anything inheritable in these keyframes animates the whole transcript, not
- * the indicator strip — which is exactly how a two-second full-panel fade
- * shipped unnoticed. This guards the shape, since the symptom is easy to
- * mistake for a rendering quirk rather than a bug.
+ * The frame border once pulsed for the whole length of a turn. The run
+ * status line replaced that signal (ADR-0193), so the border holds still.
  */
-const CSS = readFileSync(path.join(process.cwd(), 'src/index.css'), 'utf-8')
-
-function keyframeBody(name: string): string {
-  const start = CSS.indexOf(`@keyframes ${name}`)
-  expect(start, `@keyframes ${name} not found`).toBeGreaterThan(-1)
-  const open = CSS.indexOf('{', start)
-  let depth = 0
-  for (let i = open; i < CSS.length; i += 1) {
-    if (CSS[i] === '{') depth += 1
-    if (CSS[i] === '}') {
-      depth -= 1
-      if (depth === 0) return CSS.slice(open + 1, i)
-    }
-  }
-  throw new Error(`unterminated @keyframes ${name}`)
-}
-
-describe('ai-border-pulse', () => {
-  it('animates only the indicator border, never anything the subtree inherits', () => {
-    const body = keyframeBody('ai-border-pulse')
-    // Property names only — a substring check would read `color` out of
-    // `border-left-color` and fail on the correct rule.
-    const properties = new Set(
-      [...body.matchAll(/(^|[{;\s])([a-z-]+)\s*:/g)].map((match) => match[2]),
-    )
-
-    for (const inheritable of ['opacity', 'filter', 'color', 'visibility', 'transform']) {
-      expect(properties.has(inheritable), `must not animate ${inheritable}`).toBe(false)
-    }
-    expect(properties.has('border-left-color')).toBe(true)
-  })
-})
-
 describe('aiPanelFrameStyle', () => {
-  it('pulses the border while a turn runs', () => {
-    const style = aiPanelFrameStyle(true, true, false)
+  it('marks a running turn with a 2px border in the brand color', () => {
+    const style = aiPanelFrameStyle(true, true)
 
-    expect(style.animation).toContain('ai-border-pulse')
-    expect(style.borderLeft).toContain('var(--accent-blue)')
+    expect(style.borderLeft).toBe('2px solid var(--primary)')
   })
 
-  it('does not animate when the user has asked for reduced motion', () => {
-    // The pulse runs `infinite` for the whole length of a turn. It is applied as an
-    // inline style, so no stylesheet media query can switch it off -- this is the
-    // only place it can be honoured.
-    const style = aiPanelFrameStyle(true, true, true)
+  it('does not animate while a turn runs', () => {
+    const style = aiPanelFrameStyle(true, true)
 
     expect(style.animation).toBeUndefined()
-    // The border still marks the active panel; only the movement stops.
-    expect(style.borderLeft).toContain('var(--accent-blue)')
+    expect(style.transition).toBeUndefined()
   })
 
-  it('keeps the idle border unanimated either way', () => {
-    expect(aiPanelFrameStyle(false, true, false).animation).toBeUndefined()
-    expect(aiPanelFrameStyle(false, true, true).animation).toBeUndefined()
+  it('keeps a 1px border when idle and none when the border is off', () => {
+    expect(aiPanelFrameStyle(false, true).borderLeft).toBe('1px solid var(--border)')
+    expect(aiPanelFrameStyle(true, false).borderLeft).toBeUndefined()
   })
 })
