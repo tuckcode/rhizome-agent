@@ -106,7 +106,9 @@ export function fitPanePreset(preset: PanePresetState, context: PaneFitContext) 
     widths.note = Math.min(widths.note, besideRoom())
     beside = true
   }
-  if (noteLead && beside) {
+  // Before the shell is measured `available` is Infinity; keep the saved note
+  // width rather than computing an infinite share.
+  if (noteLead && beside && Number.isFinite(available)) {
     // Room for the note and Chat together, after every other column.
     const shared = available - (used() - widths.note - NOTE_DIVIDER_WIDTH) - NOTE_DIVIDER_WIDTH
     const target = Math.round(shared * (preset.noteShare ?? NOTE_LEAD_SHARE))
@@ -145,4 +147,11 @@ export function resizePresetWidth(preset: PanePresetState, column: PaneColumn, r
   }
   const width = normalizedWidths({ [column]: Math.min(requested, columnResizeRoom(preset, column, context)) })[column]
   return { ...preset, widths: { ...preset.widths, [column]: width } }
+}
+
+/** Flex style for the note editor column. A width that is not a finite,
+ *  positive number (an unmeasured shell) lets the column flex instead of
+ *  writing `flex: 0 0 Infinitypx`. */
+export function noteEditorFlex(width: number): { flex: string } {
+  return Number.isFinite(width) && width > 0 ? { flex: `0 0 ${width}px` } : { flex: '1 1 0' }
 }

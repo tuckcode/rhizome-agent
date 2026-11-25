@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { useCallback, useLayoutEffect, useState, type RefCallback } from 'react'
 
 import { fitPanePreset } from '../lib/panePresets'
 
@@ -16,15 +16,16 @@ export function useShellCompactLayout(
   enabled: boolean,
   noteOpen: boolean,
   inspectorOpen = false,
-): ShellCompactState & { shellRef: RefObject<HTMLDivElement | null>; width: number | null } {
-  const shellRef = useRef<HTMLDivElement>(null)
+): ShellCompactState & { shellRef: RefCallback<HTMLDivElement>; width: number | null } {
+  // A callback ref, so the observer attaches when the shell mounts. The shell
+  // can mount after `enabled` turns on (the startup screen renders first), and
+  // a ref object would leave the effect with nothing to observe.
+  const [element, setElement] = useState<HTMLDivElement | null>(null)
+  const shellRef = useCallback((node: HTMLDivElement | null) => setElement(node), [])
   const [width, setWidth] = useState<number | null>(null)
 
   useLayoutEffect(() => {
-    if (!enabled) return
-
-    const element = shellRef.current
-    if (!element) return
+    if (!enabled || !element) return
 
     const updateWidth = () => {
       const nextWidth = element.getBoundingClientRect().width
@@ -42,7 +43,7 @@ export function useShellCompactLayout(
     })
     observer.observe(element)
     return () => observer.disconnect()
-  }, [enabled])
+  }, [enabled, element])
 
   return {
     shellRef,

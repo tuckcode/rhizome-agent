@@ -191,6 +191,7 @@ import {
   runNativeTextHistoryCommand,
   shouldPreferOnboardingVaultPath,
 } from './utils/appOrchestration'
+import { noteEditorFlex } from './lib/panePresets'
 import './App.css'
 
 const DEFAULT_SELECTION: SidebarSelection = INBOX_SELECTION
@@ -2350,7 +2351,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                   style={
                     !showFocusedNote ? { display: 'none' }
                       : focusedWindow ? { flex: '1 1 0' }
-                        : activeTab && !hideChatForNotesFocus ? { flex: `0 0 ${chatNoteSplitMode === 'side-by-side' ? paneWidths.note : chatNoteEditorHeight.width}px` }
+                        : activeTab && !hideChatForNotesFocus ? noteEditorFlex(chatNoteSplitMode === 'side-by-side' ? paneWidths.note : chatNoteEditorHeight.width)
                           : undefined
                   }
                 >

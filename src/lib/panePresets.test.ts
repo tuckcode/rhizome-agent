@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { loadPanePreferences, panePresetStorageKey } from './panePresetStorage'
-import { fitPanePreset, presetFromLegacy, presetToLegacy, resizePresetWidth } from './panePresets'
+import { fitPanePreset, noteEditorFlex, presetFromLegacy, presetToLegacy, resizePresetWidth } from './panePresets'
 
 describe('pane presets', () => {
   // Native audit 2026-09-26: opening a note makes the research desk (note
@@ -210,5 +210,19 @@ describe('note lead', () => {
     const loaded = loadPanePreferences('main').active
     expect(loaded.noteShare).toBeCloseTo(dragged.noteShare!)
     expect(fitPanePreset(loaded, context).widths.note).toBe(fit.widths.note - 100)
+  })
+
+  it('never sizes the note to Infinity before the shell is measured', () => {
+    const fit = fitPanePreset({ id: 'chat', widths: {} }, { ...context, shellWidth: null })
+    expect(Number.isFinite(fit.widths.note)).toBe(true)
+  })
+})
+
+describe('noteEditorFlex', () => {
+  it('writes a fixed basis only for a finite, positive width', () => {
+    expect(noteEditorFlex(480)).toEqual({ flex: '0 0 480px' })
+    expect(noteEditorFlex(Infinity)).toEqual({ flex: '1 1 0' })
+    expect(noteEditorFlex(Number.NaN)).toEqual({ flex: '1 1 0' })
+    expect(noteEditorFlex(0)).toEqual({ flex: '1 1 0' })
   })
 })

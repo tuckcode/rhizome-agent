@@ -546,8 +546,8 @@ function EditorLayout({
   const showEmptyState = tabs.length === 0 && activeTabPath === null && !isVaultLoading
 
   return (
-    <div className="editor flex flex-col min-h-0 overflow-hidden bg-background text-foreground">
-      <div className="relative flex flex-1 min-h-0">
+    <div className="editor flex min-w-0 flex-col min-h-0 overflow-hidden bg-background text-foreground">
+      <div className="relative flex min-w-0 flex-1 min-h-0">
         {showEmptyState
           ? <EditorEmptyState locale={locale} />
           : activeBinaryTab
