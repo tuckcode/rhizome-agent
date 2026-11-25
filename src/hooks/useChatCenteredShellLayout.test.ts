@@ -78,7 +78,7 @@ describe('preset column drag', () => {
     const captured = result.current.layout.resizeColumn
     act(() => captured('note', 10))
     act(() => captured('note', 10))
-    expect(result.current.controls.panePreset.widths.note).toBe(380)
+    expect(result.current.controls.panePreset.widths.note).toBe(440)
   })
 
   it('does not ratchet a tight beside note when leftovers could move to Notes', () => {
@@ -109,8 +109,8 @@ describe('workspace state and the sessions drawer', () => {
   })
 
   it('opens a drawer rather than folding an open Notes column for the rail', () => {
-    // Notes preset at 700: Chat + Notes fit, but a 240px rail would fold Notes.
-    mockedShellWidth = 700
+    // At 750px, Chat and Notes fit with the collapsed rail only.
+    mockedShellWidth = 750
     const { result } = renderHook(() => {
       const controls = useViewMode()
       return useChatCenteredShellLayout({
