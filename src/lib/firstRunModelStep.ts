@@ -90,7 +90,6 @@ export function localProviderFor(kind: FirstRunLocalKind, modelId: string): AiMo
       id: modelId,
       display_name: null,
       context_window: null,
-      max_output_tokens: null,
       capabilities: DEFAULT_MODEL_CAPABILITIES,
     }],
   }
@@ -110,7 +109,6 @@ export function keyProviderFor(preset: ProviderPreset): AiModelProvider {
       id: preset.modelId,
       display_name: null,
       context_window: null,
-      max_output_tokens: null,
       capabilities: DEFAULT_MODEL_CAPABILITIES,
     }],
   }
