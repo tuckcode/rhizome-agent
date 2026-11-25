@@ -954,8 +954,8 @@ fn native_event_sink(
                     naming_started.store(false, Ordering::SeqCst);
                 }
                 Ok(None) => {}
-                Err(error) => {
-                    log::warn!("Could not save the chat title: {error}");
+                Err(_) => {
+                    log::warn!("Could not save the chat title.");
                     naming_started.store(false, Ordering::SeqCst);
                 }
             });
