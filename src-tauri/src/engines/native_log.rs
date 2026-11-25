@@ -4,11 +4,12 @@
 //! written under `~/.prime`. Each line is flushed and synced before the
 //! next event is accepted.
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::fs::{self, File, OpenOptions};
 use std::io::{Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use crate::ai_agents::AiAgentPermissionMode;
 use crate::rhizome_loop::DurableEvent;
@@ -39,12 +40,17 @@ pub const REOPEN_WARNING: &str =
 const SESSIONS_DIR: &str = "native-sessions";
 const DAMAGE_WARNING: &str = "This chat log was damaged. Rhizome opened the verified history only.";
 
-/// Same-process holders. `flock` is per process, so a second window in this
-/// process needs its own record. The file lock still covers a second process,
-/// and the kernel drops it when that process dies.
-fn process_locks() -> &'static Mutex<HashSet<String>> {
-    static LOCKS: std::sync::OnceLock<Mutex<HashSet<String>>> = std::sync::OnceLock::new();
-    LOCKS.get_or_init(|| Mutex::new(HashSet::new()))
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SessionLockOwner {
+    Writer,
+    ReadProbe,
+}
+
+/// Track local lock holders. The file lock also protects against other processes.
+fn process_locks() -> &'static Mutex<HashMap<String, SessionLockOwner>> {
+    static LOCKS: std::sync::OnceLock<Mutex<HashMap<String, SessionLockOwner>>> =
+        std::sync::OnceLock::new();
+    LOCKS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -1091,20 +1097,42 @@ fn unlock_exclusive(file: &File) {
 }
 
 pub fn try_lock_session(session_id: &str) -> Result<SessionLock, String> {
+    try_lock_session_as(session_id, SessionLockOwner::Writer)
+}
+
+fn try_lock_session_as(session_id: &str, owner: SessionLockOwner) -> Result<SessionLock, String> {
     validate_session_id(session_id)?;
-    let dir = native_sessions_dir()?;
-    fs::create_dir_all(&dir).map_err(|error| format!("create native-sessions dir: {error}"))?;
-    {
+    let path = lock_path(session_id)?;
+    let dir = path.parent().expect("session lock directory");
+    fs::create_dir_all(dir).map_err(|error| format!("create native-sessions dir: {error}"))?;
+
+    // Give an in-process reader time to finish its lock probe. A real writer
+    // may have changed the log, so refuse that lock immediately.
+    let deadline = Instant::now() + Duration::from_millis(50);
+    loop {
         let mut held = process_locks()
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        if !held.insert(session_id.to_string()) {
-            return Err(format!(
-                "native session {session_id} is open in another window"
-            ));
+        match held.get(session_id) {
+            None => {
+                held.insert(session_id.to_string(), owner);
+                break;
+            }
+            Some(SessionLockOwner::ReadProbe)
+                if owner == SessionLockOwner::Writer && Instant::now() < deadline =>
+            {
+                drop(held);
+                #[cfg(test)]
+                tests::on_writer_lock_contended(session_id);
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            Some(_) => {
+                return Err(format!(
+                    "native session {session_id} is open in another window"
+                ));
+            }
         }
     }
-    let path = lock_path(session_id)?;
     let file = OpenOptions::new()
         .read(true)
         .write(true)
@@ -1138,8 +1166,10 @@ fn release_process_lock(session_id: &str) {
 }
 
 fn write_lock_is_held(session_id: &str) -> bool {
-    match try_lock_session(session_id) {
+    match try_lock_session_as(session_id, SessionLockOwner::ReadProbe) {
         Ok(lock) => {
+            #[cfg(test)]
+            tests::on_read_probe_locked();
             drop(lock);
             false
         }
@@ -1718,6 +1748,109 @@ pub fn write_fixture(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    type WriterLockHook = (String, Box<dyn FnOnce() + Send>);
+    static WRITER_LOCK_HOOK: Mutex<Option<WriterLockHook>> = Mutex::new(None);
+
+    thread_local! {
+        static READ_PROBE_HOOK: std::cell::RefCell<Option<Box<dyn FnOnce()>>> =
+            const { std::cell::RefCell::new(None) };
+    }
+
+    pub(super) fn on_read_probe_locked() {
+        if let Some(hook) = READ_PROBE_HOOK.take() {
+            hook();
+        }
+    }
+
+    pub(super) fn on_writer_lock_contended(session_id: &str) {
+        let hook = {
+            let mut pending = WRITER_LOCK_HOOK.lock().expect("writer lock hook");
+            if pending.as_ref().is_some_and(|(id, _)| id == session_id) {
+                pending.take()
+            } else {
+                None
+            }
+        };
+        if let Some((_, hook)) = hook {
+            hook();
+        }
+    }
+
+    #[test]
+    fn opening_a_log_does_not_stop_a_starting_chat_worker() {
+        use crate::commands::native_chat::NativeChats;
+        use crate::engines::{EngineEvent, NativeEngine};
+
+        let _home = temp_home();
+        let id = uuid::Uuid::new_v4().to_string();
+        let header = SessionHeader {
+            version: NATIVE_LOG_VERSION,
+            session_id: id.clone(),
+            created_at: "2026-11-14T00:00:00Z".into(),
+            target: "openai/gpt-4o-mini".into(),
+            permission_mode: "safe".into(),
+            vault_path: None,
+            vault_paths: Vec::new(),
+            system_prompt: None,
+            reasoning_level: None,
+        };
+        drop(create_session_log(&header).expect("create session"));
+        let timeout = Duration::from_secs(2);
+        let (probe_ready, probe_started) = mpsc::channel();
+        let (release, release_request) = mpsc::channel();
+        let (reader_done, reader_finished) = mpsc::channel();
+        *WRITER_LOCK_HOOK.lock().expect("writer lock hook") = Some((
+            id.clone(),
+            Box::new(move || {
+                release.send(()).expect("release reader");
+                reader_finished
+                    .recv_timeout(timeout)
+                    .expect("reader released");
+            }),
+        ));
+
+        std::thread::scope(|scope| {
+            let read_id = &id;
+            let reader = scope.spawn(move || {
+                READ_PROBE_HOOK.set(Some(Box::new(move || {
+                    probe_ready.send(()).expect("reader ready");
+                    release_request.recv_timeout(timeout).expect("writer tried");
+                })));
+                let opened = open_session_log(read_id).expect("read existing session");
+                reader_done.send(()).expect("reader done");
+                opened
+            });
+            probe_started
+                .recv_timeout(timeout)
+                .expect("reader holds probe lock");
+            let chats = NativeChats::new();
+            let (tx, rx) = mpsc::channel();
+            chats
+                .open_with_engine(id.clone(), NativeEngine::saying("ready"), move |event| {
+                    let _ = tx.send(event);
+                })
+                .expect("open worker");
+            chats.send(&id, "hello").expect("queue first turn");
+            assert_eq!(reader.join().expect("reader").header.session_id, id);
+
+            loop {
+                match rx.recv_timeout(timeout).expect("worker reply") {
+                    EngineEvent::TextDelta { text } if text == "ready" => break,
+                    EngineEvent::Error {
+                        fatal: true,
+                        message,
+                    } => {
+                        panic!("worker stopped after concurrent open: {message}")
+                    }
+                    _ => {}
+                }
+            }
+            chats.end(&id).expect("end worker");
+        });
+    }
 
     struct HomeGuard {
         _lock: std::sync::MutexGuard<'static, ()>,
@@ -2867,18 +3000,33 @@ mod tests {
         drop(third);
     }
 
+    #[cfg(unix)]
     #[test]
     fn killed_holder_releases_the_lock() {
+        use std::io::{BufRead, BufReader};
+        use std::process::Stdio;
+
         let _home = temp_home();
         let id = uuid::Uuid::new_v4().to_string();
         let path = lock_path(&id).unwrap();
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         let mut child = std::process::Command::new("python3")
             .arg("-c")
-            .arg("import fcntl,os,sys; f=open(sys.argv[1],'a+'); fcntl.flock(f.fileno(), fcntl.LOCK_EX|fcntl.LOCK_NB); os.kill(os.getpid(), 9)")
+            .arg("import fcntl,sys; f=open(sys.argv[1],'a+'); fcntl.flock(f.fileno(), fcntl.LOCK_EX|fcntl.LOCK_NB); print('locked', flush=True); sys.stdin.read()")
             .arg(&path)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
             .spawn()
             .expect("python3");
+        let _release_on_unwind = child.stdin.take();
+        let mut ready = String::new();
+        BufReader::new(child.stdout.take().expect("child stdout"))
+            .read_line(&mut ready)
+            .expect("child lock status");
+        assert_eq!(ready.trim_end(), "locked");
+        assert!(write_lock_is_held(&id), "detect the external writer");
+        assert!(try_lock_session(&id).is_err(), "refuse a second writer");
+        child.kill().expect("kill holder");
         let status = child.wait().expect("wait");
         assert!(!status.success(), "the holder must be killed");
         let lock =
