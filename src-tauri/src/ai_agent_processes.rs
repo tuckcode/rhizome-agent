@@ -241,10 +241,16 @@ mod tests {
     fn interrupt_sends_sigint_first() {
         use std::os::unix::process::ExitStatusExt;
 
-        let child = std::process::Command::new("node")
-            .args(["-e", "setTimeout(() => {}, 30000)"])
+        // Wait for node to print "ready". A SIGINT sent during node startup
+        // can be lost, and the grace timer then escalates to SIGTERM.
+        let mut child = std::process::Command::new("node")
+            .args(["-e", "console.log('ready'); setTimeout(() => {}, 30000)"])
+            .stdout(std::process::Stdio::piped())
             .spawn()
             .unwrap();
+        let mut stdout = std::io::BufReader::new(child.stdout.take().unwrap());
+        let mut line = String::new();
+        std::io::BufRead::read_line(&mut stdout, &mut line).unwrap();
         with_stream_id("ai-agent-stream-interrupt".into(), || {
             let registered = register_current_stream_child(child);
             assert!(interrupt_stream(
