@@ -48,6 +48,13 @@ export async function chooseNotePlacement(page: Page, placement: 'top' | 'beside
   const name = placement === 'top' ? 'Note on top of Chat' : 'Note beside Chat'
   if (await clickInlineIfItStays(page, 'radio', name)) return
   await openNoteActionsMenu(page)
-  await page.getByRole('radio', { name }).click()
-  if (await page.getByRole('menu').isVisible()) await page.keyboard.press('Escape')
+  const menu = page.getByRole('menu')
+  const menuChoice = menu.getByRole('radio', { name, exact: true })
+  if (await menuChoice.isVisible()) {
+    await menuChoice.click()
+    if (await menu.isVisible()) await page.keyboard.press('Escape')
+    return
+  }
+  await page.keyboard.press('Escape')
+  await page.locator('.breadcrumb-bar').getByRole('radio', { name, exact: true }).click()
 }

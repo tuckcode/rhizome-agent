@@ -61,8 +61,7 @@ test('Getting Started template shows inline retry on clone failure and opens aft
 
   await expect(page.getByTestId('welcome-screen')).not.toBeVisible()
   await expect(page.getByText(`Rhizome Vault created and opened at ${clonedPath}`)).toBeVisible()
-  await expect(page.getByTestId('claude-onboarding-screen')).toBeVisible()
-  await expect(page.getByText('Claude Code not detected')).toBeVisible()
-  await page.getByTestId('claude-onboarding-continue').click()
+  // First run now asks for a model after the vault step.
+  await page.getByTestId('first-run-model-skip').click()
   await expect(page.locator('[data-testid="note-list-container"]')).toBeVisible()
 })

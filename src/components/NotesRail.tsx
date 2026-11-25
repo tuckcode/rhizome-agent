@@ -31,7 +31,6 @@ interface NotesRailProps {
   onMouseEnter?: () => void
   onMouseLeave?: () => void
   onFocusCapture?: () => void
-  onMenuOpenChange?: (open: boolean) => void
   items?: readonly NotesRailItem[]
   showInbox?: boolean
   selection?: SidebarSelection
@@ -56,7 +55,6 @@ export function NotesRail({
   onMouseEnter,
   onMouseLeave,
   onFocusCapture,
-  onMenuOpenChange,
   items,
   showInbox = false,
   selection,
@@ -143,10 +141,10 @@ export function NotesRail({
           <NotesPanelModeControl
             mode={triggerMode}
             onModeChange={onModeChange}
-            onMenuOpenChange={onMenuOpenChange}
             triggerRef={modeButtonRef}
             windowTooNarrow={windowTooNarrow}
             openForNow={openForNow}
+            vertical
           />
           {railItems.map((item) => {
             const Icon = item.icon

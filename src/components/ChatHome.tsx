@@ -63,6 +63,9 @@ interface ChatHomeProps {
   onOpenCommandPalette?: () => void
   /** Lets the shell make room for Chat's secondary note pane at narrow widths. */
   onNotePaneOpenChange?: (open: boolean) => void
+  stackNotePane?: boolean
+  fittedNotePaneWidth?: number
+  onFittedNotePaneResize?: (deltaX: number) => void
   /**
    * A note handed to Chat from outside — the vault's "Ask the agent about this
    * note". Carries an id so asking about the *same* note twice still reopens
@@ -106,6 +109,9 @@ export default function ChatHome({
   onOpenSessionFootprint,
   onOpenCommandPalette,
   onNotePaneOpenChange,
+  stackNotePane = false,
+  fittedNotePaneWidth,
+  onFittedNotePaneResize,
   requestedNote,
   railLayoutWidth,
   onOpenAiSettings,
@@ -271,17 +277,18 @@ export default function ChatHome({
           newChatRef={newChatRef}
           onOpenMycelium={onOpenSessionFootprint}
           onOpenAiSettings={onOpenAiSettings}
+          notePaneStacked={notePaneOpen && stackNotePane}
           notePane={
             openNote ? (
               <div
                 data-testid="chat-note-pane-region"
-                className="flex min-h-0 shrink-0"
+                className={stackNotePane ? "flex min-h-0 w-full shrink-0 basis-2/5" : "flex min-h-0 shrink-0"}
               >
               <ChatNotePane
                 locale={locale}
                 label={openNote.label}
-                width={notePaneWidth.width}
-                onResize={notePaneWidth.resizeBy}
+                width={stackNotePane ? undefined : fittedNotePaneWidth ?? notePaneWidth.width}
+                onResize={stackNotePane ? undefined : fittedNotePaneWidth === undefined ? notePaneWidth.resizeBy : onFittedNotePaneResize}
                 body={openNoteContent.body}
                 error={openNoteContent.error}
                 loading={openNoteContent.loading}

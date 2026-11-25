@@ -7,6 +7,7 @@ import {
 } from '../lib/aiAgentPermissionMode'
 import { createScopedStreamEventName } from './aiStreamEvents'
 import { cleanupTauriEventListener } from './tauriEventCleanup'
+import type { NativeApprovalChoice, NativeApprovalOption } from '../lib/nativeToolApproval'
 
 type AiAgentStreamEvent =
   | { kind: 'Init'; session_id: string }
@@ -19,6 +20,16 @@ type AiAgentStreamEvent =
   | { kind: 'QueueUpdate'; queued: number }
   | { kind: 'Compaction'; phase: string; reason?: string; tokens_before?: number }
   | { kind: 'TurnBoundary' }
+  | {
+    kind: 'ApprovalRequested'
+    prompt_id: string
+    tool: string
+    args: string
+    options: NativeApprovalOption[]
+    path?: string
+    call_id?: string
+  }
+  | { kind: 'ApprovalDismissed'; prompt_id: string }
   | { kind: 'Done' }
 
 export interface AgentStreamCallbacks {
@@ -115,10 +126,32 @@ function handleStreamEvent(data: AiAgentStreamEvent, callbacks: AgentStreamCallb
     case 'TurnBoundary':
       callbacks.onTurnBoundary?.()
       return
+    case 'ApprovalRequested':
+      // Claude Code engine (ADR-0191 step 4). Rhizome asks before Claude
+      // Code edits or runs a command; no answer denies.
+      callbacks.onApprovalRequested?.({
+        promptId: data.prompt_id,
+        tool: data.tool,
+        args: data.args,
+        options: data.options,
+        path: data.path,
+        callId: data.call_id || undefined,
+        reply: (choice) => replyAiAgentApproval(data.prompt_id, choice),
+      })
+      return
+    case 'ApprovalDismissed':
+      callbacks.onApprovalDismissed?.(data.prompt_id)
+      return
     case 'Done':
       callbacks.onDone()
       return
   }
+}
+
+function replyAiAgentApproval(promptId: string, choice: NativeApprovalChoice): void {
+  void import('@tauri-apps/api/core')
+    .then(({ invoke }) => invoke<boolean>('reply_ai_agent_approval', { promptId, choice }))
+    .catch(() => {})
 }
 
 function createStreamCloser(callbacks: AgentStreamCallbacks): () => void {

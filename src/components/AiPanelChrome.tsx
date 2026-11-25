@@ -569,23 +569,38 @@ function AiPanelEmptyState({
     )
   }
 
+  const subline = hasContext
+    ? 'Rhizome can work from the open note, or from the rest of this repo.'
+    : 'Rhizome can research this repo, edit files, and run commands here.'
+
   return (
     <div
-      className="flex min-h-full flex-1 flex-col items-center justify-end px-6 pb-5 text-center"
+      className="@container relative flex min-h-full flex-1 flex-col items-center px-6 pb-8 text-center"
       data-layout="hero"
       data-testid="ai-panel-empty-state"
     >
-      <BrandMark size={44} />
-      <p className="mt-3 font-mono text-sm font-semibold tracking-wide text-muted-foreground" data-testid="chat-home-wordmark">
-        rhizome
-      </p>
-      <h2 className="mt-4 font-sans text-3xl font-semibold tracking-tight text-foreground">
-        What are we working on?
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute bottom-0 left-1/2 h-80 w-full max-w-[36rem] -translate-x-1/2"
+        // A radial gradient fades to clear inside its own box, so a narrow
+        // chat column never cuts it into hard edges the way a blur would.
+        style={{ backgroundImage: 'radial-gradient(closest-side, color-mix(in oklab, var(--primary) 14%, transparent), transparent)' }}
+      />
+      {/* mt-auto sits the hero at the bottom when there is room. In a short
+          window it shrinks to 0, so the pill stays in view and can scroll. */}
+      <div className="relative mt-auto inline-flex items-center gap-2 rounded-full border border-border bg-background/60 py-1 pl-1.5 pr-3">
+        <BrandMark size={20} />
+        <p className="font-mono text-xs font-semibold tracking-wide text-muted-foreground" data-testid="chat-home-wordmark">
+          rhizome
+        </p>
+      </div>
+      <h2 className="relative mt-4 font-sans text-4xl font-semibold leading-none tracking-tighter text-foreground @xl:mt-6 @xl:text-6xl">
+        What are we{' '}
+        <br />
+        working on?
       </h2>
-      <p className="mt-2 max-w-lg text-base leading-6 text-muted-foreground">
-        {hasContext
-          ? 'Rhizome can work from the open note, or from the rest of this repo.'
-          : 'Rhizome can research this repo, edit files, and run commands here.'}
+      <p className="relative mt-3 max-w-md text-sm leading-6 text-muted-foreground @xl:mt-5 @xl:text-base">
+        {subline}
       </p>
     </div>
   )

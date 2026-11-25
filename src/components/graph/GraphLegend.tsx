@@ -77,7 +77,7 @@ export function GraphLegend({
   return (
     <div
       data-testid="graph-legend"
-      className="absolute bottom-3 left-3 z-10 flex max-h-[40%] max-w-[240px] flex-col rounded-[var(--radius)] border text-[11px]"
+      className="absolute bottom-3 left-3 z-10 flex max-h-[40%] max-w-[min(260px,calc(50%-1.125rem))] flex-col rounded-[var(--radius)] border text-[13px]"
       style={{
         borderColor: 'var(--border)',
         background: 'var(--surface-panel, var(--sidebar))',
@@ -89,15 +89,15 @@ export function GraphLegend({
         onClick={toggle}
         data-testid="graph-legend-toggle"
         aria-expanded={open}
-        className="flex w-full shrink-0 items-center justify-between gap-2 px-2.5 py-1.5 text-left"
+        className="flex min-h-9 w-full shrink-0 items-center justify-between gap-3 px-3 py-2 text-left"
         style={{ color: 'var(--foreground)' }}
       >
         <span className="font-medium">{t('graph.legend.title')}</span>
-        {open ? <CaretDown size={12} /> : <CaretUp size={12} />}
+        {open ? <CaretDown size={14} /> : <CaretUp size={14} />}
       </button>
 
       {open && (
-        <div className="flex min-h-0 flex-col gap-2.5 overflow-y-auto px-2.5 pb-2.5" data-testid="graph-legend-body">
+        <div className="flex min-h-0 flex-col gap-3 overflow-y-auto px-3 pb-3" data-testid="graph-legend-body">
           <div data-testid="graph-legend-counts">
             {t('graph.legend.counts', {
               nodes: String(data.nodes.length),
@@ -115,25 +115,25 @@ export function GraphLegend({
 
           {nodeTypes.length > 0 && (
             <div>
-              <div className="mb-1 uppercase tracking-wide opacity-70">
+              <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide opacity-70">
                 {t('graph.legend.nodesHeading')}
               </div>
-              <ul className="flex flex-col gap-1">
+              <ul className="flex flex-col gap-1.5">
                 {nodeTypes.map(({ key, node }) => (
-                  <li key={key} className="flex items-center gap-1.5">
+                  <li key={key} className="flex items-center gap-2">
                     <span
                       aria-hidden="true"
-                      className="inline-block size-2 shrink-0 rounded-full"
+                      className="inline-block size-2.5 shrink-0 rounded-full"
                       style={{ background: colorForNode(node) }}
                     />
                     <span className="truncate">{key || t('graph.legend.untyped')}</span>
                   </li>
                 ))}
                 {ghostCount > 0 && (
-                  <li className="flex items-center gap-1.5" data-testid="graph-legend-ghost">
+                  <li className="flex items-center gap-2" data-testid="graph-legend-ghost">
                     <span
                       aria-hidden="true"
-                      className="inline-block size-2 shrink-0 rounded-full opacity-50"
+                      className="inline-block size-2.5 shrink-0 rounded-full opacity-50"
                       style={{ background: 'var(--muted-foreground)' }}
                     />
                     <span className="truncate">{t('graph.legend.ghost')}</span>
@@ -145,15 +145,15 @@ export function GraphLegend({
 
           {presentEdgeKinds.length > 0 && (
             <div>
-              <div className="mb-1 uppercase tracking-wide opacity-70">
+              <div className="mb-1.5 text-[11px] font-medium uppercase tracking-wide opacity-70">
                 {t('graph.legend.linksHeading')}
               </div>
-              <ul className="flex flex-col gap-1">
+              <ul className="flex flex-col gap-1.5">
                 {presentEdgeKinds.map((kind) => (
-                  <li key={kind} className="flex items-center gap-1.5">
+                  <li key={kind} className="flex items-center gap-2">
                     <span
                       aria-hidden="true"
-                      className="inline-block h-0.5 w-3 shrink-0 rounded"
+                      className="inline-block h-[3px] w-4 shrink-0 rounded"
                       style={{ background: colorForEdge({ kind }) }}
                     />
                     <span className="truncate">{t(EDGE_KIND_LABEL_KEY[kind])}</span>
@@ -163,7 +163,7 @@ export function GraphLegend({
             </div>
           )}
 
-          <div className="opacity-70" data-testid="graph-legend-controls">
+          <div className="text-[12px] leading-snug opacity-70" data-testid="graph-legend-controls">
             {t('graph.legend.controls')}
           </div>
         </div>

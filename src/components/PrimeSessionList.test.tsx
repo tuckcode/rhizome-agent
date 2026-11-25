@@ -420,6 +420,26 @@ describe('PrimeSessionList', () => {
       expect(tracked.renamed).toBe(1)
     })
 
+    it('renames a native session through its own host command', async () => {
+      invoked.result = [{
+        sessionId: 'n1',
+        createdAt: '2026-10-13T12:00:00.000Z',
+        target: 'free_tier_auto',
+        title: 'Generated topic',
+      }]
+      render(<PrimeSessionList engine="native" onSelect={vi.fn()} locale="en" now={NOW} />)
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Rename Generated topic' }))
+      const input = screen.getByTestId('prime-session-rename')
+      fireEvent.change(input, { target: { value: 'My chosen title' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      expect(await screen.findByText('My chosen title')).toBeInTheDocument()
+      expect(invoked.calls).toContain('rename_native_session')
+      expect(invoked.args).toContainEqual({ sessionId: 'n1', name: 'My chosen title' })
+      expect(invoked.calls).not.toContain('rename_prime_session')
+    })
+
     it('does not create a session when renaming with no vault', async () => {
       invoked.result = [summary({ id: 'a', path: '/sessions/a.jsonl', title: 'File me' })]
 

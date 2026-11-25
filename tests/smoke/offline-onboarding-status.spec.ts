@@ -64,8 +64,8 @@ test('status bar keeps a Getting Started clone entry available after onboarding'
   await page.getByTestId('welcome-create-vault').click()
 
   await expect(page.getByText('Rhizome Vault created and opened at /Users/mock/Documents/Rhizome Vault')).toBeVisible()
-  await expect(page.getByTestId('claude-onboarding-screen')).toBeVisible()
-  await page.getByTestId('claude-onboarding-continue').click()
+  // First run now asks for a model after the vault step.
+  await page.getByTestId('first-run-model-skip').click()
   await expect(page.locator('[data-testid="note-list-container"]')).toBeVisible()
   await page.getByTestId('status-vault-trigger').click()
   await expect(page.getByTestId('vault-menu-clone-getting-started')).toBeVisible()

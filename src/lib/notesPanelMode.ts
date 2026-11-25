@@ -1,5 +1,3 @@
-import { ArrowsHorizontal, Sidebar, SidebarSimple } from '@phosphor-icons/react'
-import type { Icon } from '@phosphor-icons/react'
 import { COMMAND_RAIL_DEFAULT_PINNED } from './railChrome'
 import { isMac } from '../utils/platform'
 
@@ -11,11 +9,6 @@ export type OverlaySide = 'none' | 'left' | 'right'
 export const NOTES_PANEL_MODE_STORAGE_PREFIX = 'rhizome:notes-panel-mode'
 export const NOTES_PANEL_DEFAULT_WINDOW_ID = 'main'
 
-export const NOTES_PANEL_MODE_ICONS: Record<NotesPanelMode, Icon> = {
-  auto: ArrowsHorizontal,
-  rail: SidebarSimple,
-  open: Sidebar,
-}
 
 /**
  * CommandRail starts pinned. The notes panel matches that default (Open)

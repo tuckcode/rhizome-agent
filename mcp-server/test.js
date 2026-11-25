@@ -647,6 +647,7 @@ describe('stdio process lifecycle', () => {
         rhizome_graph_orphans: [],
         rhizome_graph_dead_links: [],
         rhizome_graph_neighbors: ['note'],
+        rhizome_graph_pack: ['note'],
         rhizome_graph_path: ['from', 'to'],
       }
 

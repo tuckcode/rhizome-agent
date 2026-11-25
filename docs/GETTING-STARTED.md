@@ -24,6 +24,13 @@ User-facing name is **Rhizome**. The bundle is still `ai.rhizome.agent` / `Rhizo
 - **git** CLI (required by the git integration features)
 - **Prime Agent** on `PATH` is not required for Chat. `./install.sh` may still fetch it until the leftover engine code is removed. Not vendored.
 
+### macOS app packaging
+
+Use Xcode 26 or newer for `pnpm tauri build --bundles app`. The build compiles
+Paper and Evergreen with Apple's asset tool before it packages the app. macOS
+uses Paper for its light icon appearance and Evergreen for dark. Older macOS
+versions use the Evergreen icon file in the bundle.
+
 ### Linux system dependencies
 
 If you run the desktop app on Linux, install Tauri's WebKit2GTK 4.1 dependencies first:
@@ -93,6 +100,9 @@ pnpm install
 
 # Run in browser (no Rust needed — uses mock data)
 pnpm dev
+
+# Optional: Graph reads a real vault, read-only (needs a built rhizome-tool)
+RHIZOME_DEV_GRAPH_VAULT="/path/to/vault" pnpm dev
 # Open http://localhost:5202
 # Vite pins 5202. 5173 is wrong. Playwright's config default is 5201
 # when BASE_URL is unset.

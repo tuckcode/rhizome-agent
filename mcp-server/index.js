@@ -346,6 +346,20 @@ const TOOLS = [
     },
   },
   {
+    name: 'rhizome_graph_pack',
+    description: 'One note and its direct links in one call: the note body (frontmatter removed, capped at 6000 characters), then each linked note with its snippet, link direction (out, in, both) and link kinds, most connected first. Use before get_note when you also need to know what surrounds the note.',
+    annotations: LOCAL_READ_ONLY_TOOL_ANNOTATIONS,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        note: { type: 'string', description: 'Note to pack. A vault path, a title, or a filename stem all resolve.' },
+        limit: { type: 'number', description: 'Maximum linked notes to return (default 20). The reply always reports the true total.' },
+        vaultPath: { type: 'string', description: 'Optional target vault root. Uses active vault if omitted.' },
+      },
+      required: ['note'],
+    },
+  },
+  {
     name: 'rhizome_graph_path',
     description: 'How two notes connect, if they do — the shortest chain of links between them, in either direction.',
     annotations: LOCAL_READ_ONLY_TOOL_ANNOTATIONS,
@@ -601,6 +615,15 @@ async function handleRhizomeGraphNeighbors(args) {
   return { content: [{ type: 'text', text: output }] }
 }
 
+async function handleRhizomeGraphPack(args) {
+  const vaultPath = resolveVaultPath(args, toolService)
+  const note = typeof args.note === 'string' ? args.note.trim() : ''
+  if (!note) throw new Error('note is required')
+  const output = await runGraphQuery(vaultPath, ['pack', note, ...graphLimitArgs(args)])
+  appendRhizomeEvent(vaultPath, { type: 'graph-pack' })
+  return { content: [{ type: 'text', text: output }] }
+}
+
 async function handleRhizomeGraphPath(args) {
   const vaultPath = resolveVaultPath(args, toolService)
   const from = typeof args.from === 'string' ? args.from.trim() : ''
@@ -680,6 +703,7 @@ const TOOL_HANDLERS = new Map([
   ['rhizome_graph_orphans', handleRhizomeGraphOrphans],
   ['rhizome_graph_dead_links', handleRhizomeGraphDeadLinks],
   ['rhizome_graph_neighbors', handleRhizomeGraphNeighbors],
+  ['rhizome_graph_pack', handleRhizomeGraphPack],
   ['rhizome_graph_path', handleRhizomeGraphPath],
   ['rhizome_import_source', handleRhizomeImportSource],
   ['rhizome_distill', handleRhizomeDistill],

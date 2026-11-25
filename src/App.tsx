@@ -174,6 +174,7 @@ import { syncVaultAssetScope, useNoteWindowLifecycle } from './hooks/useNoteWind
 import { useVaultRenameDetection } from './hooks/useVaultRenameDetection'
 import { useVaultOpenedTelemetry } from './hooks/useVaultOpenedTelemetry'
 import { useStartupScreenState } from './hooks/useStartupScreenState'
+import { shouldShowModelStep as modelStepWanted, useModelStepPending } from './lib/firstRunModelStep'
 import { useGitFileWorkflows } from './hooks/useGitFileWorkflows'
 import { useAutoGitWork } from './hooks/useAutoGitWork'
 import { useAppAiWorkspaceBridge } from './hooks/useAppAiWorkspaceBridge'
@@ -190,6 +191,7 @@ import {
   runNativeTextHistoryCommand,
   shouldPreferOnboardingVaultPath,
 } from './utils/appOrchestration'
+import { noteEditorFlex } from './lib/panePresets'
 import './App.css'
 
 const DEFAULT_SELECTION: SidebarSelection = INBOX_SELECTION
@@ -1695,7 +1697,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     prefillAiComposer(formatAskChatExcerpt(title, excerpt))
     trackEvent('note_excerpt_ask_chat')
   }, [activeTabEntry])
-  const [, setChatNotePaneOpen] = useState(false)
+  const [chatNotePaneOpen, setChatNotePaneOpen] = useState(false)
   const [sessionRailSlot, setSessionRailSlot] = useState<HTMLDivElement | null>(null)
   const [notesFocus, setNotesFocus] = useState(false)
   const hideNotesForCanvas = isGraphDestination || isMyceliumDestination || isResearchDestination
@@ -1723,7 +1725,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     panePreset, setPanePreset, updatePanePreset, railPinned: railPinned || railConsumesExpandedWidth(reportedRailWidth),
     viewMode,
     setViewMode: handleSetViewModeWithNotes,
-    noteOpen: Boolean(activeTab),
+    noteOpen: Boolean(activeTab || (!hideNotesForCanvas && chatNotePaneOpen)),
     inspectorOpen: !layout.inspectorCollapsed,
     hideNotesForCanvas,
     chatDestination: isChatDestination,
@@ -1766,7 +1768,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     })
   }, [])
   const [leftOverlaying, setLeftOverlaying] = useState(false)
-  const [notesMenuOpen, setNotesMenuOpen] = useState(false)
   const fittedNotesMode = fittedNotesPanelMode(storedNotesMode, notesOpen && !hideNotesForCanvas)
   const layoutNotesMode = notesSessionOpen && notesOpen && !hideNotesForCanvas ? 'open' : fittedNotesMode
   const notesWindowTooNarrow = compactVaultPanel && storedNotesMode === 'open'
@@ -1781,7 +1782,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
   const notesHover = useHoverExpandPanel({
     enabled: chatCentered && layoutNotesMode === 'auto' && !hideNotesForCanvas,
     peerOverlaying: leftOverlaying,
-    menuOpen: notesMenuOpen,
   })
   const handleNotesModeChange = useCallback((mode: NotesPanelMode) => {
     setNotesSessionOpen(false)
@@ -1845,10 +1845,12 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     return () => cancelAnimationFrame(frameId)
   }, [activeTabEntry, activeTabPath, pendingNoteListPdfExportPath, pdfExportRef])
 
+  const modelStepPending = useModelStepPending()
   const {
     isStartupLoading,
     isVaultContentLoading,
     shouldResumeFreshStartOnboarding,
+    shouldShowModelStep,
     shouldShowStartupScreen,
   } = useStartupScreenState({
     isNoteWindow: Boolean(noteWindowParams),
@@ -1857,6 +1859,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
     runtimeMissingVaultPath,
     selectedVaultPath,
     settingsLoaded,
+    modelStepPending: modelStepWanted({ pending: modelStepPending, providers: settings.ai_model_providers }),
     telemetryConsent: settings.telemetry_consent,
     vaultIsLoading: vault.isLoading,
     vaultSwitcher,
@@ -2125,6 +2128,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         settings={settings}
         settingsLoaded={settingsLoaded}
         shouldResumeFreshStartOnboarding={shouldResumeFreshStartOnboarding}
+        shouldShowModelStep={shouldShowModelStep}
         vaultSwitcher={vaultSwitcher}
       />
     )
@@ -2216,7 +2220,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         onFocusToggle={handleNotesFocusToggle}
         mode={storedNotesMode}
         onModeChange={handleNotesModeChange}
-        onModeMenuOpenChange={setNotesMenuOpen}
         modeButtonRef={notesHover.modeButtonRef}
         windowTooNarrow={notesWindowTooNarrow}
         openForNow={notesOpenForNow}
@@ -2229,6 +2232,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
           requestedView={connectionsRequest}
           canOpenNote={vaultBridge.canOpenNoteByPath}
           exitLabel={peerToolExit}
+          activeNotePath={activeNotePath}
           onOpenNote={path => {
             handleRailSelectChat()
             vaultBridge.openNoteByPath(path)
@@ -2266,6 +2270,11 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
         sessionsRailSlot={commandRailEnabled ? sessionRailSlot : undefined}
         onRailSessionPicked={handleRailSessionPicked}
         onNotePaneOpenChange={setChatNotePaneOpen}
+        stackNotePane={Boolean(activeTab || workspace === 'focused' || workspace === 'stacked')}
+        fittedNotePaneWidth={
+          !activeTab && workspace === 'desk' && Number.isFinite(paneWidths.note) ? paneWidths.note : undefined
+        }
+        onFittedNotePaneResize={delta => resizeColumn('note', -delta)}
         onOpenSessionFootprint={handleOpenSessionFootprint}
         onOpenCommandPalette={dialogs.openCommandPalette}
         requestedNote={chatNoteRequest}
@@ -2342,7 +2351,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                   style={
                     !showFocusedNote ? { display: 'none' }
                       : focusedWindow ? { flex: '1 1 0' }
-                        : activeTab && !hideChatForNotesFocus ? { flex: `0 0 ${chatNoteSplitMode === 'side-by-side' ? paneWidths.note : chatNoteEditorHeight.width}px` }
+                        : activeTab && !hideChatForNotesFocus ? noteEditorFlex(chatNoteSplitMode === 'side-by-side' ? paneWidths.note : chatNoteEditorHeight.width)
                           : undefined
                   }
                 >
@@ -2460,7 +2469,7 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                   <GraphView vaultPath={resolvedPath} onOpenNote={(path) => {
                     vaultBridge.openNoteByPath(path)
                     handleRailSelectChat()
-                  }} locale={appLocale} onExit={handleRailSelectChat} exitLabel={peerToolExit} />
+                  }} locale={appLocale} onExit={handleRailSelectChat} exitLabel={peerToolExit} activeNotePath={activeNotePath} />
                 </Suspense>
                 {effectiveShowAIChat && aiWorkspaceSurface}
               </div>
@@ -2586,7 +2595,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
               onMouseEnter={notesHover.onMouseEnter}
               onMouseLeave={notesHover.onMouseLeave}
               onFocusCapture={notesHover.onFocusCapture}
-              onMenuOpenChange={setNotesMenuOpen}
               showInbox={explicitOrganizationEnabled}
               selection={effectiveSelection}
               onSelectSection={handleSetSelection}
@@ -2608,7 +2616,6 @@ function MainApp({ noteWindowParams }: { noteWindowParams: NoteWindowParams | nu
                 onFocusToggle={handleNotesFocusToggle}
                 mode={storedNotesMode}
                 onModeChange={handleNotesModeChange}
-                onModeMenuOpenChange={setNotesMenuOpen}
                 modeButtonRef={notesHover.modeButtonRef}
                 windowTooNarrow={notesWindowTooNarrow}
                 openForNow={notesOpenForNow}

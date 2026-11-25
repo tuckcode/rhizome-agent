@@ -41,7 +41,7 @@ export function ChatNotePane({
   return (
     <aside
       data-testid="chat-note-pane"
-      className="relative flex min-h-0 shrink-0 flex-col border-l border-border bg-background"
+      className="relative flex min-h-0 w-full shrink-0 flex-col border-l border-border bg-background"
       style={width ? { width } : undefined}
     >
       {/* Sits on the border itself and reaches past it on both sides — a

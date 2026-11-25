@@ -25,26 +25,27 @@ interface ChatHomeSuggestionsProps {
 
 /**
  * The content under the composer on the new-chat screen: three starter
- * cards, then the notes that changed last. A starter or a note fills the
+ * pills, then the notes that changed last. A starter or a note fills the
  * composer. It does not send.
  */
 export function ChatHomeSuggestions({ recentNotes = [], onOpenNote }: ChatHomeSuggestionsProps) {
   return (
-    <div className="mt-6 pb-[12vh]" data-testid="chat-home-suggestions">
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+    // The bottom space lifts the hero group to the middle of the chat column.
+    <div className="mt-6 pb-[24vh]" data-testid="chat-home-suggestions">
+      <div className="flex flex-wrap justify-center gap-2">
         {STARTERS.map((starter) => (
           <Button
             key={starter.label}
             type="button"
             variant="outline"
-            className="h-auto flex-col items-start gap-1.5 whitespace-normal rounded-xl px-3 py-3 text-left"
+            className="h-9 gap-2 rounded-full px-4"
             aria-label={starter.label}
+            title={starter.detail}
             data-testid="chat-empty-starter"
             onClick={() => prefillAiComposer(starter.prompt)}
           >
-            <starter.icon aria-hidden="true" className="text-primary" size={18} />
+            <starter.icon aria-hidden="true" className="text-primary" size={16} />
             <span className="text-sm font-medium text-foreground">{starter.label}</span>
-            <span className="text-xs font-normal text-muted-foreground">{starter.detail}</span>
           </Button>
         ))}
       </div>

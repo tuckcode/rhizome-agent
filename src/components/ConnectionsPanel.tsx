@@ -38,6 +38,8 @@ export const ConnectionsPanel = forwardRef<ConnectionsPanelHandle, {
   /** Opens a view after mount, used when Inbox was closed at the moment of the request. */
   requestedView?: ConnectionsViewRequest | null
   exitLabel?: string
+  /** The note open in the editor. Graph keeps it visible with no links. */
+  activeNotePath?: string | null
 }>(function ConnectionsPanel({
   vaultPath,
   locale = 'en',
@@ -45,11 +47,12 @@ export const ConnectionsPanel = forwardRef<ConnectionsPanelHandle, {
   canOpenNote,
   requestedView,
   exitLabel = PEER_TOOL_EXIT_NOTES,
+  activeNotePath = null,
 }, ref) {
   const [view, setView] = useState<ConnectionsView>(() => requestedView?.view ?? 'graph')
   const [presented, setPresented] = useState(() => requestedView != null)
   const [graphFocusToken, setGraphFocusToken] = useState(0)
-  const [graphState, setGraphState] = useState<GraphViewRetainedState>({ selectedId: null, egoRootId: null, query: '', hiddenTypes: [], hideGhosts: false })
+  const [graphState, setGraphState] = useState<GraphViewRetainedState>({ selectedId: null, egoRootId: null, query: '', hiddenTypes: [], hideGhosts: false, hideUnlinked: true })
   const [myceliumState, setMyceliumState] = useState<SessionActivityRetainedState>(() => ({
     path: requestedView?.view === 'mycelium' ? requestedView.focusPath ?? '' : '',
     selected: null,
@@ -151,7 +154,7 @@ export const ConnectionsPanel = forwardRef<ConnectionsPanelHandle, {
       >
         <Suspense fallback={<p className="p-3 text-xs">Loading connections…</p>}>
           {selected === 'graph'
-            ? <GraphView key={graphFocusToken} vaultPath={vaultPath} locale={locale} onOpenNote={openNote} retainedState={graphState} onRetainedStateChange={setGraphState} exitLabel={exitLabel} />
+            ? <GraphView key={graphFocusToken} vaultPath={vaultPath} locale={locale} onOpenNote={openNote} retainedState={graphState} onRetainedStateChange={setGraphState} exitLabel={exitLabel} activeNotePath={activeNotePath} />
             : <SessionActivityHistory key={myceliumFocusToken} expanded locale={locale} vaultPath={vaultPath} canOpenNote={canOpenNote} onOpenNote={onOpenNote ? openNote : undefined} retainedState={myceliumState} onRetainedStateChange={setMyceliumState} />}
         </Suspense>
       </div>

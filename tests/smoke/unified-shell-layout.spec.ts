@@ -25,10 +25,7 @@ async function openAlphaProject(page: Page): Promise<void> {
 }
 
 async function collapseOpenNotesPanel(page: Page): Promise<void> {
-  const trigger = page.getByTestId('notes-panel-mode-trigger')
-  await expect(trigger).toBeVisible()
-  await trigger.click()
-  await page.getByTestId('notes-panel-mode-rail').click()
+  await page.getByTestId('vault-panel').getByRole('button', { name: 'Rail', exact: true }).click()
   await expect(page.getByTestId('vault-panel')).toHaveCount(0)
 }
 
@@ -59,13 +56,14 @@ test.describe('Unified shell geometry', () => {
     // openFixtureVault already opens Notes so the list is ready.
     const vaultPanel = page.getByTestId('vault-panel')
     const browse = page.getByTestId('vault-panel-browse-toggle')
-    const mode = page.getByTestId('notes-panel-mode-trigger')
 
     await expect(vaultPanel).toBeVisible()
     await expect(page.getByTestId('vault-panel-navigation')).toHaveCount(0)
     await expect(page.getByTestId('note-list-container')).toBeVisible()
     await expectMinimumTarget(browse)
-    await expectMinimumTarget(mode, 24)
+    for (const mode of ['Auto', 'Rail', 'Open']) {
+      await expectMinimumTarget(vaultPanel.getByRole('button', { name: mode, exact: true }), 24)
+    }
 
     await browse.click()
     const navigation = page.getByTestId('vault-panel-navigation')
@@ -90,7 +88,7 @@ test.describe('Unified shell geometry', () => {
     await openAlphaProject(page)
 
     const shell = page.locator('.app')
-    await expect(shell).toHaveAttribute('data-compact-sessions', 'false')
+    await expect(shell).toHaveAttribute('data-compact-sessions', 'true')
     await expect(shell).toHaveAttribute('data-compact-vault', 'false')
     await expect(page.getByTestId('chat-home')).toBeVisible()
     const noteEditor = page.locator('.app__note-editor:not(.app__note-editor--idle)')
@@ -122,8 +120,10 @@ test.describe('Unified shell geometry', () => {
     await page.setViewportSize({ width: 1500, height: 900 })
     await expect(page.getByTestId('vault-panel')).toBeVisible()
     const rail = page.getByTestId('command-rail')
-    await rail.hover()
+    await expect(rail).toHaveAttribute('data-expanded', 'false')
+    await rail.getByTestId('command-rail-expand').click()
     await expect(page.getByTestId('prime-session-list')).toBeVisible()
+    await rail.getByTestId('command-rail-expand').click()
 
     await collapseOpenNotesPanel(page)
     await waitForKeyboardShortcutsReady(page)
@@ -132,11 +132,9 @@ test.describe('Unified shell geometry', () => {
     await expect(page.getByTestId('vault-panel-navigation')).toHaveCount(0)
     await expect(page.getByTestId('note-list-container')).toBeVisible()
 
-    // First launch pins the rail open. At 1500 it fits, so Sessions stay
-    // visible when the pointer leaves. CommandRail.test.tsx covers the
-    // compact rail's hover reveal.
-    await page.locator('.app__editor').hover()
-    await expect(page.getByTestId('prime-session-list')).toBeVisible()
+    // Closing the note restores the saved Sessions layout.
+    await page.getByTestId('breadcrumb-close-note').click()
+    await expect(rail).toHaveAttribute('data-expanded', 'true')
   })
 
   test('puts the note beside Chat and collapses Notes @smoke', async ({ page }) => {

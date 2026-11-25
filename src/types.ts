@@ -186,6 +186,11 @@ export interface Settings {
   chat_engine?: string | null
   /** Native picker value. Absent uses the catalog default. */
   native_chat_target?: string | null
+  /**
+   * ADR-0191: new chats may run on the user's installed Claude Code.
+   * Absent or false is off. Rhizome never reads a Claude credential.
+   */
+  claude_code_engine_enabled?: boolean | null
   /** Agent step cap per turn. Absent defaults to 50. */
   agent_max_steps?: number | null
   /** Models shown first in Chat, as `provider/id`. Empty means the whole catalog. */

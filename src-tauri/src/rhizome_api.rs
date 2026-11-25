@@ -217,7 +217,12 @@ pub enum GraphQuery {
     Neighbors { note: String, depth: usize },
     /// How two notes connect, if they do.
     Path { from: String, to: String },
+    /// One note's body plus its direct links with snippets, in one reply.
+    Pack { note: String, limit: usize },
 }
+
+/// Default cap on links in a note pack.
+pub const NOTE_PACK_LIMIT: usize = 20;
 
 /// Default cap for list-shaped queries. Generous enough that a normal
 /// vault is never truncated; the reports carry `total` and `truncated`
@@ -262,6 +267,10 @@ pub fn graph_query_from_tool(
             from: text("from")?,
             to: text("to")?,
         }),
+        "rhizome_graph_pack" => Ok(GraphQuery::Pack {
+            note: text("note")?,
+            limit: number("limit", NOTE_PACK_LIMIT)?,
+        }),
         other => Err(format!("Unknown graph query tool: {other}")),
     }
 }
@@ -286,6 +295,19 @@ pub fn graph_query(vault_path: &Path, query: &GraphQuery) -> Result<String, Stri
         GraphQuery::Path { from, to } => {
             let found = gq::shortest_path(&graph, from, to)
                 .ok_or_else(|| format!("No note in this vault matches \"{from}\" or \"{to}\""))?;
+            serde_json::to_string(&found)
+        }
+        GraphQuery::Pack { note, limit } => {
+            let read = |rel: &str| {
+                let full = vault_path.join(rel);
+                // Never read outside the vault, even if a path looks odd.
+                if !full.starts_with(vault_path) {
+                    return None;
+                }
+                std::fs::read_to_string(full).ok()
+            };
+            let found = gq::note_pack(&graph, note, *limit, read)
+                .ok_or_else(|| format!("No note in this vault matches \"{note}\""))?;
             serde_json::to_string(&found)
         }
     };

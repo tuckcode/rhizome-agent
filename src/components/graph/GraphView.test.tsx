@@ -62,7 +62,7 @@ describe('GraphView', () => {
   it('fires the view-opened telemetry with counts only (no content)', async () => {
     await renderGraph()
     expect(trackEvent).toHaveBeenCalledWith('graph_view_opened', {
-      nodeCount: 4,
+      nodeCount: 6,
       edgeCount: 3,
       ghostCount: 1,
     })
@@ -311,6 +311,48 @@ describe('GraphView exit affordance', () => {
         fireEvent.keyDown(window, { key: 'Escape' })
       }
       expect(onExit).toHaveBeenCalledOnce()
+    })
+  })
+
+  describe('unlinked notes', () => {
+    const nodeIds = () => lastCanvasProps?.data.nodes.map((n) => n.id) ?? []
+
+    it('hides unlinked notes by default and offers a review chip', async () => {
+      await renderGraph()
+      expect(nodeIds()).not.toContain('note/loose-thought.md')
+      expect(screen.getByTestId('graph-unlinked-chip')).toHaveTextContent('2 unlinked notes')
+    })
+
+    it('lists unlinked notes newest first and picking one shows it', async () => {
+      await renderGraph()
+      fireEvent.click(screen.getByTestId('graph-unlinked-chip'))
+      const rows = screen.getAllByTestId('graph-unlinked-row')
+      expect(rows.map((row) => row.textContent)).toEqual(['Loose ThoughtNote', 'Reading ListNote'])
+      fireEvent.click(rows[1])
+      await waitFor(() => expect(nodeIds()).toContain('note/reading-list.md'))
+      expect(screen.getByTestId('graph-node-preview')).toBeInTheDocument()
+      expect(trackEvent).toHaveBeenCalledWith('graph_unlinked_note_picked', {})
+    })
+
+    it('keeps the open note visible with no links', async () => {
+      render(<GraphView vaultPath="/Users/mock/demo-vault-v2" activeNotePath="/Users/mock/demo-vault-v2/note/loose-thought.md" />)
+      await waitFor(() => expect(screen.getByTestId('graph-view')).toBeInTheDocument())
+      expect(nodeIds()).toContain('note/loose-thought.md')
+      expect(nodeIds()).not.toContain('note/reading-list.md')
+    })
+
+    it('lets a search find an unlinked note', async () => {
+      await renderGraph()
+      fireEvent.change(screen.getByTestId('graph-search'), { target: { value: 'reading' } })
+      await waitFor(() => expect(nodeIds()).toEqual(['note/reading-list.md']))
+      expect(screen.queryByTestId('graph-unlinked-chip')).not.toBeInTheDocument()
+    })
+
+    it('shows every note after Show all in graph', async () => {
+      await renderGraph()
+      fireEvent.click(screen.getByTestId('graph-unlinked-chip'))
+      fireEvent.click(screen.getByTestId('graph-unlinked-show-all'))
+      await waitFor(() => expect(nodeIds()).toHaveLength(6))
     })
   })
 })

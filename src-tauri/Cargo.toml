@@ -1,6 +1,6 @@
 [package]
 name = "rhizome"
-version = "0.1.0"
+version = "0.1.1"
 description = "Rhizome — desktop chat shell (separate from Rhizome Desktop)"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/tuckcode/rhizome-agent"

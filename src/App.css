@@ -228,7 +228,8 @@
 .vault-panel__note-list {
   min-width: 0;
   min-height: 0;
-  flex: 0 0 auto;
+  /* Shrink to fit: the hover sheet is the saved width less the 46px rail. */
+  flex: 0 1 auto;
   display: flex;
   overflow: hidden;
 }

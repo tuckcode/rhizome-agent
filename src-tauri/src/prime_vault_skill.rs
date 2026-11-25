@@ -329,6 +329,7 @@ questions instead of reading notes to infer the same answer.
 
 | Tool | Args example | Answers |
 |------|----------------|---------|
+| `rhizome_graph_pack` | `{{"note":"bi-temporal-facts"}}` | This note's body plus each direct link's snippet and direction, in one call |
 | `rhizome_graph_neighbors` | `{{"note":"bi-temporal-facts","depth":1}}` | What is this note connected to? |
 | `rhizome_graph_path` | `{{"from":"rhizome","to":"persistent-wiki"}}` | How do these two relate, if at all? |
 | `rhizome_graph_health` | `{{}}` | Size, orphan count, dead-link count, most-connected notes |
@@ -337,6 +338,10 @@ questions instead of reading notes to infer the same answer.
 
 `note` resolves a vault path, a title, or a filename stem, so
 `"bi-temporal-facts"` and `"concepts/bi-temporal-facts.md"` both work.
+
+**Pack before reading.** To read a note and judge what surrounds it, call
+`rhizome_graph_pack` once in place of `get_note` plus one read per link. Open
+a linked note in full only when its snippet is not enough.
 
 **Reach for the graph before reading.** Asked how one thing relates to another,
 or what surrounds a topic, one `rhizome_graph_neighbors` call answers what

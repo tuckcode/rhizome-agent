@@ -2,43 +2,31 @@ import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { NotesPanelModeControl } from './NotesPanelModeControl'
 
-vi.mock('./ui/action-tooltip', () => ({
-  ActionTooltip: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}))
-
 describe('NotesPanelModeControl', () => {
-  it('shows the current mode and a menu with icon, sentence-case label, and check', async () => {
+  it('shows three direct choices and marks the selected mode', () => {
     const onModeChange = vi.fn()
     render(<NotesPanelModeControl mode="auto" onModeChange={onModeChange} />)
 
-    const trigger = screen.getByTestId('notes-panel-mode-trigger')
-    expect(trigger).toHaveAttribute('data-mode', 'auto')
-    expect(trigger).toHaveAccessibleName('Panel: Auto')
-    expect(trigger).toHaveClass('h-6')
-    expect(trigger).toHaveStyle({ width: '24px', height: '24px', borderRadius: '8px' })
+    const group = screen.getByRole('group', { name: 'Notes panel mode' })
+    const auto = within(group).getByRole('button', { name: 'Auto' })
+    const rail = within(group).getByRole('button', { name: 'Rail' })
+    expect(auto).toHaveAttribute('aria-pressed', 'true')
+    expect(rail).toHaveAttribute('aria-pressed', 'false')
+    expect(within(group).getByRole('button', { name: 'Open' })).toBeVisible()
 
-    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false })
-    const menu = await screen.findByTestId('notes-panel-mode-menu')
-    expect(menu).toHaveStyle({ zIndex: '60' })
-    expect(within(menu).getByRole('group')).toBeInTheDocument()
-    expect(within(menu).getByTestId('notes-panel-mode-auto')).toHaveTextContent('Auto')
-    expect(within(menu).getByTestId('notes-panel-mode-rail')).toHaveTextContent('Rail')
-    expect(within(menu).getByTestId('notes-panel-mode-open')).toHaveTextContent('Open')
-    expect(within(menu).getByTestId('notes-panel-mode-auto')).toHaveAttribute('data-checked', 'true')
-    expect(within(menu).getByRole('menuitemradio', { name: 'Auto' })).toHaveAttribute('aria-checked', 'true')
-    expect(within(menu).getByTestId('notes-panel-mode-rail')).toHaveAttribute('data-checked', 'false')
-
-    fireEvent.click(within(menu).getByTestId('notes-panel-mode-rail'))
+    fireEvent.click(rail)
     expect(onModeChange).toHaveBeenCalledWith('rail')
   })
 
-  it('keeps the picked mode in the tooltip when the window folded Open to Auto', () => {
+  it('explains when the window folds the saved Open mode', () => {
     render(<NotesPanelModeControl mode="open" onModeChange={vi.fn()} windowTooNarrow />)
-    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Open (window too narrow)')
+    expect(screen.getByRole('button', { name: 'Open' })).toHaveAccessibleDescription('Window too narrow to keep Notes open.')
   })
 
-  it('marks a temporary view-switch open without changing the saved mode label', () => {
+  it('explains temporary expansion without changing the saved mode', () => {
     render(<NotesPanelModeControl mode="rail" onModeChange={vi.fn()} openForNow />)
-    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Rail (open for now)')
+    const rail = screen.getByRole('button', { name: 'Rail' })
+    expect(rail).toHaveAttribute('aria-pressed', 'true')
+    expect(rail).toHaveAccessibleDescription('Notes is open for now.')
   })
 })

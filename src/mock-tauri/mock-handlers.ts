@@ -204,11 +204,13 @@ let mockSettings: Settings = {
   agent_max_steps: null,
   chat_engine: null,
   native_chat_target: null,
+  claude_code_engine_enabled: null,
 }
 
 const DEFAULT_MOCK_VAULT_PATH = '/Users/mock/demo-vault-v2'
 const mockArchivedSessions = new Set<string>()
 const mockArchivedNativeSessions = new Set<string>()
+const mockNativeSessionNames = new Map<string, string>()
 let mockForkedNative: { sessionId: string; events: unknown[] } | null = null
 
 const mockSessionNames = new Map<string, string>()
@@ -543,13 +545,16 @@ const MOCK_LIBRARY = [
 ]
 
 // Fixture for the wiki graph view (rhizome_wiki_graph tool): three notes
-// and one ghost so browser dev / tests exercise both node variants.
+// one ghost, and two unlinked notes so browser dev / tests exercise every
+// node variant and the unlinked review list.
 const MOCK_WIKI_GRAPH = {
   nodes: [
     { id: 'note/daily-log.md', path: 'note/daily-log.md', title: 'Daily Log', isA: 'Note', ghost: false, snippet: 'Today I worked on the MCP server implementation.', modifiedAt: 1752300000, icon: null, linkCount: 2, backlinkCount: 0 },
     { id: 'project/test-project.md', path: 'project/test-project.md', title: 'Test Project', isA: 'Project', ghost: false, snippet: 'This is a test project.', modifiedAt: 1752200000, icon: 'flask', linkCount: 0, backlinkCount: 2 },
     { id: 'project/second-project.md', path: 'project/second-project.md', title: 'Second Project', isA: 'Project', ghost: false, snippet: 'Another project.', modifiedAt: 1752100000, icon: null, linkCount: 1, backlinkCount: 0 },
     { id: 'ghost:unwritten idea', path: null, title: 'Unwritten Idea', isA: null, ghost: true, snippet: '', modifiedAt: null, icon: null, linkCount: 0, backlinkCount: 1 },
+    { id: 'note/loose-thought.md', path: 'note/loose-thought.md', title: 'Loose Thought', isA: 'Note', ghost: false, snippet: 'A note with no links in or out.', modifiedAt: 1752400000, icon: null, linkCount: 0, backlinkCount: 0 },
+    { id: 'note/reading-list.md', path: 'note/reading-list.md', title: 'Reading List', isA: 'Note', ghost: false, snippet: 'Books to read. Not linked yet.', modifiedAt: 1752000000, icon: null, linkCount: 0, backlinkCount: 0 },
   ],
   edges: [
     { source: 'note/daily-log.md', target: 'project/test-project.md', kind: 'wikilink', field: null },
@@ -642,6 +647,21 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   },
   get_conflict_files: (): string[] => [],
   check_claude_cli: () => ({ installed: false, version: null }),
+  // Preview only: set localStorage `rhizome:mock-claude-code` to `signed_out`
+  // or `ready` to see those states in the browser. Default is not installed.
+  get_claude_code_engine_status: () => {
+    const preview = typeof localStorage === 'undefined' ? null : localStorage.getItem('rhizome:mock-claude-code')
+    if (preview === 'signed_out' || preview === 'ready') {
+      return { installed: true, version: '2.1.0 (Claude Code)', loggedIn: preview === 'ready', authMethod: preview === 'ready' ? 'claude.ai' : null }
+    }
+    return { installed: false, version: null, loggedIn: null, authMethod: null }
+  },
+  start_claude_code_login: () => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('rhizome:mock-claude-code') === 'signed_out') {
+      localStorage.setItem('rhizome:mock-claude-code', 'ready')
+    }
+    return null
+  },
   get_ai_agents_status: () => ({
     // Browser mock only. A native build reports the real Prime version.
     // Settings hides this line when the version is the string `mock`.
@@ -703,7 +723,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
         sessionId: 'mock-native-1',
         createdAt: new Date(Date.now() - 60_000).toISOString(),
         target: 'free_tier_auto',
-        title: 'Native hello',
+        title: mockNativeSessionNames.get('mock-native-1') ?? 'Native hello',
         archived: mockArchivedNativeSessions.has('mock-native-1'),
       },
     ]
@@ -712,11 +732,15 @@ export const mockHandlers: Record<string, (args: any) => any> = {
         sessionId: mockForkedNative.sessionId,
         createdAt: new Date().toISOString(),
         target: 'free_tier_auto',
-        title: 'Forked native chat',
+        title: mockNativeSessionNames.get(mockForkedNative.sessionId) ?? 'Forked native chat',
         archived: mockArchivedNativeSessions.has(mockForkedNative.sessionId),
       })
     }
     return rows
+  },
+  rename_native_session: (args: { sessionId: string; name: string }) => {
+    mockNativeSessionNames.set(args.sessionId, args.name)
+    return null
   },
   set_native_session_archived: (args: { sessionId?: string; archived?: boolean }) => {
     const id = args?.sessionId
@@ -1090,6 +1114,7 @@ export const mockHandlers: Record<string, (args: any) => any> = {
   stream_claude_chat: () => 'mock-session',
   stream_ai_agent: () => null,
   abort_ai_agent_stream: () => false,
+  reply_ai_agent_approval: () => false,
   start_rhizome_job: () => null,
   cancel_rhizome_job: () => true,
   call_rhizome_tool: (args: { name: string }) => {
@@ -1170,7 +1195,10 @@ export const mockHandlers: Record<string, (args: any) => any> = {
       multi_workspace_enabled: s.multi_workspace_enabled ?? null,
       agent_profile: s.agent_profile?.trim() || null,
       chat_engine: s.chat_engine ?? null,
-      native_chat_target: s.native_chat_target ?? null,
+      native_chat_target: s.claude_code_engine_enabled !== true && s.native_chat_target === 'agent:claude_code'
+        ? null
+        : s.native_chat_target ?? null,
+      claude_code_engine_enabled: s.claude_code_engine_enabled === true ? true : null,
       agent_max_steps: s.agent_max_steps == null ? null : Math.max(1, Math.floor(s.agent_max_steps)),
     }
     return null

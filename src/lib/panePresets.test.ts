@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { loadPanePreferences, panePresetStorageKey } from './panePresetStorage'
-import { fitPanePreset, presetFromLegacy, presetToLegacy, resizePresetWidth } from './panePresets'
+import { fitPanePreset, noteEditorFlex, presetFromLegacy, presetToLegacy, resizePresetWidth } from './panePresets'
 
 describe('pane presets', () => {
   // Native audit 2026-09-26: opening a note makes the research desk (note
@@ -208,5 +208,42 @@ describe('loadPanePreferences', () => {
       savedWidths: {},
     }))
     expect(loadPanePreferences('/Vault').active).toMatchObject({ id: 'read', readNotes: true })
+  })
+})
+
+describe('note lead', () => {
+  const context = { shellWidth: 1512, noteOpen: true, railPinned: true, noteLead: true }
+
+  it('gives the open note 60 percent of the note-plus-Chat room and folds the rail', () => {
+    const fit = fitPanePreset({ id: 'chat', widths: {} }, context)
+    expect(fit.railPinned).toBe(false)
+    expect(fit.split).toBe('side-by-side')
+    const shared = fit.widths.note + fit.chatWidth
+    expect(fit.widths.note).toBe(Math.round(shared * 0.6))
+    expect(fit.chatWidth).toBeGreaterThanOrEqual(420)
+  })
+
+  it('keeps a dragged note share through save and load', () => {
+    const fit = fitPanePreset({ id: 'chat', widths: {} }, context)
+    const dragged = resizePresetWidth({ id: 'chat', widths: {} }, 'note', fit.widths.note - 100, context)
+    expect(dragged.noteShare).toBeLessThan(0.6)
+    localStorage.setItem(panePresetStorageKey('main'), JSON.stringify({ version: 1, active: dragged, savedWidths: {} }))
+    const loaded = loadPanePreferences('main').active
+    expect(loaded.noteShare).toBeCloseTo(dragged.noteShare!)
+    expect(fitPanePreset(loaded, context).widths.note).toBe(fit.widths.note - 100)
+  })
+
+  it('never sizes the note to Infinity before the shell is measured', () => {
+    const fit = fitPanePreset({ id: 'chat', widths: {} }, { ...context, shellWidth: null })
+    expect(Number.isFinite(fit.widths.note)).toBe(true)
+  })
+})
+
+describe('noteEditorFlex', () => {
+  it('writes a fixed basis only for a finite, positive width', () => {
+    expect(noteEditorFlex(480)).toEqual({ flex: '0 0 480px' })
+    expect(noteEditorFlex(Infinity)).toEqual({ flex: '1 1 0' })
+    expect(noteEditorFlex(Number.NaN)).toEqual({ flex: '1 1 0' })
+    expect(noteEditorFlex(0)).toEqual({ flex: '1 1 0' })
   })
 })

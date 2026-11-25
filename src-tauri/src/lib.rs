@@ -13,6 +13,7 @@ mod app_icon;
 pub mod app_updater;
 mod board;
 pub mod claude_cli;
+mod claude_code_approval;
 mod claude_invocation;
 mod cli_agent_runtime;
 pub mod codex_cli;
@@ -758,6 +759,9 @@ macro_rules! app_invoke_handler {
             commands::init_git_repo,
             commands::check_claude_cli,
             commands::get_ai_agents_status,
+            commands::get_claude_code_engine_status,
+            commands::start_claude_code_login,
+            commands::cancel_claude_code_login,
             commands::get_agent_docs_path,
             commands::get_vault_ai_guidance_status,
             commands::restore_vault_ai_guidance,
@@ -765,6 +769,7 @@ macro_rules! app_invoke_handler {
             commands::stream_ai_agent,
             commands::speak_reply,
             commands::abort_ai_agent_stream,
+            commands::reply_ai_agent_approval,
             commands::get_prime_session_host_status,
             commands::list_prime_running_sessions,
             commands::get_prime_session_stats,
@@ -821,6 +826,7 @@ macro_rules! app_invoke_handler {
             commands::native_chat_approval_reply,
             commands::native_chat_end,
             commands::native_chat_list,
+            commands::rename_native_session,
             commands::native_chat_fork,
             commands::native_chat_open,
             commands::native_chat_delete,

@@ -822,6 +822,7 @@ describe('App', () => {
     expect(screen.getByTestId('chat-center')).not.toHaveStyle({ display: 'none' })
     const pane = await screen.findByTestId('chat-note-pane')
     expect(pane).toHaveTextContent('Test Project')
+    await waitFor(() => expect(screen.getByTestId('command-rail')).toHaveStyle({ width: '46px' }))
   })
 
   it('does not open Notes from a Prime session footprint when leftover prime migrates', async () => {
@@ -859,7 +860,7 @@ describe('App', () => {
     expect(screen.getByTestId('command-rail-history')).toBeInTheDocument()
     expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
     expect(screen.getByTestId('notes-panel-rail')).toBeVisible()
-    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Open')
+    expect(screen.getByTestId('notes-panel-mode-open')).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('opens History from the view button and its shortcut when Notes is closed', async () => {
@@ -891,7 +892,7 @@ describe('App', () => {
     pressViewShortcut('2')
     expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
     expect(localStorage.getItem(notesPanelModeStorageKey('main'))).toBe('rail')
-    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Rail (open for now)')
+    expect(screen.getByTestId('notes-panel-mode-rail')).toHaveAccessibleDescription('Notes is open for now.')
   })
 
   it('keeps Chat as the canvas while Notes is open, and Inbox only opens the list', async () => {
@@ -905,7 +906,7 @@ describe('App', () => {
       expect(screen.queryByTestId('vault-panel')).not.toBeInTheDocument()
     })
     expect(screen.getByTestId('chat-center')).not.toHaveStyle({ display: 'none' })
-    expect(screen.getByTestId('notes-panel-mode-trigger')).toHaveAccessibleName('Panel: Open')
+    expect(screen.getByTestId('notes-panel-mode-open')).toHaveAttribute('aria-pressed', 'true')
 
     await openNotesPanelFromRail()
     expect(await screen.findByTestId('vault-panel')).toBeInTheDocument()
@@ -1686,6 +1687,9 @@ describe('App', () => {
     })
     expect(saveVaultList).toHaveBeenCalledTimes(1)
 
+    // First run asks for a model after the vault step.
+    fireEvent.click(await screen.findByTestId('first-run-model-skip', undefined, { timeout: SLOW_APP_READY_TIMEOUT_MS }))
+
     await waitFor(() => {
       expect(screen.getByTestId('status-vault-trigger')).toHaveTextContent('Work Vault')
     }, { timeout: SLOW_APP_READY_TIMEOUT_MS })
@@ -1740,6 +1744,8 @@ describe('App', () => {
       })
     })
     expect(saveVaultList).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(await screen.findByTestId('first-run-model-skip', undefined, { timeout: SLOW_APP_READY_TIMEOUT_MS }))
 
     await waitFor(() => {
       expect(screen.getByTestId('status-vault-trigger')).toHaveTextContent(expectedLabel)

@@ -512,6 +512,12 @@ failures and the 100 MiB rollover notice are non-fatal; missing keys,
 provider failures, and `ensure_log` failures are fatal. The Chat stream
 ends on a fatal error, `TurnEnd`, `Cancelled`, or `TurnCapped`.
 
+After the first successful reply in a new chat, the native host requests a short
+title through the configured model with no tools. Claude Code sessions use a
+local title based on the first request. The host stores the title beside its chat
+log. A manual rename takes priority over a pending model result. The host emits
+`native-chat-title-changed` so the header and Sessions list refresh.
+
 The installation setting `agent_max_steps` defaults to 50 model rounds per
 turn, with a minimum of 1. Settings → AI Agents exposes it as an integer
 input without an upper-bound control. `TurnCapped { steps, max_steps }` is
@@ -1564,6 +1570,12 @@ asks, as pure transforms over the same `GraphDto`:
   draw exactly that subgraph. Depth is clamped to `MAX_DEPTH` (5).
 - **`shortest_path(from, to)`** — BFS, endpoints included, `connected: false`
   rather than an error when there is no route.
+- **`note_pack(note, limit, read_body)`** — one note's body (frontmatter
+  removed, capped at `PACK_MAX_BODY_CHARS`, 6000) plus each direct link with
+  its snippet, direction (`out`, `in`, `both`) and edge kinds, most connected
+  first. It replaces `get_note` plus one read per linked note. `read_body` is
+  a parameter so the transform stays pure. `graph_query` passes a reader that
+  refuses paths outside the vault.
 
 `resolve_note` accepts a vault path, a path without `.md`, a title, or a
 filename stem — an agent says "Alpha" and "notes/alpha.md" meaning the same
@@ -1575,8 +1587,9 @@ Exposed the same three ways as the rest: `rhizome_api::graph_query`
 `rhizome_commands::call_rhizome_tool` (argument parsing lives in
 `rhizome_api::graph_query_from_tool` so it is testable without an
 `AppHandle`), and a `graph-query <vault_path> <kind>` subcommand on the
-`rhizome-tool` sidecar. MCP surfaces five tools —
-`rhizome_graph_health`, `_orphans`, `_dead_links`, `_neighbors`, `_path`.
+`rhizome-tool` sidecar. MCP surfaces six tools —
+`rhizome_graph_health`, `_orphans`, `_dead_links`, `_neighbors`, `_path`,
+`_pack`.
 
 **These have no Python fallback on purpose.** The older
 `rhizome_graph_summary` shells out to the external `rhizome-graph` CLI,

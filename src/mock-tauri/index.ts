@@ -33,6 +33,22 @@ function resolveMockHandler(command: string) {
   return windowHandler ?? Reflect.get(mockHandlers, command) as MockHandler | undefined
 }
 
+/**
+ * Graph from a real vault when the dev server has RHIZOME_DEV_GRAPH_VAULT
+ * set (see devGraphPlugin in vite.config.ts). Any failure falls back to
+ * the sample graph, so tests and plain browser dev do not change.
+ */
+async function tryDevGraph(cmd: string, args?: Record<string, unknown>): Promise<string | undefined> {
+  if (cmd !== 'call_rhizome_tool' || args?.name !== 'rhizome_wiki_graph') return undefined
+  if (typeof fetch !== 'function') return undefined
+  try {
+    const res = await fetch('/api/dev-graph')
+    return res.ok ? await res.text() : undefined
+  } catch {
+    return undefined
+  }
+}
+
 export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   // The mock layer is bundled into the app but must only ever serve data in
   // dev/test. Reaching it in a production build means isTauri() misfired — the
@@ -43,6 +59,9 @@ export async function mockInvoke<T>(cmd: string, args?: Record<string, unknown>)
       `mock Tauri invoked in a production build (command: ${cmd}) — the Tauri backend is not available`,
     )
   }
+
+  const devGraph = await tryDevGraph(cmd, args)
+  if (devGraph !== undefined) return devGraph as T
 
   const vaultResult = await tryVaultApi<T>(cmd, args)
   if (vaultResult !== undefined) return vaultResult

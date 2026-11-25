@@ -23,10 +23,10 @@ describe('LocalAgentCards', () => {
       />,
     )
 
-    expect(screen.getByTestId('settings-agent-card-claude_code').querySelector('img')).toHaveAttribute(
-      'src',
-      '/ai-agent-icons/claude-code.svg',
-    )
+    const claudeCard = screen.getByTestId('settings-agent-card-claude_code')
+    // Claude Code gets a neutral terminal glyph, never the Anthropic mark.
+    expect(claudeCard.querySelector('img')).toBeNull()
+    expect(claudeCard.querySelector('svg')).not.toBeNull()
     expect(screen.getByTestId('settings-agent-card-codex').querySelector('img')).toHaveAttribute(
       'src',
       '/ai-agent-icons/codex.svg',

@@ -119,6 +119,51 @@ pub struct PathReport {
     pub hops: Vec<NoteRef>,
 }
 
+/// How a linked note relates to the pack's root note.
+#[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum LinkDirection {
+    /// The root links to this note.
+    Out,
+    /// This note links to the root.
+    In,
+    /// Both notes link to each other.
+    Both,
+}
+
+/// One direct link of the pack's root, with enough text to judge it
+/// without a second read.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PackLink {
+    #[serde(flatten)]
+    pub note: NoteRef,
+    pub snippet: String,
+    pub direction: LinkDirection,
+    /// Edge kinds between the root and this note, sorted, no repeats.
+    pub kinds: Vec<String>,
+}
+
+/// A note and its direct links in one reply. It replaces one `get_note`
+/// call plus one call for each linked note an agent wants to judge.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NotePack {
+    pub root: NoteRef,
+    /// The root's Markdown without frontmatter. Empty for a ghost.
+    pub body: String,
+    pub body_truncated: bool,
+    /// Direct links, most connected first.
+    pub links: Vec<PackLink>,
+    /// Direct links before `limit` applied.
+    pub total_links: usize,
+    pub truncated: bool,
+}
+
+/// Body cap, in characters. A pack is a first look: the agent can still
+/// read the full note with `get_note`.
+pub const PACK_MAX_BODY_CHARS: usize = 6000;
+
 /// Depth is bounded so a bad argument cannot ask for the whole vault
 /// under the guise of a neighbourhood.
 pub const MAX_DEPTH: usize = 5;
@@ -364,6 +409,108 @@ pub fn neighbors(dto: &GraphDto, query: &str, depth: usize) -> Option<Neighborho
     })
 }
 
+/// Remove a leading YAML frontmatter block. The graph already carries the
+/// fields an agent needs from it.
+fn strip_frontmatter(raw: &str) -> &str {
+    let Some(rest) = raw
+        .strip_prefix("---\n")
+        .or_else(|| raw.strip_prefix("---\r\n"))
+    else {
+        return raw;
+    };
+    match rest.find("\n---") {
+        Some(end) => {
+            let after = &rest[end + 4..];
+            after.split_once('\n').map_or("", |(_, body)| body)
+        }
+        None => raw,
+    }
+}
+
+/// Cut `text` to at most `max` characters on a char boundary.
+fn cap_chars(text: &str, max: usize) -> (String, bool) {
+    match text.char_indices().nth(max) {
+        Some((cut, _)) => (text[..cut].to_string(), true),
+        None => (text.to_string(), false),
+    }
+}
+
+/// The root note, its body, and each direct link with a snippet and a
+/// direction. `read_body` gets the root's vault-relative path and returns
+/// the file text. It is a parameter so this stays a pure transform.
+pub fn note_pack(
+    dto: &GraphDto,
+    query: &str,
+    limit: usize,
+    read_body: impl Fn(&str) -> Option<String>,
+) -> Option<NotePack> {
+    let root = resolve_note(dto, query)?;
+    let index = node_index(dto);
+
+    // id -> (root links out, links in, kinds)
+    let mut linked: HashMap<&str, (bool, bool, Vec<String>)> = HashMap::new();
+    for edge in &dto.edges {
+        let (other, outgoing) = if edge.source == root.id {
+            (edge.target.as_str(), true)
+        } else if edge.target == root.id {
+            (edge.source.as_str(), false)
+        } else {
+            continue;
+        };
+        if other == root.id {
+            continue;
+        }
+        let slot = linked.entry(other).or_default();
+        if outgoing {
+            slot.0 = true;
+        } else {
+            slot.1 = true;
+        }
+        slot.2.push(edge.kind.clone());
+    }
+
+    let mut links: Vec<PackLink> = linked
+        .into_iter()
+        .filter_map(|(id, (out, inc, mut kinds))| {
+            let node = index.get(id)?;
+            kinds.sort_unstable();
+            kinds.dedup();
+            let direction = match (out, inc) {
+                (true, true) => LinkDirection::Both,
+                (true, false) => LinkDirection::Out,
+                _ => LinkDirection::In,
+            };
+            Some(PackLink {
+                note: NoteRef::from(*node),
+                snippet: node.snippet.clone(),
+                direction,
+                kinds,
+            })
+        })
+        .collect();
+    links.sort_by(|a, b| {
+        let degree = |l: &PackLink| l.note.link_count + l.note.backlink_count;
+        degree(b)
+            .cmp(&degree(a))
+            .then_with(|| a.note.title.cmp(&b.note.title))
+    });
+
+    let total_links = links.len();
+    links.truncate(limit);
+
+    let raw = root.path.as_deref().and_then(read_body).unwrap_or_default();
+    let (body, body_truncated) = cap_chars(strip_frontmatter(&raw).trim(), PACK_MAX_BODY_CHARS);
+
+    Some(NotePack {
+        root: NoteRef::from(root),
+        body,
+        body_truncated,
+        links,
+        total_links,
+        truncated: total_links > limit,
+    })
+}
+
 pub fn shortest_path(dto: &GraphDto, from: &str, to: &str) -> Option<PathReport> {
     let start = resolve_note(dto, from)?;
     let goal = resolve_note(dto, to)?;
@@ -601,5 +748,68 @@ mod tests {
     #[test]
     fn shortest_path_returns_none_when_an_endpoint_does_not_resolve() {
         assert!(shortest_path(&fixture(), "Lonely", "No Such Note").is_none());
+    }
+
+    #[test]
+    fn note_pack_gives_body_and_direct_links_with_direction() {
+        let pack = note_pack(&fixture(), "Alpha", 20, |path| {
+            assert_eq!(path, "notes/alpha.md");
+            Some("---\ntype: Note\n---\n# Alpha\nBody text.\n".to_string())
+        })
+        .unwrap();
+
+        assert_eq!(pack.root.id, "notes/alpha.md");
+        assert_eq!(pack.body, "# Alpha\nBody text.");
+        assert!(!pack.body_truncated);
+        let by_id: HashMap<&str, LinkDirection> = pack
+            .links
+            .iter()
+            .map(|l| (l.note.id.as_str(), l.direction))
+            .collect();
+        assert_eq!(by_id.get("index.md"), Some(&LinkDirection::In));
+        assert_eq!(by_id.get("notes/gamma.md"), Some(&LinkDirection::Out));
+        assert_eq!(pack.total_links, 3, "index, gamma, and the ghost");
+        assert!(pack
+            .links
+            .iter()
+            .all(|l| l.kinds == vec!["wikilink".to_string()]));
+    }
+
+    #[test]
+    fn note_pack_reports_truncation_and_caps_the_body() {
+        let long = "x".repeat(PACK_MAX_BODY_CHARS + 10);
+        let pack = note_pack(&fixture(), "Alpha", 1, |_| Some(long.clone())).unwrap();
+
+        assert_eq!(pack.links.len(), 1);
+        assert_eq!(pack.total_links, 3);
+        assert!(pack.truncated);
+        assert_eq!(pack.body.chars().count(), PACK_MAX_BODY_CHARS);
+        assert!(pack.body_truncated);
+    }
+
+    #[test]
+    fn note_pack_marks_mutual_links_as_both() {
+        let dto = build_graph(
+            Path::new("/vault"),
+            &[entry("a.md", "A", &["B"]), entry("b.md", "B", &["A"])],
+        );
+        let pack = note_pack(&dto, "A", 20, |_| None).unwrap();
+
+        assert_eq!(pack.links.len(), 1);
+        assert_eq!(pack.links[0].direction, LinkDirection::Both);
+        assert_eq!(pack.body, "");
+    }
+
+    #[test]
+    fn note_pack_returns_none_for_an_unknown_note() {
+        assert!(note_pack(&fixture(), "Nowhere", 20, |_| None).is_none());
+    }
+
+    #[test]
+    fn strip_frontmatter_leaves_a_note_without_one_alone() {
+        assert_eq!(
+            strip_frontmatter("# Title\n---\nrule"),
+            "# Title\n---\nrule"
+        );
     }
 }

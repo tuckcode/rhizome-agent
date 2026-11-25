@@ -155,13 +155,13 @@ fn parse_args(argv: &[String]) -> Result<Command, String> {
             })
         }
         "graph-query" => {
-            let limit = take_flag(&mut rest, "--limit")
+            let limit_flag = take_flag(&mut rest, "--limit")
                 .map(|v| {
                     v.parse::<usize>()
                         .map_err(|_| "--limit must be a number".to_string())
                 })
-                .transpose()?
-                .unwrap_or(rhizome_api::GRAPH_QUERY_LIMIT);
+                .transpose()?;
+            let limit = limit_flag.unwrap_or(rhizome_api::GRAPH_QUERY_LIMIT);
             let depth = take_flag(&mut rest, "--depth")
                 .map(|v| {
                     v.parse::<usize>()
@@ -170,7 +170,7 @@ fn parse_args(argv: &[String]) -> Result<Command, String> {
                 .transpose()?
                 .unwrap_or(1);
             const USAGE: &str = "usage: graph-query <vault_path> \
-                 <health | orphans | dead-links | neighbors <note> | path <from> <to>> \
+                 <health | orphans | dead-links | neighbors <note> | path <from> <to> | pack <note>> \
                  [--limit N] [--depth N]";
             if rest.len() < 2 {
                 return Err(USAGE.to_string());
@@ -187,6 +187,10 @@ fn parse_args(argv: &[String]) -> Result<Command, String> {
                 ("path", 4) => GraphQuery::Path {
                     from: rest[2].clone(),
                     to: rest[3].clone(),
+                },
+                ("pack", 3) => GraphQuery::Pack {
+                    note: rest[2].clone(),
+                    limit: limit_flag.unwrap_or(rhizome_api::NOTE_PACK_LIMIT),
                 },
                 _ => return Err(USAGE.to_string()),
             };
@@ -569,6 +573,40 @@ mod tests {
                 query: GraphQuery::Neighbors {
                     note: "Alpha".to_string(),
                     depth: 2,
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn parses_graph_query_pack_with_default_and_explicit_limit() {
+        let cmd = parse_args(&args(&["graph-query", "/vault", "pack", "Alpha"])).unwrap();
+        assert_eq!(
+            cmd,
+            Command::GraphQuery {
+                vault_path: PathBuf::from("/vault"),
+                query: GraphQuery::Pack {
+                    note: "Alpha".to_string(),
+                    limit: rhizome_api::NOTE_PACK_LIMIT,
+                },
+            }
+        );
+        let cmd = parse_args(&args(&[
+            "graph-query",
+            "/vault",
+            "pack",
+            "Alpha",
+            "--limit",
+            "5",
+        ]))
+        .unwrap();
+        assert_eq!(
+            cmd,
+            Command::GraphQuery {
+                vault_path: PathBuf::from("/vault"),
+                query: GraphQuery::Pack {
+                    note: "Alpha".to_string(),
+                    limit: 5,
                 },
             }
         );

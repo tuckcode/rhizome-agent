@@ -75,10 +75,12 @@ describe('preset column drag', () => {
     mockedShellWidth = 1400
     const { result } = renderShell()
     act(() => result.current.layout.setSplit('side-by-side'))
+    const start = result.current.layout.widths.note
     const captured = result.current.layout.resizeColumn
     act(() => captured('note', 10))
     act(() => captured('note', 10))
-    expect(result.current.controls.panePreset.widths.note).toBe(440)
+    // Note lead keeps the dragged width as a share of the note-plus-Chat room.
+    expect(result.current.layout.widths.note).toBe(start + 20)
   })
 
   it('does not ratchet a tight beside note when leftovers could move to Notes', () => {
@@ -94,11 +96,12 @@ describe('preset column drag', () => {
 })
 
 describe('workspace state and the sessions drawer', () => {
-  it('reports the desk when a note fits beside Chat', () => {
+  it('reports the desk when a note fits beside Chat, with the rail folded', () => {
     mockedShellWidth = 1400
     const { result } = renderShell()
     expect(result.current.layout.workspace).toBe('desk')
-    expect(result.current.layout.railFits).toBe(true)
+    // Note lead folds the Sessions rail while a note is open, so it opens as a drawer.
+    expect(result.current.layout.railFits).toBe(false)
   })
 
   it('reports the focused window and a drawer-only rail when the shell is small', () => {

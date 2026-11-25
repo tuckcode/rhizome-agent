@@ -1,0 +1,12 @@
+{
+  "build": {
+    "beforeBuildCommand": "sh scripts/build-macos-icon.sh && pnpm build && pnpm bundle-mcp && pnpm agent-docs"
+  },
+  "bundle": {
+    "macOS": {
+      "files": {
+        "Resources/Assets.car": "target/macos-icon/Assets.car"
+      }
+    }
+  }
+}
