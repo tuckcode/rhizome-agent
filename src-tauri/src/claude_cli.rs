@@ -334,10 +334,192 @@ fn auth_status_for_binary(binary: &Path) -> (Option<bool>, Option<String>) {
     }
 }
 
+const CLAUDE_LOGIN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5 * 60);
+const CLAUDE_LOGIN_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_millis(25);
+
+struct ActiveLogin {
+    cancelled: std::sync::atomic::AtomicBool,
+    child: std::sync::Mutex<Option<std::process::Child>>,
+}
+
+impl ActiveLogin {
+    fn new() -> Self {
+        Self {
+            cancelled: std::sync::atomic::AtomicBool::new(false),
+            child: std::sync::Mutex::new(None),
+        }
+    }
+
+    fn kill_and_reap(&self) {
+        let mut guard = self
+            .child
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        if let Some(mut child) = guard.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+}
+
+#[derive(Default)]
+struct LoginCoordinator {
+    active: std::sync::Mutex<Option<std::sync::Arc<ActiveLogin>>>,
+}
+
+struct LoginGuard<'a> {
+    coordinator: &'a LoginCoordinator,
+    attempt: std::sync::Arc<ActiveLogin>,
+}
+
+impl Drop for LoginGuard<'_> {
+    fn drop(&mut self) {
+        self.attempt.kill_and_reap();
+        let mut slot = self
+            .coordinator
+            .active
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        if slot
+            .as_ref()
+            .is_some_and(|current| std::sync::Arc::ptr_eq(current, &self.attempt))
+        {
+            *slot = None;
+        }
+    }
+}
+
+impl LoginCoordinator {
+    fn begin(&self) -> Result<LoginGuard<'_>, String> {
+        let mut slot = self
+            .active
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        if slot.is_some() {
+            return Err("Claude Code sign-in is already in progress.".into());
+        }
+        let attempt = std::sync::Arc::new(ActiveLogin::new());
+        *slot = Some(std::sync::Arc::clone(&attempt));
+        Ok(LoginGuard {
+            coordinator: self,
+            attempt,
+        })
+    }
+
+    fn cancel(&self) -> bool {
+        let attempt = self
+            .active
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .clone();
+        let Some(attempt) = attempt else {
+            return false;
+        };
+        attempt
+            .cancelled
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        attempt.kill_and_reap();
+        true
+    }
+
+    #[cfg(test)]
+    fn has_child(&self) -> bool {
+        let attempt = self
+            .active
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+            .clone();
+        attempt.is_some_and(|a| {
+            a.child
+                .lock()
+                .unwrap_or_else(|poison| poison.into_inner())
+                .is_some()
+        })
+    }
+
+    fn run_command(
+        &self,
+        mut command: std::process::Command,
+        timeout: std::time::Duration,
+    ) -> Result<(), String> {
+        let guard = self.begin()?;
+        let attempt = &guard.attempt;
+        if attempt.cancelled.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err("Claude Code sign-in was cancelled.".into());
+        }
+        let mut child = command
+            .spawn()
+            .map_err(|err| format!("Could not start Claude Code sign-in: {err}"))?;
+        {
+            let mut child_slot = attempt
+                .child
+                .lock()
+                .unwrap_or_else(|poison| poison.into_inner());
+            if attempt.cancelled.load(std::sync::atomic::Ordering::SeqCst) {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err("Claude Code sign-in was cancelled.".into());
+            }
+            *child_slot = Some(child);
+        }
+
+        let deadline = std::time::Instant::now() + timeout;
+        loop {
+            if attempt.cancelled.load(std::sync::atomic::Ordering::SeqCst) {
+                attempt.kill_and_reap();
+                return Err("Claude Code sign-in was cancelled.".into());
+            }
+            let status = {
+                let mut child_slot = attempt
+                    .child
+                    .lock()
+                    .unwrap_or_else(|poison| poison.into_inner());
+                let Some(child) = child_slot.as_mut() else {
+                    return Err("Claude Code sign-in was cancelled.".into());
+                };
+                match child.try_wait() {
+                    Ok(Some(status)) => {
+                        let _ = child_slot.take();
+                        Some(status)
+                    }
+                    Ok(None) => None,
+                    Err(err) => {
+                        if let Some(mut child) = child_slot.take() {
+                            let _ = child.kill();
+                            let _ = child.wait();
+                        }
+                        return Err(format!("Could not complete Claude Code sign-in: {err}"));
+                    }
+                }
+            };
+            if let Some(status) = status {
+                return if status.success() {
+                    Ok(())
+                } else if attempt.cancelled.load(std::sync::atomic::Ordering::SeqCst) {
+                    Err("Claude Code sign-in was cancelled.".into())
+                } else {
+                    Err("Claude Code sign-in did not finish.".into())
+                };
+            }
+            if std::time::Instant::now() >= deadline {
+                attempt.kill_and_reap();
+                return Err("Claude Code sign-in timed out. Try again.".into());
+            }
+            std::thread::sleep(CLAUDE_LOGIN_POLL_INTERVAL);
+        }
+    }
+}
+
+fn login_coordinator() -> &'static LoginCoordinator {
+    static COORDINATOR: std::sync::OnceLock<LoginCoordinator> = std::sync::OnceLock::new();
+    COORDINATOR.get_or_init(LoginCoordinator::default)
+}
+
 /// ADR-0191 decision 2.6: run the unmodified `claude auth login`. Claude Code
 /// opens Anthropic's own sign-in page and keeps the token in its own store.
 /// Rhizome reads no output and holds no token. It only waits for the exit,
-/// then the caller asks `claude auth status` again.
+/// then the caller asks `claude auth status` again. Single-flight with a
+/// 5-minute timeout; `cancel_login` aborts and kills the child process.
 pub fn start_login() -> Result<(), String> {
     let bin = find_claude_binary()?;
     let target = crate::cli_agent_runtime::command_target_avoiding_windows_cmd_shim(&bin)?;
@@ -346,18 +528,18 @@ pub fn start_login() -> Result<(), String> {
     if let Some(first_arg) = target.first_arg {
         command.arg(first_arg);
     }
-    let status = command
+    command
         .args(["auth", "login"])
         .stdin(Stdio::null())
         .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map_err(|err| format!("Could not start Claude Code sign-in: {err}"))?;
-    if status.success() {
-        Ok(())
-    } else {
-        Err("Claude Code sign-in did not finish.".into())
-    }
+        .stderr(Stdio::null());
+    login_coordinator().run_command(command, CLAUDE_LOGIN_TIMEOUT)
+}
+
+/// Abort an in-flight `claude auth login` and kill its child process.
+/// Returns `true` if a login attempt was active and cancelled.
+pub fn cancel_login() -> bool {
+    login_coordinator().cancel()
 }
 
 /// Keeps `loggedIn` and, when signed in, `authMethod`. Drops everything else,
@@ -2027,5 +2209,92 @@ mod tests {
         assert!(!events
             .iter()
             .any(|e| matches!(e, ClaudeStreamEvent::Error { .. })));
+    }
+
+    fn sleep_command(ms: u64) -> std::process::Command {
+        let mut command = std::process::Command::new("node");
+        command
+            .args(["-e", &format!("setTimeout(() => {{}}, {ms})")])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        command
+    }
+
+    fn exit_zero_command() -> std::process::Command {
+        let mut command = std::process::Command::new("node");
+        command
+            .args(["-e", "process.exit(0)"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        command
+    }
+
+    fn wait_for_login_child(coordinator: &LoginCoordinator) {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !coordinator.has_child() {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "login child never registered"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
+
+    #[test]
+    fn login_timeout_kills_child_and_allows_retry() {
+        let coordinator = LoginCoordinator::default();
+        let error = coordinator
+            .run_command(sleep_command(30_000), std::time::Duration::from_millis(60))
+            .unwrap_err();
+        assert!(error.contains("timed out"), "unexpected error: {error}");
+        assert!(!coordinator.cancel());
+        coordinator
+            .run_command(exit_zero_command(), std::time::Duration::from_secs(5))
+            .expect("retry after timeout should succeed");
+    }
+
+    #[test]
+    fn login_cancel_kills_child_and_returns_cancelled() {
+        let coordinator = std::sync::Arc::new(LoginCoordinator::default());
+        let worker_coord = std::sync::Arc::clone(&coordinator);
+        let handle = std::thread::spawn(move || {
+            worker_coord.run_command(sleep_command(30_000), std::time::Duration::from_secs(10))
+        });
+        wait_for_login_child(&coordinator);
+        assert!(coordinator.cancel());
+        let error = handle.join().unwrap().unwrap_err();
+        assert!(error.contains("cancelled"), "unexpected error: {error}");
+        assert!(!coordinator.cancel());
+        coordinator
+            .run_command(exit_zero_command(), std::time::Duration::from_secs(5))
+            .expect("retry after cancel should succeed");
+    }
+
+    #[test]
+    fn login_is_single_flight_and_rejects_double_click() {
+        let coordinator = std::sync::Arc::new(LoginCoordinator::default());
+        let worker_coord = std::sync::Arc::clone(&coordinator);
+        let handle = std::thread::spawn(move || {
+            worker_coord.run_command(sleep_command(30_000), std::time::Duration::from_secs(10))
+        });
+        wait_for_login_child(&coordinator);
+        let second = coordinator
+            .run_command(exit_zero_command(), std::time::Duration::from_secs(5))
+            .unwrap_err();
+        assert!(
+            second.contains("already in progress"),
+            "unexpected second-click error: {second}"
+        );
+        assert!(coordinator.cancel());
+        assert!(handle.join().unwrap().unwrap_err().contains("cancelled"));
+    }
+
+    #[test]
+    fn cancel_login_when_idle_returns_false() {
+        let coordinator = LoginCoordinator::default();
+        assert!(!coordinator.cancel());
+        assert!(!cancel_login());
     }
 }

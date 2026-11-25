@@ -143,6 +143,13 @@ pub async fn start_claude_code_login() -> Result<(), String> {
         .map_err(|err| err.to_string())?
 }
 
+/// Abort an in-flight `start_claude_code_login` and kill its child process.
+#[cfg(desktop)]
+#[tauri::command]
+pub fn cancel_claude_code_login() -> bool {
+    crate::claude_cli::cancel_login()
+}
+
 #[cfg(desktop)]
 #[tauri::command]
 pub fn get_agent_docs_path(app_handle: tauri::AppHandle) -> Result<String, String> {
@@ -370,6 +377,12 @@ pub fn get_claude_code_engine_status() -> crate::claude_cli::ClaudeCodeEngineSta
 #[tauri::command]
 pub fn start_claude_code_login() -> Result<(), String> {
     Err("Claude Code is not available on mobile.".into())
+}
+
+#[cfg(mobile)]
+#[tauri::command]
+pub fn cancel_claude_code_login() -> bool {
+    false
 }
 
 #[cfg(mobile)]
