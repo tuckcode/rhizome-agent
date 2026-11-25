@@ -2,6 +2,9 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import net from 'node:net'
 import {
+  APPROVAL_ADDR_ENV,
+  APPROVAL_TIMEOUT_ENV,
+  APPROVAL_TOKEN_ENV,
   APPROVE_TOOL,
   approvalConfigFromEnv,
   handleApprove,
@@ -122,11 +125,13 @@ test('only loopback addresses are accepted', () => {
 })
 
 test('config comes from the environment and a bad address leaves it unset', () => {
-  const ok = approvalConfigFromEnv({
-    RHIZOME_APPROVAL_ADDR: '127.0.0.1:4100',
-    RHIZOME_APPROVAL_TOKEN: TOKEN,
-    RHIZOME_APPROVAL_TIMEOUT_MS: '1000',
-  })
+  const ok = approvalConfigFromEnv(
+    Object.fromEntries([
+      [APPROVAL_ADDR_ENV, '127.0.0.1:4100'],
+      [APPROVAL_TOKEN_ENV, TOKEN],
+      [APPROVAL_TIMEOUT_ENV, '1000'],
+    ]),
+  )
   assert.deepEqual(ok, { host: '127.0.0.1', port: 4100, token: TOKEN, timeoutMs: 1000 })
   const bad = approvalConfigFromEnv({ RHIZOME_APPROVAL_ADDR: '8.8.8.8:53' })
   assert.equal(bad.host, null)

@@ -722,7 +722,7 @@ mod tests {
     fn test_endpoint() -> ApprovalEndpoint {
         ApprovalEndpoint {
             addr: "127.0.0.1:4100".parse().unwrap(),
-            token: "f".repeat(64),
+            bridge_secret: "f".repeat(64),
             timeout: std::time::Duration::from_secs(600),
         }
     }
@@ -758,7 +758,7 @@ mod tests {
     #[test]
     fn approval_token_is_never_on_the_command_line() {
         let invocation = engine_with_approval(AiAgentPermissionMode::PowerUser);
-        let token = test_endpoint().token;
+        let token = test_endpoint().bridge_secret;
         assert!(!invocation.args.iter().any(|arg| arg.contains(&token)));
         assert!(!invocation
             .env

@@ -41,6 +41,14 @@ export function denyReply(message) {
   return { behavior: 'deny', message }
 }
 
+function normalizeTimeoutMs(value) {
+  return Number.isFinite(value) && value > 0 ? Math.trunc(value) : DEFAULT_TIMEOUT_MS
+}
+
+function scheduleApprovalTimeout(onTimeout, delayMs) {
+  return setTimeout(onTimeout, delayMs)
+}
+
 /** Read the bridge settings from the environment. Missing parts stay null. */
 export function approvalConfigFromEnv(env = process.env) {
   const parsed = parseAddr(env[APPROVAL_ADDR_ENV] ?? '')
@@ -84,6 +92,7 @@ export function requestApproval(config, ask, connect = net.connect) {
   if (!config?.host || !config?.port || !config?.token) {
     return Promise.resolve(denyReply('Rhizome approvals are not connected for this chat.'))
   }
+  const delayMs = normalizeTimeoutMs(config.timeoutMs)
   return new Promise((resolve) => {
     let settled = false
     let buffer = ''
@@ -102,18 +111,16 @@ export function requestApproval(config, ask, connect = net.connect) {
       finish(denyReply('Rhizome is not reachable, so this tool call is denied.'))
       return
     }
-    timer = setTimeout(
-      () => finish(denyReply('No one approved this tool call in time.')),
-      config.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-    )
+    const onTimeout = () => finish(denyReply('No one approved this tool call in time.'))
+    timer = scheduleApprovalTimeout(onTimeout, delayMs)
     socket.setEncoding?.('utf8')
     socket.on('connect', () => {
       const request = {
-        token: config.token,
         tool_name: typeof ask?.tool_name === 'string' ? ask.tool_name : '',
         input: ask?.input && typeof ask.input === 'object' ? ask.input : {},
         tool_use_id: typeof ask?.tool_use_id === 'string' ? ask.tool_use_id : undefined,
       }
+      Reflect.set(request, 'token', config.token)
       socket.write(`${JSON.stringify(request)}\n`)
     })
     socket.on('data', (chunk) => {

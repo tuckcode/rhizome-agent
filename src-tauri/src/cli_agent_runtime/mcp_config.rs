@@ -32,13 +32,22 @@ pub(crate) fn rhizome_approval_mcp_server(
     // The MCP side waits a little longer than the broker, so the broker's
     // own deny (with its message) normally arrives first.
     let mcp_timeout_ms = endpoint.timeout.as_millis().saturating_add(15_000);
+    let mut env = serde_json::Map::new();
+    env.insert(
+        APPROVAL_ADDR_ENV.into(),
+        serde_json::Value::String(endpoint.addr.to_string()),
+    );
+    env.insert(
+        APPROVAL_TOKEN_ENV.into(),
+        serde_json::Value::String(endpoint.bridge_secret.clone()),
+    );
+    env.insert(
+        APPROVAL_TIMEOUT_ENV.into(),
+        serde_json::Value::String(mcp_timeout_ms.to_string()),
+    );
     serde_json::json!({
         "command": "node",
         "args": [approval_server_path],
-        "env": {
-            APPROVAL_ADDR_ENV: endpoint.addr.to_string(),
-            APPROVAL_TOKEN_ENV: endpoint.token,
-            APPROVAL_TIMEOUT_ENV: mcp_timeout_ms.to_string(),
-        }
+        "env": env
     })
 }

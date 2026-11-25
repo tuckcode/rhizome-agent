@@ -57,7 +57,7 @@ const PATH_FIELDS: &[&str] = &["file_path", "notebook_path", "path"];
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct ApprovalEndpoint {
     pub addr: SocketAddr,
-    pub token: String,
+    pub bridge_secret: String,
     pub timeout: Duration,
 }
 
@@ -124,7 +124,7 @@ pub(crate) fn reply(prompt_id: &str, reply: ApprovalReply) -> bool {
 }
 
 struct Inner {
-    token: String,
+    bridge_secret: String,
     timeout: Duration,
     scope: Vec<PathBuf>,
     closed: AtomicBool,
@@ -155,7 +155,7 @@ impl ApprovalBroker {
             .local_addr()
             .map_err(|e| format!("Could not start the approval bridge: {e}"))?;
         let inner = Arc::new(Inner {
-            token: fresh_token(),
+            bridge_secret: fresh_bridge_secret(),
             timeout,
             scope: vault_scope(vaults),
             closed: AtomicBool::new(false),
@@ -170,7 +170,7 @@ impl ApprovalBroker {
         Ok(Self {
             endpoint: ApprovalEndpoint {
                 addr,
-                token: inner.token.clone(),
+                bridge_secret: inner.bridge_secret.clone(),
                 timeout,
             },
             inner,
@@ -208,7 +208,7 @@ impl Drop for ApprovalBroker {
 }
 
 /// 64 hex characters from two v4 UUIDs (OS random source, 244 random bits).
-fn fresh_token() -> String {
+fn fresh_bridge_secret() -> String {
     format!(
         "{}{}",
         uuid::Uuid::new_v4().simple(),
@@ -274,7 +274,7 @@ fn token_matches(expected: &str, given: &str) -> bool {
 }
 
 fn decide(request: WireRequest, inner: &Inner) -> WireReply {
-    if !token_matches(&inner.token, &request.token) {
+    if !token_matches(&inner.bridge_secret, &request.token) {
         return WireReply::deny("Rhizome refused an approval request it did not start.");
     }
     if inner.closed.load(Ordering::SeqCst) {
@@ -442,7 +442,7 @@ mod tests {
 
     fn request(endpoint: &ApprovalEndpoint, tool: &str, input: serde_json::Value) -> String {
         serde_json::json!({
-            "token": endpoint.token,
+            "token": endpoint.bridge_secret,
             "tool_name": tool,
             "input": input,
             "tool_use_id": "toolu_1",
@@ -490,8 +490,8 @@ mod tests {
             DEFAULT_APPROVAL_TIMEOUT,
         );
         assert!(a.endpoint().addr.ip().is_loopback());
-        assert_eq!(a.endpoint().token.len(), 64);
-        assert_ne!(a.endpoint().token, b.endpoint().token);
+        assert_eq!(a.endpoint().bridge_secret.len(), 64);
+        assert_ne!(a.endpoint().bridge_secret, b.endpoint().bridge_secret);
     }
 
     #[test]

@@ -500,7 +500,7 @@ mod tests {
         fn ask_bash(endpoint: &crate::claude_code_approval::ApprovalEndpoint) -> serde_json::Value {
             let mut stream = TcpStream::connect(endpoint.addr).unwrap();
             let body = serde_json::json!({
-                "token": endpoint.token,
+                "token": endpoint.bridge_secret,
                 "tool_name": "Bash",
                 "input": {"command": "ls"},
                 "tool_use_id": "toolu_9",
