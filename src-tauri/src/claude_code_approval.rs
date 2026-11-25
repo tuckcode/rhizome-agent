@@ -663,6 +663,26 @@ mod tests {
     }
 
     #[test]
+    fn all_four_write_tools_inside_the_vault_ask() {
+        let dir = vault();
+        let scope = vault_scope(&[dir.path().display().to_string()]);
+        for (tool, field, file) in [
+            ("Edit", "file_path", "note.md"),
+            ("Write", "file_path", "note.md"),
+            ("MultiEdit", "file_path", "note.md"),
+            ("NotebookEdit", "notebook_path", "book.ipynb"),
+        ] {
+            let target = dir.path().join(file).display().to_string();
+            let input = serde_json::json!({ field: target });
+            assert_eq!(
+                rule(tool, &input, &scope),
+                Rule::Ask { path: Some(target) },
+                "{tool} inside vault must ask"
+            );
+        }
+    }
+
+    #[test]
     fn writes_outside_the_vault_deny_and_unknown_tools_ask() {
         let dir = vault();
         let scope = vault_scope(&[dir.path().display().to_string()]);

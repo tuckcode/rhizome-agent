@@ -29,7 +29,11 @@ const CLAUDE_CHAT_DISALLOWED_TOOLS_COMPAT: &str =
 const CLAUDE_ENGINE_SETTING_SOURCES: &str = "user";
 // Claude Code auto memory stays off so no second memory store grows beside
 // the vault. Set twice on purpose: in `--settings` and in the environment.
+// Limited mode also puts every file-edit tool in `permissions.ask` so a
+// user's `~/.claude/settings.json` `permissions.allow` rule (e.g. `Write`)
+// cannot skip `--permission-prompt-tool` (`deny -> ask -> allow` order).
 const CLAUDE_ENGINE_SETTINGS: &str = r#"{"autoMemoryEnabled":false}"#;
+const CLAUDE_ENGINE_LIMITED_SETTINGS: &str = r#"{"autoMemoryEnabled":false,"permissions":{"ask":["Edit","Write","MultiEdit","NotebookEdit"]}}"#;
 pub(crate) const CLAUDE_ENGINE_DISABLE_AUTO_MEMORY_ENV: (&str, &str) =
     ("CLAUDE_CODE_DISABLE_AUTO_MEMORY", "1");
 // Limited mode asks on every edit, so it never runs in `acceptEdits`.
@@ -249,7 +253,7 @@ fn engine_args(
         "--setting-sources".into(),
         CLAUDE_ENGINE_SETTING_SOURCES.into(),
         "--settings".into(),
-        CLAUDE_ENGINE_SETTINGS.into(),
+        engine_settings(req.permission_mode).into(),
         "--mcp-config".into(),
         mcp_config_arg.into(),
         "--strict-mcp-config".into(),
@@ -298,6 +302,13 @@ fn engine_permission_mode(permission_mode: AiAgentPermissionMode) -> &'static st
     match permission_mode {
         AiAgentPermissionMode::Safe => CLAUDE_ENGINE_LIMITED_PERMISSION_MODE,
         AiAgentPermissionMode::PowerUser => CLAUDE_ENGINE_POWER_USER_PERMISSION_MODE,
+    }
+}
+
+fn engine_settings(permission_mode: AiAgentPermissionMode) -> &'static str {
+    match permission_mode {
+        AiAgentPermissionMode::Safe => CLAUDE_ENGINE_LIMITED_SETTINGS,
+        AiAgentPermissionMode::PowerUser => CLAUDE_ENGINE_SETTINGS,
     }
 }
 
@@ -618,12 +629,63 @@ mod tests {
         let args = engine(AiAgentPermissionMode::Safe).args;
 
         assert_eq!(arg_value_after(&args, "--permission-mode"), Some("manual"));
-        assert_args_lack!(args, ["acceptEdits", "--allowedTools"]);
+        assert_args_lack!(args, ["acceptEdits", "--allowedTools", "--allowed-tools"]);
         assert_eq!(
             arg_value_after(&args, "--tools"),
             Some("Read,Edit,MultiEdit,Write,Glob,Grep,LS,mcp__rhizome__*")
         );
         assert_no_arg_contains!(args, "Bash");
+    }
+
+    #[test]
+    fn engine_limited_mode_asks_all_edit_tools_even_with_user_allow_rule() {
+        // Claude Code evaluates merged permission rules in `deny -> ask -> allow`
+        // order, so putting a tool in `--settings` `permissions.ask` overrides
+        // a user `~/.claude/settings.json` `permissions.allow` rule.
+        let user_allow = ["Edit", "Write", "MultiEdit", "NotebookEdit"];
+
+        for invocation in [
+            engine(AiAgentPermissionMode::Safe),
+            engine_with_approval(AiAgentPermissionMode::Safe),
+        ] {
+            let args = &invocation.args;
+            assert_eq!(arg_value_after(args, "--setting-sources"), Some("user"));
+            assert_eq!(arg_value_after(args, "--permission-mode"), Some("manual"));
+            assert_args_lack!(args, ["acceptEdits", "--allowedTools", "--allowed-tools"]);
+            assert_no_arg_contains!(args, "Bash");
+
+            let settings: serde_json::Value =
+                serde_json::from_str(arg_value_after(args, "--settings").unwrap()).unwrap();
+            assert_eq!(
+                settings["autoMemoryEnabled"],
+                serde_json::Value::Bool(false)
+            );
+            let ask_rules: Vec<&str> = settings["permissions"]["ask"]
+                .as_array()
+                .expect("permissions.ask array")
+                .iter()
+                .map(|entry| entry.as_str().expect("string rule"))
+                .collect();
+            assert_eq!(
+                ask_rules,
+                vec!["Edit", "Write", "MultiEdit", "NotebookEdit"]
+            );
+
+            for tool in ["Edit", "Write", "MultiEdit", "NotebookEdit"] {
+                // `ask` is checked before `allow` in Claude Code's rule engine.
+                let decision = if ask_rules.contains(&tool) {
+                    "ask"
+                } else if user_allow.contains(&tool) {
+                    "allow"
+                } else {
+                    "default"
+                };
+                assert_eq!(
+                    decision, "ask",
+                    "{tool} must still ask when user settings allow it"
+                );
+            }
+        }
     }
 
     #[test]
@@ -639,6 +701,9 @@ mod tests {
             Some("Read,Edit,MultiEdit,Write,Glob,Grep,LS,Bash,mcp__rhizome__*")
         );
         assert_args_lack!(args, ["--allowedTools", "--allowed-tools"]);
+        let settings: serde_json::Value =
+            serde_json::from_str(arg_value_after(&args, "--settings").unwrap()).unwrap();
+        assert!(settings.get("permissions").is_none());
     }
 
     #[test]
