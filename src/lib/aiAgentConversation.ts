@@ -27,6 +27,13 @@ export interface AiAgentMessage {
   actions: AiAction[]
   response?: string
   isStreaming?: boolean
+  /**
+   * How many times streamed reply text arrived, counted at most once a
+   * second. The text stays in the stream buffer until the turn seals, so
+   * the run status line reads this to show Writing and to keep its quiet
+   * clock running only while nothing arrives.
+   */
+  streamedText?: number
   capped?: { steps: number; max_steps: number }
   id?: string
   /**

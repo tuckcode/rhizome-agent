@@ -53,10 +53,15 @@ export function escapeApprovalLabel(
   return sliceGraphemes(raw, max)
 }
 
-export function approvalAriaLabel(actionLabel: string, display: string): string {
-  if (!display.trim()) return actionLabel
-  const escaped = escapeApprovalLabel(display)
-  return escaped ? `${actionLabel}: ${escaped}` : actionLabel
+/**
+ * The accessible name of a row button. `notes` are the risk and overflow
+ * tags, which sit in their own spans and would otherwise go unread.
+ */
+export function approvalAriaLabel(actionLabel: string, display: string, notes: Array<string | null> = []): string {
+  const escaped = display.trim() ? escapeApprovalLabel(display) : ''
+  const base = escaped ? `${actionLabel}: ${escaped}` : actionLabel
+  const extra = notes.filter((note): note is string => Boolean(note))
+  return extra.length > 0 ? `${base}. ${extra.join('. ')}` : base
 }
 
 function middleTruncateFilename(file: string, max: number): string {

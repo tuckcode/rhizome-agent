@@ -20,7 +20,7 @@ test.describe('responsive note deletion', () => {
 
   test('keyboard delete keeps the app responsive while deletion is in flight @smoke', async ({ page }) => {
     await openFixtureVaultDesktopHarness(page, tempVaultDir)
-    await page.getByText('Alpha Project', { exact: true }).first().click()
+    await page.getByTestId('note-list-container').getByText('Alpha Project', { exact: true }).first().click()
     await expect(page.getByRole('heading', { name: 'Alpha Project', level: 1 })).toBeVisible({ timeout: 5_000 })
 
     await page.evaluate(() => {
@@ -63,7 +63,7 @@ test.describe('responsive note deletion', () => {
 
   test('breadcrumb delete menu responds to a single pointer click @smoke', async ({ page }) => {
     await openFixtureVaultDesktopHarness(page, tempVaultDir)
-    await page.getByText('Alpha Project', { exact: true }).first().click()
+    await page.getByTestId('note-list-container').getByText('Alpha Project', { exact: true }).first().click()
     await expect(page.getByRole('heading', { name: 'Alpha Project', level: 1 })).toBeVisible({ timeout: 5_000 })
 
     await page.getByRole('button', { name: 'More note actions' }).click()

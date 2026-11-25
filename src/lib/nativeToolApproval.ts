@@ -134,3 +134,14 @@ export function approvalTitle(tool: string, created: boolean): string {
 export function previewLooksCreated(preview?: string): boolean {
   return Boolean(preview?.includes('--- /dev/null'))
 }
+
+/**
+ * The engine labels the session grant "Allow for session". For a file
+ * tool the grant covers one path (`mutate_session_matches`), so the
+ * label names that scope.
+ */
+export function approvalOptionLabel(option: NativeApprovalOption, tool: string): string {
+  const fileTool = tool === 'edit_file' || tool === 'write_file'
+  if (option.id === 'allow_session' && fileTool) return 'Allow this file for the session'
+  return option.label
+}

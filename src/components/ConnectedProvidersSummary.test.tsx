@@ -4,7 +4,7 @@ import { createMissingAiAgentsStatus } from '../lib/aiAgents'
 import { createTranslator } from '../lib/i18n'
 import type { AiModelProvider } from '../lib/aiTargets'
 import { resetListProviderModelsCache } from '../lib/listProviderModels'
-import { providerRowId, summaryRowId } from '../lib/connectedProviders'
+import { accountRowId, providerRowId, summaryRowId } from '../lib/connectedProviders'
 import { ConnectedProvidersSummary } from './ConnectedProvidersSummary'
 
 const secrets = vi.hoisted(() => ({
@@ -229,6 +229,28 @@ describe('ConnectedProvidersSummary', () => {
       await vi.advanceTimersByTimeAsync(1600)
     })
     expect(row).not.toHaveAttribute('data-highlighted')
+  })
+
+  it('focuses the ChatGPT row Sign in button when the chat asks to sign in', async () => {
+    installFocusRetryTimers()
+    const focusRowId = summaryRowId(accountRowId('openai'))
+    render(
+      <ConnectedProvidersSummary
+        t={createTranslator('en')}
+        agents={createMissingAiAgentsStatus()}
+        providers={[]}
+        onChange={vi.fn()}
+        onOpen={vi.fn()}
+        focusRowId={focusRowId}
+        onFocusConsumed={vi.fn()}
+      />,
+    )
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(64)
+    })
+
+    expect(screen.getByTestId('settings-connected-sign-in-account:openai')).toHaveFocus()
   })
 
   it('retries Add key focus until the key field mounts, then consumes the focus request', async () => {

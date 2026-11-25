@@ -683,8 +683,9 @@ describe('App', () => {
     expect(screen.getByTestId('vault-panel-navigation')).toContainElement(screen.getByTestId('sidebar-top-nav'))
 
     await selectInboxInVaultPanel()
-    expect(await screen.findByText('Test Project')).toBeInTheDocument()
-    expect(await screen.findByText('Software Development')).toBeInTheDocument()
+    const list = await screen.findByTestId('note-list-container')
+    expect(await within(list).findByText('Test Project')).toBeInTheDocument()
+    expect(await within(list).findByText('Software Development')).toBeInTheDocument()
   })
 
   it('keeps the app shell usable while the vault note scan is pending', async () => {
@@ -1825,7 +1826,7 @@ describe('App', () => {
     })
 
     expect(screen.getByText('Related to')).toBeInTheDocument()
-    expect(screen.getByText('Beta')).toBeInTheDocument()
+    expect(within(noteListContainer).getByText('Beta')).toBeInTheDocument()
   })
 
   it('defaults to All Notes when explicit organization is disabled in vault config', async () => {

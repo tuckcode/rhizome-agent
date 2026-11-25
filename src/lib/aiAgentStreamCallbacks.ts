@@ -175,6 +175,9 @@ function findQueuedFollowUpId(
   ))?.id
 }
 
+/** Streamed text marks the message at most this often. */
+export const TEXT_ACTIVITY_EVERY_MS = 1_000
+
 export function createStreamCallbacks(context: StreamMutationContext) {
   const {
     messageId,
@@ -203,6 +206,8 @@ export function createStreamCallbacks(context: StreamMutationContext) {
   // previous tool start. The accumulator itself is never cleared here — the
   // panel renders message.response, not action.beforeText.
   let responseMark = 0
+  // When streamed text last marked the message. Null until the turn's first text.
+  let textMarkedAt: number | null = null
 
   function sealActiveTurn(): void {
     const sealedText = finalResponseText(responseAccRef.current, agent)
@@ -221,6 +226,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
           ? {
               ...message,
               isStreaming: false,
+              streamedText: undefined,
               reasoningDone: true,
               response: sealedText,
               actions: sealPendingActions(message),
@@ -263,6 +269,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
 
     responseAccRef.current = ''
     responseMark = 0
+    textMarkedAt = null
     toolInputMapRef.current = new Map()
     failureTracked = false
     if (retarget.id) {
@@ -286,6 +293,16 @@ export function createStreamCallbacks(context: StreamMutationContext) {
       sealedByTurnBoundary = false
       markReasoningDone(setMessages, activeMessageId)
       responseAccRef.current += chunk
+      // Text counts as run activity. Mark it at most once a second, so a fast
+      // stream does not render the thread for every token.
+      const now = Date.now()
+      if (textMarkedAt === null || now - textMarkedAt >= TEXT_ACTIVITY_EVERY_MS) {
+        textMarkedAt = now
+        updateMessage(setMessages, activeMessageId, (message) => ({
+          ...message,
+          streamedText: (message.streamedText ?? 0) + 1,
+        }))
+      }
     },
 
     onToolStart: (toolName: string, toolId: string, input?: string) => {
@@ -466,6 +483,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
       updateMessage(setMessages, activeMessageId, (message) => ({
         ...message,
         isStreaming: false,
+        streamedText: undefined,
         reasoningDone: true,
         response: partial
           ? `${partial}\n\nError: ${reason ? `worker-failed: ${reason}` : displayError}`
@@ -493,6 +511,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
         ...message,
         capped,
         isStreaming: false,
+        streamedText: undefined,
         reasoningDone: true,
         response: normalizeAssistantResponseText(responseAccRef.current),
         actions: sealPendingActions(message),
@@ -513,6 +532,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
         updateMessage(setMessages, activeMessageId, (message) => ({
           ...message,
           isStreaming: false,
+          streamedText: undefined,
           reasoningDone: true,
           queuedFollowUp: undefined,
           actions: sealPendingActions(message),
@@ -526,6 +546,7 @@ export function createStreamCallbacks(context: StreamMutationContext) {
       updateMessage(setMessages, activeMessageId, (message) => ({
         ...message,
         isStreaming: false,
+        streamedText: undefined,
         reasoningDone: true,
         response: finalResponse,
         queuedFollowUp: undefined,

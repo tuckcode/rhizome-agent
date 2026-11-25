@@ -1,5 +1,9 @@
 const WORKER_START_FAILURE_PREFIX = 'worker-failed: '
 
+/** What a user reads when the engine did not start. The host's own words name internals. */
+export const ENGINE_DID_NOT_START = "Rhizome couldn't start its engine."
+
+
 /**
  * Reason after `worker-failed: `, or null when this is not a worker-start failure.
  *
@@ -27,14 +31,16 @@ export function workerStartFailureReason(message: string): string | null {
 
 /**
  * Assistant text for a failed send.
- * A worker that failed to start shows its reason. Every other message stays as written.
+ * A worker that failed to start says the engine did not start; the host's
+ * reason stays behind Copy error on the status line. Every other message
+ * stays as written.
  */
 export function presentWorkerStartFailure(message: string): string | null {
   const reason = workerStartFailureReason(message)
   if (!reason) return null
   const embedded = message.match(/\n\nError:\s*worker-failed: [\s\S]*$/u)
   if (embedded?.index !== undefined) {
-    return `${message.slice(0, embedded.index)}\n\nError: ${reason}`
+    return `${message.slice(0, embedded.index)}\n\nError: ${ENGINE_DID_NOT_START}`
   }
-  return `Error: ${reason}`
+  return `Error: ${ENGINE_DID_NOT_START}`
 }

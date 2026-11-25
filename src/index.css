@@ -953,24 +953,6 @@
   line-height: inherit;
 }
 
-/* --- AI panel working border animation --- */
-
-/*
- * Pulses the working indicator strip only.
- *
- * This animated `opacity` until 2026-08-22, and the rule lands on the
- * <aside> that wraps the whole AI panel — opacity applies to the entire
- * subtree, so the transcript, tool cards and composer all breathed from
- * full to 60% every two seconds for as long as a turn ran. Fading the
- * border colour itself gets the intended pulse and touches nothing else.
- *
- * Keep this animating border-left-color and nothing inheritable.
- */
-@keyframes ai-border-pulse {
-  0%, 100% { border-left-color: var(--accent-blue); }
-  50% { border-left-color: color-mix(in srgb, var(--accent-blue) 35%, transparent); }
-}
-
 /* --- Typing indicator dots --- */
 
 .typing-dot {
@@ -992,21 +974,15 @@
  *
  * `reducedMotion.ts` notes that nothing consulted this setting before confetti,
  * "which was fine while nothing moved on its own." That stopped being true: the
- * Chat border pulse and the typing dots both run `infinite` for the whole length
- * of a turn, and the header Sparkle and tool-count badge carry Tailwind's
- * `animate-pulse`. For the people this setting exists for, that is the case it
- * was meant to cover.
+ * typing dots run `infinite` for the whole length of a turn, and the header
+ * Sparkle and tool-count badge carry Tailwind's `animate-pulse`. For the people
+ * this setting exists for, that is the case it was meant to cover.
  *
- * The pulse conveys "a turn is running", which the status text also states, so
- * dropping the animation loses no information. Holding the dots at full opacity
- * keeps the indicator visible while it stops moving.
+ * The run status line states that a turn is running, so dropping the animation
+ * loses no information. Holding the dots at full opacity keeps the indicator
+ * visible while it stops moving. The Chat border does not move (ADR-0193).
  */
 @media (prefers-reduced-motion: reduce) {
-  /*
-   * The Chat border pulse is not here: it is an inline `animation` on the panel
-   * <aside> (aiPanelPulse.ts), which a stylesheet rule cannot override without
-   * !important. It consults prefersReducedMotion() in that module instead.
-   */
   .typing-dot {
     animation: none;
     opacity: 0.7;
@@ -1025,6 +1001,17 @@
   width: 100%;
   max-width: var(--chat-column-width, 46rem);
   margin-inline: auto;
+}
+/* New-chat screen: the input is the focal point, so it is larger. */
+[data-chat-home='true'] [data-testid='chat-composer-box'] {
+  padding: 0.5rem;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--text-primary) 8%, transparent),
+    0 8px 24px color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+[data-chat-home='true'] [data-testid='chat-composer-box'] [contenteditable] {
+  min-height: 3.5rem;
+  font-size: 1.125rem;
+  line-height: 1.6;
 }
 .chat-transcript {
   container-type: inline-size;

@@ -1,6 +1,14 @@
-import { useEffect, useRef, useState, type MutableRefObject, type ReactNode, type RefObject } from 'react'
+import { useEffect, useMemo, useRef, useState, type MutableRefObject, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { aiPanelFrameStyle } from './aiPanelPulse'
+import { recentNotesForChatHome } from '../lib/chatHomeNotes'
+import { ChatHomeSuggestions } from './ChatHomeSuggestions'
+import { ChatRunStatusLine } from './ChatRunStatusLine'
+import { useStopRunShortcut } from '../hooks/useStopRunShortcut'
+import { chatRunFailureFromReply, isChatgptAccountTarget, latestRunTurn } from '../lib/chatRunStatus'
+import { requestProviderSettingsFocus } from '../lib/providerSettingsFocus'
+import { accountRowId, summaryRowId } from '../lib/connectedProviders'
+import { CHATGPT_ACCOUNT_PROVIDER_ID } from '../lib/accountSignInProviders'
 import { APP_STORAGE_KEYS } from '../constants/appStorage'
 
 import { usePanelWidth } from '../hooks/usePanelWidth'
@@ -53,7 +61,6 @@ import { promoteSessionFromHost } from '../utils/promoteChatToVault'
 import { usePrimeSessionRestore } from '../hooks/usePrimeSessionRestore'
 import { usePrimeSessionStats } from '../hooks/usePrimeSessionStats'
 import { ChatComposerBar } from './ChatComposerBar'
-import { workerStartFailureReason } from '../lib/primeWorkerStartError'
 import { PrimeGoalDialog } from './PrimeGoalDialog'
 import { PrimeScheduleDialog } from './PrimeScheduleDialog'
 import { useAiPanelGoalDialog } from './useAiPanelGoalDialog'
@@ -113,6 +120,8 @@ interface AiPanelProps {
   forkTargetsPrimeEntry?: boolean
   /** Sessions-list → Mycelium for that session (C67). */
   onOpenMycelium?: (sessionPath: string) => void
+  /** Opens Settings > AI. The status line uses it to reach the ChatGPT account row. */
+  onOpenAiSettings?: () => void
 }
 
 interface AiPanelViewProps {
@@ -160,11 +169,19 @@ interface AiPanelViewProps {
   targetId?: string
   /** Sessions-list → Mycelium for that session (C67). */
   onOpenMycelium?: (sessionPath: string) => void
+  /** Opens Settings > AI. The status line uses it to reach the ChatGPT account row. */
+  onOpenAiSettings?: () => void
   newChatRef?: MutableRefObject<(() => void) | null>
 }
 
 function readinessFromReadyFlag(ready: boolean | undefined): AiAgentReadiness {
   return (ready ?? true) ? 'ready' : 'missing'
+}
+
+/** Open Settings > AI on the ChatGPT account row in Connected. */
+function openChatgptAccountRow(openAiSettings: () => void): void {
+  requestProviderSettingsFocus({ tab: 'api', rowId: summaryRowId(accountRowId(CHATGPT_ACCOUNT_PROVIDER_ID)) })
+  openAiSettings()
 }
 
 function getLastAgentMessage(messages: AiAgentMessage[]): string | null {
@@ -276,6 +293,7 @@ export function AiPanelView({
   targetId,
   vaultPath = null,
   onOpenMycelium,
+  onOpenAiSettings,
   newChatRef,
 }: AiPanelViewProps) {
   const view = resolveAiPanelViewModel({
@@ -310,6 +328,8 @@ export function AiPanelView({
   // usage reflects the exchange that just happened.
   const primeStats = usePrimeSessionStats(isPrimeTarget, agent.status)
   const { queue, refresh: refreshQueue, clear: clearQueue } = usePrimeQueue(isPrimeTarget, isActive)
+  const recentNotes = useMemo(() => recentNotesForChatHome(entries ?? []), [entries])
+  useStopRunShortcut(isActive, handleStop, panelRef)
   // If Waiting chrome shows a follow-up, the transcript must show it too —
   // send-path append alone can lose a race with rehydrate (2026-09-06 dogfood).
   useEffect(() => {
@@ -509,6 +529,19 @@ export function AiPanelView({
     reportError: reportSwitchError,
   })
 
+  const onContinueMessage = agent.getNativeSession().readOnly ? undefined : agent.continueMessage
+  const latestTurn = latestRunTurn(agent.messages)
+  const cappedTurnId = !isActive && latestTurn?.capped ? latestTurn.id : undefined
+  const runFailure = agent.status === 'error'
+    ? chatRunFailureFromReply(getLastAgentMessage(agent.messages), { chatgptTarget: isChatgptAccountTarget(modelTarget) })
+    : null
+  const failedTurnId = runFailure ? latestTurn?.id : undefined
+
+  // The new-chat screen: no message, no run, no picked session, and an agent that is ready.
+  const chatHome = agent.messages.length === 0
+    && !isActive
+    && transcriptState === 'new'
+    && view.defaultAiAgentReadiness === 'ready'
   return (
     <NativeLiveSlotProvider slot={agent.getNativeLiveSlot?.() ?? null}>
     <>
@@ -615,7 +648,7 @@ export function AiPanelView({
         onOpenNote={onOpenNote}
         onNavigateWikilink={handleNavigateWikilink}
         onRegenerateMessage={agent.regenerateMessage}
-        onContinueMessage={agent.getNativeSession().readOnly ? undefined : agent.continueMessage}
+        onContinueMessage={onContinueMessage}
         onPromoteToVault={
           onPromoteToVault
             ? (text) => onPromoteToVault(text, promoteSessionFromHost(primeHost.sessionId, primeHost.sessionPath))
@@ -625,6 +658,7 @@ export function AiPanelView({
         hasContext={hasContext}
         focusedTranscriptIndex={focusedTranscriptIndex}
         transcriptState={transcriptState}
+        runFailure={runFailure?.label ?? null}
       />
       </div>
       </div>
@@ -664,6 +698,7 @@ export function AiPanelView({
         queue={isPrimeTarget ? queue : undefined}
         onClearQueue={isPrimeTarget ? () => void clearQueue() : undefined}
         onStop={handleStop}
+        home={chatHome ? <ChatHomeSuggestions recentNotes={recentNotes} onOpenNote={onOpenNote} /> : undefined}
         onUnsupportedAiPaste={reportAttachment}
         vision={vision}
         modelLabel={modelTarget.split('/').pop() || 'This model'}
@@ -700,13 +735,20 @@ export function AiPanelView({
           <ChatComposerBar
             locale={locale}
             deck={composerDeck}
-            working={isActive}
-            failureReason={isPrimeTarget && agent.status === 'error'
-              ? workerStartFailureReason(getLastAgentMessage(agent.messages) ?? '')
-              : null}
             stats={primeStats}
           />
         ) : undefined}
+        statusLine={(
+          <ChatRunStatusLine
+            messages={agent.messages}
+            isActive={isActive}
+            failure={runFailure}
+            onStop={handleStop}
+            onContinue={cappedTurnId && onContinueMessage ? () => onContinueMessage(cappedTurnId) : undefined}
+            onSignIn={onOpenAiSettings ? () => openChatgptAccountRow(onOpenAiSettings) : undefined}
+            onRetry={failedTurnId ? () => void agent.regenerateMessage(failedTurnId) : undefined}
+          />
+        )}
         commandEntries={isPrimeTarget ? localizedCommands : undefined}
         commandDisabled={isPrimeTarget ? commandDisabled : undefined}
         commandSkillLabel={translate(locale, 'ai.command.skill')}
@@ -784,6 +826,7 @@ export function AiPanel({
   onConversationReset,
   onSessionHeader,
   onOpenMycelium,
+  onOpenAiSettings,
 }: AiPanelProps) {
   const defaultAiAgentReadiness = chatEngineAllowsSendWithoutPrime(chatEngine)
     ? 'ready'
@@ -829,6 +872,7 @@ export function AiPanel({
       onConversationReset={onConversationReset}
       onSessionHeader={onSessionHeader}
       onOpenMycelium={onOpenMycelium}
+      onOpenAiSettings={onOpenAiSettings}
       onClose={onClose}
       onOpenNote={onOpenNote}
       onPromoteToVault={onPromoteToVault}

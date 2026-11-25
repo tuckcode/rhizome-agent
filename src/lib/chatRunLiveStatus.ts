@@ -14,6 +14,10 @@ export interface ChatRunSnapshot {
   tools: ChatRunTool[]
   notice?: string
   noticeId?: string
+  /** The run has had no event for 30 seconds and no tool runs. */
+  quiet?: boolean
+  /** Why the run did not start, in the words the status line shows. */
+  failure?: string
 }
 
 interface ChatRunMessage {
@@ -21,6 +25,8 @@ interface ChatRunMessage {
   id?: string
   actions?: Array<{ tool: string; toolId?: string; status: string; approval?: unknown }>
   response?: string
+  isStreaming?: boolean
+  streamedText?: number
   localMarker?: string
   localMarkerTone?: 'warning'
 }
@@ -47,6 +53,10 @@ export function nextChatRunAnnouncement(
 ): string | null {
   if (!previous) return null
 
+  if (next.failure && next.failure !== previous.failure) {
+    return next.failure
+  }
+
   const lines: string[] = []
   if (next.notice && next.noticeId && next.noticeId !== previous.noticeId) {
     lines.push(next.notice)
@@ -56,6 +66,9 @@ export function nextChatRunAnnouncement(
   }
   if (lines.length > 0) {
     return lines.join(' ')
+  }
+  if (next.isActive && next.quiet && !previous.quiet) {
+    return 'No response for 30 seconds'
   }
 
   for (const tool of next.tools) {
@@ -100,7 +113,7 @@ export function chatRunSnapshotFromMessages(
 
   return {
     isActive,
-    hasResponse: Boolean(latestTurn?.response?.trim()),
+    hasResponse: Boolean(latestTurn?.response?.trim()) || Boolean(latestTurn?.isStreaming && latestTurn.streamedText),
     ...(latestTurn?.capped ? { capped: latestTurn.capped } : {}),
     tools: (latestTurn?.actions ?? []).map((action) => ({
       id: action.toolId || action.tool,
