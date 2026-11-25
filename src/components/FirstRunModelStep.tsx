@@ -67,7 +67,7 @@ const PATH_LABELS: Record<FirstRunModelPath, { title: string; description: strin
     description: 'Use your ChatGPT plan. Sign-in opens in your browser.',
   },
   claude_code: {
-    title: 'Claude',
+    title: 'Claude Code',
     description: 'Use your Claude plan. Claude Code opens sign-in in your browser.',
   },
   api_key: {
@@ -418,7 +418,7 @@ function ClaudeCodePanel({
         </p>
         <div>
           <Button type="button" disabled={busy} onClick={onUse} data-testid="first-run-model-claude-code-use">
-            Use Claude
+            Use Claude Code
           </Button>
         </div>
       </div>
