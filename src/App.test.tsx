@@ -1686,6 +1686,9 @@ describe('App', () => {
     })
     expect(saveVaultList).toHaveBeenCalledTimes(1)
 
+    // First run asks for a model after the vault step.
+    fireEvent.click(await screen.findByTestId('first-run-model-skip', undefined, { timeout: SLOW_APP_READY_TIMEOUT_MS }))
+
     await waitFor(() => {
       expect(screen.getByTestId('status-vault-trigger')).toHaveTextContent('Work Vault')
     }, { timeout: SLOW_APP_READY_TIMEOUT_MS })
@@ -1740,6 +1743,8 @@ describe('App', () => {
       })
     })
     expect(saveVaultList).toHaveBeenCalledTimes(1)
+
+    fireEvent.click(await screen.findByTestId('first-run-model-skip', undefined, { timeout: SLOW_APP_READY_TIMEOUT_MS }))
 
     await waitFor(() => {
       expect(screen.getByTestId('status-vault-trigger')).toHaveTextContent(expectedLabel)
