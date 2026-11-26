@@ -1196,45 +1196,6 @@ pub async fn get_prime_provider_status() -> Result<Vec<crate::preflight::Provide
     run_blocking(crate::preflight::provider_statuses).await
 }
 
-/// Sign Prime in to an OAuth provider in the system browser (ADR-0176).
-///
-/// Resolves once the browser has returned and Prime has stored the token,
-/// then reloads the attached session so it reads the new credential.
-#[cfg(desktop)]
-#[tauri::command]
-pub async fn sign_in_prime_provider(app: tauri::AppHandle, provider: String) -> Result<(), String> {
-    use tauri_plugin_opener::OpenerExt;
-
-    tokio::task::spawn_blocking(move || {
-        crate::prime_login::sign_in(&provider, crate::prime_login::KeySource::Browser, |url| {
-            if let Err(error) = app.opener().open_url(url, None::<&str>) {
-                log::warn!("Could not open the sign-in page: {error}");
-            }
-        })?;
-        crate::prime_session_host::reload_attached_session();
-        Ok(())
-    })
-    .await
-    .map_err(|error| format!("Sign-in task failed: {error}"))?
-}
-
-/// Store a pasted API key in Prime's credential store (ADR-0176).
-#[cfg(desktop)]
-#[tauri::command]
-pub async fn save_prime_provider_key(provider: String, key: String) -> Result<(), String> {
-    tokio::task::spawn_blocking(move || {
-        crate::prime_login::sign_in(
-            &provider,
-            crate::prime_login::KeySource::Pasted(&key),
-            |_| {},
-        )?;
-        crate::prime_session_host::reload_attached_session();
-        Ok(())
-    })
-    .await
-    .map_err(|error| format!("Saving the key failed: {error}"))?
-}
-
 /// Fetch Nous Portal's public model list and merge it into Prime's catalog.
 ///
 /// Does not write the API key. Prime still reads `NOUS_API_KEY` from the
