@@ -7,9 +7,9 @@ A **session** is one chat with the agent. Rhizome lists your sessions on the lef
 
 ## Two kinds of session
 
-Which kind you get depends on the engine that ran the chat. See [Agents, engines and models](../concepts/ai.md).
+New chats always run on Rhizome's engine. Sessions that Prime saved before it stopped being a chat engine are the other kind. See [Agents, engines and models](../concepts/ai.md).
 
-| | Prime sessions | Chats on Rhizome's engine |
+| | Old Prime sessions | Chats on Rhizome's engine |
 |---|---|---|
 | Kept in | `~/.prime/agent/sessions/` | `native-sessions/` in the app config folder |
 | Owned by | Prime | Rhizome |

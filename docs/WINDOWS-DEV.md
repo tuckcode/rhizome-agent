@@ -1,4 +1,4 @@
-# Windows development — Rhizome + Prime
+# Windows development
 
 > **⚠️ Status, corrected 2026-08-22: the app has never been launched on
 > Windows.** Not "the daemon does not connect yet" — nobody has observed
@@ -13,10 +13,9 @@
 >
 > **Stamped 16:05:** still no Windows work this window. C42 stays skip.
 
-Rhizome **targets** Windows (Tauri + WebView2). Prime chat/sessions
-need the **`prime-agent` daemon** running on the same machine; the named-pipe
-client for it landed in `1922a27`/`326930b` and is likewise unverified on a
-real Windows box.
+Rhizome **targets** Windows (Tauri + WebView2). Chat runs on Rhizome's own
+engine (ADR-0187), so no outside daemon is needed. Prime is no longer part of
+Rhizome (ADR-0189).
 
 ## One-time prerequisites
 
@@ -44,39 +43,11 @@ cd rhizome-agent
 git pull origin main
 ```
 
-You need **`1922a27` or later** (`feat: connect Prime daemon over Windows named
-pipe (#32)`). Check:
-
-```powershell
-git log -1 --oneline
-```
-
-## Install JS + Prime CLI
+## Install packages
 
 ```powershell
 pnpm install
-prime-agent --version
 ```
-
-Prime Agent is not the npm package `prime-agent`. That name is not on the public registry. Install Prime from [Prime's install page](https://github.com/PrimeIntellect-ai/prime-agent#install). The published installer is for macOS and Linux.
-
-`0.7.1+` required (`0.7.4` probed in handoff).
-
-## Start Prime daemon (required for chat / sessions)
-
-The daemon must stay running while you use Prime features. Start it detached:
-
-```powershell
-Start-Process prime-agent -ArgumentList "--mode","daemon" -WindowStyle Hidden
-Start-Sleep -Seconds 2
-prime-agent status
-```
-
-Look for a line containing `\\.\pipe\prime-agent-daemon` (may show a `*`
-marker for the default service — that is display only, not part of the path).
-
-If status fails, the CLI is not on `PATH` — reopen the terminal after
-`npm i -g`, or use the full path under `%APPDATA%\npm\prime-agent.cmd`.
 
 ## Run Rhizome
 
@@ -86,22 +57,13 @@ pnpm tauri dev
 
 First compile can take several minutes (Rust + frontend).
 
-### UI-only without a daemon
+### Interface only
 
 ```powershell
 pnpm dev
 ```
 
-Uses `mock-tauri` — session list UI works without Prime.
-
-## Troubleshooting Prime on Windows
-
-| Symptom | Fix |
-|--------|-----|
-| “Prime not installed” | Install Prime from its install page, then restart the terminal |
-| “Service unreachable” | Start daemon (see above); `prime-agent status` |
-| Wrong pipe | `$env:RHIZOME_PRIME_DAEMON_SOCKET='\\.\pipe\prime-agent-daemon'` then retry |
-| App builds but Prime panel empty | Open a vault first; attach creates a session |
+Uses `mock-tauri`, so the interface runs without the Rust backend.
 
 ## Build a Windows installer (optional)
 

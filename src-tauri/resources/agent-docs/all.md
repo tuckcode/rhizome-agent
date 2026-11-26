@@ -12,7 +12,7 @@ A coding harness that doesn't forget. Rhizome runs its own agent loop on any mod
 ## What you get
 
 - **Memory you can read.** Save an answer to the vault with one click. It becomes a Markdown file. In a Git repository, every change is a commit you can undo. [Your vault is the agent's memory](concepts/vault-as-memory.md)
-- **A replay of where the agent went.** Mycelium draws the folder a Prime run worked in as a map, and lights up each file the agent searched, read or edited. [Mycelium](concepts/mycelium.md)
+- **A replay of where the agent went.** Mycelium draws the folder an old Prime run worked in as a map, and lights up each file the agent searched, read or edited. [Mycelium](concepts/mycelium.md)
 - **Free models that switch for you.** With **Taproot**, Rhizome routes a chat across free hosted models. When a provider fails or runs out, it moves to the next one. [Free models and routing](concepts/free-models-and-routing.md)
 - **Its own agent loop.** Rhizome sends your message to a model, runs the tools the model asks for, and repeats until the answer is done. That native loop is the only chat engine (ADR-0187). [Agents, engines and models](concepts/ai.md)
 
@@ -76,8 +76,6 @@ Type a message and press Enter. You should get an answer, or a clear failure:
 | You see | Do this |
 |---|---|
 | No provider key | Add a key in Settings → AI Agents → API model, or turn on a free provider. See [Set up models and keys](../guides/configure-ai-models.md) |
-| Prime is installed, but Chat still says it's missing | Applies to Prime-locked chats only. Wait a few seconds. The check repeats |
-| The provider login expired (Prime) | Run `prime-agent` and `/login` in a terminal. Settings no longer has a Prime sign-in |
 
 More cases: [Chat doesn't answer](../troubleshooting/chat-doesnt-answer.md).
 
@@ -94,7 +92,7 @@ Show Notes with ⌘2 (or the View menu), open the note, quit Rhizome with ⌘Q, 
 | What | Where |
 |---|---|
 | Notes, attachments, types, saved views | Your vault folder |
-| Prime chat sessions | `~/.prime/agent/sessions/` |
+| Old Prime chat sessions, read by Mycelium | `~/.prime/agent/sessions/` |
 | Chats from Rhizome's own engine | `native-sessions/` in the app config folder (`com.rhizome.app`) |
 | API keys | The system keychain |
 | Settings, window size, recent vaults | Local app settings |
@@ -139,21 +137,9 @@ cd rhizome-agent
 pnpm tauri dev
 ```
 
-`./install.sh` installs the project's dependencies. If Prime Agent isn't on the machine, it may still download Prime's command-line tool. Chat doesn't use it (ADR-0189), and that step comes out with the leftover engine code. Rhizome doesn't include a copy of Prime or Node. Chat runs on Rhizome's own engine.
+`./install.sh` clones the repo if needed and installs the project's dependencies. It downloads nothing else. Rhizome doesn't include a copy of Node. Chat runs on Rhizome's own engine.
 
 `pnpm tauri dev` builds the app and opens it.
-
-## Set up Prime (legacy)
-
-Skip this section unless you use Prime from the CLI. New chats use Rhizome's own engine. Add a provider key or use **Taproot** in Settings → AI Agents. See [Set up models and keys](../guides/configure-ai-models.md).
-
-The first time `prime-agent` runs in a terminal, it asks you to run `/login` and choose a model provider. Rhizome's Settings no longer has a Prime sign-in.
-
-Prime stops when the terminal that started it closes. To keep it running in the background:
-
-```bash
-(prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status
-```
 
 ## If you already have a built copy
 
@@ -238,7 +224,7 @@ If the vault is a Git repository, every change to it can be committed, including
 
 ## See where the agent went
 
-**Mycelium** replays a Prime session as a map. The folder the agent worked in becomes a city of files, and each file the agent searched, read or edited lights up. When something breaks, you can see which files a run touched and where it went in circles. Mycelium uses the open-source Mindwalk project, which you install separately. [Mycelium](../concepts/mycelium.md)
+**Mycelium** replays an old Prime session as a map. The folder the agent worked in becomes a city of files, and each file the agent searched, read or edited lights up. When something breaks, you can see which files a run touched and where it went in circles. Mycelium uses the open-source Mindwalk project, which you install separately. [Mycelium](../concepts/mycelium.md)
 
 ## Free models, routed for you
 
@@ -566,7 +552,7 @@ Mycelium uses [Mindwalk](https://github.com/cosmtrek/mindwalk) (MIT) © 2026 Ric
 ## Before you start
 
 1. Install Mindwalk so that the `mindwalk` program is on your path. See [Mindwalk](https://github.com/cosmtrek/mindwalk) for install steps.
-2. Chat with Prime as the engine. Mycelium reads Prime sessions from `~/.prime/agent/sessions/`. It doesn't show chats from Rhizome's own engine, and the agent can't search old Mycelium sessions.
+2. Have Prime sessions on disk. Mycelium reads sessions that Prime saved in `~/.prime/agent/sessions/` before it stopped being a chat engine (ADR-0189). It doesn't show chats from Rhizome's own engine yet, and the agent can't search old Mycelium sessions.
 
 If Mindwalk is missing, Mycelium says **Install Mindwalk, then retry**.
 
@@ -928,7 +914,7 @@ The agent's long-term memory is your vault: a folder of Markdown files you can r
 ## What you get
 
 - **You decide what's remembered.** Knowledge reaches the vault when you save it, not as a side effect of every chat.
-- **Recall shows its source.** When a Prime answer uses a vault note, it's marked **From your vault**, so you can open the note and check.
+- **Recall shows its source.** When an answer reads a vault note with the `get_note` tool, it's marked **From your vault**, so you can open the note and check.
 - **Memory is reversible.** In a Git-backed vault, every saved or edited note is a change you can diff and revert.
 - **Memory is portable.** It's plain Markdown. Open it in another editor, sync it with Git, or keep it if you stop using Rhizome.
 
@@ -978,13 +964,13 @@ A vault can hold an `AGENTS.md` file with your conventions: how notes are named,
 |---|---|---|
 | Saved notes | The vault | Read, edit, diff, revert, sync |
 | Imported Claude Code chats | `Imports/claude-code/` in the vault | Read, edit, link |
-| Chat transcripts (Prime) | `~/.prime/agent/sessions/` | Resume from the sessions list |
+| Old chat transcripts (Prime) | `~/.prime/agent/sessions/` | Read in Mycelium |
 | Chat transcripts (Rhizome's engine) | `native-sessions/` in the app config folder | Resume from the sessions list |
 | Vault activity log | `.rhizome/events.jsonl` in the vault | Inspect |
 
 ## Related
 
-- [Mycelium](mycelium.md): see which files a Prime run touched.
+- [Mycelium](mycelium.md): see which files an old Prime run touched.
 - [Vaults](vaults.md) · [Git](git.md) · [Chat with the agent](../guides/use-ai-panel.md)
 
 ---
@@ -1145,7 +1131,7 @@ If you already use Claude Code, Hermes Agent, Cursor or Prime, a lot of what you
 
 ## The one big difference
 
-In most harnesses, memory is a file or store that belongs to the tool: `MEMORY.md`, `USER.md`, a database, a cloud account. In Rhizome, memory is your **vault**, a folder of Markdown notes. You choose what's saved with **Save to vault**. With Prime, answers that use a note say it came from your vault. With Git, every change can be diffed and reverted. See [Your vault is the agent's memory](../concepts/vault-as-memory.md).
+In most harnesses, memory is a file or store that belongs to the tool: `MEMORY.md`, `USER.md`, a database, a cloud account. In Rhizome, memory is your **vault**, a folder of Markdown notes. You choose what's saved with **Save to vault**. Answers that read a note say it came from your vault. With Git, every change can be diffed and reverted. See [Your vault is the agent's memory](../concepts/vault-as-memory.md).
 
 ## From Claude Code
 
@@ -1166,7 +1152,7 @@ Rhizome doesn't run Claude Code inside Chat. Keep using Claude Code in the termi
 |---|---|
 | `MEMORY.md` / `USER.md` | Vault notes you save on purpose. Automatic saving exists but is off by default |
 | Memory writes you approve | **Save to vault** is an explicit click. It writes straight away, so review the note after, or undo with Git |
-| Observable, interruptible runs | Stop any run; with Prime, send a follow-up while it works; see a Prime run's file footprint in [Mycelium](../concepts/mycelium.md) |
+| Observable, interruptible runs | Stop any run; see an old Prime run's file footprint in [Mycelium](../concepts/mycelium.md) |
 | Skills | Rhizome's own plugin system is planned |
 | Your choice of provider | Your own providers, local models or **Taproot**. Keys live in the system keychain |
 
@@ -1466,9 +1452,9 @@ A **session** is one chat with the agent. Rhizome lists your sessions on the lef
 
 ## Two kinds of session
 
-Which kind you get depends on the engine that ran the chat. See [Agents, engines and models](../concepts/ai.md).
+New chats always run on Rhizome's engine. Sessions that Prime saved before it stopped being a chat engine are the other kind. See [Agents, engines and models](../concepts/ai.md).
 
-| | Prime sessions | Chats on Rhizome's engine |
+| | Old Prime sessions | Chats on Rhizome's engine |
 |---|---|---|
 | Kept in | `~/.prime/agent/sessions/` | `native-sessions/` in the app config folder |
 | Owned by | Prime | Rhizome |
@@ -1636,7 +1622,7 @@ See [Agents, engines and models](../concepts/ai.md#permission-modes).
 ## See what the agent did
 
 - **Changes:** next to All Notes in the sidebar. The files that changed, with diffs. Commit or revert.
-- **Mycelium:** for Prime sessions, a map of which files the run searched, read or edited. See [Mycelium](../concepts/mycelium.md). Native chats are not drawn in Mycelium.
+- **Mycelium:** for old Prime sessions, a map of which files the run searched, read or edited. See [Mycelium](../concepts/mycelium.md). Native chats are not drawn in Mycelium.
 
 ## Requests that work well
 
@@ -1918,7 +1904,7 @@ Type is not inferred from folder location. It comes from frontmatter, and relati
 | `AGENTS.md` | Your conventions for AI agents working in this vault. |
 | `CLAUDE.md` | A compatibility copy for tools that look for that name. |
 
-Chats from Rhizome's engine aren't kept in the vault. They're in `native-sessions/` in the app config folder. Prime keeps its sessions in `~/.prime/agent/sessions/`.
+Chats from Rhizome's engine aren't kept in the vault. They're in `native-sessions/` in the app config folder. Sessions saved by Prime before it was removed stay in `~/.prime/agent/sessions/`, where Mycelium reads them.
 
 PDFs, images, and other non-Markdown files stay as normal files. Folder browsing can show them in place, and Settings controls whether PDFs, images, and unsupported files appear in All Notes.
 
@@ -2069,10 +2055,6 @@ There's no in-app updater. To update:
 3. Run `./install.sh`, then `pnpm tauri dev`.
 
 If you built an `.app` before, replace it with a new build.
-
-## Update Prime
-
-If you still use Prime from the CLI or in a legacy Prime-locked chat, Rhizome may check for Prime updates but never installs one on its own. When an update is ready, click **Update now**. If it fails, update Prime from a terminal.
 
 ## Report a platform bug
 
@@ -2476,29 +2458,20 @@ You can also customize view appearance with the same kind of icon and color cont
 Source: troubleshooting/ai-agent-not-found.md
 URL: /troubleshooting/ai-agent-not-found
 
-Rhizome runs Prime Agent as a separate program. It can only use Prime when Prime is installed and Rhizome can find it.
+Chat runs on Rhizome's own engine, which is built into the app and needs nothing else installed. Other agents, such as a command-line tool you picked as a chat target, run as separate programs. Rhizome can only use one when it is installed and Rhizome can find it.
 
-You don't need Prime for Chat. Rhizome's own engine is the only chat engine, and Prime is no longer a chat engine (ADR-0189); its leftover code is still in the repo until the follow-up PRs.
+Prime and Hermes are no longer chat engines (ADR-0189). A chat that used to run on them now runs on Rhizome's engine.
 
 ## Symptoms
 
-- Chat says Prime is missing.
-- `prime-agent` works in one terminal but not from Rhizome.
+- The command palette says an agent "is not available on this machine".
+- The agent's command works in one terminal but not from Rhizome.
 
-## Checks
+## Fixes
 
-1. Open a terminal and run:
-
-   ```bash
-   prime-agent status
-   ```
-
-2. If the command isn't found, run `./install.sh` in your `rhizome-agent` folder. It installs Prime when it's missing.
-3. If Prime is installed but not running, start the daemon:
-
-   ```bash
-   (prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status
-   ```
+1. Click **Use Rhizome instead** to send the prompt to Rhizome's own engine.
+2. Or click **Install**, follow that agent's install steps, then try again.
+3. If the agent is installed but still not found, check your `PATH` below.
 
 ## Path issues
 
@@ -2525,16 +2498,7 @@ New chats use Rhizome's own engine (ADR-0187).
 | Enter does nothing while a reply runs | Rhizome's engine takes one turn at a time. Wait for the reply, or press Stop |
 | Another window is already running this chat | Only one turn can run at a time. Wait, or continue in that window |
 
-## Prime Agent
-
-| You see | Do this |
-|---|---|
-| Prime is missing | Applies to Prime-locked chats only. Install Prime with `./install.sh`, run `prime-agent` once, and start the daemon (see [Install](../start/install.md#set-up-prime-legacy)) |
-| Prime is installed, but Chat still says it's missing | Wait a few seconds. The check repeats. If it keeps failing, see [AI agent not found](ai-agent-not-found.md) |
-| Chat stopped answering after you closed a terminal | Prime stops with the terminal that started it. Start it as a daemon: `(prime-agent --mode daemon >/dev/null 2>&1 &) && sleep 2 && prime-agent status` |
-| The provider login expired | Run `prime-agent`, then `/login`. Settings no longer has a Prime sign-in |
-
-## Either engine
+## Anything else
 
 | You see | Do this |
 |---|---|
@@ -2579,7 +2543,7 @@ If `git fetch` fails in the terminal, fix system Git auth first.
 Source: troubleshooting/model-provider-connection.md
 URL: /troubleshooting/model-provider-connection
 
-Use this checklist when a model provider doesn't answer. It applies to Rhizome's own engine. Prime handles its own providers; see [Chat doesn't answer](chat-doesnt-answer.md).
+Use this checklist when a model provider doesn't answer. It applies to Rhizome's own engine. For other cases, see [Chat doesn't answer](chat-doesnt-answer.md).
 
 ## Local providers
 

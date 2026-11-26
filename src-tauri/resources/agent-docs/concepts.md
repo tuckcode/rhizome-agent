@@ -290,7 +290,7 @@ Mycelium uses [Mindwalk](https://github.com/cosmtrek/mindwalk) (MIT) © 2026 Ric
 ## Before you start
 
 1. Install Mindwalk so that the `mindwalk` program is on your path. See [Mindwalk](https://github.com/cosmtrek/mindwalk) for install steps.
-2. Chat with Prime as the engine. Mycelium reads Prime sessions from `~/.prime/agent/sessions/`. It doesn't show chats from Rhizome's own engine, and the agent can't search old Mycelium sessions.
+2. Have Prime sessions on disk. Mycelium reads sessions that Prime saved in `~/.prime/agent/sessions/` before it stopped being a chat engine (ADR-0189). It doesn't show chats from Rhizome's own engine yet, and the agent can't search old Mycelium sessions.
 
 If Mindwalk is missing, Mycelium says **Install Mindwalk, then retry**.
 
@@ -652,7 +652,7 @@ The agent's long-term memory is your vault: a folder of Markdown files you can r
 ## What you get
 
 - **You decide what's remembered.** Knowledge reaches the vault when you save it, not as a side effect of every chat.
-- **Recall shows its source.** When a Prime answer uses a vault note, it's marked **From your vault**, so you can open the note and check.
+- **Recall shows its source.** When an answer reads a vault note with the `get_note` tool, it's marked **From your vault**, so you can open the note and check.
 - **Memory is reversible.** In a Git-backed vault, every saved or edited note is a change you can diff and revert.
 - **Memory is portable.** It's plain Markdown. Open it in another editor, sync it with Git, or keep it if you stop using Rhizome.
 
@@ -702,13 +702,13 @@ A vault can hold an `AGENTS.md` file with your conventions: how notes are named,
 |---|---|---|
 | Saved notes | The vault | Read, edit, diff, revert, sync |
 | Imported Claude Code chats | `Imports/claude-code/` in the vault | Read, edit, link |
-| Chat transcripts (Prime) | `~/.prime/agent/sessions/` | Resume from the sessions list |
+| Old chat transcripts (Prime) | `~/.prime/agent/sessions/` | Read in Mycelium |
 | Chat transcripts (Rhizome's engine) | `native-sessions/` in the app config folder | Resume from the sessions list |
 | Vault activity log | `.rhizome/events.jsonl` in the vault | Inspect |
 
 ## Related
 
-- [Mycelium](mycelium.md): see which files a Prime run touched.
+- [Mycelium](mycelium.md): see which files an old Prime run touched.
 - [Vaults](vaults.md) · [Git](git.md) · [Chat with the agent](../guides/use-ai-panel.md)
 
 ---
