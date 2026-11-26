@@ -184,6 +184,29 @@ Native tools: `echo`; read-only `read_file`, `list_dir`, `grep`, `glob`
 identity. ADR-0187's "Power User edits auto-run" line does not match the
 code: mutate tools still ask.
 
+### First launch, Connected, images, step caps (2026-10-24)
+
+Verified against `resolveEffectiveChatEngine`, `ConnectedProvidersSummary`,
+`composerAttachments.ts`, `chat_images.rs`, `agent_max_steps`, and the
+removed Prime update / onboarding paths.
+
+- First launch has no `AiAgentsOnboardingPrompt`, no Show AI Setup, and no
+  agent-runtime picker. After the vault, Chat is native.
+  `resolveEffectiveChatEngine` always returns `native`.
+- There is no Prime Chat-engine update offer. Do not restore
+  `usePrimeUpdate`, `ChatEngineUpdateBanner`, or `prime_update.rs`.
+  `VersionUpdateIndicator` is Rhizome only.
+- Settings → AI Agents opens on **Connected**. Local CLI cards do not
+  offer Use in chat. The picker keeps unset providers as disabled rows
+  and links the footer to Connected. A live list that stalls 10 seconds
+  says Couldn't load models.
+- Native images: PNG / JPEG / GIF / WebP, at most 4, 5 MB each. Stored
+  beside the JSONL as `{id}.images.json` + `{id}-images/` (ADR-0190).
+  Text-only refuses. Unknown asks **Send anyway**. Anthropic stays refused.
+- `agent_max_steps` defaults to 50. A capped turn is `TurnCapped`, not
+  success or failure. Chat shows **Continue**; each Continue gets 50
+  fresh rounds. Do not treat a cap as a fatal error.
+
 ### Prime verbs that landed in Chat
 
 Implemented on main. **#14 / #17 / #18 closed tonight** (2026-09-13):

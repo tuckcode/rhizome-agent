@@ -3,7 +3,7 @@ title: Model provider connection
 description: What to check when a local or hosted model provider won't connect.
 ---
 
-Use this checklist when a model provider doesn't answer. It applies to Rhizome's own engine. Prime handles its own providers; see [Chat doesn't answer](chat-doesnt-answer.md).
+Use this checklist when a model provider doesn't answer. It applies to Rhizome's own engine. Settings → AI Agents opens on **Connected**, which shows Ready, Needs a key, Not running, or Couldn't load models.
 
 ## Local providers
 
@@ -19,7 +19,8 @@ For Ollama or LM Studio:
 1. Check the provider kind and endpoint.
 2. Check that the model ID exists for your account.
 3. Check the key. With **Save locally in Rhizome**, the key is in the system keychain. With **Read from env var**, the variable must be set for the app, not only in your terminal.
-4. Click **Test model**. It sends one short request with no tools.
+4. Click **Test model**. It sends one short request with no tools. You can also paste a key and test from **Connected**.
+5. If the picker says **Couldn't load models**, wait for Retry. The live list gives up after 10 seconds.
 
 Never store keys in the vault. Vault notes are committed and can be pushed.
 

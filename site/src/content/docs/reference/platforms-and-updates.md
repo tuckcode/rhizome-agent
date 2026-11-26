@@ -11,11 +11,19 @@ Rhizome is a developer preview. It's built and tested on macOS, from source.
 | Windows | Builds from source, but isn't supported for daily use yet |
 | Linux | Builds from source, but hasn't been checked as an install for someone new |
 
-There is no signed download, no Homebrew package, and no release channel yet. The app reports version `0.1.0`. That's the bundle version, not a promise about every macOS release.
+There is no signed download for a stranger and no Homebrew package. The app reports version `0.1.0`. That's the bundle version, not a promise about every macOS release.
 
-## Update Rhizome
+## Update a packaged app
 
-There's no in-app updater. To update:
+The packaged app checks for **Rhizome** updates on startup when **Check for updates automatically** is on in Settings. You can also click **Check for updates** in the status bar.
+
+If an update is ready, **Update now** downloads and installs Rhizome through the Tauri updater. Restart with the existing Restart control. That offer updates Rhizome only. There is no Prime Chat-engine update check.
+
+Alpha reads the `alpha-latest` feed. Stable reads `stable-latest`. Those tags are prereleases on purpose: GitHub's latest-release URL does not serve alpha builds.
+
+A source `pnpm tauri dev` session is not this path. An unsigned local build cannot install from the signed feed.
+
+## Update a source checkout
 
 1. Commit or push important vault changes first. Your notes are local files, but a clean Git state makes recovery simpler.
 2. Pull the latest code: `git pull` in your `rhizome-agent` folder.
@@ -23,9 +31,9 @@ There's no in-app updater. To update:
 
 If you built an `.app` before, replace it with a new build.
 
-## Update Prime
+## Prime from the CLI
 
-If you still use Prime from the CLI or in a legacy Prime-locked chat, Rhizome may check for Prime updates but never installs one on its own. When an update is ready, click **Update now**. If it fails, update Prime from a terminal.
+Skip this unless you still run `prime-agent` in a terminal. Chat does not use it. Rhizome does not offer to update Prime. Update that CLI yourself if you need a newer copy.
 
 ## Report a platform bug
 

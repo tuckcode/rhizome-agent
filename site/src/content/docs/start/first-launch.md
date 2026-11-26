@@ -16,7 +16,9 @@ Change either one later in Settings → Telemetry. Analytics events leave out va
 
 ## 2. Chat opens
 
-Rhizome opens on Chat. On a first launch, the sessions list opens next to it. The theme is Graphite. Dark is Graphite, Light is Earth light, and System follows the OS between those two. Earth dark, Loam, and Mycelium are color skins in Settings → Appearance.
+Rhizome opens on Chat. There is no Prime setup screen and no agent-runtime picker. After the vault is ready, Chat uses Rhizome's own engine.
+
+On a first launch, the sessions list opens next to Chat. The theme is Graphite. Dark is Graphite, Light is Earth light, and System follows the OS between those two. Earth dark, Loam, and Mycelium are color skins in Settings → Appearance.
 
 The left rail holds your sessions, the **Views** group (Research, Graph, Mycelium and History) and Settings. On a Mac, Ctrl+⌘1 to Ctrl+⌘4 open the four Views. On Windows, use Ctrl+Shift+1 to Ctrl+Shift+4.
 
@@ -40,9 +42,9 @@ Type a message and press Enter. You should get an answer, or a clear failure:
 
 | You see | Do this |
 |---|---|
-| No provider key | Add a key in Settings → AI Agents → API model, or turn on a free provider. See [Set up models and keys](../guides/configure-ai-models.md) |
-| Prime is installed, but Chat still says it's missing | Applies to Prime-locked chats only. Wait a few seconds. The check repeats |
-| The provider login expired (Prime) | Run `prime-agent` and `/login` in a terminal. Settings no longer has a Prime sign-in |
+| No provider key | Add a key in Settings → AI Agents → **Connected**, or turn on a free provider. See [Set up models and keys](../guides/configure-ai-models.md) |
+| Couldn't load models | Retry in the picker, or open Settings → AI Agents → Connected |
+| The model can't read images | Remove the image, or switch to a model that can. See [Chat with the agent](../guides/use-ai-panel.md#send-an-image) |
 
 More cases: [Chat doesn't answer](../troubleshooting/chat-doesnt-answer.md).
 
