@@ -7,7 +7,9 @@ use std::process::{ExitStatus, Stdio};
 
 const CLAUDE_PROVIDER_ENV_KEYS: &[EnvName<'static>] = &[
     EnvName::trusted("ANTHROPIC_API_KEY"),
-    EnvName::trusted("ANTHROPIC_AUTH_TOKEN"),
+    // No ANTHROPIC_AUTH_TOKEN: it is a bearer token, and Rhizome must not read
+    // one from the user's shell (ADR-0191 decision 2.8). A value already in
+    // the process environment still passes through, unread.
     EnvName::trusted("ANTHROPIC_BASE_URL"),
     EnvName::trusted("ANTHROPIC_CUSTOM_HEADERS"),
     EnvName::trusted("ANTHROPIC_MODEL"),
@@ -290,6 +292,7 @@ where
             fallback_args: &invocation.fallback_args,
             stdin_text: invocation.stdin_text.as_deref(),
             cwd: None,
+            env: &invocation.env,
         },
         &mut emit,
     )
@@ -309,6 +312,7 @@ where
             fallback_args: &invocation.fallback_args,
             stdin_text: invocation.stdin_text.as_deref(),
             cwd: Some(&req.vault_path),
+            env: &invocation.env,
         },
         &mut emit,
     )
@@ -331,12 +335,14 @@ struct ClaudeSubprocessRequest<'a> {
     fallback_args: &'a [Vec<String>],
     stdin_text: Option<&'a str>,
     cwd: Option<&'a str>,
+    env: &'a [(&'static str, &'static str)],
 }
 
 struct ClaudeCommandRequest<'a> {
     bin: &'a Path,
     args: &'a [String],
     cwd: Option<&'a str>,
+    env: &'a [(&'static str, &'static str)],
 }
 
 #[derive(Clone, Copy)]
@@ -408,6 +414,7 @@ where
             bin: request.bin,
             args: attempt_args,
             cwd: request.cwd,
+            env: request.env,
         })?;
         let process = crate::cli_agent_runtime::JsonLineProcess::new(cmd, "claude")
             .with_stdin(request.stdin_text);
@@ -457,6 +464,9 @@ fn build_claude_command(
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    for (name, value) in request.env {
+        cmd.env(name, value);
+    }
     if let Some(dir) = request.cwd {
         cmd.current_dir(dir);
     }
@@ -469,6 +479,10 @@ fn configure_claude_command_environment(cmd: &mut std::process::Command, bin: &P
 }
 
 fn format_failed_claude_exit(failure: ClaudeFailure<'_>) -> String {
+    if is_unsupported_engine_flag_error(failure.stderr) {
+        return CLAUDE_TOO_OLD_MESSAGE.into();
+    }
+
     if is_claude_too_many_redirects_error(failure.stderr) {
         return localized_error(CLAUDE_TOO_MANY_REDIRECTS_KEY);
     }
@@ -507,6 +521,42 @@ fn is_claude_auth_error(stderr: ClaudeStderr<'_>) -> bool {
     ["not logged in", "authentication", "auth"]
         .iter()
         .any(|pattern| lower.contains(pattern))
+}
+
+const CLAUDE_TOO_OLD_MESSAGE: &str =
+    "This Claude Code is too old for Rhizome. Run `claude update` in your terminal, then try again.";
+
+/// Flags the engine profile needs. A `claude` that rejects one is older than
+/// the version floor; the engine has no weaker fallback (ADR-0191).
+const CLAUDE_ENGINE_FLAGS: &[&str] = &[
+    "--setting-sources",
+    "--settings",
+    "--strict-mcp-config",
+    "--permission-mode",
+    "--permission-prompts",
+    "--tools",
+    "--add-dir",
+];
+
+fn looks_like_unsupported_option(lower: &str) -> bool {
+    [
+        "unknown option",
+        "unknown argument",
+        "unrecognized option",
+        "unexpected argument",
+        "unknown command-line option",
+        "invalid choice",
+        "invalid argument",
+        "is invalid. allowed choices",
+    ]
+    .iter()
+    .any(|pattern| lower.contains(pattern))
+}
+
+fn is_unsupported_engine_flag_error(stderr: ClaudeStderr<'_>) -> bool {
+    let lower = stderr.to_ascii_lowercase();
+    CLAUDE_ENGINE_FLAGS.iter().any(|flag| lower.contains(flag))
+        && looks_like_unsupported_option(&lower)
 }
 
 fn is_unsupported_claude_flag_error(stderr: ClaudeStderr<'_>) -> bool {
@@ -1215,6 +1265,7 @@ mod tests {
             bin: &bin,
             args: &args,
             cwd: Some("/tmp/vault"),
+            env: &[],
         })
         .unwrap();
         let actual_args: Vec<OsString> = command.get_args().map(OsStr::to_os_string).collect();
@@ -1267,6 +1318,7 @@ mod tests {
             bin: &shim,
             args: &args,
             cwd: Some("/tmp/vault"),
+            env: &[],
         })
         .unwrap();
         let actual_args = command.get_args().collect::<Vec<_>>();
@@ -1288,6 +1340,61 @@ mod tests {
     fn claude_provider_env_keys_include_reported_anthropic_overrides() {
         assert!(CLAUDE_PROVIDER_ENV_KEYS.contains(&EnvName::trusted("ANTHROPIC_API_KEY")));
         assert!(CLAUDE_PROVIDER_ENV_KEYS.contains(&EnvName::trusted("ANTHROPIC_BASE_URL")));
+    }
+
+    #[test]
+    fn claude_shell_env_list_reads_no_bearer_or_oauth_token() {
+        // ADR-0191 decision 2.8: Rhizome never reads a Claude token from the
+        // user's shell. AWS_SESSION_TOKEN is a cloud provider credential the
+        // user owns, read under the same rules as their terminal.
+        // The messages name no env key, so no key name reaches test output.
+        let token_names = CLAUDE_PROVIDER_ENV_KEYS
+            .iter()
+            .map(|name| name.as_str())
+            .filter(|name| {
+                name.contains("AUTH_TOKEN")
+                    || name.contains("OAUTH_TOKEN")
+                    || name.starts_with("CLAUDE_CODE_OAUTH")
+            })
+            .count();
+        assert_eq!(token_names, 0, "a bearer or OAuth token is in the env list");
+    }
+
+    #[test]
+    fn build_claude_command_sets_the_invocation_env() {
+        let bin = PathBuf::from("claude");
+        let args = vec!["-p".to_string(), "hello".to_string()];
+        let command = build_claude_command(ClaudeCommandRequest {
+            bin: &bin,
+            args: &args,
+            cwd: None,
+            env: &[crate::claude_invocation::CLAUDE_ENGINE_DISABLE_AUTO_MEMORY_ENV],
+        })
+        .unwrap();
+
+        let value = command
+            .get_envs()
+            .find(|(key, _)| *key == OsStr::new("CLAUDE_CODE_DISABLE_AUTO_MEMORY"))
+            .and_then(|(_, value)| value.map(OsStr::to_os_string));
+        assert_eq!(value, Some(OsString::from("1")));
+    }
+
+    #[test]
+    fn an_old_claude_that_rejects_an_engine_flag_is_told_to_update() {
+        for stderr in [
+            "error: unknown option '--permission-prompts'",
+            "error: unknown option '--setting-sources'",
+            "error: option '--permission-mode <mode>' argument 'manual' is invalid. Allowed choices are acceptEdits, bypassPermissions, default, plan.",
+        ] {
+            let message = format_failed_claude_exit(ClaudeFailure {
+                stderr: ClaudeStderr(stderr),
+                status: failed_exit_status(),
+            });
+            assert_eq!(message, CLAUDE_TOO_OLD_MESSAGE, "{stderr}");
+        }
+        assert!(!is_unsupported_engine_flag_error(ClaudeStderr(
+            "Claude CLI is not authenticated"
+        )));
     }
 
     #[cfg(unix)]
@@ -1336,6 +1443,7 @@ mod tests {
                 fallback_args: &[],
                 stdin_text: stdin_text.0,
                 cwd: None,
+                env: &[],
             },
             &mut |e| events.push(e),
         );
@@ -1392,6 +1500,7 @@ mod tests {
                 fallback_args: &fallback_args,
                 stdin_text: None,
                 cwd: None,
+                env: &[],
             },
             &mut |event| events.push(event),
         );
@@ -1693,6 +1802,7 @@ mod tests {
                 fallback_args: &[],
                 stdin_text: None,
                 cwd: None,
+                env: &[],
             },
             &mut |e| events.push(e),
         );

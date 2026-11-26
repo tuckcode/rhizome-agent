@@ -18,10 +18,25 @@ const CLAUDE_POWER_USER_AGENT_TOOLS: &str =
     "Read,Edit,MultiEdit,Write,Glob,Grep,LS,Bash,mcp__rhizome__*";
 const CLAUDE_CHAT_DISALLOWED_TOOLS_COMPAT: &str =
     "Bash,Glob,Grep,Read,Edit,Write,NotebookEdit,WebFetch,WebSearch,TodoWrite,Task,MultiEdit,LS";
-const CLAUDE_SAFE_DISALLOWED_TOOLS_COMPAT: &str =
-    "Bash,NotebookEdit,WebFetch,WebSearch,TodoWrite,Task";
-const CLAUDE_POWER_USER_DISALLOWED_TOOLS_COMPAT: &str =
-    "NotebookEdit,WebFetch,WebSearch,TodoWrite,Task";
+
+// Claude Code engine profile (ADR-0191 decisions 5 and 6).
+//
+// `--setting-sources user` keeps a vault folder's own `.claude/settings.json`
+// (hooks, permission rules) from running: without it, a `-p` run in a synced
+// vault runs that folder's hooks with no trust prompt. `--strict-mcp-config`
+// does the same for the folder's `.mcp.json`. Both are pinned by tests.
+const CLAUDE_ENGINE_SETTING_SOURCES: &str = "user";
+// Claude Code auto memory stays off so no second memory store grows beside
+// the vault. Set twice on purpose: in `--settings` and in the environment.
+const CLAUDE_ENGINE_SETTINGS: &str = r#"{"autoMemoryEnabled":false}"#;
+pub(crate) const CLAUDE_ENGINE_DISABLE_AUTO_MEMORY_ENV: (&str, &str) =
+    ("CLAUDE_CODE_DISABLE_AUTO_MEMORY", "1");
+// Limited mode asks on every edit, so it never runs in `acceptEdits`.
+const CLAUDE_ENGINE_LIMITED_PERMISSION_MODE: &str = "manual";
+const CLAUDE_ENGINE_POWER_USER_PERMISSION_MODE: &str = "acceptEdits";
+// Until the approval bridge (plan step 4) answers prompts, nothing answers
+// them: every call that would ask is denied. Fail closed.
+const CLAUDE_ENGINE_PERMISSION_PROMPTS: &str = "none";
 const WINDOWS_COMMAND_LINE_STDIN_THRESHOLD: usize = 24 * 1024;
 
 #[derive(Debug)]
@@ -29,6 +44,8 @@ pub(crate) struct ClaudeInvocation {
     pub(crate) args: Vec<String>,
     pub(crate) fallback_args: Vec<Vec<String>>,
     pub(crate) stdin_text: Option<String>,
+    /// Extra environment set on the process. Never a credential.
+    pub(crate) env: Vec<(&'static str, &'static str)>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -61,6 +78,7 @@ fn chat_with_windows_limit(
                 PromptSource::Stdin,
             )],
             stdin_text: Some(stdin_prompt(&req.message, req.system_prompt.as_deref())),
+            env: Vec::new(),
         };
     }
 
@@ -68,45 +86,27 @@ fn chat_with_windows_limit(
         args,
         fallback_args,
         stdin_text: None,
+        env: Vec::new(),
     }
 }
 
+/// The Claude Code engine profile. No weaker fallback: a `claude` too old for
+/// these flags fails with an update message instead of running unconfined.
 fn agent_with_windows_limit(
     req: &AgentStreamRequest,
     enforce_windows_limit: bool,
 ) -> Result<ClaudeInvocation, String> {
-    let args = agent_args(req)?;
-    let fallback_args = vec![
-        agent_args_without_session_persistence(req)?,
-        agent_args_compat(req)?,
-    ];
-    if should_pipe_prompt_for_windows(enforce_windows_limit, &args, &fallback_args) {
-        return Ok(ClaudeInvocation {
-            args: agent_args_with_tool_policy(
-                req,
-                AgentToolPolicy::strict(req.permission_mode),
-                PromptSource::Stdin,
-            )?,
-            fallback_args: vec![
-                agent_args_with_tool_policy(
-                    req,
-                    AgentToolPolicy::strict_without_session_persistence(req.permission_mode),
-                    PromptSource::Stdin,
-                )?,
-                agent_args_with_tool_policy(
-                    req,
-                    AgentToolPolicy::compat(req.permission_mode),
-                    PromptSource::Stdin,
-                )?,
-            ],
-            stdin_text: Some(stdin_prompt(&req.message, req.system_prompt.as_deref())),
-        });
-    }
-
+    let args = engine_args(req, PromptSource::Argument)?;
+    let stdin = should_pipe_prompt_for_windows(enforce_windows_limit, &args, &[]);
     Ok(ClaudeInvocation {
-        args,
-        fallback_args,
-        stdin_text: None,
+        args: if stdin {
+            engine_args(req, PromptSource::Stdin)?
+        } else {
+            args
+        },
+        fallback_args: Vec::new(),
+        stdin_text: stdin.then(|| stdin_prompt(&req.message, req.system_prompt.as_deref())),
+        env: vec![CLAUDE_ENGINE_DISABLE_AUTO_MEMORY_ENV],
     })
 }
 
@@ -153,33 +153,8 @@ fn chat_args_with_tool_policy(
     args
 }
 
-fn agent_args(req: &AgentStreamRequest) -> Result<Vec<String>, String> {
-    agent_args_with_tool_policy(
-        req,
-        AgentToolPolicy::strict(req.permission_mode),
-        PromptSource::Argument,
-    )
-}
-
-fn agent_args_without_session_persistence(req: &AgentStreamRequest) -> Result<Vec<String>, String> {
-    agent_args_with_tool_policy(
-        req,
-        AgentToolPolicy::strict_without_session_persistence(req.permission_mode),
-        PromptSource::Argument,
-    )
-}
-
-fn agent_args_compat(req: &AgentStreamRequest) -> Result<Vec<String>, String> {
-    agent_args_with_tool_policy(
-        req,
-        AgentToolPolicy::compat(req.permission_mode),
-        PromptSource::Argument,
-    )
-}
-
-fn agent_args_with_tool_policy(
+fn engine_args(
     req: &AgentStreamRequest,
-    policy: AgentToolPolicy,
     prompt_source: PromptSource,
 ) -> Result<Vec<String>, String> {
     let mut args: Vec<String> = vec!["-p".into()];
@@ -191,25 +166,23 @@ fn agent_args_with_tool_policy(
         "stream-json".into(),
         "--verbose".into(),
         "--include-partial-messages".into(),
+        "--setting-sources".into(),
+        CLAUDE_ENGINE_SETTING_SOURCES.into(),
+        "--settings".into(),
+        CLAUDE_ENGINE_SETTINGS.into(),
         "--mcp-config".into(),
         mcp_config(&req.vault_path, &req.vault_paths)?,
         "--strict-mcp-config".into(),
         "--permission-mode".into(),
-        "acceptEdits".into(),
-        policy.tool_flag.into(),
-        policy.tool_value.into(),
+        engine_permission_mode(req.permission_mode).into(),
+        "--permission-prompts".into(),
+        CLAUDE_ENGINE_PERMISSION_PROMPTS.into(),
+        "--tools".into(),
+        agent_tools(req.permission_mode).into(),
     ]);
-
-    if policy.include_session_persistence_flag {
-        args.push("--no-session-persistence".into());
-    }
-    if let Some(allowed_tools) = policy.preapproved_tools {
-        args.push("--allowedTools".into());
-        args.push(allowed_tools.into());
-    }
-    if let Some(disallowed_tools) = policy.disallowed_tools {
-        args.push("--disallowedTools".into());
-        args.push(disallowed_tools.into());
+    for dir in engine_add_dirs(&req.vault_path, &req.vault_paths) {
+        args.push("--add-dir".into());
+        args.push(dir);
     }
     if prompt_source == PromptSource::Argument {
         append_non_empty_arg_pair(
@@ -220,6 +193,25 @@ fn agent_args_with_tool_policy(
     }
 
     Ok(args)
+}
+
+/// Every vault the chat may read, once each, in order.
+fn engine_add_dirs(vault_path: &str, vault_paths: &[String]) -> Vec<String> {
+    let mut dirs: Vec<String> = Vec::new();
+    for dir in std::iter::once(vault_path).chain(vault_paths.iter().map(String::as_str)) {
+        let dir = dir.trim();
+        if !dir.is_empty() && !dirs.iter().any(|seen| seen == dir) {
+            dirs.push(dir.to_string());
+        }
+    }
+    dirs
+}
+
+fn engine_permission_mode(permission_mode: AiAgentPermissionMode) -> &'static str {
+    match permission_mode {
+        AiAgentPermissionMode::Safe => CLAUDE_ENGINE_LIMITED_PERMISSION_MODE,
+        AiAgentPermissionMode::PowerUser => CLAUDE_ENGINE_POWER_USER_PERMISSION_MODE,
+    }
 }
 
 fn append_non_empty_arg_pair(args: &mut Vec<String>, flag: &str, value: Option<&str>) {
@@ -267,61 +259,10 @@ fn windows_command_line_utf16_units(args: &[String]) -> usize {
     args.iter().map(|arg| arg.encode_utf16().count() + 3).sum()
 }
 
-struct AgentToolPolicy {
-    tool_flag: &'static str,
-    tool_value: &'static str,
-    include_session_persistence_flag: bool,
-    preapproved_tools: Option<&'static str>,
-    disallowed_tools: Option<&'static str>,
-}
-
-impl AgentToolPolicy {
-    fn strict(permission_mode: AiAgentPermissionMode) -> Self {
-        Self {
-            tool_flag: "--tools",
-            tool_value: agent_tools(permission_mode),
-            include_session_persistence_flag: true,
-            preapproved_tools: preapproved_agent_tools(permission_mode),
-            disallowed_tools: None,
-        }
-    }
-
-    fn strict_without_session_persistence(permission_mode: AiAgentPermissionMode) -> Self {
-        Self {
-            include_session_persistence_flag: false,
-            ..Self::strict(permission_mode)
-        }
-    }
-
-    fn compat(permission_mode: AiAgentPermissionMode) -> Self {
-        Self {
-            tool_flag: "--allowedTools",
-            tool_value: agent_tools(permission_mode),
-            include_session_persistence_flag: false,
-            preapproved_tools: None,
-            disallowed_tools: Some(disallowed_agent_tools_compat(permission_mode)),
-        }
-    }
-}
-
 fn agent_tools(permission_mode: AiAgentPermissionMode) -> &'static str {
     match permission_mode {
         AiAgentPermissionMode::Safe => CLAUDE_SAFE_AGENT_TOOLS,
         AiAgentPermissionMode::PowerUser => CLAUDE_POWER_USER_AGENT_TOOLS,
-    }
-}
-
-fn preapproved_agent_tools(permission_mode: AiAgentPermissionMode) -> Option<&'static str> {
-    match permission_mode {
-        AiAgentPermissionMode::Safe => None,
-        AiAgentPermissionMode::PowerUser => Some("Bash"),
-    }
-}
-
-fn disallowed_agent_tools_compat(permission_mode: AiAgentPermissionMode) -> &'static str {
-    match permission_mode {
-        AiAgentPermissionMode::Safe => CLAUDE_SAFE_DISALLOWED_TOOLS_COMPAT,
-        AiAgentPermissionMode::PowerUser => CLAUDE_POWER_USER_DISALLOWED_TOOLS_COMPAT,
     }
 }
 
@@ -496,125 +437,188 @@ mod tests {
         assert!(agent_stdin.contains(&long_message));
     }
 
+    fn engine(mode: AiAgentPermissionMode) -> ClaudeInvocation {
+        agent_with_windows_limit(&agent_request("Rename the note", None, mode), false).unwrap()
+    }
+
+    fn arg_values_after<'a>(args: &'a [String], name: &str) -> Vec<&'a str> {
+        args.windows(2)
+            .filter(|pair| pair[0] == name)
+            .map(|pair| pair[1].as_str())
+            .collect()
+    }
+
+    const BOTH_MODES: [AiAgentPermissionMode; 2] = [
+        AiAgentPermissionMode::Safe,
+        AiAgentPermissionMode::PowerUser,
+    ];
+
     #[test]
     fn agent_args_with_system_prompt() {
-        if let Ok(args) = agent_args(&agent_request(
-            "do it",
-            Some("Act as expert."),
-            AiAgentPermissionMode::Safe,
-        )) {
-            assert_args_contain!(args, ["--append-system-prompt", "Act as expert."]);
-        }
+        let args = agent_with_windows_limit(
+            &agent_request("do it", Some("Act as expert."), AiAgentPermissionMode::Safe),
+            false,
+        )
+        .unwrap()
+        .args;
+        assert_eq!(
+            arg_value_after(&args, "--append-system-prompt"),
+            Some("Act as expert.")
+        );
     }
 
     #[test]
     fn agent_args_empty_system_prompt_is_skipped() {
-        if let Ok(args) = agent_args(&agent_request("x", Some(""), AiAgentPermissionMode::Safe)) {
-            assert!(!args.contains(&"--append-system-prompt".to_string()));
+        let args = agent_with_windows_limit(
+            &agent_request("x", Some(""), AiAgentPermissionMode::Safe),
+            false,
+        )
+        .unwrap()
+        .args;
+        assert_args_lack!(args, ["--append-system-prompt"]);
+    }
+
+    #[test]
+    fn engine_loads_user_settings_only_and_strict_mcp_in_every_mode() {
+        for mode in BOTH_MODES {
+            let args = engine(mode).args;
+            assert_eq!(
+                arg_value_after(&args, "--setting-sources"),
+                Some("user"),
+                "{mode:?}"
+            );
+            assert_args_contain!(args, ["--strict-mcp-config", "--mcp-config"]);
         }
     }
 
     #[test]
-    fn agent_args_without_session_persistence_keeps_tools_allowlist() {
-        let args = agent_args_without_session_persistence(&agent_request(
-            "Rename the note",
-            None,
-            AiAgentPermissionMode::Safe,
-        ))
-        .unwrap();
-
-        assert_args_contain!(
-            args,
-            [
-                "--tools",
-                "Read,Edit,MultiEdit,Write,Glob,Grep,LS,mcp__rhizome__*"
-            ]
-        );
-        assert_args_lack!(args, ["--no-session-persistence"]);
+    fn engine_turns_claude_code_auto_memory_off() {
+        for mode in BOTH_MODES {
+            let invocation = engine(mode);
+            let settings: serde_json::Value =
+                serde_json::from_str(arg_value_after(&invocation.args, "--settings").unwrap())
+                    .unwrap();
+            assert_eq!(
+                settings["autoMemoryEnabled"],
+                serde_json::Value::Bool(false)
+            );
+            assert!(invocation
+                .env
+                .contains(&("CLAUDE_CODE_DISABLE_AUTO_MEMORY", "1")));
+        }
     }
 
     #[test]
-    fn agent_args_compat_uses_allowed_and_disallowed_tools_without_removed_flags() {
-        let args = agent_args_compat(&agent_request(
-            "Rename the note",
-            None,
-            AiAgentPermissionMode::Safe,
-        ))
-        .unwrap();
+    fn engine_limited_mode_asks_on_every_edit_and_has_no_bash() {
+        let args = engine(AiAgentPermissionMode::Safe).args;
 
+        assert_eq!(arg_value_after(&args, "--permission-mode"), Some("manual"));
+        assert_args_lack!(args, ["acceptEdits", "--allowedTools"]);
         assert_eq!(
-            arg_value_after(&args, "--allowedTools"),
+            arg_value_after(&args, "--tools"),
             Some("Read,Edit,MultiEdit,Write,Glob,Grep,LS,mcp__rhizome__*")
         );
-        assert_args_contain!(args, ["--disallowedTools"]);
-        assert_args_lack!(args, ["--tools"]);
-        assert_args_lack!(args, ["--no-session-persistence"]);
-    }
-
-    #[test]
-    fn agent_args_use_safe_mode_without_bash_by_default() {
-        let args = agent_args(&agent_request(
-            "Rename the note",
-            None,
-            AiAgentPermissionMode::Safe,
-        ))
-        .unwrap();
-
-        assert_args_contain!(
-            args,
-            ["--strict-mcp-config", "--permission-mode", "acceptEdits"]
-        );
-        assert_args_contain!(
-            args,
-            ["Read,Edit,MultiEdit,Write,Glob,Grep,LS,mcp__rhizome__*"]
-        );
         assert_no_arg_contains!(args, "Bash");
-        assert_args_lack!(args, ["--allowedTools"]);
-        assert_args_lack!(args, ["--dangerously-skip-permissions"]);
     }
 
     #[test]
-    fn agent_args_allow_bash_in_power_user_mode_without_dangerous_bypass() {
-        let args = agent_args(&agent_request(
-            "Rename the note",
-            None,
-            AiAgentPermissionMode::PowerUser,
-        ))
-        .unwrap();
+    fn engine_power_user_accepts_edits_but_never_preapproves_bash() {
+        let args = engine(AiAgentPermissionMode::PowerUser).args;
 
-        assert_args_contain!(args, ["--strict-mcp-config"]);
-        assert_args_contain!(
-            args,
-            ["Read,Edit,MultiEdit,Write,Glob,Grep,LS,Bash,mcp__rhizome__*"]
+        assert_eq!(
+            arg_value_after(&args, "--permission-mode"),
+            Some("acceptEdits")
         );
-        assert_args_lack!(args, ["--dangerously-skip-permissions"]);
+        assert_eq!(
+            arg_value_after(&args, "--tools"),
+            Some("Read,Edit,MultiEdit,Write,Glob,Grep,LS,Bash,mcp__rhizome__*")
+        );
+        assert_args_lack!(args, ["--allowedTools", "--allowed-tools"]);
+    }
+
+    #[test]
+    fn engine_denies_every_prompt_until_the_approval_bridge_lands() {
+        for mode in BOTH_MODES {
+            let args = engine(mode).args;
+            assert_eq!(arg_value_after(&args, "--permission-prompts"), Some("none"));
+        }
+    }
+
+    #[test]
+    fn engine_never_runs_bare_unconfined_or_without_sessions() {
+        for mode in BOTH_MODES {
+            let invocation = engine(mode);
+            assert_args_lack!(
+                invocation.args,
+                [
+                    "--bare",
+                    "--dangerously-skip-permissions",
+                    "bypassPermissions",
+                    "--no-session-persistence",
+                    "--disallowedTools",
+                ]
+            );
+            assert!(invocation.fallback_args.is_empty(), "no weaker fallback");
+        }
+    }
+
+    #[test]
+    fn engine_passes_no_credential_to_claude() {
+        for mode in BOTH_MODES {
+            let invocation = engine(mode);
+            let all = invocation
+                .args
+                .iter()
+                .map(String::as_str)
+                .chain(
+                    invocation
+                        .env
+                        .iter()
+                        .flat_map(|(name, value)| [*name, *value]),
+                )
+                .collect::<Vec<_>>()
+                .join(" ")
+                .to_ascii_uppercase();
+            for fragment in [
+                "TOKEN",
+                "API_KEY",
+                "CREDENTIALS",
+                "SETUP-TOKEN",
+                "CLAUDE.JSON",
+            ] {
+                assert!(!all.contains(fragment), "found {fragment}");
+            }
+        }
+    }
+
+    #[test]
+    fn engine_adds_each_vault_once() {
+        let req = AgentStreamRequest {
+            vault_paths: vec![
+                "/tmp/vault".into(),
+                "/tmp/second".into(),
+                " ".into(),
+                "/tmp/second".into(),
+            ],
+            ..agent_request("search", None, AiAgentPermissionMode::Safe)
+        };
+        let args = agent_with_windows_limit(&req, false).unwrap().args;
+
+        assert_eq!(
+            arg_values_after(&args, "--add-dir"),
+            vec!["/tmp/vault", "/tmp/second"]
+        );
     }
 
     #[test]
     fn agent_args_power_user_and_safe_modes_can_reach_the_rhizome_mcp_server() {
-        for mode in [
-            AiAgentPermissionMode::Safe,
-            AiAgentPermissionMode::PowerUser,
-        ] {
-            let args = agent_args(&agent_request("search the vault", None, mode)).unwrap();
-            assert_args_contain!(args, ["--strict-mcp-config"]);
+        for mode in BOTH_MODES {
+            let args = engine(mode).args;
             assert!(
                 args.iter().any(|a| a.contains("mcp__rhizome__*")),
                 "mode {mode:?} did not allow mcp__rhizome__* tools: {args:?}"
             );
         }
-    }
-
-    #[test]
-    fn agent_args_preapprove_bash_for_power_user_runs() {
-        let args = agent_args(&agent_request(
-            "Run a local script",
-            None,
-            AiAgentPermissionMode::PowerUser,
-        ))
-        .unwrap();
-
-        assert_eq!(arg_value_after(&args, "--allowedTools"), Some("Bash"));
     }
 
     #[test]
