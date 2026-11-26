@@ -679,8 +679,6 @@ Each answers "nothing", which is true of a host with no session.
   The skill bakes `find_node()`'s absolute binary plus a GUI-safe `PATH`
   (`$HOME/.local/bin`, Homebrew, `/usr/local/bin`) and short chat manners
   (answer first, CLI not IPython, stop after one environment error).
-  Adapter command-set snapshot: `docs/prime-adapter-surface.json`
-  (`pnpm prime:surface`).
 - Frontend: `usePrimeHostStatus` (status poll), `usePrimeAgentActivity` (app-level,
   goal/heartbeats), `usePrimeRunningSessionFiles` (roster → which logs are alive),
   `RlmFamilyBand` (live RLM children from that roster; Stop → `cancel_rlm_child`),

@@ -11,7 +11,7 @@ description: >-
 Three jobs. One verb per invocation. Spec:
 [`docs/plans/rhizome-ship-skill.md`](../../../docs/plans/rhizome-ship-skill.md).
 
-This is a **coding-tool** skill. Not a Prime product skill. Do not copy
+This is a **coding-tool** skill. Not a product skill for the app. Do not copy
 STE / voice files into this tree.
 
 ## Hard stops
