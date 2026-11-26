@@ -50,6 +50,10 @@ New chats use Rhizome's own engine (ADR-0187).
 | A notice appears, but the reply goes on | Something went wrong that didn't stop the turn, such as part of the chat not being saved. Read the notice; the chat still works |
 | The model can't be reached | Click **Test model** on the provider. See [Model provider connection](model-provider-connection.md) |
 | Enter does nothing while a reply runs | Rhizome's engine takes one turn at a time. Wait for the reply, or press Stop |
+| **Continue (12/50)** (your numbers may differ) | The step limit paused the turn. It is not a failure. Click Continue for 50 more rounds. **Agent max steps** changes the next message you type, not the size of Continue. See [Chat with the agent](../guides/use-ai-panel.md#when-a-turn-reaches-its-step-limit) |
+| `Continue couldn't start:` | Read the reason on that line. The paused turn is still there and can be tried again |
+| `<model> can't read images` | Remove the image, or pick a model that can read images. The message is not sent as text only |
+| `Every model that can read images is cooling down. Try again shortly.` | Wait, then send again. Taproot does not switch to a text-only model to get an answer |
 | Another window is already running this chat | Only one turn can run at a time. Wait, or continue in that window |
 
 ## Prime Agent

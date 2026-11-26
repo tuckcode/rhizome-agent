@@ -353,6 +353,7 @@
       "Test the connection",
       "Use free models",
       "Pick the model for Chat",
+      "Limit how long one turn runs",
       "If it doesn't connect"
     ]
   },
@@ -461,6 +462,8 @@
     "headings": [
       "Start a chat",
       "While a reply is running",
+      "When a turn reaches its step limit",
+      "Attach an image",
       "Ask from the editor or about a note",
       "Keep what matters",
       "Come back to a chat",
