@@ -293,6 +293,43 @@ describe('PrimeSessionList', () => {
       expect(invoked.calls.filter((cmd) => cmd === 'native_chat_list').length).toBeGreaterThanOrEqual(2)
     })
 
+    it('marks each native row with the harness that ran it, from the stored target', async () => {
+      invoked.result = [
+        {
+          sessionId: 'n1',
+          createdAt: '2026-10-13T12:00:00.000Z',
+          target: 'free_tier_auto',
+          title: 'Native hello',
+        },
+        {
+          sessionId: 'n2',
+          createdAt: '2026-10-13T11:00:00.000Z',
+          target: 'agent:claude_code',
+          title: 'Terminal chat',
+        },
+      ]
+
+      render(<PrimeSessionList engine="native" onSelect={vi.fn()} locale="en" now={NOW} />)
+
+      const claudeRow = await screen.findByRole('button', { name: 'Open session Terminal chat, Claude Code' })
+      expect(within(claudeRow).getByTestId('harness-marker-claude_code')).toHaveAttribute('title', 'Claude Code')
+      expect(claudeRow.querySelector('img')).toBeNull()
+      expect(claudeRow.innerHTML).not.toContain('claude-code.svg')
+
+      const nativeRow = screen.getByRole('button', { name: 'Open session Native hello' })
+      expect(within(nativeRow).getByTestId('harness-marker-rhizome')).toHaveAttribute('title', 'Rhizome')
+    })
+
+    it('shows no harness marker on Prime rows', async () => {
+      invoked.result = [summary({ id: 'p1', path: '/p1.jsonl', title: 'Prime row' })]
+
+      render(<PrimeSessionList onSelect={vi.fn()} locale="en" now={NOW} />)
+
+      await screen.findByText('Prime row')
+      expect(screen.queryByTestId('harness-marker-rhizome')).toBeNull()
+      expect(screen.queryByTestId('harness-marker-claude_code')).toBeNull()
+    })
+
     it('files a native session through the native archive command', async () => {
       invoked.result = [
         {

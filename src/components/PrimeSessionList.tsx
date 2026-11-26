@@ -54,6 +54,8 @@ import {
   trackPrimeSessionRenamed,
 } from '../lib/productAnalytics'
 import { usePrimeRunningSessionFiles } from '../hooks/usePrimeRunningSessionFiles'
+import { harnessForTarget, SESSION_HARNESS_LABEL, type SessionHarness } from '../lib/sessionHarness'
+import { HarnessMarker } from './HarnessMarker'
 import { useDragRegion } from '../hooks/useDragRegion'
 import { sessionsColumnTitleBarStyle } from '../utils/trafficLights'
 import { copyLocalPath } from '../utils/url'
@@ -303,12 +305,22 @@ function SessionNameInput({
   )
 }
 
+/**
+ * The button's aria-label replaces its content's names, so the marker's own
+ * name would be lost. Rhizome is the default and stays unspoken; a Claude Code
+ * row says so (ADR-0191 decision 4).
+ */
+function harnessRowLabel(label: string, harness: SessionHarness | undefined): string {
+  return harness === 'claude_code' ? `${label}, ${SESSION_HARNESS_LABEL.claude_code}` : label
+}
+
 function SessionRowButton({
   label,
   title,
   meta,
   active,
   status,
+  harness,
   onSelect,
 }: {
   label: string
@@ -316,6 +328,8 @@ function SessionRowButton({
   meta: string | null
   active: boolean
   status: PrimeSessionStatus
+  /** Native rows only. Prime rows show no marker. */
+  harness?: SessionHarness
   onSelect: () => void
 }) {
   return (
@@ -323,7 +337,7 @@ function SessionRowButton({
       type="button"
       variant="ghost"
       onClick={onSelect}
-      aria-label={label}
+      aria-label={harnessRowLabel(label, harness)}
       aria-current={active ? 'true' : undefined}
       className={cn(
         'grid h-auto w-full min-w-0 grid-cols-[6px_1fr] items-start justify-start gap-1.5 rounded-sm',
@@ -346,8 +360,11 @@ function SessionRowButton({
         )}
       />
       <span className="min-w-0">
-        <span className="block truncate text-[11px] leading-tight text-foreground" title={title}>
-          {title}
+        <span className="flex min-w-0 items-center gap-1">
+          {harness ? <HarnessMarker harness={harness} size={11} decorative /> : null}
+          <span className="block truncate text-[11px] leading-tight text-foreground" title={title}>
+            {title}
+          </span>
         </span>
         {meta ? (
           <span className="mt-px block truncate font-mono text-[11px] tracking-[0.02em] text-muted-foreground">
@@ -370,6 +387,7 @@ function SessionRowButton({
  */
 const LiveSessionRow = memo(function LiveSessionRow({
   sessionId,
+  harness,
   label,
   title,
   meta,
@@ -384,6 +402,7 @@ const LiveSessionRow = memo(function LiveSessionRow({
   onReachEnd,
 }: {
   sessionId: string
+  harness?: SessionHarness
   label: string
   title: string
   meta: string | null
@@ -409,6 +428,7 @@ const LiveSessionRow = memo(function LiveSessionRow({
         meta={meta}
         active={active}
         status={status}
+        harness={harness}
         onSelect={() => onSelectId(sessionId)}
       />
       <SessionRowActions>
@@ -422,6 +442,7 @@ const LiveSessionRow = memo(function LiveSessionRow({
 /** A filed session. Same row, and its action puts it back. */
 const ArchivedSessionRow = memo(function ArchivedSessionRow({
   sessionId,
+  harness,
   label,
   title,
   meta,
@@ -435,6 +456,7 @@ const ArchivedSessionRow = memo(function ArchivedSessionRow({
   onReachEnd,
 }: {
   sessionId: string
+  harness?: SessionHarness
   label: string
   title: string
   meta: string | null
@@ -462,6 +484,7 @@ const ArchivedSessionRow = memo(function ArchivedSessionRow({
         // dot even if the daemon still holds it — the archive is where you
         // put the things you are not watching.
         status="saved"
+        harness={harness}
         onSelect={() => onSelectId(sessionId)}
       />
       <SessionRowActions>
@@ -948,6 +971,7 @@ export default function PrimeSessionList({
               <LiveSessionRow
                 key={session.id}
                 sessionId={session.id}
+                harness={engine === 'native' ? harnessForTarget(session.target) : undefined}
                 title={title}
                 meta={metaFor.get(session.id) ?? null}
                 label={rowLabel(title, status)}
@@ -1006,6 +1030,7 @@ export default function PrimeSessionList({
                       <ArchivedSessionRow
                         key={session.id}
                         sessionId={session.id}
+                        harness={engine === 'native' ? harnessForTarget(session.target) : undefined}
                         title={title}
                         meta={metaFor.get(session.id) ?? null}
                         label={t('ai.sessions.selectAria', { title })}

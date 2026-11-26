@@ -257,6 +257,7 @@ export function nativeChatListItemToSummary(item: NativeChatListItem): PrimeSess
     mtimeMs: Number.isFinite(started) ? started : null,
     archived: item.archived === true,
     hasConversation: true,
+    target: item.target?.trim() || null,
   }
 }
 

@@ -37,6 +37,11 @@ export interface PrimeSessionSummary {
   archived?: boolean
   /** Ran in a temp directory — test and probe residue, grouped out of the main list. */
   scratch?: boolean
+  /**
+   * Native sessions only: the target stored on the session log. Drives the
+   * harness marker (ADR-0191 decision 4), so it survives a restart.
+   */
+  target?: string | null
 }
 
 /** Coarse age, for analytics only — never rendered. */
